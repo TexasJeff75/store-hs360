@@ -172,12 +172,6 @@ class BigCommerceStorefrontService {
   }
   async getProducts(logError?: (message: string, error?: Error, type?: 'error' | 'warning' | 'info', source?: string) => void): Promise<{ products: Product[]; errorMessage?: string }> {
     try {
-      // First test basic connection
-      const connectionWorks = await this.testConnection(logError);
-      if (!connectionWorks) {
-        throw new Error('STORE_NOT_LIVE');
-      }
-      
       const query = `
         query GetProducts($first: Int!) {
           site {
