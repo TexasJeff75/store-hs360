@@ -1,5 +1,5 @@
 // BigCommerce Storefront GraphQL API service
-const GRAPHQL_ENDPOINT = '/graphql';
+const GRAPHQL_ENDPOINT = `${import.meta.env.VITE_BIGCOMMERCE_STOREFRONT_API_URL}/graphql`;
 const STOREFRONT_TOKEN = import.meta.env.VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN;
 
 export interface BigCommerceProduct {
