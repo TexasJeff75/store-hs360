@@ -110,6 +110,15 @@ class BigCommerceStorefrontService {
           throw new Error('GRAPHQL_ENDPOINT_NOT_FOUND');
         }
         
+        // Check for 401 Unauthorized - invalid JWT token
+        if (response.status === 401) {
+          const errorData = JSON.parse(errorText);
+          if (errorData.errors && errorData.errors.some((e: any) => e.message.includes('String is not a JWT'))) {
+            throw new Error('INVALID_JWT_TOKEN');
+          }
+          throw new Error('UNAUTHORIZED');
+        }
+        
         console.error('BigCommerce GraphQL Error Details:', {
           status: response.status,
           statusText: response.statusText,
