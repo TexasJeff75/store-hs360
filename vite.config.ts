@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
         '/api/graphql': {
           target: env.VITE_BIGCOMMERCE_STOREFRONT_API_URL,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ''),
+          rewrite: (path) => path.replace(/^\/api/, '') + '/graphql',
           headers: {
             'Authorization': `Bearer ${env.VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN}`,
           },

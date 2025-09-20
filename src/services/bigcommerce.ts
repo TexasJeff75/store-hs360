@@ -83,7 +83,6 @@ class BigCommerceStorefrontService {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Authorization': `Bearer ${STOREFRONT_TOKEN}`,
         },
         body: JSON.stringify({
           query,
