@@ -1,13 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import { loadEnv } from 'vite';
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => {
+  // Load env file based on `mode` in the current working directory.
+  const env = loadEnv(mode, process.cwd(), '');
+  
+  return {
   plugins: [react()],
   server: {
     proxy: {
       '/graphql': {
-        target: process.env.VITE_BIGCOMMERCE_STOREFRONT_API_URL || 'https://store-hash.mybigcommerce.com',
+        target: env.VITE_BIGCOMMERCE_STOREFRONT_API_URL || 'https://store-hash.mybigcommerce.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/graphql/, '/graphql'),
         configure: (proxy, options) => {
@@ -15,13 +20,13 @@ export default defineConfig({
             console.log('GraphQL Proxy Debug:', {
               originalUrl: req.url,
               targetUrl: proxyReq.path,
-              target: process.env.VITE_BIGCOMMERCE_STOREFRONT_API_URL,
-              hasToken: !!process.env.VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN,
-              tokenPreview: process.env.VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN ? 
-                `${process.env.VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN.substring(0, 10)}...` : 'NONE'
+              target: env.VITE_BIGCOMMERCE_STOREFRONT_API_URL,
+              hasToken: !!env.VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN,
+              tokenPreview: env.VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN ? 
+                `${env.VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN.substring(0, 10)}...` : 'NONE'
             });
             
-            const token = process.env.VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN;
+            const token = env.VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN;
             if (token && token.trim() !== '') {
               proxyReq.setHeader('Authorization', `Bearer ${token}`);
               console.log('✅ Added Authorization Bearer header:', `${token.substring(0, 10)}...`);
@@ -59,4 +64,5 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  };
 });
