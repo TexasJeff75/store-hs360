@@ -105,6 +105,11 @@ class BigCommerceStorefrontService {
           throw new Error('STORE_NOT_LIVE');
         }
         
+        // Check for 404 Not Found - incorrect GraphQL endpoint
+        if (response.status === 404) {
+          throw new Error('GRAPHQL_ENDPOINT_NOT_FOUND');
+        }
+        
         console.error('BigCommerce GraphQL Error Details:', {
           status: response.status,
           statusText: response.statusText,
@@ -234,6 +239,8 @@ class BigCommerceStorefrontService {
           userFriendlyMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch products.';
         } else if (errorMessage === 'STOREFRONT_TOKEN_MISSING') {
           userFriendlyMessage = 'BigCommerce Storefront API token is missing. Please check your environment variables.';
+        } else if (errorMessage === 'GRAPHQL_ENDPOINT_NOT_FOUND') {
+          userFriendlyMessage = 'GraphQL endpoint not found. Please verify your VITE_BIGCOMMERCE_STOREFRONT_API_URL is correct (should be your store\'s base URL without /graphql).';
         } else if (errorMessage === 'CORS_ERROR') {
           userFriendlyMessage = 'CORS error - please ensure your domain is added to BigCommerce CORS origins.';
         }
@@ -251,6 +258,8 @@ class BigCommerceStorefrontService {
       let displayMessage = errorMessage;
       if (errorMessage === 'STORE_NOT_LIVE') {
         displayMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch products.';
+      } else if (errorMessage === 'GRAPHQL_ENDPOINT_NOT_FOUND') {
+        displayMessage = 'GraphQL endpoint not found. Please verify your VITE_BIGCOMMERCE_STOREFRONT_API_URL is correct (should be your store\'s base URL without /graphql).';
       }
       
       return { products: this.getMockProducts(), errorMessage: displayMessage };
@@ -303,6 +312,8 @@ class BigCommerceStorefrontService {
           userFriendlyMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch categories.';
         } else if (errorMessage === 'STOREFRONT_TOKEN_MISSING') {
           userFriendlyMessage = 'BigCommerce Storefront API token is missing. Please check your environment variables.';
+        } else if (errorMessage === 'GRAPHQL_ENDPOINT_NOT_FOUND') {
+          userFriendlyMessage = 'GraphQL endpoint not found. Please verify your VITE_BIGCOMMERCE_STOREFRONT_API_URL is correct (should be your store\'s base URL without /graphql).';
         } else if (errorMessage === 'CORS_ERROR') {
           userFriendlyMessage = 'CORS error - please ensure your domain is added to BigCommerce CORS origins.';
         }
@@ -320,6 +331,8 @@ class BigCommerceStorefrontService {
       let displayMessage = errorMessage;
       if (errorMessage === 'STORE_NOT_LIVE') {
         displayMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch categories.';
+      } else if (errorMessage === 'GRAPHQL_ENDPOINT_NOT_FOUND') {
+        displayMessage = 'GraphQL endpoint not found. Please verify your VITE_BIGCOMMERCE_STOREFRONT_API_URL is correct (should be your store\'s base URL without /graphql).';
       }
       
       return { categories: ['Peptides', 'Genetic Testing', 'Lab Testing', 'Supplements', 'Hormones'], errorMessage: displayMessage };
