@@ -7,7 +7,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/graphql': {
-        target: process.env.VITE_BIGCOMMERCE_STOREFRONT_API_URL || 'https://store-hash.mybigcommerce.com/graphql',
+        target: process.env.VITE_BIGCOMMERCE_STOREFRONT_API_URL || 'https://store-hash.mybigcommerce.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/graphql/, '/graphql'),
         configure: (proxy, options) => {
