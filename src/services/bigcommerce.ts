@@ -169,6 +169,7 @@ class BigCommerceStorefrontService {
   }
 
   async getProducts(logError?: (message: string, error?: Error, type?: 'error' | 'warning' | 'info', source?: string) => void): Promise<Product[]> {
+  }
   async getProducts(logError?: (message: string, error?: Error, type?: 'error' | 'warning' | 'info', source?: string) => void): Promise<{ products: Product[]; errorMessage?: string }> {
     try {
       // First test basic connection
