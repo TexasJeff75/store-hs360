@@ -269,10 +269,6 @@ class BigCommerceStorefrontService {
         displayMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch products.';
       } else if (errorMessage === 'GRAPHQL_ENDPOINT_NOT_FOUND') {
         displayMessage = 'GraphQL endpoint not found. Please verify your VITE_BIGCOMMERCE_STOREFRONT_API_URL is correct (should be your store\'s base URL without /graphql).';
-      } else if (errorMessage === 'INVALID_JWT_TOKEN') {
-        displayMessage = 'Invalid BigCommerce Storefront API token. Please check that your VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN is a valid JWT token from your BigCommerce control panel.';
-      } else if (errorMessage === 'UNAUTHORIZED') {
-        displayMessage = 'Unauthorized access to BigCommerce API. Please verify your Storefront API token has the correct permissions.';
       }
       
       return { products: this.getMockProducts(), errorMessage: displayMessage };
@@ -346,6 +342,10 @@ class BigCommerceStorefrontService {
         displayMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch categories.';
       } else if (errorMessage === 'GRAPHQL_ENDPOINT_NOT_FOUND') {
         displayMessage = 'GraphQL endpoint not found. Please verify your VITE_BIGCOMMERCE_STOREFRONT_API_URL is correct (should be your store\'s base URL without /graphql).';
+      } else if (errorMessage === 'INVALID_JWT_TOKEN') {
+        displayMessage = 'Invalid BigCommerce Storefront API token. Please check that your VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN is a valid JWT token from your BigCommerce control panel.';
+      } else if (errorMessage === 'UNAUTHORIZED') {
+        displayMessage = 'Unauthorized access to BigCommerce API. Please verify your Storefront API token has the correct permissions.';
       }
       
       return { categories: ['Peptides', 'Genetic Testing', 'Lab Testing', 'Supplements', 'Hormones'], errorMessage: displayMessage };
