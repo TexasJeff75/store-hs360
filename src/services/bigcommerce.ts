@@ -99,6 +99,12 @@ class BigCommerceStorefrontService {
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
+        
+        // Check for "Coming Soon" page (503 error)
+        if (response.status === 503 && errorText.includes('Coming Soon')) {
+          throw new Error('STORE_NOT_LIVE');
+        }
+        
         console.error('BigCommerce GraphQL Error Details:', {
           status: response.status,
           statusText: response.statusText,
@@ -224,8 +230,19 @@ class BigCommerceStorefrontService {
       // Log the error if logger is provided
       if (logError) {
         const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Provide specific error messages for common issues
+        let userFriendlyMessage = errorMessage;
+        if (errorMessage === 'STORE_NOT_LIVE') {
+          userFriendlyMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch products.';
+        } else if (errorMessage === 'STOREFRONT_TOKEN_MISSING') {
+          userFriendlyMessage = 'BigCommerce Storefront API token is missing. Please check your environment variables.';
+        } else if (errorMessage === 'CORS_ERROR') {
+          userFriendlyMessage = 'CORS error - please ensure your domain is added to BigCommerce CORS origins.';
+        }
+        
         logError(
-          `Failed to fetch products from BigCommerce GraphQL: ${errorMessage}`,
+          `Failed to fetch products from BigCommerce GraphQL: ${userFriendlyMessage}`,
           error instanceof Error ? error : new Error(String(error)),
           'error',
           'BigCommerce GraphQL API'
@@ -275,8 +292,19 @@ class BigCommerceStorefrontService {
       // Log the error if logger is provided
       if (logError) {
         const errorMessage = error instanceof Error ? error.message : String(error);
+        
+        // Provide specific error messages for common issues
+        let userFriendlyMessage = errorMessage;
+        if (errorMessage === 'STORE_NOT_LIVE') {
+          userFriendlyMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch categories.';
+        } else if (errorMessage === 'STOREFRONT_TOKEN_MISSING') {
+          userFriendlyMessage = 'BigCommerce Storefront API token is missing. Please check your environment variables.';
+        } else if (errorMessage === 'CORS_ERROR') {
+          userFriendlyMessage = 'CORS error - please ensure your domain is added to BigCommerce CORS origins.';
+        }
+        
         logError(
-          `Failed to fetch categories from BigCommerce GraphQL: ${errorMessage}`,
+          `Failed to fetch categories from BigCommerce GraphQL: ${userFriendlyMessage}`,
           error instanceof Error ? error : new Error(String(error)),
           'error',
           'BigCommerce GraphQL API'
