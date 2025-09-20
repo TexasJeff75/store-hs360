@@ -169,11 +169,12 @@ class BigCommerceStorefrontService {
   }
 
   async getProducts(logError?: (message: string, error?: Error, type?: 'error' | 'warning' | 'info', source?: string) => void): Promise<Product[]> {
+  async getProducts(logError?: (message: string, error?: Error, type?: 'error' | 'warning' | 'info', source?: string) => void): Promise<{ products: Product[]; errorMessage?: string }> {
     try {
       // First test basic connection
       const connectionWorks = await this.testConnection(logError);
       if (!connectionWorks) {
-        throw new Error('Basic GraphQL connection failed - check your store URL and Storefront API token');
+        throw new Error('STORE_NOT_LIVE');
       }
       
       const query = `
@@ -225,14 +226,15 @@ class BigCommerceStorefrontService {
       const data = await this.makeGraphQLRequest(query, { first: 50 });
       const products: BigCommerceProduct[] = data.site.products.edges.map((edge: any) => edge.node);
       
-      return products.map(product => this.transformProduct(product));
+      return { products: products.map(product => this.transformProduct(product)) };
     } catch (error) {
       // Log the error if logger is provided
+      let userFriendlyMessage = '';
       if (logError) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         
         // Provide specific error messages for common issues
-        let userFriendlyMessage = errorMessage;
+        userFriendlyMessage = errorMessage;
         if (errorMessage === 'STORE_NOT_LIVE') {
           userFriendlyMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch products.';
         } else if (errorMessage === 'STOREFRONT_TOKEN_MISSING') {
@@ -250,11 +252,17 @@ class BigCommerceStorefrontService {
       }
       
       // Return mock data when API fails
-      return this.getMockProducts();
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      let displayMessage = errorMessage;
+      if (errorMessage === 'STORE_NOT_LIVE') {
+        displayMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch products.';
+      }
+      
+      return { products: this.getMockProducts(), errorMessage: displayMessage };
     }
   }
 
-  async getCategories(logError?: (message: string, error?: Error, type?: 'error' | 'warning' | 'info', source?: string) => void): Promise<string[]> {
+  async getCategories(logError?: (message: string, error?: Error, type?: 'error' | 'warning' | 'info', source?: string) => void): Promise<{ categories: string[]; errorMessage?: string }> {
     try {
       const query = `
         query GetCategories($first: Int!) {
@@ -287,14 +295,15 @@ class BigCommerceStorefrontService {
         }
       });
       
-      return [...new Set(allCategories)]; // Remove duplicates
+      return { categories: [...new Set(allCategories)] }; // Remove duplicates
     } catch (error) {
       // Log the error if logger is provided
+      let userFriendlyMessage = '';
       if (logError) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         
         // Provide specific error messages for common issues
-        let userFriendlyMessage = errorMessage;
+        userFriendlyMessage = errorMessage;
         if (errorMessage === 'STORE_NOT_LIVE') {
           userFriendlyMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch categories.';
         } else if (errorMessage === 'STOREFRONT_TOKEN_MISSING') {
@@ -312,7 +321,13 @@ class BigCommerceStorefrontService {
       }
       
       // Return mock categories when API fails
-      return ['Peptides', 'Genetic Testing', 'Lab Testing', 'Supplements', 'Hormones'];
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      let displayMessage = errorMessage;
+      if (errorMessage === 'STORE_NOT_LIVE') {
+        displayMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch categories.';
+      }
+      
+      return { categories: ['Peptides', 'Genetic Testing', 'Lab Testing', 'Supplements', 'Hormones'], errorMessage: displayMessage };
     }
   }
 

@@ -41,8 +41,14 @@ function App() {
           bigCommerceService.getCategories(logError)
         ]);
         
-        setProducts(productsData);
-        setCategories(categoriesData);
+        setProducts(productsData.products);
+        setCategories(categoriesData.categories);
+        
+        // Set error message if either API call failed
+        if (productsData.errorMessage || categoriesData.errorMessage) {
+          const errorMsg = productsData.errorMessage || categoriesData.errorMessage;
+          setError(errorMsg);
+        }
       } catch (err) {
         setError('Failed to load products. Please try again later.');
       } finally {
