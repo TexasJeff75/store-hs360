@@ -163,3 +163,9 @@ export async function fetchCategories(logError?: (message: string, error?: Error
     return { categories: mockCategories, errorMessage };
   }
 }
+
+// Export service object for backward compatibility
+export const bigCommerceService = {
+  getProducts: fetchProducts,
+  getCategories: fetchCategories
+};
