@@ -1,289 +1,252 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit, Trash2, Users, MapPin } from 'lucide-react';
-import { multiTenantService, Organization } from '../../services/multiTenant';
+import { AuthProvider } from './contexts/AuthContext';
+import Header from './components/Header';
+import Hero from './components/Hero';
+import ProductCard from './components/ProductCard';
+import ProductFilter from './components/ProductFilter';
+import Cart from './components/Cart';
+import Footer from './components/Footer';
+import ErrorDebugPanel from './components/ErrorDebugPanel';
+import { bigCommerceService, Product } from './services/bigcommerce';
+import { useErrorLogger } from './hooks/useErrorLogger';
 
-const OrganizationManagement: React.FC = () => {
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showModal, setShowModal] = useState(false);
-  const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
-
-  useEffect(() => {
-    fetchOrganizations();
-  }, []);
-
-  const fetchOrganizations = async () => {
-    try {
-      setLoading(true);
-      const orgs = await multiTenantService.getOrganizations();
-      setOrganizations(orgs);
-    } catch (error) {
-      console.error('Error fetching organizations:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const openModal = (org?: Organization) => {
-    setSelectedOrg(org || null);
-    setShowModal(true);
-  };
-
-  const closeModal = () => {
-    setSelectedOrg(null);
-    setShowModal(false);
-  };
-
-  if (loading) {
-    return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-24 bg-gray-200 rounded-lg"></div>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Organization Management</h2>
-          <p className="text-gray-600">Manage organizations and their settings</p>
-        </div>
-        <button
-          onClick={() => openModal()}
-          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Add Organization</span>
-        </button>
-      </div>
-
-      {/* Organizations Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {organizations.map((org) => (
-          <div key={org.id} className="bg-white rounded-lg shadow border border-gray-200 p-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
-                  <Building2 className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">{org.name}</h3>
-                  <p className="text-sm text-gray-500">{org.code}</p>
-                </div>
-              </div>
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => openModal(org)}
-                  className="text-gray-400 hover:text-purple-600"
-                >
-                  <Edit className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            {org.description && (
-              <p className="text-sm text-gray-600 mb-4">{org.description}</p>
-            )}
-
-            <div className="space-y-2">
-              {org.contact_email && (
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <span>📧</span>
-                  <span>{org.contact_email}</span>
-                </div>
-              )}
-              {org.contact_phone && (
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <span>📞</span>
-                  <span>{org.contact_phone}</span>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">Status</span>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  org.is_active 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {org.is_active ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* Organization Modal */}
-      {showModal && (
-        <OrganizationModal
-          organization={selectedOrg}
-          onClose={closeModal}
-          onSave={fetchOrganizations}
-        />
-      )}
-    </div>
-  );
-};
-
-// Organization Modal Component
-interface OrganizationModalProps {
-  organization: Organization | null;
-  onClose: () => void;
-  onSave: () => void;
+interface CartItem {
+  id: number;
+  name: string;
+  price: number;
+  quantity: number;
+  image: string;
 }
 
-const OrganizationModal: React.FC<OrganizationModalProps> = ({ 
-  organization, 
-  onClose, 
-  onSave 
-}) => {
-  const [formData, setFormData] = useState({
-    name: organization?.name || '',
-    code: organization?.code || '',
-    description: organization?.description || '',
-    contact_email: organization?.contact_email || '',
-    contact_phone: organization?.contact_phone || '',
-    is_active: organization?.is_active ?? true
-  });
-  const [loading, setLoading] = useState(false);
+function App() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const { errors, logError, clearErrors } = useErrorLogger();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      if (organization) {
-        await multiTenantService.updateOrganization(organization.id, formData);
-      } else {
-        await multiTenantService.createOrganization(formData);
+  // Fetch products and categories from BigCommerce
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const [productsData, categoriesData] = await Promise.all([
+          bigCommerceService.getProducts(logError),
+          bigCommerceService.getCategories(logError)
+        ]);
+        
+        setProducts(productsData.products);
+        setCategories(categoriesData.categories);
+        
+        // Set error message if either API call failed
+        if (productsData.errorMessage || categoriesData.errorMessage) {
+          const errorMsg = productsData.errorMessage || categoriesData.errorMessage;
+          setError(errorMsg);
+        }
+      } catch (err) {
+        setError('Failed to load products. Please try again later.');
+      } finally {
+        setLoading(false);
       }
-      onSave();
-      onClose();
-    } catch (error) {
-      console.error('Error saving organization:', error);
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    fetchData();
+  }, [logError]);
+
+  const addToCart = (productId: number) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    setCartItems(prev => {
+      const existingItem = prev.find(item => item.id === productId);
+      if (existingItem) {
+        return prev.map(item =>
+          item.id === productId
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      } else {
+        return [...prev, {
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: 1,
+          image: product.image
+        }];
+      }
+    });
   };
 
+  const updateCartQuantity = (id: number, quantity: number) => {
+    if (quantity === 0) {
+      removeFromCart(id);
+      return;
+    }
+    setCartItems(prev =>
+      prev.map(item =>
+        item.id === id ? { ...item, quantity } : item
+      )
+    );
+  };
+
+  const removeFromCart = (id: number) => {
+    setCartItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Filter products
+  const filteredProducts = products.filter(product => {
+    const categoryMatch = selectedCategory === 'all' || product.category === selectedCategory;
+    const priceMatch = product.price >= priceRange[0] && product.price <= priceRange[1];
+    return categoryMatch && priceMatch;
+  });
+
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
-      <div className="absolute inset-0 bg-black bg-opacity-50" onClick={onClose}></div>
-      
-      <div className="absolute inset-0 flex items-center justify-center p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-          <div className="p-6">
-            <h3 className="text-lg font-semibold mb-4">
-              {organization ? 'Edit Organization' : 'Add Organization'}
-            </h3>
+    <AuthProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Header cartCount={cartCount} onCartClick={() => setIsCartOpen(true)} />
+        
+        <Hero />
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Organization Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  required
-                />
+        {/* Products Section */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4"></h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto"></p>
+          </div>
+
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Filter Sidebar */}
+            <div className="lg:w-64 flex-shrink-0">
+              <ProductFilter
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+                priceRange={priceRange}
+                onPriceRangeChange={setPriceRange}
+                isOpen={isFilterOpen}
+                onToggle={() => setIsFilterOpen(!isFilterOpen)}
+              />
+            </div>
+
+            {/* Products Grid */}
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-6">
+                {loading ? (
+                  <p className="text-gray-600"></p>
+                ) : error ? (
+                  <p className="text-red-600"></p>
+                ) : (
+                  <p className="text-gray-600"></p>
+                )}
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600"></span>
+                  <select className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent">
+                    <option></option>
+                    <option></option>
+                    <option></option>
+                    <option></option>
+                    <option></option>
+                  </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Organization Code
-                </label>
-                <input
-                  type="text"
-                  value={formData.code}
-                  onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="e.g., ACME, HS360"
-                  required
-                />
-              </div>
+              {loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-100 animate-pulse">
+                      <div className="h-48 bg-gray-200 rounded-t-lg"></div>
+                      <div className="p-4 space-y-3">
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                        <div className="h-8 bg-gray-200 rounded"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : error ? (
+                <div className="text-center py-16">
+                  <p className="text-red-500 text-lg mb-4"></p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-6 py-2 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all"
+                  >
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredProducts.map(product => (
+                    <ProductCard
+                      key={product.id}
+                      {...product}
+                      onAddToCart={addToCart}
+                    />
+                  ))}
+                </div>
+              )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  rows={3}
-                />
-              </div>
+              {!loading && !error && filteredProducts.length === 0 && (
+                <div className="text-center py-16">
+                  <p className="text-gray-500 text-lg"></p>
+                  <button
+                    onClick={() => {
+                      setSelectedCategory('all');
+                      setPriceRange([0, 100]);
+                    }}
+                    className="mt-4 text-pink-600 hover:text-pink-700 transition-colors"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contact Email
-                </label>
+        {/* Newsletter Section */}
+        <section className="bg-gradient-to-r from-pink-600 to-orange-600 text-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold mb-4">Stay Connected with HealthSpan360</h2>
+              <p className="text-pink-100 mb-8 max-w-2xl mx-auto">
+                Get the latest insights on peptide therapy, genetic testing, and personalized healthcare delivered to your inbox.
+              </p>
+              <div className="max-w-md mx-auto flex">
                 <input
                   type="email"
-                  value={formData.contact_email}
-                  onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  placeholder="Enter your email"
+                  className="flex-1 px-4 py-3 rounded-l-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Contact Phone
-                </label>
-                <input
-                  type="tel"
-                  value={formData.contact_phone}
-                  onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="is_active"
-                  checked={formData.is_active}
-                  onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                  className="h-4 w-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
-                />
-                <label htmlFor="is_active" className="ml-2 block text-sm text-gray-900">
-                  Active Organization
-                </label>
-              </div>
-
-              <div className="flex space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50"
-                >
-                  {loading ? 'Saving...' : 'Save'}
+                <button className="bg-white text-pink-600 px-6 py-3 rounded-r-lg hover:bg-gray-100 transition-colors font-semibold">
+                  Subscribe
                 </button>
               </div>
-            </form>
+            </div>
           </div>
-        </div>
-      </div>
-    </div>
-  );
-};
+        </section>
 
-export default OrganizationManagement;
+        <Footer />
+
+        <Cart
+          isOpen={isCartOpen}
+          onClose={() => setIsCartOpen(false)}
+          items={cartItems}
+          onUpdateQuantity={updateCartQuantity}
+          onRemoveItem={removeFromCart}
+        />
+
+        <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
+      </div>
+    </AuthProvider>
+  );
+}
+
+export default App;

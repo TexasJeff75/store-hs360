@@ -1,207 +1,220 @@
-import React, { useState } from 'react';
-import { Search, ShoppingCart, User, Menu, X, Heart, Dna, LogIn, UserCheck, Settings } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import AuthModal from './AuthModal';
-import UserProfile from './UserProfile';
-import AdminDashboard from './admin/AdminDashboard';
+import React, { useState, useEffect } from 'react';
+import { AuthProvider } from './contexts/AuthContext';
+import Header from './components/Header';
+import Hero from './components/Hero';
+import ProductCard from './components/ProductCard';
+import ProductFilter from './components/ProductFilter';
+import Cart from './components/Cart';
+import Footer from './components/Footer';
+import ErrorDebugPanel from './components/ErrorDebugPanel';
+import { bigCommerceService, Product } from './services/bigcommerce';
+import { useErrorLogger } from './hooks/useErrorLogger';
 
-interface HeaderProps {
-  cartCount: number;
-  onCartClick: () => void;
+interface CartItem {
+  id: number;
+  name: string;
+  price: number;
+  quantity: number;
+  image: string;
 }
 
-const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const { user, profile } = useAuth();
+function App() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const { errors, logError, clearErrors } = useErrorLogger();
+
+  // Fetch products and categories from BigCommerce
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const [productsData, categoriesData] = await Promise.all([
+          bigCommerceService.getProducts(logError),
+          bigCommerceService.getCategories(logError)
+        ]);
+        
+        setProducts(productsData.products);
+        setCategories(categoriesData.categories);
+        
+        // Set error message if either API call failed
+        if (productsData.errorMessage || categoriesData.errorMessage) {
+          const errorMsg = productsData.errorMessage || categoriesData.errorMessage;
+          setError(errorMsg);
+        }
+      } catch (err) {
+        setError('Failed to load products. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [logError]);
+
+  const addToCart = (productId: number) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    setCartItems(prev => {
+      const existingItem = prev.find(item => item.id === productId);
+      if (existingItem) {
+        return prev.map(item =>
+          item.id === productId
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      } else {
+        return [...prev, {
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: 1,
+          image: product.image
+        }];
+      }
+    });
+  };
+
+  const updateCartQuantity = (id: number, quantity: number) => {
+    if (quantity === 0) {
+      removeFromCart(id);
+      return;
+    }
+    setCartItems(prev =>
+      prev.map(item =>
+        item.id === id ? { ...item, quantity } : item
+      )
+    );
+  };
+
+  const removeFromCart = (id: number) => {
+    setCartItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Filter products
+  const filteredProducts = products.filter(product => {
+    const categoryMatch = selectedCategory === 'all' || product.category === selectedCategory;
+    const priceMatch = product.price >= priceRange[0] && product.price <= priceRange[1];
+    return categoryMatch && priceMatch;
+  });
 
   return (
-    <header className="bg-white shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <div className="flex items-center">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-r from-pink-500 to-orange-500 rounded-full flex items-center justify-center">
-                <Dna className="h-6 w-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold bg-gradient-to-r from-pink-500 to-orange-500 bg-clip-text text-transparent">
-                  HealthSpan360
-                </h1>
-                <p className="text-xs text-gray-500">Turning Insight Into Impact</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Desktop Navigation */}
-          <nav className="hidden md:flex space-x-8">
-            <a href="#" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors">
-              Home
-            </a>
-            <a href="#" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors">
-              About
-            </a>
-            <a href="#" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors">
-              Services
-            </a>
-            <a href="#" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors">
-              For Providers
-            </a>
-            <a href="#" className="text-gray-700 hover:text-blue-600 px-3 py-2 text-sm font-medium transition-colors">
-              For Patients
-            </a>
-            <a href="#" className="text-gray-700 hover:text-pink-600 px-3 py-2 text-sm font-medium transition-colors">
-              Resources
-            </a>
-            <a href="#" className="text-gray-700 hover:text-pink-600 px-3 py-2 text-sm font-medium transition-colors">
-              Contact
-            </a>
-          </nav>
-
-          {/* Search Bar */}
-          <div className="hidden md:flex items-center flex-1 max-w-lg mx-8">
-            <div className="relative w-full">
-              <input
-                type="text"
-                placeholder="Search for products..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-              />
-              <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-            </div>
-          </div>
-
-          {/* Right Side Icons */}
-          <div className="flex items-center space-x-4">
-            <button className="text-gray-700 hover:text-blue-600 transition-colors">
-              <Heart className="h-6 w-6" />
-            </button>
-            
-            {/* User Authentication */}
-            {user ? (
-              <div className="flex items-center space-x-2">
-                {/* Admin Button */}
-                {profile?.role === 'admin' && (
-                  <button 
-                    onClick={() => setIsAdminOpen(true)}
-                    className="text-gray-700 hover:text-purple-600 transition-colors"
-                    title="Admin Dashboard"
-                  >
-                    <Settings className="h-6 w-6" />
-                  </button>
-                )}
-                
-                {/* User Profile Button */}
-                <button 
-                  onClick={() => setIsProfileOpen(true)}
-                  className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
-                >
-                  <div className="relative">
-                    <User className="h-6 w-6" />
-                    {profile?.role === 'approved' && (
-                      <UserCheck className="h-3 w-3 text-green-600 absolute -top-1 -right-1" />
-                    )}
-                  </div>
-                  <span className="hidden md:block text-sm font-medium">
-                    {profile?.email?.split('@')[0] || 'User'}
-                  </span>
-                </button>
-               </div>
-            ) : (
-              <button 
-                onClick={() => setIsAuthModalOpen(true)}
-                className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
-                type="button"
-              >
-                <LogIn className="h-6 w-6" />
-                <span className="hidden md:block text-sm font-medium">Sign In</span>
-              </button>
-            )}
-            
-            <button 
-              onClick={onCartClick}
-              className="text-gray-700 hover:text-pink-600 transition-colors relative"
-            >
-              <ShoppingCart className="h-6 w-6" />
-              {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-gradient-to-r from-pink-500 to-orange-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-            
-            {/* Mobile menu button */}
-            <button
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden text-gray-700 hover:text-pink-600 transition-colors"
-            >
-              {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Navigation */}
-        {isMenuOpen && (
-          <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-gray-200">
-              <a href="#" className="text-gray-700 hover:text-pink-600 block px-3 py-2 text-base font-medium">
-                Home
-              </a>
-              <a href="#" className="text-gray-700 hover:text-pink-600 block px-3 py-2 text-base font-medium">
-                About
-              </a>
-              <a href="#" className="text-gray-700 hover:text-pink-600 block px-3 py-2 text-base font-medium">
-                Services
-              </a>
-              <a href="#" className="text-gray-700 hover:text-pink-600 block px-3 py-2 text-base font-medium">
-                For Providers
-              </a>
-              <a href="#" className="text-gray-700 hover:text-pink-600 block px-3 py-2 text-base font-medium">
-                For Patients
-              </a>
-              <a href="#" className="text-gray-700 hover:text-pink-600 block px-3 py-2 text-base font-medium">
-                Resources
-              </a>
-              <a href="#" className="text-gray-700 hover:text-pink-600 block px-3 py-2 text-base font-medium">
-                Contact
-              </a>
-              {/* Mobile Search */}
-              <div className="px-3 py-2">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search for products..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                  />
-                  <Search className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+    <AuthProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Header cartCount={cartCount} onCartClick={() => setIsCartOpen(true)} />
+                  <p className="text-gray-600"></p>
+        <Hero />
+                  <p className="text-red-600"></p>
+        {/* Products Section */}
+                  <p className="text-gray-600"></p>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto"></p>
+                  <p className="text-red-600"></p>
+                  <span className="text-sm text-gray-600"></span>
+                  <p className="text-gray-600"></p>
+                    <option></option>
+                    <option></option>
+                    <option></option>
+                    <option></option>
+                    <option></option>
+                  </select>
                 </div>
               </div>
+
+              {loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-100 animate-pulse">
+                      <div className="h-48 bg-gray-200 rounded-t-lg"></div>
+                      <div className="p-4 space-y-3">
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                        <div className="h-8 bg-gray-200 rounded"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : error ? (
+                <div className="text-center py-16">
+                  <p className="text-red-500 text-lg mb-4"></p>
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredProducts.map(product => (
+                    <ProductCard
+                      key={product.id}
+                      {...product}
+                      onAddToCart={addToCart}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {!loading && !error && filteredProducts.length === 0 && (
+                <div className="text-center py-16">
+                  <p className="text-gray-500 text-lg"></p>
+                  <button
+                    onClick={() => {
+                      setSelectedCategory('all');
+                      setPriceRange([0, 100]);
+                    }}
+                    className="mt-4 text-pink-600 hover:text-pink-700 transition-colors"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        )}
+        </section>
+
+        {/* Newsletter Section */}
+        <section className="bg-gradient-to-r from-pink-600 to-orange-600 text-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold mb-4">Stay Connected with HealthSpan360</h2>
+              <p className="text-pink-100 mb-8 max-w-2xl mx-auto">
+                Get the latest insights on peptide therapy, genetic testing, and personalized healthcare delivered to your inbox.
+              </p>
+              <div className="max-w-md mx-auto flex">
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  className="flex-1 px-4 py-3 rounded-l-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                />
+                <button className="bg-white text-pink-600 px-6 py-3 rounded-r-lg hover:bg-gray-100 transition-colors font-semibold">
+                  Subscribe
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <Footer />
+
+        <Cart
+          isOpen={isCartOpen}
+          onClose={() => setIsCartOpen(false)}
+          items={cartItems}
+          onUpdateQuantity={updateCartQuantity}
+          onRemoveItem={removeFromCart}
+        />
+
+        <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
       </div>
-
-      {/* Auth Modal */}
-      <AuthModal 
-        isOpen={isAuthModalOpen} 
-        onClose={() => setIsAuthModalOpen(false)} 
-      />
-
-      {/* User Profile Modal */}
-      <UserProfile 
-        isOpen={isProfileOpen} 
-        onClose={() => setIsProfileOpen(false)} 
-      />
-
-      {/* Admin Dashboard */}
-      <AdminDashboard 
-        isOpen={isAdminOpen} 
-        onClose={() => setIsAdminOpen(false)} 
-      />
-    </header>
+    </AuthProvider>
   );
-};
+}
 
-export default Header;
+export default App;

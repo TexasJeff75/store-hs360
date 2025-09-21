@@ -119,49 +119,21 @@ function App() {
         {/* Products Section */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Premium Health Products
-            </h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Discover our carefully curated selection of supplements, vitamins, and wellness products 
-              designed to support your optimal health journey.
-            </p>
-          </div>
-
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Filter Sidebar */}
-            <div className="lg:w-64 flex-shrink-0">
-              <ProductFilter
-                categories={categories}
-                selectedCategory={selectedCategory}
-                onCategoryChange={setSelectedCategory}
-                priceRange={priceRange}
-                onPriceRangeChange={setPriceRange}
-                isOpen={isFilterOpen}
-                onToggle={() => setIsFilterOpen(!isFilterOpen)}
-              />
-            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4"></h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto"></p>
 
             {/* Products Grid */}
             <div className="flex-1">
-              <div className="flex items-center justify-between mb-6">
-                {loading ? (
-                  <p className="text-gray-600">Loading products...</p>
+                  <p className="text-gray-600"></p>
                 ) : error ? (
-                  <p className="text-red-600">{error}</p>
-                ) : (
-                  <p className="text-gray-600">
-                    Showing {filteredProducts.length} products
-                  </p>
-                )}
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600">Sort by:</span>
-                  <select className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent">
-                    <option>Featured</option>
-                    <option>Price: Low to High</option>
-                    <option>Price: High to Low</option>
-                    <option>Newest</option>
-                    <option>Best Rating</option>
+                  <p className="text-red-600"></p>
+                  <span className="text-sm text-gray-600"></span>
+                  <p className="text-gray-600"></p>
+                    <option></option>
+                    <option></option>
+                    <option></option>
+                    <option></option>
+                    <option></option>
                   </select>
                 </div>
               </div>
@@ -181,12 +153,8 @@ function App() {
                 </div>
               ) : error ? (
                 <div className="text-center py-16">
-                  <p className="text-red-500 text-lg mb-4">{error}</p>
+                  <p className="text-red-500 text-lg mb-4"></p>
                   <button
-                    onClick={() => window.location.reload()}
-                    className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-6 py-2 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all"
-                  >
-                    Try Again
                   </button>
                 </div>
               ) : (
@@ -203,7 +171,7 @@ function App() {
 
               {!loading && !error && filteredProducts.length === 0 && (
                 <div className="text-center py-16">
-                  <p className="text-gray-500 text-lg">No products found matching your criteria.</p>
+                  <p className="text-gray-500 text-lg"></p>
                   <button
                     onClick={() => {
                       setSelectedCategory('all');

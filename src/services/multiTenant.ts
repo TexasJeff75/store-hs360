@@ -1,374 +1,252 @@
-import { supabase } from './supabase';
+import React, { useState, useEffect } from 'react';
+import { AuthProvider } from './contexts/AuthContext';
+import Header from './components/Header';
+import Hero from './components/Hero';
+import ProductCard from './components/ProductCard';
+import ProductFilter from './components/ProductFilter';
+import Cart from './components/Cart';
+import Footer from './components/Footer';
+import ErrorDebugPanel from './components/ErrorDebugPanel';
+import { bigCommerceService, Product } from './services/bigcommerce';
+import { useErrorLogger } from './hooks/useErrorLogger';
 
-export interface Organization {
-  id: string;
+interface CartItem {
+  id: number;
   name: string;
-  code: string;
-  description?: string;
-  billing_address?: any;
-  contact_email?: string;
-  contact_phone?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  price: number;
+  quantity: number;
+  image: string;
 }
 
-export interface Location {
-  id: string;
-  organization_id: string;
-  name: string;
-  code: string;
-  address?: any;
-  contact_email?: string;
-  contact_phone?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  organization?: Organization;
-}
+function App() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const { errors, logError, clearErrors } = useErrorLogger();
 
-export interface UserOrganizationRole {
-  id: string;
-  user_id: string;
-  organization_id: string;
-  location_id?: string;
-  role: 'admin' | 'manager' | 'member' | 'viewer';
-  is_primary: boolean;
-  created_at: string;
-  updated_at: string;
-  organization?: Organization;
-  location?: Location;
-}
-
-export interface OrganizationPricing {
-  id: string;
-  organization_id: string;
-  product_id: number;
-  contract_price: number;
-  min_quantity: number;
-  max_quantity?: number;
-  effective_date: string;
-  expiry_date?: string;
-  created_by?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface LocationPricing {
-  id: string;
-  location_id: string;
-  product_id: number;
-  contract_price: number;
-  min_quantity: number;
-  max_quantity?: number;
-  effective_date: string;
-  expiry_date?: string;
-  created_by?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-class MultiTenantService {
-  // Organizations
-  async getOrganizations(): Promise<Organization[]> {
-    const { data, error } = await supabase
-      .from('organizations')
-      .select('*')
-      .eq('is_active', true)
-      .order('name');
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  async createOrganization(org: Partial<Organization>): Promise<Organization> {
-    const { data, error } = await supabase
-      .from('organizations')
-      .insert(org)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  }
-
-  async updateOrganization(id: string, updates: Partial<Organization>): Promise<Organization> {
-    const { data, error } = await supabase
-      .from('organizations')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  }
-
-  // Locations
-  async getLocationsByOrganization(organizationId: string): Promise<Location[]> {
-    const { data, error } = await supabase
-      .from('locations')
-      .select(`
-        *,
-        organization:organizations(*)
-      `)
-      .eq('organization_id', organizationId)
-      .eq('is_active', true)
-      .order('name');
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  async createLocation(location: Partial<Location>): Promise<Location> {
-    const { data, error } = await supabase
-      .from('locations')
-      .insert(location)
-      .select(`
-        *,
-        organization:organizations(*)
-      `)
-      .single();
-
-    if (error) throw error;
-    return data;
-  }
-
-  async updateLocation(id: string, updates: Partial<Location>): Promise<Location> {
-    const { data, error } = await supabase
-      .from('locations')
-      .update(updates)
-      .eq('id', id)
-      .select(`
-        *,
-        organization:organizations(*)
-      `)
-      .single();
-
-    if (error) throw error;
-    return data;
-  }
-
-  // User Organization Roles
-  async getUserOrganizations(userId: string): Promise<UserOrganizationRole[]> {
-    const { data, error } = await supabase
-      .from('user_organization_roles')
-      .select(`
-        *,
-        organization:organizations(*),
-        location:locations(*)
-      `)
-      .eq('user_id', userId)
-      .order('is_primary', { ascending: false });
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  async getOrganizationUsers(organizationId: string): Promise<any[]> {
-    const { data, error } = await supabase
-      .from('user_organization_roles')
-      .select(`
-        *,
-        user:profiles(*),
-        location:locations(*)
-      `)
-      .eq('organization_id', organizationId)
-      .order('role');
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  async assignUserToOrganization(
-    userId: string,
-    organizationId: string,
-    role: string,
-    locationId?: string,
-    isPrimary: boolean = false
-  ): Promise<UserOrganizationRole> {
-    const { data, error } = await supabase
-      .from('user_organization_roles')
-      .insert({
-        user_id: userId,
-        organization_id: organizationId,
-        location_id: locationId,
-        role,
-        is_primary: isPrimary
-      })
-      .select(`
-        *,
-        organization:organizations(*),
-        location:locations(*)
-      `)
-      .single();
-
-    if (error) throw error;
-    return data;
-  }
-
-  async updateUserOrganizationRole(
-    id: string,
-    updates: Partial<UserOrganizationRole>
-  ): Promise<UserOrganizationRole> {
-    const { data, error } = await supabase
-      .from('user_organization_roles')
-      .update(updates)
-      .eq('id', id)
-      .select(`
-        *,
-        organization:organizations(*),
-        location:locations(*)
-      `)
-      .single();
-
-    if (error) throw error;
-    return data;
-  }
-
-  async removeUserFromOrganization(id: string): Promise<void> {
-    const { error } = await supabase
-      .from('user_organization_roles')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-  }
-
-  // Pricing
-  async getOrganizationPricing(organizationId: string): Promise<OrganizationPricing[]> {
-    const { data, error } = await supabase
-      .from('organization_pricing')
-      .select('*')
-      .eq('organization_id', organizationId)
-      .order('product_id');
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  async getLocationPricing(locationId: string): Promise<LocationPricing[]> {
-    const { data, error } = await supabase
-      .from('location_pricing')
-      .select('*')
-      .eq('location_id', locationId)
-      .order('product_id');
-
-    if (error) throw error;
-    return data || [];
-  }
-
-  async setOrganizationPricing(pricing: Partial<OrganizationPricing>): Promise<OrganizationPricing> {
-    const { data, error } = await supabase
-      .from('organization_pricing')
-      .upsert(pricing)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  }
-
-  async setLocationPricing(pricing: Partial<LocationPricing>): Promise<LocationPricing> {
-    const { data, error } = await supabase
-      .from('location_pricing')
-      .upsert(pricing)
-      .select()
-      .single();
-
-    if (error) throw error;
-    return data;
-  }
-
-  // Get effective pricing for a user (location > organization > individual > regular)
-  async getEffectivePricing(
-    userId: string,
-    productId: number,
-    regularPrice: number
-  ): Promise<{
-    price: number;
-    source: 'location' | 'organization' | 'individual' | 'regular';
-    savings?: number;
-  }> {
-    try {
-      // Get user's organizations and locations
-      const userOrgs = await this.getUserOrganizations(userId);
-      
-      let bestPrice = regularPrice;
-      let source: 'location' | 'organization' | 'individual' | 'regular' = 'regular';
-
-      // Check location pricing first (highest priority)
-      for (const userOrg of userOrgs) {
-        if (userOrg.location_id) {
-          const locationPricing = await supabase
-            .from('location_pricing')
-            .select('*')
-            .eq('location_id', userOrg.location_id)
-            .eq('product_id', productId)
-            .lte('effective_date', new Date().toISOString())
-            .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString())
-            .order('effective_date', { ascending: false })
-            .limit(1)
-            .single();
-
-          if (locationPricing.data && locationPricing.data.contract_price < bestPrice) {
-            bestPrice = locationPricing.data.contract_price;
-            source = 'location';
-          }
+  // Fetch products and categories from BigCommerce
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        
+        const [productsData, categoriesData] = await Promise.all([
+          bigCommerceService.getProducts(logError),
+          bigCommerceService.getCategories(logError)
+        ]);
+        
+        setProducts(productsData.products);
+        setCategories(categoriesData.categories);
+        
+        // Set error message if either API call failed
+        if (productsData.errorMessage || categoriesData.errorMessage) {
+          const errorMsg = productsData.errorMessage || categoriesData.errorMessage;
+          setError(errorMsg);
         }
+      } catch (err) {
+        setError('Failed to load products. Please try again later.');
+      } finally {
+        setLoading(false);
       }
+    };
 
-      // Check organization pricing if no location pricing found
-      if (source === 'regular') {
-        for (const userOrg of userOrgs) {
-          const orgPricing = await supabase
-            .from('organization_pricing')
-            .select('*')
-            .eq('organization_id', userOrg.organization_id)
-            .eq('product_id', productId)
-            .lte('effective_date', new Date().toISOString())
-            .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString())
-            .order('effective_date', { ascending: false })
-            .limit(1)
-            .single();
+    fetchData();
+  }, [logError]);
 
-          if (orgPricing.data && orgPricing.data.contract_price < bestPrice) {
-            bestPrice = orgPricing.data.contract_price;
-            source = 'organization';
-          }
-        }
+  const addToCart = (productId: number) => {
+    const product = products.find(p => p.id === productId);
+    if (!product) return;
+
+    setCartItems(prev => {
+      const existingItem = prev.find(item => item.id === productId);
+      if (existingItem) {
+        return prev.map(item =>
+          item.id === productId
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      } else {
+        return [...prev, {
+          id: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: 1,
+          image: product.image
+        }];
       }
+    });
+  };
 
-      // Check individual contract pricing if no org/location pricing
-      if (source === 'regular') {
-        const individualPricing = await supabase
-          .from('contract_pricing')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('product_id', productId)
-          .single();
-
-        if (individualPricing.data && individualPricing.data.contract_price < bestPrice) {
-          bestPrice = individualPricing.data.contract_price;
-          source = 'individual';
-        }
-      }
-
-      const savings = bestPrice < regularPrice ? regularPrice - bestPrice : undefined;
-
-      return {
-        price: bestPrice,
-        source,
-        savings
-      };
-    } catch (error) {
-      console.error('Error getting effective pricing:', error);
-      return {
-        price: regularPrice,
-        source: 'regular'
-      };
+  const updateCartQuantity = (id: number, quantity: number) => {
+    if (quantity === 0) {
+      removeFromCart(id);
+      return;
     }
-  }
+    setCartItems(prev =>
+      prev.map(item =>
+        item.id === id ? { ...item, quantity } : item
+      )
+    );
+  };
+
+  const removeFromCart = (id: number) => {
+    setCartItems(prev => prev.filter(item => item.id !== id));
+  };
+
+  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Filter products
+  const filteredProducts = products.filter(product => {
+    const categoryMatch = selectedCategory === 'all' || product.category === selectedCategory;
+    const priceMatch = product.price >= priceRange[0] && product.price <= priceRange[1];
+    return categoryMatch && priceMatch;
+  });
+
+  return (
+    <AuthProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Header cartCount={cartCount} onCartClick={() => setIsCartOpen(true)} />
+        
+        <Hero />
+
+        {/* Products Section */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4"></h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto"></p>
+          </div>
+
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Filter Sidebar */}
+            <div className="lg:w-64 flex-shrink-0">
+              <ProductFilter
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+                priceRange={priceRange}
+                onPriceRangeChange={setPriceRange}
+                isOpen={isFilterOpen}
+                onToggle={() => setIsFilterOpen(!isFilterOpen)}
+              />
+            </div>
+
+            {/* Products Grid */}
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-6">
+                {loading ? (
+                  <p className="text-gray-600"></p>
+                ) : error ? (
+                  <p className="text-red-600"></p>
+                ) : (
+                  <p className="text-gray-600"></p>
+                )}
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600"></span>
+                  <select className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent">
+                    <option></option>
+                    <option></option>
+                    <option></option>
+                    <option></option>
+                    <option></option>
+                  </select>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-100 animate-pulse">
+                      <div className="h-48 bg-gray-200 rounded-t-lg"></div>
+                      <div className="p-4 space-y-3">
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                        <div className="h-8 bg-gray-200 rounded"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : error ? (
+                <div className="text-center py-16">
+                  <p className="text-red-500 text-lg mb-4"></p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-6 py-2 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all"
+                  >
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredProducts.map(product => (
+                    <ProductCard
+                      key={product.id}
+                      {...product}
+                      onAddToCart={addToCart}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {!loading && !error && filteredProducts.length === 0 && (
+                <div className="text-center py-16">
+                  <p className="text-gray-500 text-lg"></p>
+                  <button
+                    onClick={() => {
+                      setSelectedCategory('all');
+                      setPriceRange([0, 100]);
+                    }}
+                    className="mt-4 text-pink-600 hover:text-pink-700 transition-colors"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Newsletter Section */}
+        <section className="bg-gradient-to-r from-pink-600 to-orange-600 text-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold mb-4">Stay Connected with HealthSpan360</h2>
+              <p className="text-pink-100 mb-8 max-w-2xl mx-auto">
+                Get the latest insights on peptide therapy, genetic testing, and personalized healthcare delivered to your inbox.
+              </p>
+              <div className="max-w-md mx-auto flex">
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  className="flex-1 px-4 py-3 rounded-l-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                />
+                <button className="bg-white text-pink-600 px-6 py-3 rounded-r-lg hover:bg-gray-100 transition-colors font-semibold">
+                  Subscribe
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <Footer />
+
+        <Cart
+          isOpen={isCartOpen}
+          onClose={() => setIsCartOpen(false)}
+          items={cartItems}
+          onUpdateQuantity={updateCartQuantity}
+          onRemoveItem={removeFromCart}
+        />
+
+        <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
+      </div>
+    </AuthProvider>
+  );
 }
 
-export const multiTenantService = new MultiTenantService();
+export default App;
