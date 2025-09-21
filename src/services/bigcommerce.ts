@@ -15,15 +15,15 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
 }
 
 export const PRODUCTS_BASIC = `
-  query($first:Int=12){
-    site{ 
-      products(first:$first){ 
-        edges{ 
-          node{ 
-            entityId 
-            name 
-            path 
-            defaultImage{ url(width:640) } 
+  query Products($first: Int = 20) {
+    site {
+      products(first: $first) {
+        edges {
+          node {
+            entityId
+            name
+            path
+            defaultImage { url(width: 640) }
             prices {
               price {
                 value
@@ -41,20 +41,30 @@ export const PRODUCTS_BASIC = `
                 }
               }
             }
-          } 
-        } 
-      } 
+          }
+        }
+      }
     }
   }`;
 
 export const CATEGORIES_BASIC = `
-  query{
-    site{ 
-      categoryTree(rootEntityId:0){ 
-        entityId 
-        name 
-        path 
-      } 
+  query Categories($root: Int = 0, $depth: Int = 2) {
+    site {
+      categoryTree(rootEntityId: $root, depth: $depth) {
+        entityId
+        name
+        path
+        children {
+          entityId
+          name
+          path
+          children {
+            entityId
+            name
+            path
+          }
+        }
+      }
     }
   }`;
 
@@ -132,10 +142,11 @@ export async function fetchProducts(logError?: (message: string, error?: Error) 
   errorMessage?: string;
 }> {
   try {
-    const data = await gql(PRODUCTS_BASIC, { first: 12 });
-    const products = data.site?.products?.edges?.map((edge: any) => 
+    const data = await gql(PRODUCTS_BASIC, { first: 20 });
+    const edges = data?.site?.products?.edges ?? [];
+    const products = edges.map((edge: any) => 
       transformBigCommerceProduct(edge.node)
-    ) || [];
+    );
     
     return { products: products.length > 0 ? products : mockProducts };
   } catch (error) {
@@ -152,8 +163,9 @@ export async function fetchCategories(logError?: (message: string, error?: Error
   errorMessage?: string;
 }> {
   try {
-    const data = await gql(CATEGORIES_BASIC);
-    const categories = data.site?.categoryTree?.map((cat: any) => cat.name) || [];
+    const data = await gql(CATEGORIES_BASIC, { root: 0, depth: 2 });
+    const categoryTree = data?.site?.categoryTree ?? [];
+    const categories = categoryTree.map((cat: any) => cat.name);
     
     return { categories: categories.length > 0 ? categories : mockCategories };
   } catch (error) {
