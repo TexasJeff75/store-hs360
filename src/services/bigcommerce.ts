@@ -1,4 +1,6 @@
 // BigCommerce Storefront GraphQL API service
+import { connNodes, pick } from '../utils/graphql';
+
 const GRAPHQL_ENDPOINT = '/api/gql';
 
 export interface BigCommerceProduct {
@@ -146,7 +148,7 @@ class BigCommerceStorefrontService {
   }
   async getProducts(logError?: (message: string, error?: Error, type?: 'error' | 'warning' | 'info', source?: string) => void): Promise<{ products: Product[]; errorMessage?: string }> {
     try {
-      // Simplified query to avoid size issues
+      // Null-safe query with only essential fields
       const query = `
         query GetProducts {
           site {
@@ -173,6 +175,14 @@ class BigCommerceStorefrontService {
                       }
                     }
                   }
+                  customFields(first: 10) {
+                    edges {
+                      node {
+                        name
+                        value
+                      }
+                    }
+                  }
                 }
               }
             }
@@ -181,9 +191,19 @@ class BigCommerceStorefrontService {
       `;
       
       const data = await this.makeGraphQLRequest(query);
-      const products: BigCommerceProduct[] = data.site.products.edges.map((edge: any) => edge.node);
       
-      return { products: products.map(product => this.transformProduct(product)) };
+      // Null-safe product extraction
+      const productEdges = data?.site?.products?.edges ?? [];
+      if (!Array.isArray(productEdges)) {
+        console.warn("[products] Unexpected response shape:", data);
+        return { products: this.getMockProducts(), errorMessage: "Invalid response format from BigCommerce" };
+      }
+      
+      const products = productEdges
+        .map((edge: any) => this.transformProduct(edge?.node))
+        .filter(Boolean);
+      
+      return { products };
     } catch (error) {
       // Log the error if logger is provided
       let userFriendlyMessage = '';
@@ -205,7 +225,7 @@ class BigCommerceStorefrontService {
 
   async getCategories(logError?: (message: string, error?: Error, type?: 'error' | 'warning' | 'info', source?: string) => void): Promise<{ categories: string[]; errorMessage?: string }> {
     try {
-      // Simplified query to avoid size issues
+      // Null-safe categories query
       const query = `
         query GetCategories {
           site {
@@ -218,10 +238,16 @@ class BigCommerceStorefrontService {
       `;
       
       const data = await this.makeGraphQLRequest(query);
-      const categories: BigCommerceCategory[] = data.site.categoryTree || [];
+      const categoryTree = data?.site?.categoryTree ?? [];
+      if (!Array.isArray(categoryTree)) {
+        console.warn("[categories] Unexpected response shape:", data);
+        return { categories: ['Peptides', 'Genetic Testing', 'Lab Testing', 'Supplements', 'Hormones'], errorMessage: "Invalid response format from BigCommerce" };
+      }
       
       // Extract category names
-      const allCategories: string[] = categories.map(cat => cat.name);
+      const allCategories: string[] = categoryTree
+        .map((cat: any) => cat?.name)
+        .filter(Boolean);
       
       return { categories: [...new Set(allCategories)] }; // Remove duplicates
     } catch (error) {
@@ -317,27 +343,31 @@ class BigCommerceStorefrontService {
     ];
   }
 
-  private transformProduct(bcProduct: BigCommerceProduct): Product {
+  private transformProduct(bcProduct: any): Product | null {
+    if (!bcProduct) return null;
+    
+    // Safely read connections using connNodes helper
+    const categories = connNodes(bcProduct.categories);
+    const customFields = connNodes<{ name: string; value: string }>(bcProduct.customFields);
+    
     // Get the first category name, or default to 'General'
-    const categoryName = bcProduct.categories.edges.length > 0 
-      ? bcProduct.categories.edges[0].node.name
-      : 'General';
+    const categoryName = categories.length > 0 ? categories[0].name : 'General';
 
     // Extract benefits from custom fields or description
-    const benefits = this.extractBenefits(bcProduct);
+    const benefits = this.extractBenefits({ customFields });
 
     // Get the main product image
     const image = bcProduct.defaultImage?.url || 
       'https://images.pexels.com/photos/3683107/pexels-photo-3683107.jpeg?auto=compress&cs=tinysrgb&w=400';
 
     // Handle pricing
-    const price = bcProduct.prices.price.value;
-    const originalPrice = bcProduct.prices.salePrice ? price : undefined;
-    const currentPrice = bcProduct.prices.salePrice?.value || price;
+    const price = bcProduct.prices?.price?.value || 0;
+    const originalPrice = bcProduct.prices?.salePrice ? price : undefined;
+    const currentPrice = bcProduct.prices?.salePrice?.value || price;
 
     return {
       id: bcProduct.entityId,
-      name: bcProduct.name,
+      name: bcProduct.name || 'Unknown Product',
       price: currentPrice,
       originalPrice,
       image,
@@ -345,42 +375,34 @@ class BigCommerceStorefrontService {
       reviews: Math.floor(Math.random() * 500) + 50, // Random reviews - you could integrate with review system
       category: categoryName,
       benefits,
-      description: bcProduct.description || '',
+      description: '',
     };
   }
 
-  private extractBenefits(product: BigCommerceProduct): string[] {
+  private extractBenefits(src: { customFields?: Array<{ name: string; value: string }> }): string[] {
+    const fields = src?.customFields ?? [];
+    
     // Look for benefits in custom fields first
-    if (product.customFields.edges.length > 0) {
-      const benefitsField = product.customFields.edges.find(edge => 
-        edge.node.name.toLowerCase().includes('benefit') || 
-        edge.node.name.toLowerCase().includes('feature')
-      );
+    const benefitsField = fields.find(field => 
+      /benefit/i.test(field.name) || /feature/i.test(field.name)
+    );
       
-      if (benefitsField) {
-        return benefitsField.node.value.split(',').map(b => b.trim()).slice(0, 3);
+    if (benefitsField?.value) {
+      try {
+        // Try JSON first; if not JSON, return a line-split list
+        const parsed = JSON.parse(benefitsField.value);
+        return Array.isArray(parsed) ? parsed : [String(parsed)];
+      } catch {
+        return benefitsField.value
+          .split(/[,\r?\n]/)
+          .map(s => s.trim())
+          .filter(Boolean)
+          .slice(0, 3);
       }
     }
 
-    // Default benefits based on product name/category
-    const name = product.name.toLowerCase();
-    const defaultBenefits = [];
-
-    if (name.includes('peptide') || name.includes('bpc') || name.includes('thymosin')) {
-      defaultBenefits.push('Tissue Repair', 'Recovery Support');
-    } else if (name.includes('genetic') || name.includes('dna')) {
-      defaultBenefits.push('Genetic Insights', 'Personalized Care');
-    } else if (name.includes('nad') || name.includes('anti-aging')) {
-      defaultBenefits.push('Anti-aging', 'Energy Boost');
-    } else if (name.includes('hormone')) {
-      defaultBenefits.push('Hormone Balance', 'Vitality');
-    } else if (name.includes('immune')) {
-      defaultBenefits.push('Immune Support', 'Wellness');
-    } else {
-      defaultBenefits.push('Health Support', 'Wellness');
-    }
-
-    return defaultBenefits.slice(0, 2);
+    // Default benefits when no custom fields are found
+    return ['Health Support', 'Wellness'];
   }
 }
 
