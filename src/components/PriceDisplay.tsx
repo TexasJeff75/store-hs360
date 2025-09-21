@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tag, Loader2 } from 'lucide-react';
+import { Tag, Loader2, Building2, MapPin, User } from 'lucide-react';
 import { useContractPricing } from '../hooks/useContractPricing';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -19,7 +19,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   showSavings = true
 }) => {
   const { user, profile } = useAuth();
-  const { price, isContractPrice, savings, loading } = useContractPricing(productId, regularPrice);
+  const { price, source, savings, loading } = useContractPricing(productId, regularPrice);
 
   if (loading) {
     return (
@@ -30,6 +30,26 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
     );
   }
 
+  const isContractPrice = source !== 'regular';
+  
+  const getSourceIcon = () => {
+    switch (source) {
+      case 'location': return <MapPin className="h-3 w-3" />;
+      case 'organization': return <Building2 className="h-3 w-3" />;
+      case 'individual': return <User className="h-3 w-3" />;
+      default: return <Tag className="h-3 w-3" />;
+    }
+  };
+
+  const getSourceLabel = () => {
+    switch (source) {
+      case 'location': return 'Location Price';
+      case 'organization': return 'Organization Price';
+      case 'individual': return 'Contract Price';
+      default: return 'Contract Price';
+    }
+  };
+
   return (
     <div className={`flex items-center space-x-2 ${className}`}>
       <div className="flex items-center space-x-2">
@@ -38,8 +58,8 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
         {/* Contract Price Badge */}
         {isContractPrice && (
           <div className="flex items-center space-x-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
-            <Tag className="h-3 w-3" />
-            <span>Contract Price</span>
+            {getSourceIcon()}
+            <span>{getSourceLabel()}</span>
           </div>
         )}
         
@@ -61,14 +81,14 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
       {/* Login Prompt for Better Pricing */}
       {!user && (
         <div className="text-xs text-blue-600">
-          Sign in for contract pricing
+          Sign in for special pricing
         </div>
       )}
 
       {/* Approval Pending Message */}
       {user && profile?.role === 'pending' && (
         <div className="text-xs text-yellow-600">
-          Account approval pending for contract pricing
+          Account approval pending for special pricing
         </div>
       )}
     </div>

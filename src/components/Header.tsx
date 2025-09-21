@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Search, ShoppingCart, User, Menu, X, Heart, Dna, LogIn, UserCheck } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, X, Heart, Dna, LogIn, UserCheck, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import AuthModal from './AuthModal';
 import UserProfile from './UserProfile';
+import AdminDashboard from './admin/AdminDashboard';
 
 interface HeaderProps {
   cartCount: number;
@@ -13,6 +14,7 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const { user, profile } = useAuth();
 
   return (
@@ -79,20 +81,34 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick }) => {
             
             {/* User Authentication */}
             {user ? (
-              <button 
-                onClick={() => setIsProfileOpen(true)}
-                className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
-              >
-                <div className="relative">
-                  <User className="h-6 w-6" />
-                  {profile?.role === 'approved' && (
-                    <UserCheck className="h-3 w-3 text-green-600 absolute -top-1 -right-1" />
-                  )}
+              <div className="flex items-center space-x-2">
+                {/* Admin Button */}
+                {profile?.role === 'admin' && (
+                  <button 
+                    onClick={() => setIsAdminOpen(true)}
+                    className="text-gray-700 hover:text-purple-600 transition-colors"
+                    title="Admin Dashboard"
+                  >
+                    <Settings className="h-6 w-6" />
+                  </button>
+                )}
+                
+                {/* User Profile Button */}
+                <button 
+                  onClick={() => setIsProfileOpen(true)}
+                  className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
+                >
+                  <div className="relative">
+                    <User className="h-6 w-6" />
+                    {profile?.role === 'approved' && (
+                      <UserCheck className="h-3 w-3 text-green-600 absolute -top-1 -right-1" />
+                    )}
+                  </div>
+                  <span className="hidden md:block text-sm font-medium">
+                    {profile?.email?.split('@')[0] || 'User'}
+                  </span>
+                </button>
                 </div>
-                <span className="hidden md:block text-sm font-medium">
-                  {profile?.email?.split('@')[0] || 'User'}
-                </span>
-              </button>
             ) : (
               <button 
                 onClick={() => setIsAuthModalOpen(true)}
@@ -176,6 +192,12 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick }) => {
       <UserProfile 
         isOpen={isProfileOpen} 
         onClose={() => setIsProfileOpen(false)} 
+      />
+
+      {/* Admin Dashboard */}
+      <AdminDashboard 
+        isOpen={isAdminOpen} 
+        onClose={() => setIsAdminOpen(false)} 
       />
     </header>
   );
