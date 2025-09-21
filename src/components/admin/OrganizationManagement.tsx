@@ -7,7 +7,7 @@ import ProductFilter from '../ProductFilter';
 import Cart from '../Cart';
 import Footer from '../Footer';
 import ErrorDebugPanel from '../ErrorDebugPanel';
-import { bigCommerceService, Product } from './services/bigcommerce';
+import { bigCommerceService, Product } from '../../services/bigcommerce';
 import { useErrorLogger } from './hooks/useErrorLogger';
 
 interface CartItem {
