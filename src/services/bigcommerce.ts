@@ -1,11 +1,12 @@
 // data-only helpers
-const GQL = "/api/gql";
+const API_BASE = import.meta.env.VITE_API_BASE || "";
+const GQL = `${API_BASE}/api/gql`;
 
 export async function gql<T>(query: string, variables?: Record<string, any>): Promise<T> {
-  const res = await fetch(GQL, {
+  const res = await fetch(GQL, { 
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ query, variables }),
+    headers: { "Content-Type": "application/json" }, 
+    body: JSON.stringify({ query, variables })
   });
   const txt = await res.text();
   const json = JSON.parse(txt);
