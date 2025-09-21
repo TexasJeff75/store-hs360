@@ -47,7 +47,7 @@ export const PRODUCTS_BASIC = `
   }`;
 
 export const CATEGORIES_BASIC = `
-  query($first:Int=20){
+  query{
     site{ 
       categoryTree(rootEntityId:0){ 
         entityId 
@@ -151,7 +151,7 @@ export async function fetchCategories(logError?: (message: string, error?: Error
   errorMessage?: string;
 }> {
   try {
-    const data = await gql(CATEGORIES_BASIC, { first: 20 });
+    const data = await gql(CATEGORIES_BASIC);
     const categories = data.site?.categoryTree?.map((cat: any) => cat.name) || [];
     
     return { categories: categories.length > 0 ? categories : mockCategories };
