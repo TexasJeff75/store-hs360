@@ -1,0 +1,29 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Missing Supabase environment variables. Please check your .env file.');
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+// Database types for TypeScript support
+export interface Profile {
+  id: string;
+  email: string;
+  is_approved: boolean;
+  role: 'pending' | 'approved' | 'admin';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ContractPricing {
+  id: string;
+  user_id: string;
+  product_id: number;
+  contract_price: number;
+  created_at: string;
+  updated_at: string;
+}
