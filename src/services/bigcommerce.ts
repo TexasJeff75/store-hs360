@@ -1,247 +1,165 @@
-import React, { useState, useEffect } from 'react';
-import { AuthProvider } from './contexts/AuthContext';
-import Header from './components/Header';
-import Hero from './components/Hero';
-import ProductCard from './components/ProductCard';
-import ProductFilter from './components/ProductFilter';
-import Cart from './components/Cart';
-import Footer from './components/Footer';
-import ErrorDebugPanel from './components/ErrorDebugPanel';
-import { bigCommerceService, Product } from './services/bigcommerce';
-import { useErrorLogger } from './hooks/useErrorLogger';
+// data-only helpers
+const GQL = "/api/gql";
 
-interface CartItem {
+export async function gql<T>(query: string, variables?: Record<string, any>): Promise<T> {
+  const res = await fetch(GQL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, variables }),
+  });
+  const txt = await res.text();
+  const json = JSON.parse(txt);
+  if (!res.ok || json.errors) throw new Error(JSON.stringify(json.errors || json));
+  return json.data as T;
+}
+
+export const PRODUCTS_BASIC = `
+  query($first:Int=12){
+    site{ 
+      products(first:$first){ 
+        edges{ 
+          node{ 
+            entityId 
+            name 
+            path 
+            defaultImage{ url(width:640) } 
+            prices {
+              price {
+                value
+                currencyCode
+              }
+              salePrice {
+                value
+                currencyCode
+              }
+            }
+            categories {
+              edges {
+                node {
+                  name
+                }
+              }
+            }
+          } 
+        } 
+      } 
+    }
+  }`;
+
+export const CATEGORIES_BASIC = `
+  query($first:Int=20){
+    site{ 
+      categoryTree(rootEntityId:0){ 
+        entityId 
+        name 
+        path 
+      } 
+    }
+  }`;
+
+// TypeScript interfaces
+export interface Product {
   id: number;
   name: string;
   price: number;
-  quantity: number;
+  originalPrice?: number;
   image: string;
+  rating: number;
+  reviews: number;
+  category: string;
+  benefits: string[];
 }
 
-function App() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const { errors, logError, clearErrors } = useErrorLogger();
+// Mock data for fallback
+export const mockProducts: Product[] = [
+  {
+    id: 1,
+    name: "Premium Peptide Complex",
+    price: 89.99,
+    originalPrice: 119.99,
+    image: "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640",
+    rating: 4.8,
+    reviews: 124,
+    category: "Peptides",
+    benefits: ["Energy Support", "Recovery"]
+  },
+  {
+    id: 2,
+    name: "Genetic Health Panel",
+    price: 299.99,
+    image: "https://images.pexels.com/photos/3825527/pexels-photo-3825527.jpeg?auto=compress&cs=tinysrgb&w=640",
+    rating: 4.9,
+    reviews: 89,
+    category: "Testing",
+    benefits: ["Health Insights", "Personalized"]
+  },
+  {
+    id: 3,
+    name: "Advanced Biomarker Test",
+    price: 199.99,
+    originalPrice: 249.99,
+    image: "https://images.pexels.com/photos/3938023/pexels-photo-3938023.jpeg?auto=compress&cs=tinysrgb&w=640",
+    rating: 4.7,
+    reviews: 156,
+    category: "Testing",
+    benefits: ["Comprehensive", "Lab Quality"]
+  }
+];
 
-  // Fetch products and categories from BigCommerce
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const [productsData, categoriesData] = await Promise.all([
-          bigCommerceService.getProducts(logError),
-          bigCommerceService.getCategories(logError)
-        ]);
-        
-        setProducts(productsData.products);
-        setCategories(categoriesData.categories);
-        
-        // Set error message if either API call failed
-        if (productsData.errorMessage || categoriesData.errorMessage) {
-          const errorMsg = productsData.errorMessage || categoriesData.errorMessage;
-          setError(errorMsg);
-        }
-      } catch (err) {
-        setError('Failed to load products. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
+export const mockCategories: string[] = ["Peptides", "Testing", "Supplements", "Wellness"];
 
-    fetchData();
-  }, [logError]);
-
-  const addToCart = (productId: number) => {
-    const product = products.find(p => p.id === productId);
-    if (!product) return;
-
-    setCartItems(prev => {
-      const existingItem = prev.find(item => item.id === productId);
-      if (existingItem) {
-        return prev.map(item =>
-          item.id === productId
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      } else {
-        return [...prev, {
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          quantity: 1,
-          image: product.image
-        }];
-      }
-    });
+// Data transformation helpers
+export function transformBigCommerceProduct(bcProduct: any): Product {
+  return {
+    id: bcProduct.entityId,
+    name: bcProduct.name,
+    price: bcProduct.prices?.price?.value || 0,
+    originalPrice: bcProduct.prices?.salePrice?.value !== bcProduct.prices?.price?.value 
+      ? bcProduct.prices?.price?.value 
+      : undefined,
+    image: bcProduct.defaultImage?.url || "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640",
+    rating: 4.5, // Default rating
+    reviews: Math.floor(Math.random() * 200) + 10, // Random reviews
+    category: bcProduct.categories?.edges?.[0]?.node?.name || "General",
+    benefits: ["Health Support", "Quality Tested"] // Default benefits
   };
+}
 
-  const updateCartQuantity = (id: number, quantity: number) => {
-    if (quantity === 0) {
-      removeFromCart(id);
-      return;
+// API functions
+export async function fetchProducts(logError?: (message: string, error?: Error) => void): Promise<{
+  products: Product[];
+  errorMessage?: string;
+}> {
+  try {
+    const data = await gql(PRODUCTS_BASIC, { first: 12 });
+    const products = data.site?.products?.edges?.map((edge: any) => 
+      transformBigCommerceProduct(edge.node)
+    ) || [];
+    
+    return { products: products.length > 0 ? products : mockProducts };
+  } catch (error) {
+    const errorMessage = "BigCommerce API unavailable, using sample data";
+    if (logError) {
+      logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
     }
-    setCartItems(prev =>
-      prev.map(item =>
-        item.id === id ? { ...item, quantity } : item
-      )
-    );
-  };
-
-  const removeFromCart = (id: number) => {
-    setCartItems(prev => prev.filter(item => item.id !== id));
-  };
-
-  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-
-  // Filter products
-  const filteredProducts = products.filter(product => {
-    const categoryMatch = selectedCategory === 'all' || product.category === selectedCategory;
-    const priceMatch = product.price >= priceRange[0] && product.price <= priceRange[1];
-    return categoryMatch && priceMatch;
-  });
-
-  return (
-    <AuthProvider>
-      <div className="min-h-screen bg-gray-50">
-        <Header cartCount={cartCount} onCartClick={() => setIsCartOpen(true)} />
-        
-        <Hero />
-
-        {/* Products Section */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Our Products</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">Discover our range of products</p>
-          </div>
-          <div>
-            {loading ? (
-              <div>
-                <p className="text-gray-600">Loading products...</p>
-              </div>
-            ) : error ? (
-              <div>
-                <p className="text-red-600">Error loading products</p>
-              </div>
-            ) : (
-              <div>
-                <p className="text-gray-600">Products loaded successfully</p>
-                <div>
-                  <select>
-                    <option>All</option>
-                    <option>Category 1</option>
-                    <option>Category 2</option>
-                    <option>Category 3</option>
-                    <option>Category 4</option>
-                  </select>
-                </div>
-              </div>
-            )}
-          </div>
-          <div>
-            <span className="text-sm text-gray-600">Filter results</span>
-          </div>
-          <div>
-            {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-100 animate-pulse">
-                    <div className="h-48 bg-gray-200 rounded-t-lg"></div>
-                    <div className="p-4 space-y-3">
-                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                      <div className="h-8 bg-gray-200 rounded"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : error ? (
-              <div className="text-center py-16">
-                <p className="text-red-500 text-lg mb-4">Error loading products</p>
-                <button>
-                  Retry
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredProducts.map(product => (
-                  <ProductCard
-                    key={product.id}
-                    {...product}
-                    onAddToCart={addToCart}
-                  />
-                ))}
-              </div>
-            )}
-
-            {!loading && !error && filteredProducts.length === 0 && (
-              <div className="text-center py-16">
-                <p className="text-gray-500 text-lg">No products found</p>
-                <button
-                  onClick={() => {
-                    setSelectedCategory('all');
-                    setPriceRange([0, 100]);
-                  }}
-                  className="mt-4 text-pink-600 hover:text-pink-700 transition-colors"
-                >
-                  Clear filters
-                </button>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* Newsletter Section */}
-        <section className="bg-gradient-to-r from-pink-600 to-orange-600 text-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold mb-4">Stay Connected with HealthSpan360</h2>
-              <p className="text-pink-100 mb-8 max-w-2xl mx-auto">
-                Get the latest insights on peptide therapy, genetic testing, and personalized healthcare delivered to your inbox.
-              </p>
-              <div className="max-w-md mx-auto flex">
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="flex-1 px-4 py-2 rounded-l-lg text-gray-900"
-                />
-                <button className="px-6 py-2 bg-white text-pink-600 rounded-r-lg hover:bg-gray-100 transition-colors">
-                  <select>
-                    <option>Option 1</option>
-                    <option>Option 2</option>
-                    <option>Option 3</option>
-                    <option>Option 4</option>
-                    <option>Option 5</option>
-                  </select>
-                  Subscribe
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <Footer />
-
-        <Cart
-          isOpen={isCartOpen}
-          onClose={() => setIsCartOpen(false)}
-          items={cartItems}
-          onUpdateQuantity={updateCartQuantity}
-          onRemoveItem={removeFromCart}
-        />
-
-        <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
-      </div>
-    </AuthProvider>
-  );
+    return { products: mockProducts, errorMessage };
+  }
 }
 
-export default App;
+export async function fetchCategories(logError?: (message: string, error?: Error) => void): Promise<{
+  categories: string[];
+  errorMessage?: string;
+}> {
+  try {
+    const data = await gql(CATEGORIES_BASIC, { first: 20 });
+    const categories = data.site?.categoryTree?.map((cat: any) => cat.name) || [];
+    
+    return { categories: categories.length > 0 ? categories : mockCategories };
+  } catch (error) {
+    const errorMessage = "BigCommerce API unavailable, using sample categories";
+    if (logError) {
+      logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
+    }
+    return { categories: mockCategories, errorMessage };
+  }
+}
