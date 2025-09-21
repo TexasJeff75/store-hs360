@@ -100,11 +100,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Fetching profile for user:', userId);
       setLoading(true);
       
+      // Add timeout to prevent hanging requests
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
+        .abortSignal(controller.signal)
         .single();
+      
+      clearTimeout(timeoutId);
 
       if (error && error.code !== 'PGRST116') {
         console.error('Error fetching profile:', error);
@@ -117,7 +124,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(data);
       }
     } catch (error) {
-      console.error('Error fetching profile:', error);
+      if (error.name === 'AbortError') {
+        console.error('Profile fetch timed out');
+      } else {
+        console.error('Error fetching profile:', error);
+      }
       setProfile(null);
     } finally {
       setLoading(false);

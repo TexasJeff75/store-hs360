@@ -3,11 +3,19 @@ const API_BASE = import.meta.env.VITE_API_BASE || "";
 const GQL = `${API_BASE}/api/gql`;
 
 export async function gql<T>(query: string, variables?: Record<string, any>): Promise<T> {
+  // Add timeout and better error handling
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+  
   const res = await fetch(GQL, { 
     method: "POST",
     headers: { "Content-Type": "application/json" }, 
-    body: JSON.stringify({ query, variables })
+    body: JSON.stringify({ query, variables }),
+    signal: controller.signal
   });
+  
+  clearTimeout(timeoutId);
+  
   const txt = await res.text();
   const json = JSON.parse(txt);
   if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt.slice(0,200)}`);

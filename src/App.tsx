@@ -45,10 +45,20 @@ function AppContent() {
         setLoading(true);
         setError(null);
         
-        const [productsData, categoriesData] = await Promise.all([
+        // Add timeout to the entire fetch operation
+        const fetchPromise = Promise.all([
           bigCommerceService.getProducts((err: unknown, ctx?: string) => logError(err, ctx)),
           bigCommerceService.getCategories((err: unknown, ctx?: string) => logError(err, ctx))
         ]);
+        
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Request timeout')), 20000)
+        );
+        
+        const [productsData, categoriesData] = await Promise.race([
+          fetchPromise,
+          timeoutPromise
+        ]) as any;
         
         setProducts(productsData.products);
         setCategories(categoriesData.categories);
@@ -59,7 +69,11 @@ function AppContent() {
           setError(errorMsg);
         }
       } catch (err) {
-        setError('Failed to load products. Please try again later.');
+        const errorMessage = err instanceof Error && err.message === 'Request timeout' 
+          ? 'Request timed out. Please check your connection and try again.'
+          : 'Failed to load products. Please try again later.';
+        setError(errorMessage);
+        logError(err, 'fetchData');
       } finally {
         setLoading(false);
       }
