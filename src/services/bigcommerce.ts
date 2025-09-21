@@ -34,7 +34,7 @@ const PRODUCTS_Q = /* GraphQL */ `
     }
   }`;
 
-export const CATEGORIES_BASIC = `
+const CATEGORIES_Q = /* GraphQL */ `
   query Categories($root: Int = 0) {
     site {
       categoryTree(rootEntityId: $root) {
@@ -107,7 +107,7 @@ export const mockProducts: Product[] = [
 export const mockCategories: string[] = ["Peptides", "Testing", "Supplements", "Wellness"];
 
 // Data transformation helpers
-export function transformBigCommerceProduct(bcProduct: any): Product {
+function transformBigCommerceProduct(bcProduct: any): Product {
   return {
     id: bcProduct.entityId,
     name: bcProduct.name,
@@ -123,49 +123,46 @@ export function transformBigCommerceProduct(bcProduct: any): Product {
   };
 }
 
-// API functions
-export async function fetchProducts(logError?: (message: string, error?: Error) => void): Promise<{
-  products: Product[];
-  errorMessage?: string;
-}> {
-  try {
-    const data = await gql(PRODUCTS_Q, { first: 20 });
-    const edges = data?.site?.products?.edges ?? [];
-    const products = edges.map((edge: any) => 
-      transformBigCommerceProduct(edge.node)
-    );
-    
-    return { products: products.length > 0 ? products : mockProducts };
-  } catch (error) {
-    const errorMessage = "BigCommerce API unavailable, using sample data";
-    if (logError) {
-      logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
+class BigCommerceService {
+  async getProducts(logError?: (message: string, error?: Error) => void): Promise<{
+    products: Product[];
+    errorMessage?: string;
+  }> {
+    try {
+      const data = await gql(PRODUCTS_Q, { first: 20 });
+      const edges = data?.site?.products?.edges ?? [];
+      const products = edges.map((edge: any) => 
+        transformBigCommerceProduct(edge.node)
+      );
+      
+      return { products: products.length > 0 ? products : mockProducts };
+    } catch (error) {
+      const errorMessage = "BigCommerce API unavailable, using sample data";
+      if (logError) {
+        logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
+      }
+      return { products: mockProducts, errorMessage };
     }
-    return { products: mockProducts, errorMessage };
+  }
+
+  async getCategories(logError?: (message: string, error?: Error) => void): Promise<{
+    categories: string[];
+    errorMessage?: string;
+  }> {
+    try {
+      const data = await gql(CATEGORIES_Q, { root: 0 });
+      const categoryTree = data?.site?.categoryTree ?? [];
+      const categories = categoryTree.map((cat: any) => cat.name);
+      
+      return { categories: categories.length > 0 ? categories : mockCategories };
+    } catch (error) {
+      const errorMessage = "BigCommerce API unavailable, using sample categories";
+      if (logError) {
+        logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
+      }
+      return { categories: mockCategories, errorMessage };
+    }
   }
 }
 
-export async function fetchCategories(logError?: (message: string, error?: Error) => void): Promise<{
-  categories: string[];
-  errorMessage?: string;
-}> {
-  try {
-    const data = await gql(CATEGORIES_BASIC, { root: 0 });
-    const categoryTree = data?.site?.categoryTree ?? [];
-    const categories = categoryTree.map((cat: any) => cat.name);
-    
-    return { categories: categories.length > 0 ? categories : mockCategories };
-  } catch (error) {
-    const errorMessage = "BigCommerce API unavailable, using sample categories";
-    if (logError) {
-      logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
-    }
-    return { categories: mockCategories, errorMessage };
-  }
-}
-
-// Export service object for backward compatibility
-export const bigCommerceService = {
-  getProducts: fetchProducts,
-  getCategories: fetchCategories
-};
+export const bigCommerceService = new BigCommerceService();
