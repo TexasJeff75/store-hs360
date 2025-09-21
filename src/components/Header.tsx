@@ -30,7 +30,6 @@ const Header: React.FC<HeaderProps> = ({
                 HealthSpan360
               </h1>
               {loading && (
-              </h1>
               <span className="text-sm text-gray-600 hidden sm:inline">Loading...</span>
               )}
             </div>
