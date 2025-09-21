@@ -52,9 +52,9 @@ export const PRODUCTS_BASIC = `
   }`;
 
 export const CATEGORIES_BASIC = `
-  query Categories($root: Int = 0, $depth: Int = 2) {
+  query Categories($root: Int = 0) {
     site {
-      categoryTree(rootEntityId: $root, depth: $depth) {
+      categoryTree(rootEntityId: $root) {
         entityId
         name
         path
@@ -167,7 +167,7 @@ export async function fetchCategories(logError?: (message: string, error?: Error
   errorMessage?: string;
 }> {
   try {
-    const data = await gql(CATEGORIES_BASIC, { root: 0, depth: 2 });
+    const data = await gql(CATEGORIES_BASIC, { root: 0 });
     const categoryTree = data?.site?.categoryTree ?? [];
     const categories = categoryTree.map((cat: any) => cat.name);
     
