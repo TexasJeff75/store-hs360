@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "netlify dev",
+    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:functions\"",
     "dev:vite": "vite",
+    "dev:functions": "node server/gql.cjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
