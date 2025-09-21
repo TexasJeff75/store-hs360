@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, Plus, Edit, Trash2, Search, MapPin, Users, Mail, Phone } from 'lucide-react';
-import { multiTenantService } from '@/services/multiTenant';
-import type { Organization } from '@/services/supabase';
+import { multiTenantService } from '../../services/multiTenant';
+import type { Organization } from '../../services/supabase';
 
 const OrganizationManagement: React.FC = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
