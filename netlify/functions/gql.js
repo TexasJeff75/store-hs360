@@ -125,7 +125,8 @@ exports.handler = async (event, context) => {
       statusCode: response.status,
       headers: {
         'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=60'
       },
       body: responseText
     };
