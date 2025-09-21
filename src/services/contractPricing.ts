@@ -260,6 +260,158 @@ class ContractPricingService {
       return null;
     }
   }
+
+  /**
+   * Set organization pricing (Admin only)
+   */
+  async setOrganizationPrice(
+    organizationId: string,
+    productId: number,
+    contractPrice: number,
+    minQuantity?: number,
+    maxQuantity?: number,
+    effectiveDate?: string,
+    expiryDate?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { data, error } = await supabase
+        .from('organization_pricing')
+        .upsert({
+          organization_id: organizationId,
+          product_id: productId,
+          contract_price: contractPrice,
+          min_quantity: minQuantity || 1,
+          max_quantity: maxQuantity,
+          effective_date: effectiveDate || new Date().toISOString(),
+          expiry_date: expiryDate,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error setting organization price:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
+    }
+  }
+
+  /**
+   * Set location pricing (Admin only)
+   */
+  async setLocationPrice(
+    locationId: string,
+    productId: number,
+    contractPrice: number,
+    minQuantity?: number,
+    maxQuantity?: number,
+    effectiveDate?: string,
+    expiryDate?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { data, error } = await supabase
+        .from('location_pricing')
+        .upsert({
+          location_id: locationId,
+          product_id: productId,
+          contract_price: contractPrice,
+          min_quantity: minQuantity || 1,
+          max_quantity: maxQuantity,
+          effective_date: effectiveDate || new Date().toISOString(),
+          expiry_date: expiryDate,
+        })
+        .select()
+        .single();
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error setting location price:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
+    }
+  }
+
+  /**
+   * Remove organization pricing (Admin only)
+   */
+  async removeOrganizationPrice(
+    organizationId: string,
+    productId: number,
+    effectiveDate?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      let query = supabase
+        .from('organization_pricing')
+        .delete()
+        .eq('organization_id', organizationId)
+        .eq('product_id', productId);
+
+      if (effectiveDate) {
+        query = query.eq('effective_date', effectiveDate);
+      }
+
+      const { error } = await query;
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error removing organization price:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
+    }
+  }
+
+  /**
+   * Remove location pricing (Admin only)
+   */
+  async removeLocationPrice(
+    locationId: string,
+    productId: number,
+    effectiveDate?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      let query = supabase
+        .from('location_pricing')
+        .delete()
+        .eq('location_id', locationId)
+        .eq('product_id', productId);
+
+      if (effectiveDate) {
+        query = query.eq('effective_date', effectiveDate);
+      }
+
+      const { error } = await query;
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error removing location price:', error);
+      return { 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      };
+    }
+  }
 }
 
 export const contractPricingService = new ContractPricingService();
