@@ -120,33 +120,35 @@ function App() {
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Our Products</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">Discover our premium selection of peptides and health optimization products</p>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">Discover our range of products</p>
           </div>
-
-          {/* Filter Section */}
-          <div className="mb-8">
-            <ProductFilter
-              categories={categories}
-              selectedCategory={selectedCategory}
-              onCategoryChange={setSelectedCategory}
-              priceRange={priceRange}
-              onPriceRangeChange={setPriceRange}
-              isOpen={isFilterOpen}
-              onToggle={() => setIsFilterOpen(!isFilterOpen)}
-            />
-          </div>
-
-          {/* Products Grid */}
-          <div className="mb-6">
+          <div>
             {loading ? (
-              <p className="text-gray-600">Loading products...</p>
+              <div>
+                <p className="text-gray-600">Loading...</p>
+              </div>
             ) : error ? (
-              <p className="text-red-600">Error loading products: {error}</p>
+              <div>
+                <p className="text-red-600">Error loading products</p>
+              </div>
             ) : (
-              <p className="text-gray-600">Showing {filteredProducts.length} products</p>
+              <div>
+                <p className="text-gray-600">Products loaded successfully</p>
+                <div>
+                  <select>
+                    <option>All</option>
+                    <option>Category 1</option>
+                    <option>Category 2</option>
+                    <option>Category 3</option>
+                    <option>Category 4</option>
+                  </select>
+                </div>
+              </div>
             )}
           </div>
-
+          <div>
+            <span className="text-sm text-gray-600">Filter by price</span>
+          </div>
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {[...Array(6)].map((_, i) => (
@@ -162,12 +164,9 @@ function App() {
             </div>
           ) : error ? (
             <div className="text-center py-16">
-              <p className="text-red-500 text-lg mb-4">{error}</p>
-              <button
-                onClick={() => window.location.reload()}
-                className="bg-pink-600 text-white px-6 py-2 rounded-lg hover:bg-pink-700 transition-colors"
-              >
-                Try Again
+              <p className="text-red-500 text-lg mb-4">Error loading products</p>
+              <button>
+                Retry
               </button>
             </div>
           ) : (
@@ -184,7 +183,7 @@ function App() {
 
           {!loading && !error && filteredProducts.length === 0 && (
             <div className="text-center py-16">
-              <p className="text-gray-500 text-lg">No products found matching your criteria</p>
+              <p className="text-gray-500 text-lg">No products found</p>
               <button
                 onClick={() => {
                   setSelectedCategory('all');
@@ -210,9 +209,16 @@ function App() {
                 <input
                   type="email"
                   placeholder="Enter your email"
-                  className="flex-1 px-4 py-3 rounded-l-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-300"
+                  className="flex-1 px-4 py-2 rounded-l-lg text-gray-900"
                 />
-                <button className="bg-pink-800 hover:bg-pink-900 px-6 py-3 rounded-r-lg font-semibold transition-colors">
+                <select>
+                  <option>Option 1</option>
+                  <option>Option 2</option>
+                  <option>Option 3</option>
+                  <option>Option 4</option>
+                  <option>Option 5</option>
+                </select>
+                <button className="px-6 py-2 bg-pink-700 hover:bg-pink-800 rounded-r-lg transition-colors">
                   Subscribe
                 </button>
               </div>
