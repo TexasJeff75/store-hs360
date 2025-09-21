@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { AuthProvider } from './contexts/AuthContext';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import ProductCard from './components/ProductCard';
@@ -109,148 +110,150 @@ function App() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Header cartCount={cartCount} onCartClick={() => setIsCartOpen(true)} />
-      
-      <Hero />
+    <AuthProvider>
+      <div className="min-h-screen bg-gray-50">
+        <Header cartCount={cartCount} onCartClick={() => setIsCartOpen(true)} />
+        
+        <Hero />
 
-      {/* Products Section */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Premium Health Products
-          </h2>
-          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            Discover our carefully curated selection of supplements, vitamins, and wellness products 
-            designed to support your optimal health journey.
-          </p>
-        </div>
-
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Filter Sidebar */}
-          <div className="lg:w-64 flex-shrink-0">
-            <ProductFilter
-              categories={categories}
-              selectedCategory={selectedCategory}
-              onCategoryChange={setSelectedCategory}
-              priceRange={priceRange}
-              onPriceRangeChange={setPriceRange}
-              isOpen={isFilterOpen}
-              onToggle={() => setIsFilterOpen(!isFilterOpen)}
-            />
-          </div>
-
-          {/* Products Grid */}
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-6">
-              {loading ? (
-                <p className="text-gray-600">Loading products...</p>
-              ) : error ? (
-                <p className="text-red-600">{error}</p>
-              ) : (
-                <p className="text-gray-600">
-                  Showing {filteredProducts.length} products
-                </p>
-              )}
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-600">Sort by:</span>
-                <select className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent">
-                  <option>Featured</option>
-                  <option>Price: Low to High</option>
-                  <option>Price: High to Low</option>
-                  <option>Newest</option>
-                  <option>Best Rating</option>
-                </select>
-              </div>
-            </div>
-
-            {loading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-100 animate-pulse">
-                    <div className="h-48 bg-gray-200 rounded-t-lg"></div>
-                    <div className="p-4 space-y-3">
-                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                      <div className="h-8 bg-gray-200 rounded"></div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : error ? (
-              <div className="text-center py-16">
-                <p className="text-red-500 text-lg mb-4">{error}</p>
-                <button
-                  onClick={() => window.location.reload()}
-                  className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-6 py-2 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all"
-                >
-                  Try Again
-                </button>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredProducts.map(product => (
-                  <ProductCard
-                    key={product.id}
-                    {...product}
-                    onAddToCart={addToCart}
-                  />
-                ))}
-              </div>
-            )}
-
-            {!loading && !error && filteredProducts.length === 0 && (
-              <div className="text-center py-16">
-                <p className="text-gray-500 text-lg">No products found matching your criteria.</p>
-                <button
-                  onClick={() => {
-                    setSelectedCategory('all');
-                    setPriceRange([0, 100]);
-                  }}
-                  className="mt-4 text-pink-600 hover:text-pink-700 transition-colors"
-                >
-                  Clear filters
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Newsletter Section */}
-      <section className="bg-gradient-to-r from-pink-600 to-orange-600 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold mb-4">Stay Connected with HealthSpan360</h2>
-            <p className="text-pink-100 mb-8 max-w-2xl mx-auto">
-              Get the latest insights on peptide therapy, genetic testing, and personalized healthcare delivered to your inbox.
+        {/* Products Section */}
+        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
+              Premium Health Products
+            </h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Discover our carefully curated selection of supplements, vitamins, and wellness products 
+              designed to support your optimal health journey.
             </p>
-            <div className="max-w-md mx-auto flex">
-              <input
-                type="email"
-                placeholder="Enter your email"
-                className="flex-1 px-4 py-3 rounded-l-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400"
+          </div>
+
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Filter Sidebar */}
+            <div className="lg:w-64 flex-shrink-0">
+              <ProductFilter
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+                priceRange={priceRange}
+                onPriceRangeChange={setPriceRange}
+                isOpen={isFilterOpen}
+                onToggle={() => setIsFilterOpen(!isFilterOpen)}
               />
-              <button className="bg-white text-pink-600 px-6 py-3 rounded-r-lg hover:bg-gray-100 transition-colors font-semibold">
-                Subscribe
-              </button>
+            </div>
+
+            {/* Products Grid */}
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-6">
+                {loading ? (
+                  <p className="text-gray-600">Loading products...</p>
+                ) : error ? (
+                  <p className="text-red-600">{error}</p>
+                ) : (
+                  <p className="text-gray-600">
+                    Showing {filteredProducts.length} products
+                  </p>
+                )}
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm text-gray-600">Sort by:</span>
+                  <select className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent">
+                    <option>Featured</option>
+                    <option>Price: Low to High</option>
+                    <option>Price: High to Low</option>
+                    <option>Newest</option>
+                    <option>Best Rating</option>
+                  </select>
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-100 animate-pulse">
+                      <div className="h-48 bg-gray-200 rounded-t-lg"></div>
+                      <div className="p-4 space-y-3">
+                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                        <div className="h-8 bg-gray-200 rounded"></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : error ? (
+                <div className="text-center py-16">
+                  <p className="text-red-500 text-lg mb-4">{error}</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-6 py-2 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredProducts.map(product => (
+                    <ProductCard
+                      key={product.id}
+                      {...product}
+                      onAddToCart={addToCart}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {!loading && !error && filteredProducts.length === 0 && (
+                <div className="text-center py-16">
+                  <p className="text-gray-500 text-lg">No products found matching your criteria.</p>
+                  <button
+                    onClick={() => {
+                      setSelectedCategory('all');
+                      setPriceRange([0, 100]);
+                    }}
+                    className="mt-4 text-pink-600 hover:text-pink-700 transition-colors"
+                  >
+                    Clear filters
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      <Footer />
+        {/* Newsletter Section */}
+        <section className="bg-gradient-to-r from-pink-600 to-orange-600 text-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <div className="text-center">
+              <h2 className="text-3xl font-bold mb-4">Stay Connected with HealthSpan360</h2>
+              <p className="text-pink-100 mb-8 max-w-2xl mx-auto">
+                Get the latest insights on peptide therapy, genetic testing, and personalized healthcare delivered to your inbox.
+              </p>
+              <div className="max-w-md mx-auto flex">
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  className="flex-1 px-4 py-3 rounded-l-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                />
+                <button className="bg-white text-pink-600 px-6 py-3 rounded-r-lg hover:bg-gray-100 transition-colors font-semibold">
+                  Subscribe
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
 
-      <Cart
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        items={cartItems}
-        onUpdateQuantity={updateCartQuantity}
-        onRemoveItem={removeFromCart}
-      />
+        <Footer />
 
-      <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
-    </div>
+        <Cart
+          isOpen={isCartOpen}
+          onClose={() => setIsCartOpen(false)}
+          items={cartItems}
+          onUpdateQuantity={updateCartQuantity}
+          onRemoveItem={removeFromCart}
+        />
+
+        <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
+      </div>
+    </AuthProvider>
   );
 }
 

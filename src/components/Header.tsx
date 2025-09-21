@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
-import { Search, ShoppingCart, User, Menu, X, Heart, Dna } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, X, Heart, Dna, LogIn, UserCheck } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import AuthModal from './AuthModal';
+import UserProfile from './UserProfile';
 
 interface HeaderProps {
   cartCount: number;
@@ -8,6 +11,9 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const { user, profile } = useAuth();
 
   return (
     <header className="bg-white shadow-sm">
@@ -70,9 +76,33 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick }) => {
             <button className="text-gray-700 hover:text-blue-600 transition-colors">
               <Heart className="h-6 w-6" />
             </button>
-            <button className="text-gray-700 hover:text-blue-600 transition-colors">
-              <User className="h-6 w-6" />
-            </button>
+            
+            {/* User Authentication */}
+            {user ? (
+              <button 
+                onClick={() => setIsProfileOpen(true)}
+                className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
+              >
+                <div className="relative">
+                  <User className="h-6 w-6" />
+                  {profile?.role === 'approved' && (
+                    <UserCheck className="h-3 w-3 text-green-600 absolute -top-1 -right-1" />
+                  )}
+                </div>
+                <span className="hidden md:block text-sm font-medium">
+                  {profile?.email?.split('@')[0] || 'User'}
+                </span>
+              </button>
+            ) : (
+              <button 
+                onClick={() => setIsAuthModalOpen(true)}
+                className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
+              >
+                <LogIn className="h-6 w-6" />
+                <span className="hidden md:block text-sm font-medium">Sign In</span>
+              </button>
+            )}
+            
             <button 
               onClick={onCartClick}
               className="text-gray-700 hover:text-pink-600 transition-colors relative"
@@ -135,6 +165,18 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick }) => {
           </div>
         )}
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+      />
+
+      {/* User Profile Modal */}
+      <UserProfile 
+        isOpen={isProfileOpen} 
+        onClose={() => setIsProfileOpen(false)} 
+      />
     </header>
   );
 };

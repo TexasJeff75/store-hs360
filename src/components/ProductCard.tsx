@@ -1,5 +1,6 @@
 import React from 'react';
 import { Star, Heart, ShoppingCart } from 'lucide-react';
+import PriceDisplay from './PriceDisplay';
 
 interface ProductCardProps {
   id: number;
@@ -79,13 +80,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         {/* Price */}
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-2">
-            <span className="text-lg font-bold text-gray-900">${price}</span>
-            {originalPrice && (
-              <span className="text-sm text-gray-500 line-through">${originalPrice}</span>
-            )}
-          </div>
+        <div className="mb-3">
+          <PriceDisplay 
+            productId={id}
+            regularPrice={price}
+            originalPrice={originalPrice}
+            showSavings={true}
+          />
         </div>
 
         {/* Add to Cart Button */}
