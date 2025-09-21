@@ -69,7 +69,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
           setSuccess('Successfully signed in!');
           setTimeout(() => {
             handleClose();
-          }, 1500);
+          }, 1000);
         }
       } else {
         console.log('Attempting sign up...');
@@ -88,7 +88,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
             setMode('signin');
             resetForm();
             setSuccess(null);
-          }, 2000);
+          }, 1500);
         }
       }
     } catch (err) {

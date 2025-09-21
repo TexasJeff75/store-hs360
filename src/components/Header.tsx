@@ -28,7 +28,7 @@ const Header: React.FC<HeaderProps> = ({
             <div className="flex-shrink-0">
               <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-orange-600 bg-clip-text text-transparent">
                 HealthSpan360
-              </h1>
+              <span className="text-sm text-gray-600 hidden sm:inline">Loading...</span>
             </div>
           </div>
 
@@ -74,7 +74,7 @@ const Header: React.FC<HeaderProps> = ({
                 >
                   <User className="w-5 h-5" />
                   <span className="hidden sm:inline">
-                    {profile?.email?.split('@')[0] || 'Profile'}
+                    {profile?.email?.split('@')[0] || user.email?.split('@')[0] || 'Profile'}
                   </span>
                 </button>
                 
