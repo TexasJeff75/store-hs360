@@ -57,7 +57,13 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
         const { error } = await signIn(email, password);
         if (error) {
           console.error('Sign in error:', error);
-          setError(error.message || 'Failed to sign in. Please check your credentials.');
+          if (error.message.includes('Invalid login credentials')) {
+            setError('Invalid email or password. Please check your credentials and try again.');
+          } else if (error.message.includes('Email not confirmed')) {
+            setError('Please check your email and click the confirmation link before signing in.');
+          } else {
+            setError(error.message || 'Failed to sign in. Please try again.');
+          }
         } else {
           console.log('Sign in successful');
           setSuccess('Successfully signed in!');
@@ -70,13 +76,19 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
         const { error } = await signUp(email, password);
         if (error) {
           console.error('Sign up error:', error);
-          setError(error.message || 'Failed to create account. Please try again.');
+          if (error.message.includes('User already registered')) {
+            setError('An account with this email already exists. Please sign in instead.');
+          } else {
+            setError(error.message || 'Failed to create account. Please try again.');
+          }
         } else {
           console.log('Sign up successful');
-          setSuccess('Account created successfully! Please check your email to verify your account.');
+          setSuccess('Account created successfully! You can now sign in.');
           setTimeout(() => {
-            handleClose();
-          }, 3000);
+            setMode('signin');
+            resetForm();
+            setSuccess(null);
+          }, 2000);
         }
       }
     } catch (err) {

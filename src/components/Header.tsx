@@ -17,7 +17,7 @@ const Header: React.FC<HeaderProps> = ({
   onProfileClick,
   onAdminClick
 }) => {
-  const { user, profile } = useAuth();
+  const { user, profile, loading } = useAuth();
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
@@ -61,14 +61,21 @@ const Header: React.FC<HeaderProps> = ({
             </button>
 
             {/* User Authentication */}
-            {user ? (
+            {loading ? (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-pink-600"></div>
+                <span className="text-sm text-gray-600">Loading...</span>
+              </div>
+            ) : user ? (
               <div className="flex items-center space-x-2">
                 <button
                   onClick={onProfileClick}
                   className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
                 >
                   <User className="w-5 h-5" />
-                  <span className="hidden sm:inline">Profile</span>
+                  <span className="hidden sm:inline">
+                    {profile?.email?.split('@')[0] || 'Profile'}
+                  </span>
                 </button>
                 
                 {profile?.role === 'admin' && (

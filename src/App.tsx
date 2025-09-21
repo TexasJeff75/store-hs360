@@ -36,7 +36,7 @@ function AppContent() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { errors, logError, clearErrors } = useErrorLogger();
-  const { user, profile } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
 
   // Fetch products and categories from BigCommerce
   useEffect(() => {
@@ -68,6 +68,10 @@ function AppContent() {
     fetchData();
   }, [logError]);
 
+  // Debug auth state
+  useEffect(() => {
+    console.log('Auth state:', { user: user?.email, profile: profile?.role, authLoading });
+  }, [user, profile, authLoading]);
   const addToCart = (productId: number) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
