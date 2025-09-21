@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { AuthProvider } from '../../contexts/AuthContext';
-import Header from '../Header';
-import Hero from '../Hero';
-import ProductCard from '../ProductCard';
-import ProductFilter from '../ProductFilter';
-import Cart from '../Cart';
-import Footer from '../Footer';
-import ErrorDebugPanel from '../ErrorDebugPanel';
-import { bigCommerceService, Product } from '../../services/bigcommerce';
-import { useErrorLogger } from '../../hooks/useErrorLogger';
+import { AuthProvider } from '@/contexts/AuthContext';
+import Header from '@/components/Header';
+import Hero from '@/components/Hero';
+import ProductCard from '@/components/ProductCard';
+import ProductFilter from '@/components/ProductFilter';
+import Cart from '@/components/Cart';
+import Footer from '@/components/Footer';
+import ErrorDebugPanel from '@/components/ErrorDebugPanel';
+import { bigCommerceService, Product } from '@/services/bigcommerce';
+import { useErrorLogger } from '@/hooks/useErrorLogger';
 
 interface CartItem {
   id: number;
