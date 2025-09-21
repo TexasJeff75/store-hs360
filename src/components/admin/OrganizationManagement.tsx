@@ -141,7 +141,7 @@ const OrganizationManagement: React.FC = () => {
     }
   };
 
-  const filteredOrganizations = organizations.filter(org =>
+  const filteredOrganizations = organizations.filter(org => {
     const matchesSearch = 
       org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       org.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -153,6 +153,7 @@ const OrganizationManagement: React.FC = () => {
       (statusFilter === 'inactive' && !org.is_active);
     
     return matchesSearch && matchesStatus;
+  });
 
   if (loading) {
     return (
