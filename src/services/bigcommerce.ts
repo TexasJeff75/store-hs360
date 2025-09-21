@@ -119,6 +119,11 @@ class BigCommerceStorefrontService {
           throw new Error('UNAUTHORIZED');
         }
         
+        // Check for 402 Payment Required - API access not available on current plan
+        if (response.status === 402) {
+          throw new Error('API_ACCESS_NOT_AVAILABLE');
+        }
+        
         console.error('BigCommerce GraphQL Error Details:', {
           status: response.status,
           statusText: response.statusText,
@@ -269,6 +274,8 @@ class BigCommerceStorefrontService {
         displayMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch products.';
       } else if (errorMessage === 'GRAPHQL_ENDPOINT_NOT_FOUND') {
         displayMessage = 'GraphQL endpoint not found. Please verify your VITE_BIGCOMMERCE_STOREFRONT_API_URL is correct (should be your store\'s base URL without /graphql).';
+      } else if (errorMessage === 'API_ACCESS_NOT_AVAILABLE') {
+        displayMessage = 'BigCommerce Storefront API access is not available on your current plan. Using demo products instead.';
       }
       
       return { products: this.getMockProducts(), errorMessage: displayMessage };
