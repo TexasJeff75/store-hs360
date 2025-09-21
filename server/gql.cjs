@@ -7,6 +7,27 @@ app.use(express.json());
 const ENDPOINT = `https://store-${process.env.BC_STORE_HASH}.mybigcommerce.com/graphql`;
 const JWT = process.env.BC_STOREFRONT_TOKEN;
 
+// Validate environment variables
+if (!process.env.BC_STORE_HASH) {
+  console.error('❌ BC_STORE_HASH is missing from .env file');
+  process.exit(1);
+}
+
+if (!JWT) {
+  console.error('❌ BC_STOREFRONT_TOKEN is missing from .env file');
+  process.exit(1);
+}
+
+if (!JWT.startsWith('eyJ')) {
+  console.error('❌ BC_STOREFRONT_TOKEN does not appear to be a valid JWT (should start with "eyJ")');
+  console.error('Current token:', JWT.substring(0, 20) + '...');
+  process.exit(1);
+}
+
+console.log('✅ Environment variables loaded:');
+console.log('   Store Hash:', process.env.BC_STORE_HASH);
+console.log('   JWT Token:', JWT.substring(0, 20) + '...');
+console.log('   Endpoint:', ENDPOINT);
 app.post("/api/gql", async (req, res) => {
   try {
     console.log('Proxy request received:', {
