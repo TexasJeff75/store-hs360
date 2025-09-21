@@ -1,10 +1,13 @@
 [build]
-  publish = "dist"
   command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
   environment = { SECRETS_SCAN_ENABLED = "false" }
 
-[functions]
-  directory = "netlify/functions"
+[[redirects]]
+  from = "/api/gql"
+  to = "/.netlify/functions/gql"
+  status = 200
 
 [[redirects]]
   from = "/*"
