@@ -112,27 +112,26 @@ function App() {
   return (
     <AuthProvider>
       <div className="min-h-screen bg-gray-50">
-        <Header cartCount={cartCount} onCartClick={() => setIsCartOpen(true)} />
+        <Header 
+          cartCount={cartCount} 
+          onCartClick={() => setIsCartOpen(true)}
+          onAuthClick={() => setIsAuthModalOpen(true)}
+          onProfileClick={() => setIsProfileOpen(true)}
+          onAdminClick={() => setIsAdminOpen(true)}
+        />
         
         <Hero />
 
         {/* Products Section */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Our Products</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">Discover our range of products</p>
-          </div>
-
-            {/* Products Grid */}
-            <div className="flex-1">
-              {loading ? (
-                  <p className="text-gray-600">Loading products...</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4"></h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto"></p>
+                  <p className="text-gray-600"></p>
                 ) : error ? (
-                  <p className="text-red-600">Error loading products</p>
+                  <p className="text-red-600"></p>
                 ) : (
-                  <div>
-                  <span className="text-sm text-gray-600">Filter by category</span>
-                  <p className="text-gray-600">Select category</p>
+                  <p className="text-gray-600"></p>
                   <select>
                     <option>All</option>
                     <option>Category 1</option>
@@ -143,7 +142,7 @@ function App() {
                 </div>
                 )}
               </div>
-
+                  <span className="text-sm text-gray-600"></span>
               {loading ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   {[...Array(6)].map((_, i) => (
@@ -159,9 +158,8 @@ function App() {
                 </div>
               ) : error ? (
                 <div className="text-center py-16">
-                  <p className="text-red-500 text-lg mb-4">Error loading products</p>
+                  <p className="text-red-500 text-lg mb-4"></p>
                   <button>
-                    Retry
                   </button>
                 </div>
               ) : (
@@ -178,7 +176,7 @@ function App() {
 
               {!loading && !error && filteredProducts.length === 0 && (
                 <div className="text-center py-16">
-                  <p className="text-gray-500 text-lg">No products found</p>
+                  <p className="text-gray-500 text-lg"></p>
                   <button
                     onClick={() => {
                       setSelectedCategory('all');
@@ -202,11 +200,11 @@ function App() {
               </p>
               <div className="max-w-md mx-auto flex">
                 <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="flex-1 px-4 py-3 rounded-l-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                />
-                <button className="bg-white text-pink-600 px-6 py-3 rounded-r-lg hover:bg-gray-100 transition-colors font-semibold">
+                    <option></option>
+                    <option></option>
+                    <option></option>
+                    <option></option>
+                    <option></option>
                   Subscribe
                 </button>
               </div>
