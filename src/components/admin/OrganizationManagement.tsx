@@ -68,7 +68,7 @@ const OrganizationManagement: React.FC = () => {
     setSelectedOrg({
       id: '',
       name: '',
-      code: '',
+      code: generateOrgCode(''),
       description: '',
       billing_address: null,
       contact_email: '',
@@ -81,6 +81,42 @@ const OrganizationManagement: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  const generateOrgCode = (name: string) => {
+    if (!name.trim()) return '';
+    
+    // Take first 3 letters of each word, uppercase
+    const words = name.trim().split(/\s+/);
+    let code = '';
+    
+    if (words.length === 1) {
+      // Single word: take first 3-6 characters
+      code = words[0].substring(0, Math.min(6, words[0].length)).toUpperCase();
+    } else {
+      // Multiple words: take first 2-3 characters from each word
+      code = words
+        .slice(0, 3) // Max 3 words
+        .map(word => word.substring(0, word.length >= 4 ? 3 : 2))
+        .join('')
+        .toUpperCase();
+    }
+    
+    // Ensure minimum length of 3
+    if (code.length < 3) {
+      code = code.padEnd(3, 'X');
+    }
+    
+    // Check if code already exists and add number suffix if needed
+    const existingCodes = organizations.map(org => org.code.toUpperCase());
+    let finalCode = code;
+    let counter = 1;
+    
+    while (existingCodes.includes(finalCode)) {
+      finalCode = code + counter.toString().padStart(2, '0');
+      counter++;
+    }
+    
+    return finalCode;
+  };
   const handleEditOrganization = (org: Organization) => {
     setSelectedOrg(org);
     setIsEditing(true);
@@ -423,7 +459,14 @@ const OrganizationManagement: React.FC = () => {
                         <input
                           type="text"
                           value={selectedOrg.name}
-                          onChange={(e) => setSelectedOrg({...selectedOrg, name: e.target.value})}
+                          onChange={(e) => {
+                            const newName = e.target.value;
+                            setSelectedOrg({
+                              ...selectedOrg, 
+                              name: newName,
+                              code: isEditing ? selectedOrg.code : generateOrgCode(newName)
+                            });
+                          }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           placeholder="Enter organization name"
                         />
@@ -431,15 +474,22 @@ const OrganizationManagement: React.FC = () => {
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Organization Code *
+                          Organization Code * {!isEditing && <span className="text-xs text-gray-500">(Auto-generated)</span>}
                         </label>
                         <input
                           type="text"
                           value={selectedOrg.code}
                           onChange={(e) => setSelectedOrg({...selectedOrg, code: e.target.value.toUpperCase()})}
+                          readOnly={!isEditing}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           placeholder="ORG001"
                         />
+                        <p className="text-xs text-gray-500 mt-1">
+                          {isEditing 
+                            ? 'You can modify the code when editing existing organizations'
+                            : 'Code is automatically generated from the organization name'
+                          }
+                        </p>
                       </div>
                       
                       <div>
