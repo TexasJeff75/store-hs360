@@ -122,7 +122,33 @@ function App() {
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Our Products</h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">Discover our range of products</p>
           </div>
-
+          <div>
+            {loading ? (
+              <div>
+                <p className="text-gray-600">Loading...</p>
+              </div>
+            ) : error ? (
+              <div>
+                <p className="text-red-600">Error loading products</p>
+              </div>
+            ) : (
+              <div>
+                <p className="text-gray-600">Products loaded successfully</p>
+                <div>
+                  <select>
+                    <option>All</option>
+                    <option>Category 1</option>
+                    <option>Category 2</option>
+                    <option>Category 3</option>
+                    <option>Category 4</option>
+                  </select>
+                </div>
+              </div>
+            )}
+          </div>
+          <div>
+            <span className="text-sm text-gray-600">Filter by price</span>
+          </div>
           {loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {[...Array(6)].map((_, i) => (
@@ -139,10 +165,7 @@ function App() {
           ) : error ? (
             <div className="text-center py-16">
               <p className="text-red-500 text-lg mb-4">Error loading products</p>
-              <button
-                onClick={() => window.location.reload()}
-                className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-6 py-2 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all"
-              >
+              <button>
                 Retry
               </button>
             </div>
@@ -186,9 +209,16 @@ function App() {
                 <input
                   type="email"
                   placeholder="Enter your email"
-                  className="flex-1 px-4 py-3 rounded-l-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400"
+                  className="flex-1 px-4 py-2 rounded-l-lg text-gray-900"
                 />
-                <button className="bg-white text-pink-600 px-6 py-3 rounded-r-lg hover:bg-gray-100 transition-colors font-semibold">
+                <button className="px-6 py-2 bg-white text-pink-600 rounded-r-lg hover:bg-gray-100 transition-colors">
+                  <select>
+                    <option>Option 1</option>
+                    <option>Option 2</option>
+                    <option>Option 3</option>
+                    <option>Option 4</option>
+                    <option>Option 5</option>
+                  </select>
                   Subscribe
                 </button>
               </div>
@@ -204,21 +234,6 @@ function App() {
           items={cartItems}
           onUpdateQuantity={updateCartQuantity}
           onRemoveItem={removeFromCart}
-        />
-
-        <AuthModal
-          isOpen={isAuthModalOpen}
-          onClose={() => setIsAuthModalOpen(false)}
-        />
-
-        <UserProfile
-          isOpen={isProfileOpen}
-          onClose={() => setIsProfileOpen(false)}
-        />
-
-        <AdminDashboard
-          isOpen={isAdminOpen}
-          onClose={() => setIsAdminOpen(false)}
         />
 
         <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
