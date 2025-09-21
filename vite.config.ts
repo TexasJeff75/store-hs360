@@ -11,15 +11,11 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       host: true,
       proxy: {
-        '/api/graphql': {
-          target: env.VITE_BIGCOMMERCE_STOREFRONT_API_URL,
-          changeOrigin: true,
-          rewrite: (path) => '/graphql',
-          headers: {
-            'Authorization': `Bearer ${env.VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN}`,
-          },
-        },
-      },
+        "/api": {
+          target: "http://localhost:4000",
+          changeOrigin: true
+        }
+      }
     },
     optimizeDeps: {
       exclude: ['lucide-react']

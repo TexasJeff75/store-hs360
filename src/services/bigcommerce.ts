@@ -1,6 +1,5 @@
 // BigCommerce Storefront GraphQL API service
-const GRAPHQL_ENDPOINT = '/api/graphql';
-const STOREFRONT_TOKEN = import.meta.env.VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN;
+const GRAPHQL_ENDPOINT = '/api/gql';
 
 export interface BigCommerceProduct {
   entityId: number;
@@ -63,26 +62,15 @@ class BigCommerceStorefrontService {
     // Debug logging
     console.log('BigCommerce GraphQL Debug:', {
       endpoint: GRAPHQL_ENDPOINT,
-      hasToken: !!STOREFRONT_TOKEN,
-      tokenLength: STOREFRONT_TOKEN?.length || 0,
       query: query.substring(0, 100) + '...',
       variables,
-      envVars: {
-        VITE_BIGCOMMERCE_STOREFRONT_API_URL: import.meta.env.VITE_BIGCOMMERCE_STOREFRONT_API_URL,
-        VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN: STOREFRONT_TOKEN ? `${STOREFRONT_TOKEN.substring(0, 10)}...` : 'NOT_SET'
-      }
     });
-
-    if (!STOREFRONT_TOKEN) {
-      throw new Error('STOREFRONT_TOKEN_MISSING');
-    }
 
     try {
       const response = await fetch(GRAPHQL_ENDPOINT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
         },
         body: JSON.stringify({
           query,
@@ -93,52 +81,17 @@ class BigCommerceStorefrontService {
       console.log('BigCommerce GraphQL Response:', {
         status: response.status,
         statusText: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
         url: response.url
       });
 
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unknown error');
         
-        // Check for "Coming Soon" page (503 error)
-        if (response.status === 503 && errorText.includes('Coming Soon')) {
-          throw new Error('STORE_NOT_LIVE');
-        }
-        
-        // Check for 404 Not Found - incorrect GraphQL endpoint
-        if (response.status === 404) {
-          throw new Error('GRAPHQL_ENDPOINT_NOT_FOUND');
-        }
-        
-        // Check for 401 Unauthorized - invalid JWT token
-        if (response.status === 401) {
-          const errorData = JSON.parse(errorText);
-          if (errorData.errors && errorData.errors.some((e: any) => e.message.includes('String is not a JWT'))) {
-            throw new Error('INVALID_JWT_TOKEN');
-          }
-          throw new Error('UNAUTHORIZED');
-        }
-        
-        // Check for 402 Payment Required - API access not available on current plan
-        if (response.status === 402) {
-          throw new Error('API_ACCESS_NOT_AVAILABLE');
-        }
-        
-        // Check for 422 Unprocessable Entity - invalid request data
-        if (response.status === 422) {
-          throw new Error('INVALID_REQUEST_DATA');
-        }
-        
         console.error('BigCommerce GraphQL Error Details:', {
           status: response.status,
           statusText: response.statusText,
           errorText,
-          url: response.url,
-          requestHeaders: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': 'Bearer [REDACTED]'
-          }
+          url: response.url
         });
         throw new Error(`BigCommerce GraphQL error: ${response.status} ${response.statusText} - ${errorText}`);
       }
@@ -153,9 +106,6 @@ class BigCommerceStorefrontService {
       return data.data;
     } catch (error) {
       console.error('BigCommerce GraphQL Request Failed:', error);
-      if (error instanceof TypeError && error.message === 'Failed to fetch') {
-        throw new Error('CORS_ERROR');
-      }
       throw error;
     }
   }
@@ -251,21 +201,8 @@ class BigCommerceStorefrontService {
       let userFriendlyMessage = '';
       if (logError) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        
-        // Provide specific error messages for common issues
-        userFriendlyMessage = errorMessage;
-        if (errorMessage === 'STORE_NOT_LIVE') {
-          userFriendlyMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch products.';
-        } else if (errorMessage === 'STOREFRONT_TOKEN_MISSING') {
-          userFriendlyMessage = 'BigCommerce Storefront API token is missing. Please check your environment variables.';
-        } else if (errorMessage === 'GRAPHQL_ENDPOINT_NOT_FOUND') {
-          userFriendlyMessage = 'GraphQL endpoint not found. Please verify your VITE_BIGCOMMERCE_STOREFRONT_API_URL is correct (should be your store\'s base URL without /graphql).';
-        } else if (errorMessage === 'CORS_ERROR') {
-          userFriendlyMessage = 'CORS error - please ensure your domain is added to BigCommerce CORS origins.';
-        }
-        
         logError(
-          `Failed to fetch products from BigCommerce GraphQL: ${userFriendlyMessage}`,
+          `Failed to fetch products from BigCommerce GraphQL: ${errorMessage}`,
           error instanceof Error ? error : new Error(String(error)),
           'error',
           'BigCommerce GraphQL API'
@@ -274,16 +211,7 @@ class BigCommerceStorefrontService {
       
       // Return mock data when API fails
       const errorMessage = error instanceof Error ? error.message : String(error);
-      let displayMessage = errorMessage;
-      if (errorMessage === 'STORE_NOT_LIVE') {
-        displayMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch products.';
-      } else if (errorMessage === 'GRAPHQL_ENDPOINT_NOT_FOUND') {
-        displayMessage = 'GraphQL endpoint not found. Please verify your VITE_BIGCOMMERCE_STOREFRONT_API_URL is correct (should be your store\'s base URL without /graphql).';
-      } else if (errorMessage === 'API_ACCESS_NOT_AVAILABLE') {
-        displayMessage = 'BigCommerce Storefront API access is not available on your current plan. Using demo products instead.';
-      }
-      
-      return { products: this.getMockProducts(), errorMessage: displayMessage };
+      return { products: this.getMockProducts(), errorMessage };
     }
   }
 
@@ -326,21 +254,8 @@ class BigCommerceStorefrontService {
       let userFriendlyMessage = '';
       if (logError) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        
-        // Provide specific error messages for common issues
-        userFriendlyMessage = errorMessage;
-        if (errorMessage === 'STORE_NOT_LIVE') {
-          userFriendlyMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch categories.';
-        } else if (errorMessage === 'STOREFRONT_TOKEN_MISSING') {
-          userFriendlyMessage = 'BigCommerce Storefront API token is missing. Please check your environment variables.';
-        } else if (errorMessage === 'GRAPHQL_ENDPOINT_NOT_FOUND') {
-          userFriendlyMessage = 'GraphQL endpoint not found. Please verify your VITE_BIGCOMMERCE_STOREFRONT_API_URL is correct (should be your store\'s base URL without /graphql).';
-        } else if (errorMessage === 'CORS_ERROR') {
-          userFriendlyMessage = 'CORS error - please ensure your domain is added to BigCommerce CORS origins.';
-        }
-        
         logError(
-          `Failed to fetch categories from BigCommerce GraphQL: ${userFriendlyMessage}`,
+          `Failed to fetch categories from BigCommerce GraphQL: ${errorMessage}`,
           error instanceof Error ? error : new Error(String(error)),
           'error',
           'BigCommerce GraphQL API'
@@ -349,18 +264,7 @@ class BigCommerceStorefrontService {
       
       // Return mock categories when API fails
       const errorMessage = error instanceof Error ? error.message : String(error);
-      let displayMessage = errorMessage;
-      if (errorMessage === 'STORE_NOT_LIVE') {
-        displayMessage = 'Your BigCommerce store appears to be in "Coming Soon" mode. Please make your store live to fetch categories.';
-      } else if (errorMessage === 'GRAPHQL_ENDPOINT_NOT_FOUND') {
-        displayMessage = 'GraphQL endpoint not found. Please verify your VITE_BIGCOMMERCE_STOREFRONT_API_URL is correct (should be your store\'s base URL without /graphql).';
-      } else if (errorMessage === 'INVALID_JWT_TOKEN') {
-        displayMessage = 'Invalid BigCommerce Storefront API token. Please check that your VITE_BIGCOMMERCE_STOREFRONT_API_TOKEN is a valid JWT token from your BigCommerce control panel.';
-      } else if (errorMessage === 'UNAUTHORIZED') {
-        displayMessage = 'Unauthorized access to BigCommerce API. Please verify your Storefront API token has the correct permissions.';
-      }
-      
-      return { categories: ['Peptides', 'Genetic Testing', 'Lab Testing', 'Supplements', 'Hormones'], errorMessage: displayMessage };
+      return { categories: ['Peptides', 'Genetic Testing', 'Lab Testing', 'Supplements', 'Hormones'], errorMessage };
     }
   }
 
