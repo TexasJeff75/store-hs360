@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider } from './contexts/AuthContext';
 import Header from './components/Header';
+import AuthModal from './components/AuthModal';
+import UserProfile from './components/UserProfile';
+import AdminDashboard from './components/admin/AdminDashboard';
 import Hero from './components/Hero';
 import ProductCard from './components/ProductCard';
 import ProductFilter from './components/ProductFilter';
@@ -9,6 +12,7 @@ import Footer from './components/Footer';
 import ErrorDebugPanel from './components/ErrorDebugPanel';
 import { bigCommerceService, Product } from './services/bigcommerce';
 import { useErrorLogger } from './hooks/useErrorLogger';
+import { useAuth } from './contexts/AuthContext';
 
 interface CartItem {
   id: number;
@@ -18,17 +22,21 @@ interface CartItem {
   image: string;
 }
 
-function App() {
+function AppContent() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { errors, logError, clearErrors } = useErrorLogger();
+  const { user, profile } = useAuth();
 
   // Fetch products and categories from BigCommerce
   useEffect(() => {
@@ -110,9 +118,14 @@ function App() {
   });
 
   return (
-    <AuthProvider>
       <div className="min-h-screen bg-gray-50">
-        <Header cartCount={cartCount} onCartClick={() => setIsCartOpen(true)} />
+        <Header 
+          cartCount={cartCount} 
+          onCartClick={() => setIsCartOpen(true)}
+          onAuthClick={() => setIsAuthModalOpen(true)}
+          onProfileClick={() => setIsProfileOpen(true)}
+          onAdminClick={() => setIsAdminOpen(true)}
+        />
         
         <Hero />
 
@@ -214,13 +227,6 @@ function App() {
                   className="flex-1 px-4 py-2 rounded-l-lg text-gray-900"
                 />
                 <button className="px-6 py-2 bg-white text-pink-600 rounded-r-lg hover:bg-gray-100 transition-colors">
-                  <select>
-                    <option>Option 1</option>
-                    <option>Option 2</option>
-                    <option>Option 3</option>
-                    <option>Option 4</option>
-                    <option>Option 5</option>
-                  </select>
                   Subscribe
                 </button>
               </div>
@@ -238,8 +244,31 @@ function App() {
           onRemoveItem={removeFromCart}
         />
 
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+        />
+
+        <UserProfile
+          isOpen={isProfileOpen}
+          onClose={() => setIsProfileOpen(false)}
+        />
+
+        {profile?.role === 'admin' && (
+          <AdminDashboard
+            isOpen={isAdminOpen}
+            onClose={() => setIsAdminOpen(false)}
+          />
+        )}
         <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
       </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
     </AuthProvider>
   );
 }

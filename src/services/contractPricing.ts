@@ -152,32 +152,29 @@ class ContractPricingService {
    * Calculate the effective price for a user (contract price if available, otherwise regular price)
    */
   async getEffectivePrice(
-    userId: string | null, 
+    userId: string, 
     productId: number, 
-    regularPrice: number,
     userRole?: string
-  ): Promise<{ price: number; isContractPrice: boolean; savings?: number }> {
+  ): Promise<{ price: number; source: 'regular' | 'individual' | 'organization' | 'location'; savings?: number } | null> {
     // If user is not logged in or not approved, return regular price
     if (!userId || (userRole && !['approved', 'admin'].includes(userRole))) {
-      return { price: regularPrice, isContractPrice: false };
+      return null;
     }
 
     try {
       const contractPrice = await this.getContractPrice(userId, productId);
       
-      if (contractPrice && contractPrice.contract_price < regularPrice) {
-        const savings = regularPrice - contractPrice.contract_price;
+      if (contractPrice) {
         return { 
           price: contractPrice.contract_price, 
-          isContractPrice: true,
-          savings 
+          source: 'individual' as const
         };
       }
 
-      return { price: regularPrice, isContractPrice: false };
+      return null;
     } catch (error) {
       console.error('Error calculating effective price:', error);
-      return { price: regularPrice, isContractPrice: false };
+      return null;
     }
   }
 }
