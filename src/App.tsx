@@ -119,21 +119,44 @@ function App() {
         {/* Products Section */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4"></h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto"></p>
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Our Products</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">Discover our range of products</p>
+          </div>
+
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Filter Sidebar */}
+            <div className="lg:w-64 flex-shrink-0">
+              <ProductFilter
+                categories={categories}
+                selectedCategory={selectedCategory}
+                onCategoryChange={setSelectedCategory}
+                priceRange={priceRange}
+                onPriceRangeChange={setPriceRange}
+                isOpen={isFilterOpen}
+                onToggle={() => setIsFilterOpen(!isFilterOpen)}
+              />
+            </div>
 
             {/* Products Grid */}
             <div className="flex-1">
-                  <p className="text-gray-600"></p>
+              <div className="flex items-center justify-between mb-6">
+                {loading ? (
+                  <p className="text-gray-600">Loading products...</p>
                 ) : error ? (
-                  <p className="text-red-600"></p>
-                  <span className="text-sm text-gray-600"></span>
-                  <p className="text-gray-600"></p>
-                    <option></option>
-                    <option></option>
-                    <option></option>
-                    <option></option>
-                    <option></option>
+                  <p className="text-red-600">{error}</p>
+                ) : (
+                  <div className="flex items-center gap-4">
+                    <span className="text-sm text-gray-600">{filteredProducts.length} products found</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <p className="text-gray-600">Sort by:</p>
+                  <select className="border border-gray-300 rounded px-3 py-1">
+                    <option>Featured</option>
+                    <option>Price: Low to High</option>
+                    <option>Price: High to Low</option>
+                    <option>Name: A to Z</option>
+                    <option>Name: Z to A</option>
                   </select>
                 </div>
               </div>
@@ -153,8 +176,12 @@ function App() {
                 </div>
               ) : error ? (
                 <div className="text-center py-16">
-                  <p className="text-red-500 text-lg mb-4"></p>
+                  <p className="text-red-500 text-lg mb-4">{error}</p>
                   <button
+                    onClick={() => window.location.reload()}
+                    className="bg-pink-600 text-white px-6 py-2 rounded-lg hover:bg-pink-700 transition-colors"
+                  >
+                    Try Again
                   </button>
                 </div>
               ) : (
@@ -171,7 +198,7 @@ function App() {
 
               {!loading && !error && filteredProducts.length === 0 && (
                 <div className="text-center py-16">
-                  <p className="text-gray-500 text-lg"></p>
+                  <p className="text-gray-500 text-lg">No products found matching your criteria.</p>
                   <button
                     onClick={() => {
                       setSelectedCategory('all');
