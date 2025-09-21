@@ -34,6 +34,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('Form submitted, mode:', mode, 'email:', email);
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -52,6 +53,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
 
     try {
       if (mode === 'signin') {
+        console.log('Attempting sign in...');
         const { error } = await signIn(email, password);
         if (error) {
           console.error('Sign in error:', error);
@@ -64,6 +66,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
           }, 1500);
         }
       } else {
+        console.log('Attempting sign up...');
         const { error } = await signUp(email, password);
         if (error) {
           console.error('Sign up error:', error);

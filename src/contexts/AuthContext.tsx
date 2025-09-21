@@ -103,6 +103,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     console.log('Attempting to sign in with email:', email);
     
+    if (!email || !password) {
+      console.error('Email or password is missing');
+      return { error: { message: 'Email and password are required' } as AuthError };
+    }
+    
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -119,6 +124,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut();
+    
+    if (!email || !password) {
+      console.error('Email or password is missing');
+      return { error: { message: 'Email and password are required' } as AuthError };
+    }
     return { error };
   };
 
