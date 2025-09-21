@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
-import { Users, Building2, MapPin, DollarSign, Settings, BarChart3 } from 'lucide-react';
+import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package } from 'lucide-react';
 import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
 import LocationManagement from './LocationManagement';
 import PricingManagement from './PricingManagement';
+import ProductManagement from './ProductManagement';
 
 interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'analytics';
+type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'analytics';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
@@ -22,6 +23,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2 },
     { id: 'locations' as AdminTab, label: 'Locations', icon: MapPin },
     { id: 'pricing' as AdminTab, label: 'Pricing', icon: DollarSign },
+    { id: 'products' as AdminTab, label: 'Products', icon: Package },
     { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3 },
   ];
 
@@ -35,6 +37,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
         return <LocationManagement />;
       case 'pricing':
         return <PricingManagement />;
+      case 'products':
+        return <ProductManagement />;
       case 'analytics':
         return (
           <div className="p-6 text-center text-gray-500">

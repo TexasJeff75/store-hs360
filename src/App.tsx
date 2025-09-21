@@ -125,18 +125,44 @@ function AppContent() {
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   // Filter products by category
-  const peptideProducts = products.filter(product => 
+  const getVisibleProducts = () => {
+    // Load product settings from localStorage
+    const savedSettings = localStorage.getItem('productSettings');
+    const productSettings = savedSettings ? JSON.parse(savedSettings) : [];
+    
+    return products
+      .map(product => {
+        const settings = productSettings.find((s: any) => s.id === product.id);
+        if (settings && !settings.isVisible) return null;
+        
+        // Apply custom settings if they exist
+        return {
+          ...product,
+          category: settings?.customCategory || product.category,
+          benefits: settings?.customBenefits || product.benefits,
+          rating: settings?.customRating || product.rating,
+          reviews: settings?.customReviews || product.reviews,
+          displayOrder: settings?.displayOrder || 0
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => a.displayOrder - b.displayOrder);
+  };
+
+  const visibleProducts = getVisibleProducts();
+  
+  const peptideProducts = visibleProducts.filter(product => 
     product.category.toLowerCase().includes('peptide') || 
     product.name.toLowerCase().includes('peptide')
   );
   
-  const geneticTestingProducts = products.filter(product => 
+  const geneticTestingProducts = visibleProducts.filter(product => 
     product.category.toLowerCase().includes('genetic') || 
     product.name.toLowerCase().includes('genetic') ||
     product.category.toLowerCase().includes('testing') && product.name.toLowerCase().includes('genetic')
   );
   
-  const clinicalTestingProducts = products.filter(product => 
+  const clinicalTestingProducts = visibleProducts.filter(product => 
     (product.category.toLowerCase().includes('testing') || 
      product.name.toLowerCase().includes('test') ||
      product.name.toLowerCase().includes('biomarker') ||
