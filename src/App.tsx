@@ -7,6 +7,9 @@ import ProductFilter from './components/ProductFilter';
 import Cart from './components/Cart';
 import Footer from './components/Footer';
 import ErrorDebugPanel from './components/ErrorDebugPanel';
+import AuthModal from './components/AuthModal';
+import UserProfile from './components/UserProfile';
+import AdminDashboard from './components/admin/AdminDashboard';
 import { bigCommerceService, Product } from './services/bigcommerce';
 import { useErrorLogger } from './hooks/useErrorLogger';
 
@@ -28,6 +31,9 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const { errors, logError, clearErrors } = useErrorLogger();
 
   // Fetch products and categories from BigCommerce
@@ -112,7 +118,13 @@ function App() {
   return (
     <AuthProvider>
       <div className="min-h-screen bg-gray-50">
-        <Header cartCount={cartCount} onCartClick={() => setIsCartOpen(true)} />
+        <Header 
+          cartCount={cartCount} 
+          onCartClick={() => setIsCartOpen(true)}
+          onAuthClick={() => setIsAuthModalOpen(true)}
+          onProfileClick={() => setIsProfileOpen(true)}
+          onAdminClick={() => setIsAdminOpen(true)}
+        />
         
         <Hero />
 
@@ -249,6 +261,21 @@ function App() {
           items={cartItems}
           onUpdateQuantity={updateCartQuantity}
           onRemoveItem={removeFromCart}
+        />
+
+        <AuthModal 
+          isOpen={isAuthModalOpen} 
+          onClose={() => setIsAuthModalOpen(false)} 
+        />
+
+        <UserProfile 
+          isOpen={isProfileOpen} 
+          onClose={() => setIsProfileOpen(false)} 
+        />
+
+        <AdminDashboard 
+          isOpen={isAdminOpen} 
+          onClose={() => setIsAdminOpen(false)} 
         />
 
         <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />

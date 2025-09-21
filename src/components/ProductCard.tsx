@@ -81,12 +81,14 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Price */}
         <div className="mb-3">
-          <PriceDisplay 
-            productId={id}
-            regularPrice={price}
-            originalPrice={originalPrice}
-            showSavings={true}
-          />
+          <div className="flex items-center space-x-2">
+            <span className="text-lg font-bold text-gray-900">${price.toFixed(2)}</span>
+            {originalPrice && (
+              <span className="text-sm text-gray-500 line-through">
+                ${originalPrice.toFixed(2)}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Add to Cart Button */}
