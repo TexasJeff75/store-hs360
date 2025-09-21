@@ -155,13 +155,32 @@ class ContractPricingService {
     userId: string, 
     productId: number, 
     userRole?: string
-  ): Promise<{ price: number; source: 'regular' | 'individual' | 'organization' | 'location'; savings?: number } | null> {
+  ): Promise<{ price: number; source: 'regular' | 'individual' | 'organization' | 'location' } | null> {
     // If user is not logged in or not approved, return regular price
     if (!userId || (userRole && !['approved', 'admin'].includes(userRole))) {
       return null;
     }
 
     try {
+      // Check for location-specific pricing first (highest priority)
+      const locationPrice = await this.getLocationPrice(userId, productId);
+      if (locationPrice) {
+        return { 
+          price: locationPrice.contract_price, 
+          source: 'location' as const
+        };
+      }
+
+      // Check for organization-level pricing
+      const organizationPrice = await this.getOrganizationPrice(userId, productId);
+      if (organizationPrice) {
+        return { 
+          price: organizationPrice.contract_price, 
+          source: 'organization' as const
+        };
+      }
+
+      // Check for individual contract pricing (lowest priority)
       const contractPrice = await this.getContractPrice(userId, productId);
       
       if (contractPrice) {
@@ -174,6 +193,70 @@ class ContractPricingService {
       return null;
     } catch (error) {
       console.error('Error calculating effective price:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get location-specific pricing for a user and product
+   */
+  async getLocationPrice(userId: string, productId: number): Promise<any | null> {
+    try {
+      const { data, error } = await supabase
+        .from('location_pricing')
+        .select(`
+          *,
+          locations!inner(
+            user_organization_roles!inner(user_id)
+          )
+        `)
+        .eq('product_id', productId)
+        .eq('locations.user_organization_roles.user_id', userId)
+        .lte('effective_date', new Date().toISOString())
+        .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString())
+        .order('effective_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching location price:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get organization-level pricing for a user and product
+   */
+  async getOrganizationPrice(userId: string, productId: number): Promise<any | null> {
+    try {
+      const { data, error } = await supabase
+        .from('organization_pricing')
+        .select(`
+          *,
+          organizations!inner(
+            user_organization_roles!inner(user_id)
+          )
+        `)
+        .eq('product_id', productId)
+        .eq('organizations.user_organization_roles.user_id', userId)
+        .lte('effective_date', new Date().toISOString())
+        .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString())
+        .order('effective_date', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      return data;
+    } catch (error) {
+      console.error('Error fetching organization price:', error);
       return null;
     }
   }
