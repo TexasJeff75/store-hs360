@@ -46,8 +46,8 @@ function AppContent() {
         setError(null);
         
         const [productsData, categoriesData] = await Promise.all([
-          bigCommerceService.getProducts(logError),
-          bigCommerceService.getCategories(logError)
+          bigCommerceService.getProducts((err: unknown, ctx?: string) => logError(err, ctx)),
+          bigCommerceService.getCategories((err: unknown, ctx?: string) => logError(err, ctx))
         ]);
         
         setProducts(productsData.products);
