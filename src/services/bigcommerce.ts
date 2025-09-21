@@ -1,7 +1,10 @@
 // BigCommerce Storefront GraphQL API service
 import { connNodes, pick } from '../utils/graphql';
 
-const GRAPHQL_ENDPOINT = '/api/gql';
+// Use different endpoints for development vs production
+const GRAPHQL_ENDPOINT = import.meta.env.DEV 
+  ? '/api/gql'  // Development: proxy to local server
+  : '/.netlify/functions/gql';  // Production: use Netlify function
 
 export interface BigCommerceProduct {
   entityId: number;

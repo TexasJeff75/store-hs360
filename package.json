@@ -7,8 +7,10 @@
     "dev": "concurrently \"npm run dev:vite\" \"node server/gql.cjs\"",
     "dev:vite": "vite",
     "build": "vite build",
+    "build:netlify": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "vite preview"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",

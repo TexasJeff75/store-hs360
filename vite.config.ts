@@ -17,16 +17,16 @@ export default defineConfig(({ mode }) => {
         }
       }
     },
+    preview: {
+      port: 4173,
+      host: true
+    },
     optimizeDeps: {
       exclude: ['lucide-react']
     },
-    define: {
-      // Make environment variables available in production
-      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
-      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
-    },
     build: {
       sourcemap: true,
+      outDir: 'dist',
       rollupOptions: {
         output: {
           manualChunks: {
