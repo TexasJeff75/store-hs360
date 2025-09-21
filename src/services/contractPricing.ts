@@ -20,13 +20,9 @@ class ContractPricingService {
         .select('*')
         .eq('user_id', userId)
         .eq('product_id', productId)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // No rows returned - no contract price exists
-          return null;
-        }
         throw error;
       }
 
@@ -216,9 +212,9 @@ class ContractPricingService {
         .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString())
         .order('effective_date', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         throw error;
       }
 
@@ -248,9 +244,9 @@ class ContractPricingService {
         .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString())
         .order('effective_date', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         throw error;
       }
 

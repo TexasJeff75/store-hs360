@@ -29,7 +29,10 @@ const Header: React.FC<HeaderProps> = ({
               <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-orange-600 bg-clip-text text-transparent">
                 HealthSpan360
               </h1>
+              {loading && (
+              </h1>
               <span className="text-sm text-gray-600 hidden sm:inline">Loading...</span>
+              )}
             </div>
           </div>
 
