@@ -9,6 +9,11 @@ const JWT = process.env.BC_STOREFRONT_TOKEN;
 
 app.post("/api/gql", async (req, res) => {
   try {
+    console.log('Proxy request received:', {
+      query: req.body.query?.substring(0, 100) + '...',
+      variables: req.body.variables
+    });
+    
     const r = await fetch(ENDPOINT, { 
       method: "POST",
       headers: { 
@@ -18,7 +23,14 @@ app.post("/api/gql", async (req, res) => {
       body: JSON.stringify(req.body) 
     });
     
+    console.log('BigCommerce response:', {
+      status: r.status,
+      statusText: r.statusText
+    });
+    
     const responseText = await r.text();
+    console.log('Response text length:', responseText.length);
+    
     res.status(r.status).type("application/json").send(responseText);
   } catch (error) {
     console.error('GraphQL proxy error:', error);

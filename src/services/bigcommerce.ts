@@ -146,21 +146,17 @@ class BigCommerceStorefrontService {
   }
   async getProducts(logError?: (message: string, error?: Error, type?: 'error' | 'warning' | 'info', source?: string) => void): Promise<{ products: Product[]; errorMessage?: string }> {
     try {
+      // Simplified query to avoid size issues
       const query = `
-        query GetProducts($first: Int!) {
+        query GetProducts {
           site {
-            products(first: $first) {
+            products(first: 10) {
               edges {
                 node {
                   entityId
                   name
-                  description
                   prices {
                     price {
-                      value
-                      currencyCode
-                    }
-                    salePrice {
                       value
                       currencyCode
                     }
@@ -177,14 +173,6 @@ class BigCommerceStorefrontService {
                       }
                     }
                   }
-                  customFields {
-                    edges {
-                      node {
-                        name
-                        value
-                      }
-                    }
-                  }
                 }
               }
             }
@@ -192,7 +180,7 @@ class BigCommerceStorefrontService {
         }
       `;
       
-      const data = await this.makeGraphQLRequest(query, { first: 50 });
+      const data = await this.makeGraphQLRequest(query);
       const products: BigCommerceProduct[] = data.site.products.edges.map((edge: any) => edge.node);
       
       return { products: products.map(product => this.transformProduct(product)) };
@@ -217,36 +205,23 @@ class BigCommerceStorefrontService {
 
   async getCategories(logError?: (message: string, error?: Error, type?: 'error' | 'warning' | 'info', source?: string) => void): Promise<{ categories: string[]; errorMessage?: string }> {
     try {
+      // Simplified query to avoid size issues
       const query = `
-        query GetCategories($first: Int!) {
+        query GetCategories {
           site {
-            categoryTree(rootEntityId: 0) {
+            categoryTree {
               entityId
               name
-              description
-              children {
-                entityId
-                name
-                description
-              }
             }
           }
         }
       `;
       
-      const data = await this.makeGraphQLRequest(query, { first: 50 });
+      const data = await this.makeGraphQLRequest(query);
       const categories: BigCommerceCategory[] = data.site.categoryTree || [];
       
-      // Flatten categories and their children
-      const allCategories: string[] = [];
-      categories.forEach(category => {
-        allCategories.push(category.name);
-        if (category.children) {
-          category.children.forEach((child: BigCommerceCategory) => {
-            allCategories.push(child.name);
-          });
-        }
-      });
+      // Extract category names
+      const allCategories: string[] = categories.map(cat => cat.name);
       
       return { categories: [...new Set(allCategories)] }; // Remove duplicates
     } catch (error) {
