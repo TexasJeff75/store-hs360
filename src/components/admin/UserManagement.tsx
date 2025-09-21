@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Shield, Clock, CheckCircle, Edit, Trash2, Search, Filter } from 'lucide-react';
+import { User, Mail, Shield, Clock, CheckCircle, Edit, Trash2, Search, Filter, Key, AlertCircle } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import type { Profile } from '@/services/supabase';
 
@@ -11,6 +11,8 @@ const UserManagement: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [sendingPasswordReset, setSendingPasswordReset] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -35,27 +37,94 @@ const UserManagement: React.FC = () => {
 
   const updateUserRole = async (userId: string, newRole: string, isApproved: boolean) => {
     try {
+      setModalMessage(null);
+      
+      // Check if email was changed
+      const originalUser = users.find(u => u.id === userId);
+      const emailChanged = originalUser && selectedUser && originalUser.email !== selectedUser.email;
+      
+      // Update profile in our database
       const { error } = await supabase
         .from('profiles')
         .update({ 
           role: newRole,
-          is_approved: isApproved 
+          is_approved: isApproved,
+          email: selectedUser?.email || originalUser?.email
         })
         .eq('id', userId);
 
       if (error) throw error;
       
+      // If email changed, update it in Supabase Auth (admin only operation)
+      if (emailChanged && selectedUser?.email) {
+        const { error: authError } = await supabase.auth.admin.updateUserById(
+          userId,
+          { email: selectedUser.email }
+        );
+        
+        if (authError) {
+          console.warn('Could not update email in auth system:', authError.message);
+          setModalMessage({ 
+            type: 'error', 
+            text: 'Role updated but email change failed. User may need to update email manually.' 
+          });
+        } else {
+          setModalMessage({ 
+            type: 'success', 
+            text: 'User updated successfully including email change.' 
+          });
+        }
+      } else {
+        setModalMessage({ 
+          type: 'success', 
+          text: 'User updated successfully.' 
+        });
+      }
+      
       // Update local state
       setUsers(prev => prev.map(user => 
         user.id === userId 
-          ? { ...user, role: newRole as any, is_approved: isApproved }
+          ? { ...user, role: newRole as any, is_approved: isApproved, email: selectedUser?.email || user.email }
           : user
       ));
       
-      setIsEditModalOpen(false);
-      setSelectedUser(null);
+      // Don't close modal immediately if there was an error, let user see the message
+      if (!emailChanged || !authError) {
+        setTimeout(() => {
+          setIsEditModalOpen(false);
+          setSelectedUser(null);
+          setModalMessage(null);
+        }, 2000);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update user');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to update user';
+      setError(errorMessage);
+      setModalMessage({ type: 'error', text: errorMessage });
+    }
+  };
+
+  const handleSendPasswordReset = async () => {
+    if (!selectedUser?.email) return;
+    
+    try {
+      setSendingPasswordReset(true);
+      setModalMessage(null);
+      
+      const { error } = await supabase.auth.resetPasswordForEmail(selectedUser.email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
+      
+      if (error) throw error;
+      
+      setModalMessage({ 
+        type: 'success', 
+        text: `Password reset email sent to ${selectedUser.email}` 
+      });
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to send password reset email';
+      setModalMessage({ type: 'error', text: errorMessage });
+    } finally {
+      setSendingPasswordReset(false);
     }
   };
 
@@ -271,7 +340,43 @@ const UserManagement: React.FC = () => {
                       Edit User: {selectedUser.email}
                     </h3>
                     
+                    {/* Modal Message */}
+                    {modalMessage && (
+                      <div className={`mb-4 p-3 rounded-lg flex items-center space-x-2 ${
+                        modalMessage.type === 'success' 
+                          ? 'bg-green-50 border border-green-200' 
+                          : 'bg-red-50 border border-red-200'
+                      }`}>
+                        {modalMessage.type === 'success' ? (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 text-red-600" />
+                        )}
+                        <span className={`text-sm ${
+                          modalMessage.type === 'success' ? 'text-green-700' : 'text-red-700'
+                        }`}>
+                          {modalMessage.text}
+                        </span>
+                      </div>
+                    )}
+                    
                     <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Email Address
+                        </label>
+                        <input
+                          type="email"
+                          value={selectedUser.email}
+                          onChange={(e) => setSelectedUser({...selectedUser, email: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          placeholder="user@example.com"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Changing the email will update both the profile and authentication system.
+                        </p>
+                      </div>
+                      
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Role
@@ -298,6 +403,33 @@ const UserManagement: React.FC = () => {
                           <span className="ml-2 text-sm text-gray-700">Account Approved</span>
                         </label>
                       </div>
+                      
+                      {/* Password Reset Section */}
+                      <div className="pt-4 border-t border-gray-200">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-sm font-medium text-gray-700">
+                            Password Reset
+                          </label>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleSendPasswordReset}
+                          disabled={sendingPasswordReset || !selectedUser.email}
+                          className="w-full flex items-center justify-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {sendingPasswordReset ? (
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                          ) : (
+                            <Key className="h-4 w-4" />
+                          )}
+                          <span>
+                            {sendingPasswordReset ? 'Sending...' : 'Send Password Reset Email'}
+                          </span>
+                        </button>
+                        <p className="text-xs text-gray-500 mt-1">
+                          This will send a password reset link to the user's email address.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -306,13 +438,18 @@ const UserManagement: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => updateUserRole(selectedUser.id, selectedUser.role, selectedUser.is_approved)}
+                  disabled={!selectedUser.email.trim()}
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   Save Changes
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsEditModalOpen(false)}
+                  onClick={() => {
+                    setIsEditModalOpen(false);
+                    setSelectedUser(null);
+                    setModalMessage(null);
+                  }}
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   Cancel
