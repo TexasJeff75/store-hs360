@@ -18,8 +18,8 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
   return json.data;
 }
 
-export const PRODUCTS_BASIC = `
-  query Products($first: Int = 20) {
+const PRODUCTS_Q = /* GraphQL */ `
+  query ProductsBasic($first: Int = 20) {
     site {
       products(first: $first) {
         edges {
@@ -28,23 +28,6 @@ export const PRODUCTS_BASIC = `
             name
             path
             defaultImage { url(width: 640) }
-            prices {
-              price {
-                value
-                currencyCode
-              }
-              salePrice {
-                value
-                currencyCode
-              }
-            }
-            categories {
-              edges {
-                node {
-                  name
-                }
-              }
-            }
           }
         }
       }
@@ -146,7 +129,7 @@ export async function fetchProducts(logError?: (message: string, error?: Error) 
   errorMessage?: string;
 }> {
   try {
-    const data = await gql(PRODUCTS_BASIC, { first: 20 });
+    const data = await gql(PRODUCTS_Q, { first: 20 });
     const edges = data?.site?.products?.edges ?? [];
     const products = edges.map((edge: any) => 
       transformBigCommerceProduct(edge.node)
