@@ -8,13 +8,13 @@ import AdminDashboard from './admin/AdminDashboard';
 interface HeaderProps {
   cartCount: number;
   onCartClick: () => void;
-  onAuthClick: () => void;
-  onProfileClick: () => void;
-  onAdminClick: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, onAuthClick, onProfileClick, onAdminClick }) => {
+const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isAdminOpen, setIsAdminOpen] = useState(false);
   const { user, profile } = useAuth();
 
   return (
@@ -85,7 +85,7 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, onAuthClick, on
                 {/* Admin Button */}
                 {profile?.role === 'admin' && (
                   <button 
-                    onClick={onAdminClick}
+                    onClick={() => setIsAdminOpen(true)}
                     className="text-gray-700 hover:text-purple-600 transition-colors"
                     title="Admin Dashboard"
                   >
@@ -95,7 +95,7 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, onAuthClick, on
                 
                 {/* User Profile Button */}
                 <button 
-                  onClick={onProfileClick}
+                  onClick={() => setIsProfileOpen(true)}
                   className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
                 >
                   <div className="relative">
@@ -111,7 +111,7 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, onAuthClick, on
                </div>
             ) : (
               <button 
-                onClick={onAuthClick}
+                onClick={() => setIsAuthModalOpen(true)}
                 className="flex items-center space-x-2 text-gray-700 hover:text-blue-600 transition-colors"
                 type="button"
               >
@@ -182,6 +182,24 @@ const Header: React.FC<HeaderProps> = ({ cartCount, onCartClick, onAuthClick, on
           </div>
         )}
       </div>
+
+      {/* Auth Modal */}
+      <AuthModal 
+        isOpen={isAuthModalOpen} 
+        onClose={() => setIsAuthModalOpen(false)} 
+      />
+
+      {/* User Profile Modal */}
+      <UserProfile 
+        isOpen={isProfileOpen} 
+        onClose={() => setIsProfileOpen(false)} 
+      />
+
+      {/* Admin Dashboard */}
+      <AdminDashboard 
+        isOpen={isAdminOpen} 
+        onClose={() => setIsAdminOpen(false)} 
+      />
     </header>
   );
 };
