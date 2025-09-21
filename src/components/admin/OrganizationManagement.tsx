@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit, Trash2, Search, MapPin, Users, Mail, Phone } from 'lucide-react';
+import { Building2, Plus, Edit, Trash2, Search, MapPin, Users, Mail, Phone, AlertCircle, CheckCircle, Eye, Archive } from 'lucide-react';
 import { multiTenantService } from '@/services/multiTenant';
 import type { Organization } from '@/services/supabase';
 
@@ -11,9 +11,14 @@ const OrganizationManagement: React.FC = () => {
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [orgStats, setOrgStats] = useState<{ [key: string]: { locations: number; users: number } }>({});
 
   useEffect(() => {
     fetchOrganizations();
+    fetchOrgStats();
   }, []);
 
   const fetchOrganizations = async () => {
@@ -25,6 +30,37 @@ const OrganizationManagement: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to fetch organizations');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchOrgStats = async () => {
+    try {
+      const [locations, userRoles] = await Promise.all([
+        multiTenantService.getLocations(),
+        multiTenantService.getUserOrganizationRoles()
+      ]);
+
+      const stats: { [key: string]: { locations: number; users: number } } = {};
+      
+      // Count locations per organization
+      locations.forEach(location => {
+        if (!stats[location.organization_id]) {
+          stats[location.organization_id] = { locations: 0, users: 0 };
+        }
+        stats[location.organization_id].locations++;
+      });
+
+      // Count users per organization
+      userRoles.forEach(role => {
+        if (!stats[role.organization_id]) {
+          stats[role.organization_id] = { locations: 0, users: 0 };
+        }
+        stats[role.organization_id].users++;
+      });
+
+      setOrgStats(stats);
+    } catch (err) {
+      console.error('Failed to fetch organization stats:', err);
     }
   };
 
@@ -51,43 +87,72 @@ const OrganizationManagement: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  const handleViewOrganization = (org: Organization) => {
+    setSelectedOrg(org);
+    setIsViewModalOpen(true);
+  };
+
   const handleSaveOrganization = async () => {
     if (!selectedOrg) return;
 
     try {
+      setModalMessage(null);
+      
       if (isEditing) {
         await multiTenantService.updateOrganization(selectedOrg.id, selectedOrg);
         setOrganizations(prev => prev.map(org => 
           org.id === selectedOrg.id ? selectedOrg : org
         ));
+        setModalMessage({ type: 'success', text: 'Organization updated successfully!' });
       } else {
         const newOrg = await multiTenantService.createOrganization(selectedOrg);
         setOrganizations(prev => [newOrg, ...prev]);
+        setModalMessage({ type: 'success', text: 'Organization created successfully!' });
       }
-      setIsModalOpen(false);
-      setSelectedOrg(null);
+      
+      // Refresh stats
+      fetchOrgStats();
+      
+      // Auto-close modal after success
+      setTimeout(() => {
+        setIsModalOpen(false);
+        setSelectedOrg(null);
+        setModalMessage(null);
+      }, 2000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save organization');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save organization';
+      setModalMessage({ type: 'error', text: errorMessage });
     }
   };
 
-  const handleDeleteOrganization = async (orgId: string) => {
-    if (!confirm('Are you sure you want to delete this organization? This action cannot be undone.')) {
+  const handleArchiveOrganization = async (orgId: string, isActive: boolean) => {
+    const action = isActive ? 'archive' : 'restore';
+    if (!confirm(`Are you sure you want to ${action} this organization?`)) {
       return;
     }
 
     try {
-      await multiTenantService.updateOrganization(orgId, { is_active: false });
-      setOrganizations(prev => prev.filter(org => org.id !== orgId));
+      await multiTenantService.updateOrganization(orgId, { is_active: !isActive });
+      setOrganizations(prev => prev.map(org => 
+        org.id === orgId ? { ...org, is_active: !isActive } : org
+      ));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete organization');
+      setError(err instanceof Error ? err.message : `Failed to ${action} organization`);
     }
   };
 
   const filteredOrganizations = organizations.filter(org =>
-    org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    org.code.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+    const matchesSearch = 
+      org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      org.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (org.description && org.description.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    const matchesStatus = 
+      statusFilter === 'all' || 
+      (statusFilter === 'active' && org.is_active) ||
+      (statusFilter === 'inactive' && !org.is_active);
+    
+    return matchesSearch && matchesStatus;
 
   if (loading) {
     return (
@@ -125,44 +190,120 @@ const OrganizationManagement: React.FC = () => {
 
       {/* Search */}
       <div className="mb-6">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search organizations..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search organizations by name, code, or description..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Summary Stats */}
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <Building2 className="h-8 w-8 text-purple-600" />
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Total Organizations</p>
+              <p className="text-2xl font-semibold text-gray-900">{organizations.length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <CheckCircle className="h-8 w-8 text-green-600" />
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Active</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                {organizations.filter(org => org.is_active).length}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <Archive className="h-8 w-8 text-gray-600" />
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Inactive</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                {organizations.filter(org => !org.is_active).length}
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <MapPin className="h-8 w-8 text-blue-600" />
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Total Locations</p>
+              <p className="text-2xl font-semibold text-gray-900">
+                {Object.values(orgStats).reduce((sum, stat) => sum + stat.locations, 0)}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Organizations Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredOrganizations.map((org) => (
-          <div key={org.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div key={org.id} className={`bg-white rounded-lg shadow-sm border p-6 ${
+            org.is_active ? 'border-gray-200' : 'border-gray-300 bg-gray-50'
+          }`}>
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Building2 className="h-6 w-6 text-purple-600" />
+                <div className={`p-2 rounded-lg ${
+                  org.is_active ? 'bg-purple-100' : 'bg-gray-200'
+                }`}>
+                  <Building2 className={`h-6 w-6 ${
+                    org.is_active ? 'text-purple-600' : 'text-gray-500'
+                  }`} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">{org.name}</h3>
+                  <h3 className={`text-lg font-semibold ${
+                    org.is_active ? 'text-gray-900' : 'text-gray-600'
+                  }`}>{org.name}</h3>
                   <p className="text-sm text-gray-500">Code: {org.code}</p>
                 </div>
               </div>
               <div className="flex items-center space-x-1">
                 <button
+                  onClick={() => handleViewOrganization(org)}
+                  className="p-1 text-gray-400 hover:text-blue-600 rounded"
+                  title="View Details"
+                >
+                  <Eye className="h-4 w-4" />
+                </button>
+                <button
                   onClick={() => handleEditOrganization(org)}
                   className="p-1 text-gray-400 hover:text-purple-600 rounded"
+                  title="Edit Organization"
                 >
                   <Edit className="h-4 w-4" />
                 </button>
                 <button
-                  onClick={() => handleDeleteOrganization(org.id)}
-                  className="p-1 text-gray-400 hover:text-red-600 rounded"
+                  onClick={() => handleArchiveOrganization(org.id, org.is_active)}
+                  className={`p-1 text-gray-400 rounded ${
+                    org.is_active ? 'hover:text-orange-600' : 'hover:text-green-600'
+                  }`}
+                  title={org.is_active ? 'Archive Organization' : 'Restore Organization'}
                 >
-                  <Trash2 className="h-4 w-4" />
+                  <Archive className="h-4 w-4" />
                 </button>
               </div>
             </div>
@@ -184,6 +325,28 @@ const OrganizationManagement: React.FC = () => {
                   <span>{org.contact_phone}</span>
                 </div>
               )}
+            </div>
+
+            {/* Organization Stats */}
+            <div className="mb-4 grid grid-cols-2 gap-4">
+              <div className="text-center p-2 bg-gray-50 rounded">
+                <div className="flex items-center justify-center space-x-1">
+                  <MapPin className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-900">
+                    {orgStats[org.id]?.locations || 0}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500">Locations</p>
+              </div>
+              <div className="text-center p-2 bg-gray-50 rounded">
+                <div className="flex items-center justify-center space-x-1">
+                  <Users className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm font-medium text-gray-900">
+                    {orgStats[org.id]?.users || 0}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500">Users</p>
+              </div>
             </div>
 
             <div className="mt-4 pt-4 border-t border-gray-200">
@@ -230,6 +393,26 @@ const OrganizationManagement: React.FC = () => {
                     <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
                       {isEditing ? 'Edit Organization' : 'Create Organization'}
                     </h3>
+
+                    {/* Modal Message */}
+                    {modalMessage && (
+                      <div className={`mb-4 p-3 rounded-lg flex items-center space-x-2 ${
+                        modalMessage.type === 'success' 
+                          ? 'bg-green-50 border border-green-200' 
+                          : 'bg-red-50 border border-red-200'
+                      }`}>
+                        {modalMessage.type === 'success' ? (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 text-red-600" />
+                        )}
+                        <span className={`text-sm ${
+                          modalMessage.type === 'success' ? 'text-green-700' : 'text-red-700'
+                        }`}>
+                          {modalMessage.text}
+                        </span>
+                      </div>
+                    )}
                     
                     <div className="space-y-4">
                       <div>
@@ -327,6 +510,148 @@ const OrganizationManagement: React.FC = () => {
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* View Organization Modal */}
+      {isViewModalOpen && selectedOrg && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsViewModalOpen(false)}></div>
+            
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                    <div className="flex items-center justify-between mb-6">
+                      <h3 className="text-xl leading-6 font-medium text-gray-900">
+                        Organization Details
+                      </h3>
+                      <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                        selectedOrg.is_active 
+                          ? 'bg-green-100 text-green-800' 
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {selectedOrg.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-500 mb-1">
+                            Organization Name
+                          </label>
+                          <p className="text-lg font-semibold text-gray-900">{selectedOrg.name}</p>
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-500 mb-1">
+                            Organization Code
+                          </label>
+                          <p className="text-lg font-mono text-gray-900">{selectedOrg.code}</p>
+                        </div>
+                        
+                        {selectedOrg.description && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">
+                              Description
+                            </label>
+                            <p className="text-gray-900">{selectedOrg.description}</p>
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="space-y-4">
+                        {selectedOrg.contact_email && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">
+                              Contact Email
+                            </label>
+                            <div className="flex items-center space-x-2">
+                              <Mail className="h-4 w-4 text-gray-400" />
+                              <p className="text-gray-900">{selectedOrg.contact_email}</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {selectedOrg.contact_phone && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">
+                              Contact Phone
+                            </label>
+                            <div className="flex items-center space-x-2">
+                              <Phone className="h-4 w-4 text-gray-400" />
+                              <p className="text-gray-900">{selectedOrg.contact_phone}</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-500 mb-1">
+                            Created
+                          </label>
+                          <p className="text-gray-900">
+                            {new Date(selectedOrg.created_at).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Statistics */}
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                      <h4 className="text-lg font-medium text-gray-900 mb-4">Statistics</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="bg-gray-50 p-4 rounded-lg text-center">
+                          <div className="flex items-center justify-center space-x-2 mb-2">
+                            <MapPin className="h-5 w-5 text-blue-600" />
+                            <span className="text-2xl font-bold text-gray-900">
+                              {orgStats[selectedOrg.id]?.locations || 0}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600">Locations</p>
+                        </div>
+                        <div className="bg-gray-50 p-4 rounded-lg text-center">
+                          <div className="flex items-center justify-center space-x-2 mb-2">
+                            <Users className="h-5 w-5 text-green-600" />
+                            <span className="text-2xl font-bold text-gray-900">
+                              {orgStats[selectedOrg.id]?.users || 0}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-600">Users</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsViewModalOpen(false);
+                    handleEditOrganization(selectedOrg);
+                  }}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Edit Organization
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsViewModalOpen(false)}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Close
                 </button>
               </div>
             </div>
