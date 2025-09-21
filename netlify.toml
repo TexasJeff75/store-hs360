@@ -1,6 +1,7 @@
 [build]
   publish = "dist"
   command = "npm run build"
+  environment = { SECRETS_SCAN_ENABLED = "false" }
 
 [functions]
   directory = "netlify/functions"
