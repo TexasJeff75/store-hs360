@@ -5,8 +5,7 @@ import AuthModal from '@/components/AuthModal';
 import UserProfile from '@/components/UserProfile';
 import AdminDashboard from '@/components/admin/AdminDashboard';
 import Hero from '@/components/Hero';
-import ProductCard from '@/components/ProductCard';
-import ProductFilter from '@/components/ProductFilter';
+import ProductCarousel from '@/components/ProductCarousel';
 import Cart from '@/components/Cart';
 import Footer from '@/components/Footer';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
@@ -32,9 +31,6 @@ function AppContent() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { errors, logError, clearErrors } = useErrorLogger();
   const { user, profile, loading: authLoading } = useAuth();
 
@@ -128,12 +124,86 @@ function AppContent() {
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Filter products
-  const filteredProducts = products.filter(product => {
-    const categoryMatch = selectedCategory === 'all' || product.category === selectedCategory;
-    const priceMatch = product.price >= priceRange[0] && product.price <= priceRange[1];
-    return categoryMatch && priceMatch;
-  });
+  // Filter products by category
+  const peptideProducts = products.filter(product => 
+    product.category.toLowerCase().includes('peptide') || 
+    product.name.toLowerCase().includes('peptide')
+  );
+  
+  const geneticTestingProducts = products.filter(product => 
+    product.category.toLowerCase().includes('genetic') || 
+    product.name.toLowerCase().includes('genetic') ||
+    product.category.toLowerCase().includes('testing') && product.name.toLowerCase().includes('genetic')
+  );
+  
+  const clinicalTestingProducts = products.filter(product => 
+    (product.category.toLowerCase().includes('testing') || 
+     product.name.toLowerCase().includes('test') ||
+     product.name.toLowerCase().includes('biomarker') ||
+     product.name.toLowerCase().includes('lab')) &&
+    !product.name.toLowerCase().includes('genetic')
+  );
+
+  // Show loading or auth gate
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show auth modal if user is not logged in
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <Header 
+          cartCount={0} 
+          onCartClick={() => {}}
+          onAuthClick={() => setIsAuthModalOpen(true)}
+          onProfileClick={() => {}}
+          onAdminClick={() => {}}
+        />
+        
+        <div className="min-h-screen flex items-center justify-center px-4">
+          <div className="max-w-md w-full text-center">
+            <div className="bg-white rounded-lg shadow-lg p-8">
+              <div className="mb-6">
+                <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Required</h2>
+                <p className="text-gray-600">
+                  Please sign in to access our premium health products and personalized pricing.
+                </p>
+              </div>
+              
+              <button
+                onClick={() => setIsAuthModalOpen(true)}
+                className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-3 px-6 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 font-semibold"
+              >
+                Sign In to Continue
+              </button>
+              
+              <p className="text-sm text-gray-500 mt-4">
+                New to HealthSpan360? Create an account to get started.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+        />
+      </div>
+    );
+  }
 
   return (
       <div className="min-h-screen bg-gray-50">
@@ -147,85 +217,105 @@ function AppContent() {
         
         <Hero />
 
-        {/* Products Section */}
+        {/* Product Carousels Section */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Our Products</h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">Discover our range of products</p>
+          <div className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Our Product Categories</h2>
+            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              Explore our comprehensive range of health and wellness solutions
+            </p>
           </div>
           
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Filter Sidebar */}
-            <div className="lg:w-64 flex-shrink-0">
-              <ProductFilter
-                categories={categories}
-                selectedCategory={selectedCategory}
-                onCategoryChange={setSelectedCategory}
-                priceRange={priceRange}
-                onPriceRangeChange={setPriceRange}
-                isOpen={isFilterOpen}
-                onToggle={() => setIsFilterOpen(!isFilterOpen)}
+          {loading ? (
+            <div className="space-y-16">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="animate-pulse">
+                  <div className="h-8 bg-gray-200 rounded w-64 mb-6"></div>
+                  <div className="flex space-x-6 overflow-hidden">
+                    {[...Array(4)].map((_, j) => (
+                      <div key={j} className="flex-shrink-0 w-80 bg-gray-200 rounded-lg h-96"></div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="text-center py-16">
+              <p className="text-red-500 text-lg mb-4">Error loading products</p>
+              <p className="text-gray-600">{error}</p>
+            </div>
+          ) : (
+            <div className="space-y-16">
+              {/* Peptides Carousel */}
+              <ProductCarousel
+                title="Peptide Therapy"
+                products={peptideProducts}
+                onAddToCart={addToCart}
+              />
+              
+              {/* Genetic Testing Carousel */}
+              <ProductCarousel
+                title="Genetic Testing"
+                products={geneticTestingProducts}
+                onAddToCart={addToCart}
+              />
+              
+              {/* Clinical Testing Carousel */}
+              <ProductCarousel
+                title="Clinical Testing"
+                products={clinicalTestingProducts}
+                onAddToCart={addToCart}
               />
             </div>
+          )}
+          
+          {!loading && !error && products.length === 0 && (
+            <div className="text-center py-16">
+              <p className="text-gray-500 text-lg">No products available at this time</p>
+            </div>
+          )}
+        </section>
 
-            {/* Products Grid */}
-            <div className="flex-1">
-              <div className="flex justify-between items-center mb-6">
-                {loading ? (
-                  <p className="text-gray-600">Loading products...</p>
-                ) : error ? (
-                  <p className="text-red-600">{error}</p>
-                ) : (
-                  <p className="text-gray-600">{filteredProducts.length} products found</p>
-                )}
+        {/* Featured Benefits Section */}
+        <section className="bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-gray-900 mb-4">Why Choose HealthSpan360?</h2>
+              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+                Experience the difference with our science-backed approach to health optimization
+              </p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Science-Based</h3>
+                <p className="text-gray-600">All our products are backed by rigorous scientific research and clinical studies.</p>
               </div>
-
-              {loading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-100 animate-pulse">
-                      <div className="h-48 bg-gray-200 rounded-t-lg"></div>
-                      <div className="p-4 space-y-3">
-                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                        <div className="h-8 bg-gray-200 rounded"></div>
-                      </div>
-                    </div>
-                  ))}
+              
+              <div className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
                 </div>
-              ) : error ? (
-                <div className="text-center py-16">
-                  <p className="text-red-500 text-lg mb-4">Error loading products</p>
-                  <button>
-                    Retry
-                  </button>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Personalized</h3>
+                <p className="text-gray-600">Tailored solutions based on your unique genetic profile and health goals.</p>
+              </div>
+              
+              <div className="text-center">
+                <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredProducts.map(product => (
-                    <ProductCard
-                      key={product.id}
-                      {...product}
-                      onAddToCart={addToCart}
-                    />
-                  ))}
-                </div>
-              )}
-
-              {!loading && !error && filteredProducts.length === 0 && (
-                <div className="text-center py-16">
-                  <p className="text-gray-500 text-lg">No products found matching your criteria</p>
-                  <button
-                    onClick={() => {
-                      setSelectedCategory('all');
-                      setPriceRange([0, 500]);
-                    }}
-                    className="mt-4 text-pink-600 hover:text-pink-700 transition-colors"
-                  >
-                    Clear filters
-                  </button>
-                </div>
-              )}
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">Expert Support</h3>
+                <p className="text-gray-600">Access to healthcare professionals and personalized guidance throughout your journey.</p>
+              </div>
             </div>
           </div>
         </section>
