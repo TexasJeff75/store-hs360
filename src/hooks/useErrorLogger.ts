@@ -1,5 +1,4 @@
 import { useState, useCallback } from 'react';
-import { v4 as uuidv4 } from 'uuid';
 
 export interface ErrorLog {
   id: string;
@@ -18,7 +17,7 @@ export function useErrorLogger() {
     console.error(prefix, error);
 
     const errorLog: ErrorLog = {
-      id: uuidv4(),
+      id: Math.random().toString(36).substr(2, 9),
       message: error.message,
       context,
       timestamp: new Date(),

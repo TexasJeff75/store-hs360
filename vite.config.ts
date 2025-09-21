@@ -16,7 +16,7 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      external: ['uuid']
+      external: []
     }
   },
   server: {
