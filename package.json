@@ -4,9 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:functions\"",
+    "dev": "concurrently \"npm run dev:vite\" \"node server/gql.cjs\"",
     "dev:vite": "vite",
-    "dev:functions": "node server/gql.cjs",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview"
