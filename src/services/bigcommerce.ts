@@ -124,6 +124,11 @@ class BigCommerceStorefrontService {
           throw new Error('API_ACCESS_NOT_AVAILABLE');
         }
         
+        // Check for 422 Unprocessable Entity - invalid request data
+        if (response.status === 422) {
+          throw new Error('INVALID_REQUEST_DATA');
+        }
+        
         console.error('BigCommerce GraphQL Error Details:', {
           status: response.status,
           statusText: response.statusText,
