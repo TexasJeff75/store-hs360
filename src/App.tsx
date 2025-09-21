@@ -125,7 +125,7 @@ function App() {
           <div>
             {loading ? (
               <div>
-                <p className="text-gray-600">Loading...</p>
+                <p className="text-gray-600">Loading products...</p>
               </div>
             ) : error ? (
               <div>
@@ -147,54 +147,56 @@ function App() {
             )}
           </div>
           <div>
-            <span className="text-sm text-gray-600">Filter by price</span>
+            <span className="text-sm text-gray-600">Filter results</span>
           </div>
-          {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-100 animate-pulse">
-                  <div className="h-48 bg-gray-200 rounded-t-lg"></div>
-                  <div className="p-4 space-y-3">
-                    <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                    <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                    <div className="h-8 bg-gray-200 rounded"></div>
+          <div>
+            {loading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(6)].map((_, i) => (
+                  <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-100 animate-pulse">
+                    <div className="h-48 bg-gray-200 rounded-t-lg"></div>
+                    <div className="p-4 space-y-3">
+                      <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                      <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                      <div className="h-8 bg-gray-200 rounded"></div>
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          ) : error ? (
-            <div className="text-center py-16">
-              <p className="text-red-500 text-lg mb-4">Error loading products</p>
-              <button>
-                Retry
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredProducts.map(product => (
-                <ProductCard
-                  key={product.id}
-                  {...product}
-                  onAddToCart={addToCart}
-                />
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            ) : error ? (
+              <div className="text-center py-16">
+                <p className="text-red-500 text-lg mb-4">Error loading products</p>
+                <button>
+                  Retry
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredProducts.map(product => (
+                  <ProductCard
+                    key={product.id}
+                    {...product}
+                    onAddToCart={addToCart}
+                  />
+                ))}
+              </div>
+            )}
 
-          {!loading && !error && filteredProducts.length === 0 && (
-            <div className="text-center py-16">
-              <p className="text-gray-500 text-lg">No products found</p>
-              <button
-                onClick={() => {
-                  setSelectedCategory('all');
-                  setPriceRange([0, 100]);
-                }}
-                className="mt-4 text-pink-600 hover:text-pink-700 transition-colors"
-              >
-                Clear filters
-              </button>
-            </div>
-          )}
+            {!loading && !error && filteredProducts.length === 0 && (
+              <div className="text-center py-16">
+                <p className="text-gray-500 text-lg">No products found</p>
+                <button
+                  onClick={() => {
+                    setSelectedCategory('all');
+                    setPriceRange([0, 100]);
+                  }}
+                  className="mt-4 text-pink-600 hover:text-pink-700 transition-colors"
+                >
+                  Clear filters
+                </button>
+              </div>
+            )}
+          </div>
         </section>
 
         {/* Newsletter Section */}
