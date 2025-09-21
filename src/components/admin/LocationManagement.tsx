@@ -1,252 +1,355 @@
 import React, { useState, useEffect } from 'react';
-import { AuthProvider } from '@/contexts/AuthContext';
-import Header from '@/components/Header';
-import Hero from '@/components/Hero';
-import ProductCard from '@/components/ProductCard';
-import ProductFilter from '@/components/ProductFilter';
-import Cart from '@/components/Cart';
-import Footer from '@/components/Footer';
-import ErrorDebugPanel from '@/components/ErrorDebugPanel';
-import { bigCommerceService, Product } from '@/services/bigcommerce';
-import { useErrorLogger } from '@/hooks/useErrorLogger';
+import { MapPin, Plus, Edit, Trash2, Search, Building2, Mail, Phone } from 'lucide-react';
+import { multiTenantService } from '@/services/multiTenant';
+import type { Location, Organization } from '@/services/supabase';
 
-interface CartItem {
-  id: number;
-  name: string;
-  price: number;
-  quantity: number;
-  image: string;
+interface LocationWithOrg extends Location {
+  organizations?: { name: string };
 }
 
-function App() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
+const LocationManagement: React.FC = () => {
+  const [locations, setLocations] = useState<LocationWithOrg[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 100]);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const { errors, logError, clearErrors } = useErrorLogger();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState<LocationWithOrg | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
-  // Fetch products and categories from BigCommerce
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const [productsData, categoriesData] = await Promise.all([
-          bigCommerceService.getProducts(logError),
-          bigCommerceService.getCategories(logError)
-        ]);
-        
-        setProducts(productsData.products);
-        setCategories(categoriesData.categories);
-        
-        // Set error message if either API call failed
-        if (productsData.errorMessage || categoriesData.errorMessage) {
-          const errorMsg = productsData.errorMessage || categoriesData.errorMessage;
-          setError(errorMsg);
-        }
-      } catch (err) {
-        setError('Failed to load products. Please try again later.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchData();
-  }, [logError]);
+  }, []);
 
-  const addToCart = (productId: number) => {
-    const product = products.find(p => p.id === productId);
-    if (!product) return;
-
-    setCartItems(prev => {
-      const existingItem = prev.find(item => item.id === productId);
-      if (existingItem) {
-        return prev.map(item =>
-          item.id === productId
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      } else {
-        return [...prev, {
-          id: product.id,
-          name: product.name,
-          price: product.price,
-          quantity: 1,
-          image: product.image
-        }];
-      }
-    });
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      const [locationsData, orgsData] = await Promise.all([
+        multiTenantService.getLocations(),
+        multiTenantService.getOrganizations()
+      ]);
+      setLocations(locationsData);
+      setOrganizations(orgsData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch data');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const updateCartQuantity = (id: number, quantity: number) => {
-    if (quantity === 0) {
-      removeFromCart(id);
+  const handleCreateLocation = () => {
+    setSelectedLocation({
+      id: '',
+      organization_id: organizations[0]?.id || '',
+      name: '',
+      code: '',
+      address: null,
+      contact_email: '',
+      contact_phone: '',
+      is_active: true,
+      created_at: '',
+      updated_at: ''
+    });
+    setIsEditing(false);
+    setIsModalOpen(true);
+  };
+
+  const handleEditLocation = (location: LocationWithOrg) => {
+    setSelectedLocation(location);
+    setIsEditing(true);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveLocation = async () => {
+    if (!selectedLocation) return;
+
+    try {
+      if (isEditing) {
+        await multiTenantService.updateLocation(selectedLocation.id, selectedLocation);
+        setLocations(prev => prev.map(loc => 
+          loc.id === selectedLocation.id ? selectedLocation : loc
+        ));
+      } else {
+        const newLocation = await multiTenantService.createLocation(selectedLocation);
+        setLocations(prev => [newLocation, ...prev]);
+      }
+      setIsModalOpen(false);
+      setSelectedLocation(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save location');
+    }
+  };
+
+  const handleDeleteLocation = async (locationId: string) => {
+    if (!confirm('Are you sure you want to delete this location? This action cannot be undone.')) {
       return;
     }
-    setCartItems(prev =>
-      prev.map(item =>
-        item.id === id ? { ...item, quantity } : item
-      )
+
+    try {
+      await multiTenantService.updateLocation(locationId, { is_active: false });
+      setLocations(prev => prev.filter(loc => loc.id !== locationId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete location');
+    }
+  };
+
+  const filteredLocations = locations.filter(location =>
+    location.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    location.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    location.organizations?.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-32 bg-gray-200 rounded-lg"></div>
+          ))}
+        </div>
+      </div>
     );
-  };
-
-  const removeFromCart = (id: number) => {
-    setCartItems(prev => prev.filter(item => item.id !== id));
-  };
-
-  const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-
-  // Filter products
-  const filteredProducts = products.filter(product => {
-    const categoryMatch = selectedCategory === 'all' || product.category === selectedCategory;
-    const priceMatch = product.price >= priceRange[0] && product.price <= priceRange[1];
-    return categoryMatch && priceMatch;
-  });
+  }
 
   return (
-    <AuthProvider>
-      <div className="min-h-screen bg-gray-50">
-        <Header cartCount={cartCount} onCartClick={() => setIsCartOpen(true)} />
-        
-        <Hero />
+    <div className="p-6">
+      <div className="mb-6 flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Location Management</h2>
+          <p className="text-gray-600">Manage locations within organizations</p>
+        </div>
+        <button
+          onClick={handleCreateLocation}
+          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+        >
+          <Plus className="h-5 w-5" />
+          <span>Add Location</span>
+        </button>
+      </div>
 
-        {/* Products Section */}
-        <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4"></h2>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto"></p>
-          </div>
+      {error && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-700">{error}</p>
+        </div>
+      )}
 
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Filter Sidebar */}
-            <div className="lg:w-64 flex-shrink-0">
-              <ProductFilter
-                categories={categories}
-                selectedCategory={selectedCategory}
-                onCategoryChange={setSelectedCategory}
-                priceRange={priceRange}
-                onPriceRangeChange={setPriceRange}
-                isOpen={isFilterOpen}
-                onToggle={() => setIsFilterOpen(!isFilterOpen)}
-              />
-            </div>
+      {/* Search */}
+      <div className="mb-6">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search locations..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+          />
+        </div>
+      </div>
 
-            {/* Products Grid */}
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-6">
-                {loading ? (
-                  <p className="text-gray-600"></p>
-                ) : error ? (
-                  <p className="text-red-600"></p>
-                ) : (
-                  <p className="text-gray-600"></p>
-                )}
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm text-gray-600"></span>
-                  <select className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent">
-                    <option></option>
-                    <option></option>
-                    <option></option>
-                    <option></option>
-                    <option></option>
-                  </select>
+      {/* Locations Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredLocations.map((location) => (
+          <div key={location.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <MapPin className="h-6 w-6 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">{location.name}</h3>
+                  <p className="text-sm text-gray-500">Code: {location.code}</p>
                 </div>
               </div>
+              <div className="flex items-center space-x-1">
+                <button
+                  onClick={() => handleEditLocation(location)}
+                  className="p-1 text-gray-400 hover:text-purple-600 rounded"
+                >
+                  <Edit className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => handleDeleteLocation(location.id)}
+                  className="p-1 text-gray-400 hover:text-red-600 rounded"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
 
-              {loading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[...Array(6)].map((_, i) => (
-                    <div key={i} className="bg-white rounded-lg shadow-sm border border-gray-100 animate-pulse">
-                      <div className="h-48 bg-gray-200 rounded-t-lg"></div>
-                      <div className="p-4 space-y-3">
-                        <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                        <div className="h-4 bg-gray-200 rounded w-1/2"></div>
-                        <div className="h-8 bg-gray-200 rounded"></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : error ? (
-                <div className="text-center py-16">
-                  <p className="text-red-500 text-lg mb-4"></p>
-                  <button
-                    onClick={() => window.location.reload()}
-                    className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-6 py-2 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all"
-                  >
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredProducts.map(product => (
-                    <ProductCard
-                      key={product.id}
-                      {...product}
-                      onAddToCart={addToCart}
-                    />
-                  ))}
+            <div className="mb-4">
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <Building2 className="h-4 w-4" />
+                <span>{location.organizations?.name || 'Unknown Organization'}</span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {location.contact_email && (
+                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <Mail className="h-4 w-4" />
+                  <span>{location.contact_email}</span>
                 </div>
               )}
-
-              {!loading && !error && filteredProducts.length === 0 && (
-                <div className="text-center py-16">
-                  <p className="text-gray-500 text-lg"></p>
-                  <button
-                    onClick={() => {
-                      setSelectedCategory('all');
-                      setPriceRange([0, 100]);
-                    }}
-                    className="mt-4 text-pink-600 hover:text-pink-700 transition-colors"
-                  >
-                    Clear filters
-                  </button>
+              {location.contact_phone && (
+                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                  <Phone className="h-4 w-4" />
+                  <span>{location.contact_phone}</span>
                 </div>
               )}
             </div>
-          </div>
-        </section>
 
-        {/* Newsletter Section */}
-        <section className="bg-gradient-to-r from-pink-600 to-orange-600 text-white">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold mb-4">Stay Connected with HealthSpan360</h2>
-              <p className="text-pink-100 mb-8 max-w-2xl mx-auto">
-                Get the latest insights on peptide therapy, genetic testing, and personalized healthcare delivered to your inbox.
-              </p>
-              <div className="max-w-md mx-auto flex">
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="flex-1 px-4 py-3 rounded-l-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-pink-400"
-                />
-                <button className="bg-white text-pink-600 px-6 py-3 rounded-r-lg hover:bg-gray-100 transition-colors font-semibold">
-                  Subscribe
+            <div className="mt-4 pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-500">
+                  Created: {new Date(location.created_at).toLocaleDateString()}
+                </span>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                  location.is_active 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-red-100 text-red-800'
+                }`}>
+                  {location.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {filteredLocations.length === 0 && (
+        <div className="text-center py-12">
+          <MapPin className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No locations found</h3>
+          <p className="mt-1 text-sm text-gray-500">
+            {searchTerm 
+              ? 'Try adjusting your search criteria.'
+              : 'Get started by creating your first location.'
+            }
+          </p>
+        </div>
+      )}
+
+      {/* Location Modal */}
+      {isModalOpen && selectedLocation && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsModalOpen(false)}></div>
+            
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                      {isEditing ? 'Edit Location' : 'Create Location'}
+                    </h3>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Organization *
+                        </label>
+                        <select
+                          value={selectedLocation.organization_id}
+                          onChange={(e) => setSelectedLocation({...selectedLocation, organization_id: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        >
+                          {organizations.map(org => (
+                            <option key={org.id} value={org.id}>{org.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Location Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={selectedLocation.name}
+                          onChange={(e) => setSelectedLocation({...selectedLocation, name: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          placeholder="Enter location name"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Location Code *
+                        </label>
+                        <input
+                          type="text"
+                          value={selectedLocation.code}
+                          onChange={(e) => setSelectedLocation({...selectedLocation, code: e.target.value.toUpperCase()})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          placeholder="LOC001"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Contact Email
+                        </label>
+                        <input
+                          type="email"
+                          value={selectedLocation.contact_email || ''}
+                          onChange={(e) => setSelectedLocation({...selectedLocation, contact_email: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          placeholder="location@organization.com"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Contact Phone
+                        </label>
+                        <input
+                          type="tel"
+                          value={selectedLocation.contact_phone || ''}
+                          onChange={(e) => setSelectedLocation({...selectedLocation, contact_phone: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          placeholder="+1 (555) 123-4567"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={selectedLocation.is_active}
+                            onChange={(e) => setSelectedLocation({...selectedLocation, is_active: e.target.checked})}
+                            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">Active Location</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={handleSaveLocation}
+                  disabled={!selectedLocation.name || !selectedLocation.code || !selectedLocation.organization_id}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isEditing ? 'Update' : 'Create'} Location
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(false)}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Cancel
                 </button>
               </div>
             </div>
           </div>
-        </section>
-
-        <Footer />
-
-        <Cart
-          isOpen={isCartOpen}
-          onClose={() => setIsCartOpen(false)}
-          items={cartItems}
-          onUpdateQuantity={updateCartQuantity}
-          onRemoveItem={removeFromCart}
-        />
-
-        <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
-      </div>
-    </AuthProvider>
+        </div>
+      )}
+    </div>
   );
-}
+};
 
-export default App;
+export default LocationManagement;
