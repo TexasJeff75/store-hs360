@@ -10,8 +10,12 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
   });
   const txt = await res.text();
   const json = JSON.parse(txt);
-  if (!res.ok || json.errors) throw new Error(JSON.stringify(json.errors || json));
-  return json.data as T;
+  if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt.slice(0,200)}`);
+  if (json.errors?.length) {
+    // Log, but still try to return data when present
+    console.warn("GQL errors:", json.errors);
+  }
+  return json.data;
 }
 
 export const PRODUCTS_BASIC = `
