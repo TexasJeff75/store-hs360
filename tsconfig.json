@@ -4,6 +4,10 @@
     "paths": {
       "@/*": ["src/*"]
     }
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
   },
   "files": [],
   "references": [
