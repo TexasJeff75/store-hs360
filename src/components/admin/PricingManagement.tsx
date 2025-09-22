@@ -19,7 +19,11 @@ interface PricingEntry {
   createdAt: string;
 }
 
-const PricingManagement: React.FC = () => {
+interface PricingManagementProps {
+  organizationId?: string;
+}
+
+const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId }) => {
   const [pricingEntries, setPricingEntries] = useState<PricingEntry[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
@@ -42,15 +46,24 @@ const PricingManagement: React.FC = () => {
       setLoading(true);
       
       // Fetch all required data
-      const [productsData, orgsData, locationsData] = await Promise.all([
+      const [productsData, orgsData] = await Promise.all([
         bigCommerceService.getProducts(),
-        multiTenantService.getOrganizations(),
-        multiTenantService.getLocations()
+        multiTenantService.getOrganizations()
       ]);
 
       setProducts(productsData.products);
-      setOrganizations(orgsData);
-      setLocations(locationsData);
+      
+      if (organizationId) {
+        // Filter organizations to only the selected one
+        setOrganizations(orgsData.filter(org => org.id === organizationId));
+        // Fetch locations for this organization only
+        const locationsData = await multiTenantService.getLocations(organizationId);
+        setLocations(locationsData);
+      } else {
+        setOrganizations(orgsData);
+        const locationsData = await multiTenantService.getLocations();
+        setLocations(locationsData);
+      }
 
       // For now, we'll focus on individual contract pricing
       // TODO: Implement organization and location pricing fetching
@@ -64,7 +77,7 @@ const PricingManagement: React.FC = () => {
 
   const handleCreatePricing = () => {
     setSelectedEntry({
-      type: 'individual',
+      type: organizationId ? 'organization' : 'individual',
       entityId: '',
       entityName: '',
       productId: products[0]?.id || 0,
@@ -173,8 +186,15 @@ const PricingManagement: React.FC = () => {
     <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Pricing Management</h2>
-          <p className="text-gray-600">Manage contract pricing for users, organizations, and locations</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {organizationId ? 'Pricing' : 'Pricing Management'}
+          </h2>
+          <p className="text-gray-600">
+            {organizationId 
+              ? 'Manage contract pricing for this organization and its locations'
+              : 'Manage contract pricing for users, organizations, and locations'
+            }
+          </p>
         </div>
         <button
           onClick={handleCreatePricing}
@@ -328,15 +348,26 @@ const PricingManagement: React.FC = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Pricing Type *
                         </label>
-                        <select
-                          value={selectedEntry.type}
-                          onChange={(e) => setSelectedEntry({...selectedEntry, type: e.target.value as any})}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        >
-                          <option value="individual">Individual User</option>
-                          <option value="organization">Organization</option>
-                          <option value="location">Location</option>
-                        </select>
+                        {organizationId ? (
+                          <select
+                            value={selectedEntry.type}
+                            onChange={(e) => setSelectedEntry({...selectedEntry, type: e.target.value as any})}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          >
+                            <option value="organization">Organization Level</option>
+                            <option value="location">Location Level</option>
+                          </select>
+                        ) : (
+                          <select
+                            value={selectedEntry.type}
+                            onChange={(e) => setSelectedEntry({...selectedEntry, type: e.target.value as any})}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          >
+                            <option value="individual">Individual User</option>
+                            <option value="organization">Organization</option>
+                            <option value="location">Location</option>
+                          </select>
+                        )}
                       </div>
                       
                       <div>

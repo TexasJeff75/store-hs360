@@ -7,7 +7,11 @@ interface LocationWithOrg extends Location {
   organizations?: { name: string };
 }
 
-const LocationManagement: React.FC = () => {
+interface LocationManagementProps {
+  organizationId?: string;
+}
+
+const LocationManagement: React.FC<LocationManagementProps> = ({ organizationId }) => {
   const [locations, setLocations] = useState<LocationWithOrg[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,10 +28,16 @@ const LocationManagement: React.FC = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [locationsData, orgsData] = await Promise.all([
-        multiTenantService.getLocations(),
-        multiTenantService.getOrganizations()
-      ]);
+      
+      let locationsData;
+      if (organizationId) {
+        locationsData = await multiTenantService.getLocations(organizationId);
+      } else {
+        locationsData = await multiTenantService.getLocations();
+      }
+      
+      const orgsData = await multiTenantService.getOrganizations();
+      
       setLocations(locationsData);
       setOrganizations(orgsData);
     } catch (err) {
@@ -40,7 +50,7 @@ const LocationManagement: React.FC = () => {
   const handleCreateLocation = () => {
     setSelectedLocation({
       id: '',
-      organization_id: organizations[0]?.id || '',
+      organization_id: organizationId || organizations[0]?.id || '',
       name: '',
       code: '',
       address: null,
@@ -96,7 +106,7 @@ const LocationManagement: React.FC = () => {
   const filteredLocations = locations.filter(location =>
     location.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     location.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    location.organizations?.name.toLowerCase().includes(searchTerm.toLowerCase())
+    (!organizationId && location.organizations?.name.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   if (loading) {
@@ -115,8 +125,15 @@ const LocationManagement: React.FC = () => {
     <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Location Management</h2>
-          <p className="text-gray-600">Manage locations within organizations</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+            {organizationId ? 'Locations' : 'Location Management'}
+          </h2>
+          <p className="text-gray-600">
+            {organizationId 
+              ? 'Manage locations for this organization' 
+              : 'Manage locations within organizations'
+            }
+          </p>
         </div>
         <button
           onClick={handleCreateLocation}
@@ -249,15 +266,24 @@ const LocationManagement: React.FC = () => {
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Organization *
                         </label>
-                        <select
-                          value={selectedLocation.organization_id}
-                          onChange={(e) => setSelectedLocation({...selectedLocation, organization_id: e.target.value})}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        >
-                          {organizations.map(org => (
-                            <option key={org.id} value={org.id}>{org.name}</option>
-                          ))}
-                        </select>
+                        {organizationId ? (
+                          <input
+                            type="text"
+                            value={organizations.find(org => org.id === organizationId)?.name || 'Unknown Organization'}
+                            readOnly
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+                          />
+                        ) : (
+                          <select
+                            value={selectedLocation.organization_id}
+                            onChange={(e) => setSelectedLocation({...selectedLocation, organization_id: e.target.value})}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          >
+                            {organizations.map(org => (
+                              <option key={org.id} value={org.id}>{org.name}</option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                       
                       <div>

@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit, Trash2, Search, MapPin, Users, Mail, Phone, AlertCircle, CheckCircle, Eye, Archive } from 'lucide-react';
+import { Building2, Plus, Edit, Trash2, Search, MapPin, Users, Mail, Phone, AlertCircle, CheckCircle, Eye, Archive, ArrowLeft, Settings } from 'lucide-react';
 import { multiTenantService } from '@/services/multiTenant';
+import LocationManagement from './LocationManagement';
+import PricingManagement from './PricingManagement';
 import type { Organization } from '@/services/supabase';
+
+type SubManagementTab = 'locations' | 'pricing';
 
 const OrganizationManagement: React.FC = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -15,6 +19,8 @@ const OrganizationManagement: React.FC = () => {
   const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [orgStats, setOrgStats] = useState<{ [key: string]: { locations: number; users: number } }>({});
+  const [selectedOrgForSubManagement, setSelectedOrgForSubManagement] = useState<Organization | null>(null);
+  const [activeSubTab, setActiveSubTab] = useState<SubManagementTab>('locations');
 
   useEffect(() => {
     fetchOrganizations();
@@ -191,6 +197,78 @@ const OrganizationManagement: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // If we're in sub-management mode, render that instead
+  if (selectedOrgForSubManagement) {
+    const subTabs = [
+      { id: 'locations' as SubManagementTab, label: 'Locations', icon: MapPin },
+      { id: 'pricing' as SubManagementTab, label: 'Pricing', icon: DollarSign },
+    ];
+
+    return (
+      <div className="p-6">
+        {/* Sub-management header */}
+        <div className="mb-6">
+          <div className="flex items-center space-x-4 mb-4">
+            <button
+              onClick={() => {
+                setSelectedOrgForSubManagement(null);
+                setActiveSubTab('locations');
+              }}
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              <span>Back to Organizations</span>
+            </button>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <div className="p-3 bg-purple-100 rounded-lg">
+              <Building2 className="h-8 w-8 text-purple-600" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">{selectedOrgForSubManagement.name}</h2>
+              <p className="text-gray-600">Code: {selectedOrgForSubManagement.code}</p>
+              <p className="text-gray-600">Manage locations and pricing for this organization</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Sub-tabs */}
+        <div className="border-b border-gray-200 mb-6">
+          <nav className="-mb-px flex space-x-8">
+            {subTabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveSubTab(tab.id)}
+                  className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeSubTab === tab.id
+                      ? 'border-purple-500 text-purple-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span>{tab.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Sub-tab content */}
+        <div>
+          {activeSubTab === 'locations' && (
+            <LocationManagement organizationId={selectedOrgForSubManagement.id} />
+          )}
+          {activeSubTab === 'pricing' && (
+            <PricingManagement organizationId={selectedOrgForSubManagement.id} />
+          )}
+        </div>
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="p-6">
@@ -332,6 +410,13 @@ const OrganizationManagement: React.FC = () => {
                   title="Edit Organization"
                 >
                   <Edit className="h-4 w-4" />
+                </button>
+                <button
+                  onClick={() => setSelectedOrgForSubManagement(org)}
+                  className="p-1 text-gray-400 hover:text-purple-600 rounded"
+                  title="Manage Locations & Pricing"
+                >
+                  <Settings className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => handleArchiveOrganization(org.id, org.is_active)}
