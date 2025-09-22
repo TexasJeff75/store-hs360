@@ -769,6 +769,18 @@ const OrganizationManagement: React.FC = () => {
                         </div>
                       </div>
                     </div>
+                    
+                    {/* Contract Pricing */}
+                    <div className="mt-6 pt-6 border-t border-gray-200">
+                      <h4 className="text-lg font-medium text-gray-900 mb-4">All Contract Pricing</h4>
+                      <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="text-center text-gray-500">
+                          <DollarSign className="h-8 w-8 mx-auto mb-2" />
+                          <p className="text-sm">Contract pricing data will be displayed here</p>
+                          <p className="text-xs text-gray-400 mt-1">Feature coming soon</p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
