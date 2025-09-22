@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Plus, Edit, Trash2, Search, User, Building2, MapPin } from 'lucide-react';
+import { supabase } from '@/services/supabase';
 import { contractPricingService } from '@/services/contractPricing';
 import { multiTenantService } from '@/services/multiTenant';
 import { bigCommerceService } from '@/services/bigcommerce';
