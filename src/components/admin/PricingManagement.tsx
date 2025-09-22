@@ -724,6 +724,168 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
           </div>
         </div>
       )}
+
+      {/* Bulk Pricing Modal */}
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsBulkModalOpen(false)}></div>
+            
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                      Bulk Contract Pricing
+                    </h3>
+                    
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Organization
+                        </label>
+                        <input
+                          type="text"
+                          value={organizations.find(org => org.id === bulkPricingData.organizationId)?.name || 'Current Organization'}
+                          readOnly
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Discount Percentage *
+                        </label>
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="1"
+                            value={bulkPricingData.discountPercentage}
+                            onChange={(e) => setBulkPricingData({
+                              ...bulkPricingData,
+                              discountPercentage: parseInt(e.target.value) || 0
+                            })}
+                            className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            placeholder="10"
+                          />
+                          <span className="text-gray-500">%</span>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          This discount will be applied to all selected products
+                        </p>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Select Products *
+                        </label>
+                        <div className="max-h-64 overflow-y-auto border border-gray-300 rounded-lg p-3 space-y-2">
+                          <div className="flex items-center space-x-2 pb-2 border-b border-gray-200">
+                            <input
+                              type="checkbox"
+                              checked={bulkPricingData.selectedProducts.length === products.length}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setBulkPricingData({
+                                    ...bulkPricingData,
+                                    selectedProducts: products.map(p => p.id)
+                                  });
+                                } else {
+                                  setBulkPricingData({
+                                    ...bulkPricingData,
+                                    selectedProducts: []
+                                  });
+                                }
+                              }}
+                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            />
+                            <span className="font-medium text-gray-900">Select All Products</span>
+                          </div>
+                          {products.map(product => {
+                            const isSelected = bulkPricingData.selectedProducts.includes(product.id);
+                            const discountAmount = product.price * (bulkPricingData.discountPercentage / 100);
+                            const contractPrice = product.price - discountAmount;
+                            
+                            return (
+                              <div key={product.id} className="flex items-center justify-between space-x-3 p-2 hover:bg-gray-50 rounded">
+                                <div className="flex items-center space-x-3 flex-1">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setBulkPricingData({
+                                          ...bulkPricingData,
+                                          selectedProducts: [...bulkPricingData.selectedProducts, product.id]
+                                        });
+                                      } else {
+                                        setBulkPricingData({
+                                          ...bulkPricingData,
+                                          selectedProducts: bulkPricingData.selectedProducts.filter(id => id !== product.id)
+                                        });
+                                      }
+                                    }}
+                                    className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                  />
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-gray-900">{product.name}</p>
+                                    <p className="text-xs text-gray-500">Category: {product.category}</p>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <p className="text-sm text-gray-500 line-through">${product.price.toFixed(2)}</p>
+                                  <p className="text-sm font-medium text-green-600">${contractPrice.toFixed(2)}</p>
+                                  <p className="text-xs text-green-500">Save ${discountAmount.toFixed(2)}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Selected: {bulkPricingData.selectedProducts.length} of {products.length} products
+                        </p>
+                      </div>
+                      
+                      {bulkPricingData.selectedProducts.length > 0 && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <h4 className="text-sm font-medium text-blue-900 mb-2">Pricing Summary</h4>
+                          <div className="space-y-1 text-xs text-blue-800">
+                            <p>Products selected: {bulkPricingData.selectedProducts.length}</p>
+                            <p>Discount: {bulkPricingData.discountPercentage}%</p>
+                            <p>Total savings: ${bulkPricingData.selectedProducts.reduce((total, productId) => {
+                              const product = products.find(p => p.id === productId);
+                              return total + (product ? product.price * (bulkPricingData.discountPercentage / 100) : 0);
+                            }, 0).toFixed(2)}</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={handleSaveBulkPricing}
+                  disabled={bulkPricingData.selectedProducts.length === 0 || !bulkPricingData.discountPercentage}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Apply Bulk Pricing ({bulkPricingData.selectedProducts.length} products)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsBulkModalOpen(false)}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
