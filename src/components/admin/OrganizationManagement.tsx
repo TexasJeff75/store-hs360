@@ -79,9 +79,7 @@ const OrganizationManagement: React.FC = () => {
       billing_address: null,
       contact_email: '',
       contact_phone: '',
-      is_active: true,
-      created_at: '',
-      updated_at: ''
+      is_active: true
     });
     setIsEditing(false);
     setIsModalOpen(true);
