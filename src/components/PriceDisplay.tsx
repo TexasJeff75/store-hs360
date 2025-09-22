@@ -17,7 +17,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   regularPrice,
   originalPrice,
   className = '',
-  showSavings = true
+  showSavings = true,
   quantity
 }) => {
   const { user, profile } = useAuth();
