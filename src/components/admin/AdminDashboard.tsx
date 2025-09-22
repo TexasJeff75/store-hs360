@@ -14,29 +14,23 @@ interface AdminDashboardProps {
 type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'analytics';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<AdminTab>('users');
+  const [activeTab, setActiveTab] = useState<AdminTab>('organizations');
 
   if (!isOpen) return null;
 
   const tabs = [
-    { id: 'users' as AdminTab, label: 'Users', icon: Users },
     { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2 },
-    { id: 'locations' as AdminTab, label: 'Locations', icon: MapPin },
-    { id: 'pricing' as AdminTab, label: 'Pricing', icon: DollarSign },
+    { id: 'users' as AdminTab, label: 'Users', icon: Users },
     { id: 'products' as AdminTab, label: 'Carousel Products', icon: Package },
     { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3 },
   ];
 
   const renderTabContent = () => {
     switch (activeTab) {
-      case 'users':
-        return <UserManagement />;
       case 'organizations':
         return <OrganizationManagement />;
-      case 'locations':
-        return <LocationManagement />;
-      case 'pricing':
-        return <PricingManagement />;
+      case 'users':
+        return <UserManagement />;
       case 'products':
         return <ProductManagement />;
       case 'analytics':
