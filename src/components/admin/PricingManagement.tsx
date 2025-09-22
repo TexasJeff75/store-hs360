@@ -186,9 +186,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            {organizationId ? 'Pricing' : 'Pricing Management'}
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Contract Pricing</h2>
           <p className="text-gray-600">
             {organizationId 
               ? 'Manage contract pricing for this organization and its locations'
