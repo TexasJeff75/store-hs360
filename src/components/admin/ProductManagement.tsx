@@ -158,7 +158,7 @@ const ProductManagement: React.FC = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Product Management</h2>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Carousel Product Management</h2>
         <p className="text-gray-600">Manage which products appear in carousels and customize their display</p>
       </div>
 
