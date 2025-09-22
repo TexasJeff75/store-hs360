@@ -202,7 +202,7 @@ const OrganizationManagement: React.FC = () => {
   if (selectedOrgForSubManagement) {
     const subTabs = [
       { id: 'locations' as SubManagementTab, label: 'Locations', icon: MapPin },
-      { id: 'pricing' as SubManagementTab, label: 'Pricing', icon: DollarSign },
+      { id: 'pricing' as SubManagementTab, label: 'Contract Pricing', icon: DollarSign },
     ];
 
     return (
