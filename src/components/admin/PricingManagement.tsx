@@ -241,6 +241,8 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     setBulkPricingData({
       organizationId: organizationId || '',
       discountPercentage: 10,
+    });
+  };
 
   const handleEditPricing = (entry: PricingEntry) => {
     setSelectedEntry(entry);
