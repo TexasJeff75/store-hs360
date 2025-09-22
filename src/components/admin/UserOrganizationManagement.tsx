@@ -26,7 +26,7 @@ const UserOrganizationManagement: React.FC<UserOrganizationManagementProps> = ({
   const [isEditing, setIsEditing] = useState(false);
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [newUserData, setNewUserData] = useState({ email: '', password: '', role: 'member' as string });
+  const [newUserData, setNewUserData] = useState({ email: '', password: '', role: 'viewer' as string });
   const [sendingPasswordReset, setSendingPasswordReset] = useState(false);
 
   useEffect(() => {
@@ -127,7 +127,7 @@ const UserOrganizationManagement: React.FC<UserOrganizationManagementProps> = ({
         setModalMessage({ type: 'success', text: 'User created and assigned to organization successfully!' });
         
         // Reset form
-        setNewUserData({ email: '', password: '', role: 'member' });
+        setNewUserData({ email: '', password: '', role: 'viewer' });
         
         // Refresh data
         fetchData();
@@ -335,7 +335,7 @@ const UserOrganizationManagement: React.FC<UserOrganizationManagementProps> = ({
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredUsers.map((user) => {
-                const RoleIcon = getRoleIcon(user.organizationRole || 'member');
+                const RoleIcon = getRoleIcon(user.organizationRole || 'viewer');
                 return (
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -354,8 +354,8 @@ const UserOrganizationManagement: React.FC<UserOrganizationManagementProps> = ({
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <RoleIcon className="h-4 w-4 mr-2 text-gray-500" />
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.organizationRole || 'member')}`}>
-                          {user.organizationRole || 'member'}
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleColor(user.organizationRole || 'viewer')}`}>
+                          {user.organizationRole || 'viewer'}
                         </span>
                       </div>
                     </td>
@@ -485,9 +485,14 @@ const UserOrganizationManagement: React.FC<UserOrganizationManagementProps> = ({
                         >
                           <option value="viewer">Viewer</option>
                           <option value="member">Member</option>
-                          <option value="manager">Manager</option>
-                          <option value="admin">Admin</option>
                         </select>
+                        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm text-blue-800 font-medium mb-2">Role Permissions:</p>
+                          <ul className="text-xs text-blue-700 space-y-1">
+                            <li><strong>Viewer:</strong> Can only view organization information and products. Read-only access.</li>
+                            <li><strong>Member:</strong> Can view information and add new users to the organization.</li>
+                          </ul>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -506,7 +511,7 @@ const UserOrganizationManagement: React.FC<UserOrganizationManagementProps> = ({
                   type="button"
                   onClick={() => {
                     setIsCreateUserModalOpen(false);
-                    setNewUserData({ email: '', password: '', role: 'member' });
+                    setNewUserData({ email: '', password: '', role: 'viewer' });
                     setModalMessage(null);
                   }}
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
@@ -563,7 +568,7 @@ const UserOrganizationManagement: React.FC<UserOrganizationManagementProps> = ({
                             value={selectedUser?.id || ''}
                             onChange={(e) => {
                               const user = availableUsers.find(u => u.id === e.target.value);
-                              setSelectedUser(user ? { ...user, organizationRole: 'member' } : null);
+                              setSelectedUser(user ? { ...user, organizationRole: 'viewer' } : null);
                             }}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           >
@@ -580,15 +585,20 @@ const UserOrganizationManagement: React.FC<UserOrganizationManagementProps> = ({
                           Organization Role *
                         </label>
                         <select
-                          value={selectedUser?.organizationRole || 'member'}
+                          value={selectedUser?.organizationRole || 'viewer'}
                           onChange={(e) => setSelectedUser(selectedUser ? {...selectedUser, organizationRole: e.target.value} : null)}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                         >
                           <option value="viewer">Viewer</option>
                           <option value="member">Member</option>
-                          <option value="manager">Manager</option>
-                          <option value="admin">Admin</option>
                         </select>
+                        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                          <p className="text-sm text-blue-800 font-medium mb-2">Role Permissions:</p>
+                          <ul className="text-xs text-blue-700 space-y-1">
+                            <li><strong>Viewer:</strong> Can only view organization information and products. Read-only access.</li>
+                            <li><strong>Member:</strong> Can view information and add new users to the organization.</li>
+                          </ul>
+                        </div>
                       </div>
                       
                       <div>
@@ -642,9 +652,9 @@ const UserOrganizationManagement: React.FC<UserOrganizationManagementProps> = ({
                   type="button"
                   onClick={() => {
                     if (isEditing && selectedUser) {
-                      handleUpdateUserRole(selectedUser.id, selectedUser.organizationRole || 'member');
+                      handleUpdateUserRole(selectedUser.id, selectedUser.organizationRole || 'viewer');
                     } else if (selectedUser) {
-                      handleAssignExistingUser(selectedUser.id, selectedUser.organizationRole || 'member');
+                      handleAssignExistingUser(selectedUser.id, selectedUser.organizationRole || 'viewer');
                     }
                   }}
                   disabled={!selectedUser}
