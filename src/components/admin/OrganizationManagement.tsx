@@ -146,8 +146,8 @@ const OrganizationManagement: React.FC = () => {
         ));
         setModalMessage({ type: 'success', text: 'Organization updated successfully!' });
       } else {
-        // Remove id property to let Supabase auto-generate UUID
-        const { id, ...orgData } = selectedOrg;
+        // Remove id, created_at, and updated_at properties to let Supabase auto-generate them
+        const { id, created_at, updated_at, ...orgData } = selectedOrg;
         const newOrg = await multiTenantService.createOrganization(orgData);
         setOrganizations(prev => [newOrg, ...prev]);
         setModalMessage({ type: 'success', text: 'Organization created successfully!' });
