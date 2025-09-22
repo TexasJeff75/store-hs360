@@ -23,7 +23,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2 },
     { id: 'locations' as AdminTab, label: 'Locations', icon: MapPin },
     { id: 'pricing' as AdminTab, label: 'Pricing', icon: DollarSign },
-    { id: 'products' as AdminTab, label: 'Products', icon: Package },
+    { id: 'products' as AdminTab, label: 'Carousel Products', icon: Package },
     { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3 },
   ];
 
