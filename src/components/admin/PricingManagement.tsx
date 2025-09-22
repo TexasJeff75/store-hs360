@@ -36,11 +36,133 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<Partial<PricingEntry> | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [newEntryData, setNewEntryData] = useState({
+    type: 'individual' as 'individual' | 'organization' | 'location',
+    entityId: '',
+    productId: 0,
+    contractPrice: 0
+  });
 
   useEffect(() => {
     fetchData();
   }, []);
 
+  const fetchPricingEntries = async () => {
+    try {
+      const entries: PricingEntry[] = [];
+      
+      // Fetch individual contract pricing
+      if (!organizationId) {
+        const { data: contractPrices, error: contractError } = await supabase
+          .from('contract_pricing')
+          .select(`
+            *,
+            profiles:user_id (email)
+          `);
+        
+        if (!contractError && contractPrices) {
+          contractPrices.forEach(price => {
+            const product = products.find(p => p.id === price.product_id);
+            if (product && price.profiles) {
+              entries.push({
+                id: price.id,
+                type: 'individual',
+                entityId: price.user_id,
+                entityName: price.profiles.email,
+                productId: price.product_id,
+                productName: product.name,
+                contractPrice: price.contract_price,
+                regularPrice: product.price,
+                savings: product.price - price.contract_price,
+                createdAt: price.created_at
+              });
+            }
+          });
+        }
+      }
+      
+      // Fetch organization pricing
+      const { data: orgPrices, error: orgError } = await supabase
+        .from('organization_pricing')
+        .select(`
+          *,
+          organizations (name)
+        `)
+        .eq(organizationId ? 'organization_id' : 'id', organizationId || 'all');
+      
+      if (!orgError && orgPrices) {
+        orgPrices.forEach(price => {
+          const product = products.find(p => p.id === price.product_id);
+          if (product && price.organizations) {
+            entries.push({
+              id: price.id,
+              type: 'organization',
+              entityId: price.organization_id,
+              entityName: price.organizations.name,
+              productId: price.product_id,
+              productName: product.name,
+              contractPrice: price.contract_price,
+              regularPrice: product.price,
+              savings: product.price - price.contract_price,
+              createdAt: price.created_at
+            });
+          }
+        });
+      }
+      
+      // Fetch location pricing
+      const locationQuery = organizationId 
+        ? supabase
+            .from('location_pricing')
+            .select(`
+              *,
+              locations!inner (
+                name,
+                organization_id
+              )
+            `)
+            .eq('locations.organization_id', organizationId)
+        : supabase
+            .from('location_pricing')
+            .select(`
+              *,
+              locations (name)
+            `);
+      
+      const { data: locationPrices, error: locationError } = await locationQuery;
+      
+      if (!locationError && locationPrices) {
+        locationPrices.forEach(price => {
+          const product = products.find(p => p.id === price.product_id);
+          if (product && price.locations) {
+            entries.push({
+              id: price.id,
+              type: 'location',
+              entityId: price.location_id,
+              entityName: price.locations.name,
+              productId: price.product_id,
+              productName: product.name,
+              contractPrice: price.contract_price,
+              regularPrice: product.price,
+              savings: product.price - price.contract_price,
+              createdAt: price.created_at
+            });
+          }
+        });
+      }
+      
+      setPricingEntries(entries);
+    } catch (err) {
+      console.error('Error fetching pricing entries:', err);
+    }
+  };
+
+  // Re-fetch pricing entries when products are loaded
+  useEffect(() => {
+    if (products.length > 0) {
+      fetchPricingEntries();
+    }
+  }, [products, organizationId]);
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -63,10 +185,21 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
         setOrganizations(orgsData);
         const locationsData = await multiTenantService.getLocations();
         setLocations(locationsData);
+        
+        // Fetch users for individual pricing
+        const { data: usersData, error: usersError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('is_approved', true)
+          .order('email');
+        
+        if (!usersError) {
+          setUsers(usersData || []);
+        }
       }
 
-      // For now, we'll focus on individual contract pricing
-      // TODO: Implement organization and location pricing fetching
+      // Fetch existing pricing entries
+      await fetchPricingEntries();
       
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
@@ -76,7 +209,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
   };
 
   const handleCreatePricing = () => {
-    setSelectedEntry({
+    const defaultEntry = {
       type: organizationId ? 'organization' : 'individual',
       entityId: '',
       entityName: '',
@@ -85,6 +218,13 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       contractPrice: 0,
       regularPrice: products[0]?.price || 0,
       savings: 0
+    };
+    setSelectedEntry(defaultEntry);
+    setNewEntryData({
+      type: defaultEntry.type,
+      entityId: '',
+      productId: defaultEntry.productId,
+      contractPrice: 0
     });
     setIsEditing(false);
     setIsModalOpen(true);
@@ -101,27 +241,28 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
 
     try {
       if (selectedEntry.type === 'individual') {
-        if (isEditing) {
-          // Update existing pricing
-          await contractPricingService.setContractPrice(
-            selectedEntry.entityId!,
-            selectedEntry.productId!,
-            selectedEntry.contractPrice!
-          );
-        } else {
-          // Create new pricing
-          await contractPricingService.setContractPrice(
-            selectedEntry.entityId!,
-            selectedEntry.productId!,
-            selectedEntry.contractPrice!
-          );
-        }
+        await contractPricingService.setContractPrice(
+          selectedEntry.entityId!,
+          selectedEntry.productId!,
+          selectedEntry.contractPrice!
+        );
+      } else if (selectedEntry.type === 'organization') {
+        await contractPricingService.setOrganizationPrice(
+          selectedEntry.entityId!,
+          selectedEntry.productId!,
+          selectedEntry.contractPrice!
+        );
+      } else if (selectedEntry.type === 'location') {
+        await contractPricingService.setLocationPrice(
+          selectedEntry.entityId!,
+          selectedEntry.productId!,
+          selectedEntry.contractPrice!
+        );
       }
-      // TODO: Handle organization and location pricing
 
       setIsModalOpen(false);
       setSelectedEntry(null);
-      fetchData(); // Refresh data
+      await fetchPricingEntries(); // Refresh pricing data
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to save pricing');
     }
@@ -135,10 +276,13 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     try {
       if (entry.type === 'individual') {
         await contractPricingService.removeContractPrice(entry.entityId, entry.productId);
+      } else if (entry.type === 'organization') {
+        await contractPricingService.removeOrganizationPrice(entry.entityId, entry.productId);
+      } else if (entry.type === 'location') {
+        await contractPricingService.removeLocationPrice(entry.entityId, entry.productId);
       }
-      // TODO: Handle organization and location pricing deletion
 
-      fetchData(); // Refresh data
+      await fetchPricingEntries(); // Refresh pricing data
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete pricing');
     }
@@ -344,29 +488,91 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Pricing Type *
+                          {selectedEntry.type === 'individual' ? 'User *' : 
+                           selectedEntry.type === 'organization' ? 'Organization *' : 
+                           'Location *'}
                         </label>
-                        {organizationId ? (
+                        {selectedEntry.type === 'individual' ? (
                           <select
-                            value={selectedEntry.type}
-                            onChange={(e) => setSelectedEntry({...selectedEntry, type: e.target.value as any})}
+                            value={selectedEntry.entityId}
+                            onChange={(e) => {
+                              const user = users.find(u => u.id === e.target.value);
+                              setSelectedEntry({
+                                ...selectedEntry,
+                                entityId: e.target.value,
+                                entityName: user?.email || ''
+                              });
+                            }}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           >
-                            <option value="organization">Organization Level</option>
-                            <option value="location">Location Level</option>
+                            <option value="">Select a user...</option>
+                            {users.map(user => (
+                              <option key={user.id} value={user.id}>{user.email}</option>
+                            ))}
+                          </select>
+                        ) : selectedEntry.type === 'organization' ? (
+                          <select
+                            value={selectedEntry.entityId}
+                            onChange={(e) => {
+                              const org = organizations.find(o => o.id === e.target.value);
+                              setSelectedEntry({
+                                ...selectedEntry,
+                                entityId: e.target.value,
+                                entityName: org?.name || ''
+                              });
+                            }}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          >
+                            <option value="">Select an organization...</option>
+                            {organizations.map(org => (
+                              <option key={org.id} value={org.id}>{org.name}</option>
+                            ))}
                           </select>
                         ) : (
                           <select
+                            value={selectedEntry.entityId}
+                            onChange={(e) => {
+                              const location = locations.find(l => l.id === e.target.value);
+                              setSelectedEntry({
+                                ...selectedEntry,
+                                entityId: e.target.value,
+                                entityName: location?.name || ''
+                              });
+                            }}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          >
+                            <option value="">Select a location...</option>
+                            {locations.map(location => (
+                              <option key={location.id} value={location.id}>{location.name}</option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                      
+                      {!organizationId && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Pricing Type *
+                          </label>
+                          <select
                             value={selectedEntry.type}
-                            onChange={(e) => setSelectedEntry({...selectedEntry, type: e.target.value as any})}
+                            onChange={(e) => {
+                              const newType = e.target.value as 'individual' | 'organization' | 'location';
+                              setSelectedEntry({
+                                ...selectedEntry, 
+                                type: newType,
+                                entityId: '',
+                                entityName: ''
+                              });
+                            }}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           >
                             <option value="individual">Individual User</option>
                             <option value="organization">Organization</option>
                             <option value="location">Location</option>
                           </select>
-                        )}
-                      </div>
+                        </div>
+                      )}
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -448,7 +654,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                 <button
                   type="button"
                   onClick={handleSavePricing}
-                  disabled={!selectedEntry.contractPrice || !selectedEntry.productId}
+                  disabled={!selectedEntry.contractPrice || !selectedEntry.productId || !selectedEntry.entityId}
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isEditing ? 'Update' : 'Create'} Pricing
