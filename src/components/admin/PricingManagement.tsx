@@ -37,6 +37,12 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<Partial<PricingEntry> | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
+  const [bulkPricingData, setBulkPricingData] = useState({
+    organizationId: organizationId || '',
+    discountPercentage: 10,
+    selectedProducts: [] as number[]
+  });
   const [newEntryData, setNewEntryData] = useState({
     type: 'individual' as 'individual' | 'organization' | 'location',
     entityId: '',
@@ -231,6 +237,43 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     setIsModalOpen(true);
   };
 
+  const handleBulkPricing = () => {
+    setBulkPricingData({
+      organizationId: organizationId || '',
+      discountPercentage: 10,
+      selectedProducts: []
+    });
+    setIsBulkModalOpen(true);
+  };
+
+  const handleSaveBulkPricing = async () => {
+    if (!bulkPricingData.organizationId || bulkPricingData.selectedProducts.length === 0) {
+      return;
+    }
+
+    try {
+      const promises = bulkPricingData.selectedProducts.map(async (productId) => {
+        const product = products.find(p => p.id === productId);
+        if (product) {
+          const discountAmount = product.price * (bulkPricingData.discountPercentage / 100);
+          const contractPrice = product.price - discountAmount;
+          
+          return contractPricingService.setOrganizationPrice(
+            bulkPricingData.organizationId,
+            productId,
+            contractPrice
+          );
+        }
+      });
+
+      await Promise.all(promises);
+      setIsBulkModalOpen(false);
+      await fetchPricingEntries(); // Refresh pricing data
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save bulk pricing');
+    }
+  };
+
   const handleEditPricing = (entry: PricingEntry) => {
     setSelectedEntry(entry);
     setIsEditing(true);
@@ -346,6 +389,15 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
           <Plus className="h-5 w-5" />
           <span>Add Pricing</span>
         </button>
+        {organizationId && (
+          <button
+            onClick={handleBulkPricing}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+          >
+            <DollarSign className="h-5 w-5" />
+            <span>Bulk Pricing</span>
+          </button>
+        )}
       </div>
 
       {error && (
