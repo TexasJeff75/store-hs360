@@ -3,9 +3,10 @@ import { Building2, Plus, Edit, Trash2, Search, MapPin, Users, Mail, Phone, Aler
 import { multiTenantService } from '@/services/multiTenant';
 import LocationManagement from './LocationManagement';
 import PricingManagement from './PricingManagement';
+import UserOrganizationManagement from './UserOrganizationManagement';
 import type { Organization } from '@/services/supabase';
 
-type SubManagementTab = 'locations' | 'pricing';
+type SubManagementTab = 'locations' | 'pricing' | 'users';
 
 const OrganizationManagement: React.FC = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -203,6 +204,7 @@ const OrganizationManagement: React.FC = () => {
     const subTabs = [
       { id: 'locations' as SubManagementTab, label: 'Locations', icon: MapPin },
       { id: 'pricing' as SubManagementTab, label: 'Contract Pricing', icon: DollarSign },
+      { id: 'users' as SubManagementTab, label: 'Users', icon: Users },
     ];
 
     return (
@@ -264,6 +266,9 @@ const OrganizationManagement: React.FC = () => {
           )}
           {activeSubTab === 'pricing' && (
             <PricingManagement organizationId={selectedOrgForSubManagement.id} />
+          )}
+          {activeSubTab === 'users' && (
+            <UserOrganizationManagement organizationId={selectedOrgForSubManagement.id} />
           )}
         </div>
       </div>
