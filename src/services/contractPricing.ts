@@ -150,7 +150,8 @@ class ContractPricingService {
   async getEffectivePrice(
     userId: string, 
     productId: number, 
-    userRole?: string
+    userRole?: string,
+    quantity?: number
   ): Promise<{ price: number; source: 'regular' | 'individual' | 'organization' | 'location' } | null> {
     // If user is not logged in or not approved, return regular price
     if (!userId || (userRole && !['approved', 'admin'].includes(userRole))) {
@@ -159,7 +160,7 @@ class ContractPricingService {
 
     try {
       // Check for location-specific pricing first (highest priority)
-      const locationPrice = await this.getLocationPrice(userId, productId);
+      const locationPrice = await this.getLocationPrice(userId, productId, quantity);
       if (locationPrice) {
         return { 
           price: locationPrice.contract_price, 
@@ -168,7 +169,7 @@ class ContractPricingService {
       }
 
       // Check for organization-level pricing
-      const organizationPrice = await this.getOrganizationPrice(userId, productId);
+      const organizationPrice = await this.getOrganizationPrice(userId, productId, quantity);
       if (organizationPrice) {
         return { 
           price: organizationPrice.contract_price, 
@@ -196,9 +197,9 @@ class ContractPricingService {
   /**
    * Get location-specific pricing for a user and product
    */
-  async getLocationPrice(userId: string, productId: number): Promise<any | null> {
+  async getLocationPrice(userId: string, productId: number, quantity?: number): Promise<any | null> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('location_pricing')
         .select(`
           *,
@@ -209,7 +210,17 @@ class ContractPricingService {
         .eq('product_id', productId)
         .eq('locations.user_organization_roles.user_id', userId)
         .lte('effective_date', new Date().toISOString())
-        .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString())
+        .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString());
+      
+      // Add quantity filtering if provided
+      if (quantity !== undefined) {
+        query = query
+          .lte('min_quantity', quantity)
+          .or('max_quantity.is.null,max_quantity.gte.' + quantity);
+      }
+      
+      const { data, error } = await query
+        .order('contract_price', { ascending: true }) // Get lowest price first
         .order('effective_date', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -228,9 +239,9 @@ class ContractPricingService {
   /**
    * Get organization-level pricing for a user and product
    */
-  async getOrganizationPrice(userId: string, productId: number): Promise<any | null> {
+  async getOrganizationPrice(userId: string, productId: number, quantity?: number): Promise<any | null> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('organization_pricing')
         .select(`
           *,
@@ -241,7 +252,17 @@ class ContractPricingService {
         .eq('product_id', productId)
         .eq('organizations.user_organization_roles.user_id', userId)
         .lte('effective_date', new Date().toISOString())
-        .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString())
+        .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString());
+      
+      // Add quantity filtering if provided
+      if (quantity !== undefined) {
+        query = query
+          .lte('min_quantity', quantity)
+          .or('max_quantity.is.null,max_quantity.gte.' + quantity);
+      }
+      
+      const { data, error } = await query
+        .order('contract_price', { ascending: true }) // Get lowest price first
         .order('effective_date', { ascending: false })
         .limit(1)
         .maybeSingle();

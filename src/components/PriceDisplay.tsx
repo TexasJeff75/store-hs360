@@ -9,6 +9,7 @@ interface PriceDisplayProps {
   originalPrice?: number;
   className?: string;
   showSavings?: boolean;
+  quantity?: number;
 }
 
 const PriceDisplay: React.FC<PriceDisplayProps> = ({
@@ -17,9 +18,10 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   originalPrice,
   className = '',
   showSavings = true
+  quantity
 }) => {
   const { user, profile } = useAuth();
-  const { price, source, savings, loading } = useContractPricing(productId, regularPrice);
+  const { price, source, savings, loading } = useContractPricing(productId, regularPrice, quantity);
 
   if (loading) {
     return (
@@ -59,7 +61,10 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
         {isContractPrice && (
           <div className="flex items-center space-x-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
             {getSourceIcon()}
-            <span>{getSourceLabel()}</span>
+            <span>
+              {getSourceLabel()}
+              {quantity && quantity > 1 && ` (${quantity}+ units)`}
+            </span>
           </div>
         )}
         

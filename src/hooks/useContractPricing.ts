@@ -10,7 +10,7 @@ interface ContractPricingResult {
   error: string | null;
 }
 
-export function useContractPricing(productId: number, regularPrice: number): ContractPricingResult {
+export function useContractPricing(productId: number, regularPrice: number, quantity?: number): ContractPricingResult {
   const { user, profile } = useAuth();
   const [price, setPrice] = useState(regularPrice);
   const [source, setSource] = useState<'regular' | 'individual' | 'organization' | 'location'>('regular');
@@ -32,7 +32,8 @@ export function useContractPricing(productId: number, regularPrice: number): Con
         const effectivePrice = await contractPricingService.getEffectivePrice(
           user.id,
           productId,
-          profile?.role || 'pending'
+          profile?.role || 'pending',
+          quantity
         );
         
         if (effectivePrice) {
@@ -53,7 +54,7 @@ export function useContractPricing(productId: number, regularPrice: number): Con
     };
 
     fetchEffectivePrice();
-  }, [user, profile, productId, regularPrice]);
+  }, [user, profile, productId, regularPrice, quantity]);
 
   const savings = regularPrice - price;
 
