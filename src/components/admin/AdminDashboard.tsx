@@ -4,6 +4,7 @@ import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
 import LocationManagement from './LocationManagement';
 import PricingManagement from './PricingManagement';
+import ProductsManagement from './ProductsManagement';
 import ProductManagement from './ProductManagement';
 
 interface AdminDashboardProps {
@@ -11,7 +12,7 @@ interface AdminDashboardProps {
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'analytics';
+type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'carousel-products' | 'analytics';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('organizations');
@@ -21,7 +22,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const tabs = [
     { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2 },
     { id: 'users' as AdminTab, label: 'Users', icon: Users },
-    { id: 'products' as AdminTab, label: 'Carousel Products', icon: Package },
+    { id: 'products' as AdminTab, label: 'Products', icon: Package },
+    { id: 'carousel-products' as AdminTab, label: 'Carousel Products', icon: Package },
     { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3 },
   ];
 
@@ -32,6 +34,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
       case 'users':
         return <UserManagement />;
       case 'products':
+        return <ProductsManagement />;
+      case 'carousel-products':
         return <ProductManagement />;
       case 'analytics':
         return (
