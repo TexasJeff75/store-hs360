@@ -9,9 +9,39 @@ interface ProductCarouselProps {
   onAddToCart: (id: number) => void;
 }
 
+// Get product settings from localStorage (matches ProductManagement)
+const getProductSettings = (productId: number) => {
+  const saved = localStorage.getItem('productSettings');
+  if (saved) {
+    const settings = JSON.parse(saved);
+    return settings.find((s: any) => s.id === productId) || {
+      id: productId,
+      isVisible: true,
+      displayOrder: 0
+    };
+  }
+  return {
+    id: productId,
+    isVisible: true,
+    displayOrder: 0
+  };
+};
+
 const ProductCarousel: React.FC<ProductCarouselProps> = ({ title, products, onAddToCart }) => {
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const carouselRef = React.useRef<HTMLDivElement>(null);
+
+  // Filter visible products and sort by display order
+  const visibleProducts = products
+    .filter(product => {
+      const settings = getProductSettings(product.id);
+      return settings.isVisible;
+    })
+    .sort((a, b) => {
+      const settingsA = getProductSettings(a.id);
+      const settingsB = getProductSettings(b.id);
+      return settingsA.displayOrder - settingsB.displayOrder;
+    });
 
   const scrollLeft = () => {
     if (carouselRef.current) {
@@ -25,11 +55,11 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ title, products, onAd
     if (carouselRef.current) {
       const cardWidth = 320;
       carouselRef.current.scrollBy({ left: cardWidth, behavior: 'smooth' });
-      setCurrentIndex(Math.min(products.length - 1, currentIndex + 1));
+      setCurrentIndex(Math.min(visibleProducts.length - 1, currentIndex + 1));
     }
   };
 
-  if (products.length === 0) {
+  if (visibleProducts.length === 0) {
     return (
       <div className="mb-16">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">{title}</h2>
@@ -54,7 +84,7 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ title, products, onAd
           </button>
           <button
             onClick={scrollRight}
-            disabled={currentIndex >= products.length - 1}
+            disabled={currentIndex >= visibleProducts.length - 1}
             className="p-2 rounded-full bg-white border border-gray-300 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             <ChevronRight className="h-5 w-5" />
@@ -67,7 +97,7 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ title, products, onAd
         className="flex space-x-6 overflow-x-auto scrollbar-hide pb-4"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
-        {products.map((product) => (
+        {visibleProducts.map((product) => (
           <div
             key={product.id}
             className="flex-shrink-0 w-80 bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 group"
