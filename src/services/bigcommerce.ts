@@ -27,7 +27,7 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
 }
 
 const PRODUCTS_Q = /* GraphQL */ `
-  query ProductsComplete($first: Int = 20) {
+  query ProductsBasic($first: Int = 20) {
     site {
       products(first: $first) {
         edges {
@@ -35,112 +35,7 @@ const PRODUCTS_Q = /* GraphQL */ `
             entityId
             name
             path
-            description
-            plainTextDescription
-            sku
-            upc
-            weight {
-              value
-              unit
-            }
-            height {
-              value
-              unit
-            }
-            width {
-              value
-              unit
-            }
-            depth {
-              value
-              unit
-            }
-            availabilityV2 {
-              status
-              description
-            }
-            condition
-            createdAt {
-              utc
-            }
-            defaultImage {
-              url(width: 640)
-              altText
-            }
-            images {
-              edges {
-                node {
-                  url(width: 640)
-                  altText
-                }
-              }
-            }
-            prices {
-              price {
-                value
-                currencyCode
-              }
-              salePrice {
-                value
-                currencyCode
-              }
-              basePrice {
-                value
-                currencyCode
-              }
-              retailPrice {
-                value
-                currencyCode
-              }
-            }
-            categories {
-              edges {
-                node {
-                  entityId
-                  name
-                  path
-                }
-              }
-            }
-            brand {
-              name
-              path
-            }
-            customFields {
-              edges {
-                node {
-                  entityId
-                  name
-                  value
-                }
-              }
-            }
-            metafields {
-              edges {
-                node {
-                  metafields(namespace: "custom") {
-                    edges {
-                      node {
-                        id
-                        key
-                        value
-                      }
-                    }
-                  }
-                }
-              }
-            }
-            reviewSummary {
-              summationOfRatings
-              numberOfReviews
-              averageRating
-            }
-            inventory {
-              aggregated {
-                availableToSell
-                warningLevel
-              }
-            }
+            defaultImage { url(width: 640) }
           }
         }
       }
@@ -221,52 +116,18 @@ export const mockCategories: string[] = ["Peptides", "Testing", "Supplements", "
 
 // Data transformation helpers
 function transformBigCommerceProduct(bcProduct: any): Product {
-  const categories = bcProduct.categories?.edges?.map((edge: any) => edge.node) || [];
-  const customFields = bcProduct.customFields?.edges?.map((edge: any) => edge.node) || [];
-  const images = bcProduct.images?.edges?.map((edge: any) => edge.node) || [];
-  
-  // Extract benefits from custom fields or description
-  const benefitsField = customFields.find((field: any) => 
-    field.name.toLowerCase().includes('benefit') || 
-    field.name.toLowerCase().includes('feature')
-  );
-  const benefits = benefitsField?.value ? 
-    benefitsField.value.split(',').map((b: string) => b.trim()) : 
-    ['Health Support', 'Quality Tested'];
-
   return {
     id: bcProduct.entityId,
     name: bcProduct.name,
-    price: bcProduct.prices?.salePrice?.value || bcProduct.prices?.price?.value || 0,
-    originalPrice: bcProduct.prices?.retailPrice?.value || bcProduct.prices?.basePrice?.value || 
-      (bcProduct.prices?.salePrice?.value !== bcProduct.prices?.price?.value 
-        ? bcProduct.prices?.price?.value 
-        : undefined),
-    image: bcProduct.defaultImage?.url || 
-      (images.length > 0 ? images[0].url : "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640"),
-    rating: bcProduct.reviewSummary?.averageRating || 4.5,
-    reviews: bcProduct.reviewSummary?.numberOfReviews || Math.floor(Math.random() * 200) + 10,
-    category: categories.length > 0 ? categories[0].name : "General",
-    benefits: benefits,
-    // Additional BigCommerce fields
-    description: bcProduct.description,
-    plainTextDescription: bcProduct.plainTextDescription,
-    sku: bcProduct.sku,
-    upc: bcProduct.upc,
-    brand: bcProduct.brand?.name,
-    availability: bcProduct.availabilityV2?.status,
-    condition: bcProduct.condition,
-    weight: bcProduct.weight,
-    dimensions: {
-      height: bcProduct.height,
-      width: bcProduct.width,
-      depth: bcProduct.depth
-    },
-    inventory: bcProduct.inventory?.aggregated?.availableToSell,
-    customFields: customFields,
-    allCategories: categories,
-    allImages: images,
-    createdAt: bcProduct.createdAt?.utc
+    price: bcProduct.prices?.price?.value || 0,
+    originalPrice: bcProduct.prices?.salePrice?.value !== bcProduct.prices?.price?.value 
+      ? bcProduct.prices?.price?.value 
+      : undefined,
+    image: bcProduct.defaultImage?.url || "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640",
+    rating: 4.5, // Default rating
+    reviews: Math.floor(Math.random() * 200) + 10, // Random reviews
+    category: bcProduct.categories?.edges?.[0]?.node?.name || "General",
+    benefits: ["Health Support", "Quality Tested"] // Default benefits
   };
 }
 
