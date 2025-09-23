@@ -35,18 +35,6 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
     throw error;
   }
 }
-  
-  clearTimeout(timeoutId);
-  
-  const txt = await res.text();
-  const json = JSON.parse(txt);
-  if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt.slice(0,200)}`);
-  if (json.errors?.length) {
-    // Log, but still try to return data when present
-    console.warn("GQL errors:", json.errors);
-  }
-  return json.data;
-}
 
 const PRODUCTS_Q = /* GraphQL */ `
   query ProductsDetailed($first: Int = 250) {
@@ -151,29 +139,19 @@ class BigCommerceService {
     errorMessage?: string;
   }> {
     try {
-      console.log('Fetching products from BigCommerce...');
       const data = await gql(PRODUCTS_Q, { first: 250 });
-      console.log('Raw BigCommerce data:', data);
-      
       const edges = data?.site?.products?.edges ?? [];
-      console.log('Product edges found:', edges.length);
-      
       const products = edges.map((edge: any) => 
         transformBigCommerceProduct(edge.node)
       );
       
-      console.log('Transformed products:', products.length);
-      
       if (products.length === 0) {
-        const errorMessage = "No products found in BigCommerce. Check your store configuration.";
-        console.warn(errorMessage);
-        return { products: [], errorMessage };
+        return { products: [], errorMessage: "No products found in BigCommerce" };
       }
       
       return { products };
     } catch (error) {
-      console.error('BigCommerce API Error:', error);
-      const errorMessage = `BigCommerce API Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      const errorMessage = "BigCommerce API unavailable";
       if (logError) {
         logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
       }
@@ -186,25 +164,17 @@ class BigCommerceService {
     errorMessage?: string;
   }> {
     try {
-      console.log('Fetching categories from BigCommerce...');
       const data = await gql(CATEGORIES_Q, { root: 0 });
-      console.log('Raw category data:', data);
-      
       const categoryTree = data?.site?.categoryTree ?? [];
       const categories = categoryTree.map((cat: any) => cat.name);
       
-      console.log('Categories found:', categories);
-      
       if (categories.length === 0) {
-        const errorMessage = "No categories found in BigCommerce. Check your store configuration.";
-        console.warn(errorMessage);
-        return { categories: [], errorMessage };
+        return { categories: [], errorMessage: "No categories found in BigCommerce" };
       }
       
       return { categories };
     } catch (error) {
-      console.error('BigCommerce Categories API Error:', error);
-      const errorMessage = `BigCommerce Categories API Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      const errorMessage = "BigCommerce API unavailable";
       if (logError) {
         logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
       }
