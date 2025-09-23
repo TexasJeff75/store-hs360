@@ -37,6 +37,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedEntry, setSelectedEntry] = useState<Partial<PricingEntry> | null>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [newEntryData, setNewEntryData] = useState({
     type: 'individual' as 'individual' | 'organization' | 'location',
     entityId: '',
