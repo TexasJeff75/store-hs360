@@ -92,6 +92,13 @@ const ProductManagement: React.FC = () => {
     updatedSettings.push(newSettings);
     saveProductSettings(updatedSettings);
     
+    // Clear any pending changes for this product since we just saved via modal
+    setPendingProductSettings(prev => {
+      const updated = { ...prev };
+      delete updated[selectedProduct.id];
+      return updated;
+    });
+    
     setIsModalOpen(false);
     setSelectedProduct(null);
     setSelectedSettings(null);
@@ -183,33 +190,6 @@ const ProductManagement: React.FC = () => {
 
   const hasPendingChanges = Object.keys(pendingProductSettings).length > 0;
 
-  const handleSaveProduct = () => {
-    if (!selectedProduct || !selectedSettings) return;
-
-    const updatedSettings = productSettings.filter(s => s.id !== selectedProduct.id);
-    const newSettings = {
-      ...selectedSettings,
-      customBenefits: customBenefitInput 
-        ? customBenefitInput.split(',').map(b => b.trim()).filter(Boolean)
-        : undefined
-    };
-    
-    updatedSettings.push(newSettings);
-    saveProductSettings(updatedSettings);
-    
-    // Clear any pending changes for this product since we just saved via modal
-    setPendingProductSettings(prev => {
-      const updated = { ...prev };
-      delete updated[selectedProduct.id];
-      return updated;
-    });
-    
-    setIsModalOpen(false);
-    setSelectedProduct(null);
-    setSelectedSettings(null);
-    setCustomBenefitInput('');
-  };
-
   const getCategories = () => {
     const categories = [...new Set(products.map(p => p.category))];
     return categories;
@@ -218,6 +198,20 @@ const ProductManagement: React.FC = () => {
   const getEffectiveProduct = (product: Product): Product => {
     const settings = getProductSettings(product.id);
     return {
+      ...product,
+      category: settings.customCategory || product.category,
+      benefits: settings.customBenefits || product.benefits,
+      rating: settings.customRating || product.rating,
+      reviews: settings.customReviews || product.reviews
+    };
+  };
+
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
+    return matchesSearch && matchesCategory;
+  });
+
   if (loading) {
     return (
       <div className="p-6">
