@@ -3,36 +3,28 @@ const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const GQL = `${API_BASE}/gql`;
 
 export async function gql<T>(query: string, variables?: Record<string, any>): Promise<T> {
-  // Add timeout and better error handling
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-  
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
-    console.log('Making GraphQL request to:', GQL);
-    const res = await fetch(GQL, { 
+    const res = await fetch(GQL, {
       method: "POST",
-      headers: { "Content-Type": "application/json" }, 
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ query, variables }),
       signal: controller.signal
     });
-    
     clearTimeout(timeoutId);
-    
+
     const txt = await res.text();
-    console.log('GraphQL response status:', res.status);
-    console.log('GraphQL response:', txt.substring(0, 200) + '...');
-    
     const json = JSON.parse(txt);
+
     if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt.slice(0,200)}`);
-    if (json.errors?.length) {
-      // Log, but still try to return data when present
-      console.warn("GQL errors:", json.errors);
-    }
-    return json.data;
-  } catch (error) {
+    if (json.errors?.length) console.warn("GQL errors:", json.errors);
+
+    return json.data as T;
+  } catch (e) {
     clearTimeout(timeoutId);
-    console.error('GraphQL request failed:', error);
-    throw error;
+    console.error("GraphQL request failed:", e);
+    throw e instanceof Error ? e : new Error(String(e));
   }
 }
 
