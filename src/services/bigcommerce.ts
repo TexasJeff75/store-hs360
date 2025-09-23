@@ -27,7 +27,7 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
 }
 
 const PRODUCTS_Q = /* GraphQL */ `
-  query ProductsBasic($first: Int = 20) {
+  query ProductsDetailed($first: Int = 20) {
     site {
       products(first: $first) {
         edges {
@@ -36,6 +36,36 @@ const PRODUCTS_Q = /* GraphQL */ `
             name
             path
             defaultImage { url(width: 640) }
+            prices {
+              price {
+                value
+                currencyCode
+              }
+              salePrice {
+                value
+                currencyCode
+              }
+            }
+            categories {
+              edges {
+                node {
+                  name
+                  path
+                }
+              }
+            }
+            customFields {
+              edges {
+                node {
+                  name
+                  value
+                }
+              }
+            }
+            reviewSummary {
+              averageRating
+              numberOfReviews
+            }
           }
         }
       }
@@ -76,58 +106,20 @@ export interface Product {
   benefits: string[];
 }
 
-// Mock data for fallback
-export const mockProducts: Product[] = [
-  {
-    id: 1,
-    name: "Premium Peptide Complex",
-    price: 89.99,
-    originalPrice: 119.99,
-    image: "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640",
-    rating: 4.8,
-    reviews: 124,
-    category: "Peptides",
-    benefits: ["Energy Support", "Recovery"]
-  },
-  {
-    id: 2,
-    name: "Genetic Health Panel",
-    price: 299.99,
-    image: "https://images.pexels.com/photos/3825527/pexels-photo-3825527.jpeg?auto=compress&cs=tinysrgb&w=640",
-    rating: 4.9,
-    reviews: 89,
-    category: "Testing",
-    benefits: ["Health Insights", "Personalized"]
-  },
-  {
-    id: 3,
-    name: "Advanced Biomarker Test",
-    price: 199.99,
-    originalPrice: 249.99,
-    image: "https://images.pexels.com/photos/3938023/pexels-photo-3938023.jpeg?auto=compress&cs=tinysrgb&w=640",
-    rating: 4.7,
-    reviews: 156,
-    category: "Testing",
-    benefits: ["Comprehensive", "Lab Quality"]
-  }
-];
-
-export const mockCategories: string[] = ["Peptides", "Testing", "Supplements", "Wellness"];
-
 // Data transformation helpers
 function transformBigCommerceProduct(bcProduct: any): Product {
   return {
     id: bcProduct.entityId,
     name: bcProduct.name,
-    price: bcProduct.prices?.price?.value || 0,
+    price: bcProduct.prices?.price?.value || bcProduct.defaultPrice || 0,
     originalPrice: bcProduct.prices?.salePrice?.value !== bcProduct.prices?.price?.value 
       ? bcProduct.prices?.price?.value 
       : undefined,
     image: bcProduct.defaultImage?.url || "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640",
-    rating: 4.5, // Default rating
-    reviews: Math.floor(Math.random() * 200) + 10, // Random reviews
+    rating: bcProduct.reviewSummary?.averageRating || 0,
+    reviews: bcProduct.reviewSummary?.numberOfReviews || 0,
     category: bcProduct.categories?.edges?.[0]?.node?.name || "General",
-    benefits: ["Health Support", "Quality Tested"] // Default benefits
+    benefits: bcProduct.customFields?.edges?.map((edge: any) => edge.node.value) || []
   };
 }
 
@@ -143,13 +135,17 @@ class BigCommerceService {
         transformBigCommerceProduct(edge.node)
       );
       
-      return { products: products.length > 0 ? products : mockProducts };
+      if (products.length === 0) {
+        return { products: [], errorMessage: "No products found in BigCommerce" };
+      }
+      
+      return { products };
     } catch (error) {
-      const errorMessage = "BigCommerce API unavailable, using sample data";
+      const errorMessage = "BigCommerce API unavailable";
       if (logError) {
         logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
       }
-      return { products: mockProducts, errorMessage };
+      return { products: [], errorMessage };
     }
   }
 
@@ -162,13 +158,17 @@ class BigCommerceService {
       const categoryTree = data?.site?.categoryTree ?? [];
       const categories = categoryTree.map((cat: any) => cat.name);
       
-      return { categories: categories.length > 0 ? categories : mockCategories };
+      if (categories.length === 0) {
+        return { categories: [], errorMessage: "No categories found in BigCommerce" };
+      }
+      
+      return { categories };
     } catch (error) {
-      const errorMessage = "BigCommerce API unavailable, using sample categories";
+      const errorMessage = "BigCommerce API unavailable";
       if (logError) {
         logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
       }
-      return { categories: mockCategories, errorMessage };
+      return { categories: [], errorMessage };
     }
   }
 }

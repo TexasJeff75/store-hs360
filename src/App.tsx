@@ -69,7 +69,7 @@ function AppContent() {
       } catch (err) {
         const errorMessage = err instanceof Error && err.message === 'Request timeout' 
           ? 'Request timed out. Please check your connection and try again.'
-          : 'Failed to load products. Please try again later.';
+          : 'Failed to load data from BigCommerce. Please check your API configuration.';
         console.log('❌ Fetch error:', err);
         setError(errorMessage);
         logError(err, 'fetchData');
@@ -251,12 +251,13 @@ function AppContent() {
                   onAddToCart={addToCart}
                 />
               ))}
-            </div>
-          )}
-          
-          {!loading && !error && products.length === 0 && (
-            <div className="text-center py-16">
-              <p className="text-gray-500 text-lg">No products available at this time</p>
+              
+              {Object.keys(productsByCategory).length === 0 && (
+                <div className="text-center py-16">
+                  <p className="text-gray-500 text-lg">No product categories available</p>
+                  <p className="text-gray-400 text-sm mt-2">Please check your BigCommerce configuration</p>
+                </div>
+              )}
             </div>
           )}
         </section>
