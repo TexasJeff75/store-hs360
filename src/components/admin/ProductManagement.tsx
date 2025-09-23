@@ -116,7 +116,7 @@ const ProductManagement: React.FC = () => {
         ...prev[productId],
         displayOrder: order
       }
-    });
+    }));
   };
 
   const getEffectiveSettings = (productId: number): ProductSettings => {
