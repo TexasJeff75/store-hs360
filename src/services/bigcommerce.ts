@@ -27,7 +27,7 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
 }
 
 const PRODUCTS_Q = /* GraphQL */ `
-  query ProductsDetailed($first: Int = 20) {
+  query ProductsDetailed($first: Int = 250) {
     site {
       products(first: $first) {
         edges {
@@ -129,7 +129,7 @@ class BigCommerceService {
     errorMessage?: string;
   }> {
     try {
-      const data = await gql(PRODUCTS_Q, { first: 20 });
+      const data = await gql(PRODUCTS_Q, { first: 250 });
       const edges = data?.site?.products?.edges ?? [];
       const products = edges.map((edge: any) => 
         transformBigCommerceProduct(edge.node)
