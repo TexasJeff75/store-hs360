@@ -69,7 +69,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
         )}
         
         {/* Original/Regular Price Strikethrough */}
-        {(originalPrice || isContractPrice) && (
+        {(originalPrice && originalPrice !== price) || (isContractPrice && regularPrice !== price) && (
           <span className="text-sm text-gray-500 line-through">
             ${(originalPrice || regularPrice).toFixed(2)}
           </span>
