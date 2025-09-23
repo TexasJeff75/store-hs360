@@ -133,7 +133,7 @@ class BigCommerceService {
   }> {
     try {
       console.log('Fetching products from BigCommerce...');
-      const data = await gql(PRODUCTS_Q, { first: 250 });
+      const data = await gql(PRODUCTS_Q, { first: 50 });
       console.log('Raw BigCommerce data:', data);
       
       const edges = data?.site?.products?.edges ?? [];
