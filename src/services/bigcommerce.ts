@@ -118,9 +118,15 @@ const PRODUCTS_Q = /* GraphQL */ `
             metafields {
               edges {
                 node {
-                  id
-                  key
-                  value
+                  metafields(namespace: "custom") {
+                    edges {
+                      node {
+                        id
+                        key
+                        value
+                      }
+                    }
+                  }
                 }
               }
             }
