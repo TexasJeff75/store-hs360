@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Search, Eye, ExternalLink, DollarSign, Star, Tag, Image, Calendar, Hash, BarChart3 } from 'lucide-react';
+import { Package, Search, Eye, ExternalLink, DollarSign, Star, Tag, Image, Calendar, Hash, BarChart3, ChevronUp, ChevronDown } from 'lucide-react';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
 
 const ProductsManagement: React.FC = () => {
@@ -10,6 +10,8 @@ const ProductsManagement: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [sortField, setSortField] = useState<keyof Product | null>(null);
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
     fetchProducts();
@@ -37,6 +39,23 @@ const ProductsManagement: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  const handleSort = (field: keyof Product) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+  };
+
+  const getSortIcon = (field: keyof Product) => {
+    if (sortField !== field) {
+      return <ChevronUp className="h-4 w-4 text-gray-300" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ChevronUp className="h-4 w-4 text-gray-600" />
+      : <ChevronDown className="h-4 w-4 text-gray-600" />;
+  };
   const getCategories = () => {
     const categories = [...new Set(products.map(p => p.category))];
     return categories;
@@ -46,6 +65,25 @@ const ProductsManagement: React.FC = () => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
     return matchesSearch && matchesCategory;
+  }).sort((a, b) => {
+    if (!sortField) return 0;
+    
+    let aValue = a[sortField];
+    let bValue = b[sortField];
+    
+    // Handle different data types
+    if (typeof aValue === 'string' && typeof bValue === 'string') {
+      aValue = aValue.toLowerCase();
+      bValue = bValue.toLowerCase();
+    }
+    
+    if (aValue < bValue) {
+      return sortDirection === 'asc' ? -1 : 1;
+    }
+    if (aValue > bValue) {
+      return sortDirection === 'asc' ? 1 : -1;
+    }
+    return 0;
   });
 
   if (loading) {
@@ -148,22 +186,58 @@ const ProductsManagement: React.FC = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Product
+                  <button
+                    onClick={() => handleSort('name')}
+                    className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                  >
+                    <span>Product</span>
+                    {getSortIcon('name')}
+                  </button>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ID
+                  <button
+                    onClick={() => handleSort('id')}
+                    className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                  >
+                    <span>ID</span>
+                    {getSortIcon('id')}
+                  </button>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Category
+                  <button
+                    onClick={() => handleSort('category')}
+                    className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                  >
+                    <span>Category</span>
+                    {getSortIcon('category')}
+                  </button>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Price
+                  <button
+                    onClick={() => handleSort('price')}
+                    className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                  >
+                    <span>Price</span>
+                    {getSortIcon('price')}
+                  </button>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Rating
+                  <button
+                    onClick={() => handleSort('rating')}
+                    className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                  >
+                    <span>Rating</span>
+                    {getSortIcon('rating')}
+                  </button>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Reviews
+                  <button
+                    onClick={() => handleSort('reviews')}
+                    className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                  >
+                    <span>Reviews</span>
+                    {getSortIcon('reviews')}
+                  </button>
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
