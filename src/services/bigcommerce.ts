@@ -119,7 +119,6 @@ const PRODUCTS_Q = /* GraphQL */ `
               edges {
                 node {
                   id
-                  namespace
                   key
                   value
                 }
