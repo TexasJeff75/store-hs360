@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Star, ShoppingCart } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ShoppingCart } from 'lucide-react';
 import { Product } from '../services/bigcommerce';
 import PriceDisplay from './PriceDisplay';
 
@@ -118,23 +118,6 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ title, products, onAd
             <div className="p-4">
               <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{product.name}</h3>
               
-              {/* Rating */}
-              <div className="flex items-center mb-2">
-                <div className="flex items-center">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`h-4 w-4 ${
-                        i < Math.floor(product.rating) 
-                          ? 'text-yellow-400 fill-current' 
-                          : 'text-gray-300'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <span className="text-sm text-gray-600 ml-2">({product.reviews})</span>
-              </div>
-
               {/* Benefits */}
               <div className="mb-3">
                 <div className="flex flex-wrap gap-1">
