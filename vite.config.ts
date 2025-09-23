@@ -31,5 +31,6 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_BC_STORE_HASH': JSON.stringify(process.env.VITE_BC_STORE_HASH),
     'import.meta.env.VITE_BC_ACCESS_TOKEN': JSON.stringify(process.env.VITE_BC_ACCESS_TOKEN),
+    'import.meta.env.VITE_API_BASE': JSON.stringify(process.env.VITE_API_BASE || '/api'),
   },
 })

@@ -1,5 +1,5 @@
 // data-only helpers
-const API_BASE = import.meta.env.VITE_API_BASE || "/.netlify/functions";
+const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const GQL = `${API_BASE}/gql`;
 
 export async function gql<T>(query: string, variables?: Record<string, any>): Promise<T> {
