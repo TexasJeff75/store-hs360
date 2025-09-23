@@ -1,18 +1,40 @@
 // data-only helpers
-const API_BASE = import.meta.env.VITE_API_BASE || "";
-const GQL = `${API_BASE}/api/gql`;
+const API_BASE = import.meta.env.VITE_API_BASE || "/.netlify/functions";
+const GQL = `${API_BASE}/gql`;
 
 export async function gql<T>(query: string, variables?: Record<string, any>): Promise<T> {
   // Add timeout and better error handling
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+  const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
   
-  const res = await fetch(GQL, { 
-    method: "POST",
-    headers: { "Content-Type": "application/json" }, 
-    body: JSON.stringify({ query, variables }),
-    signal: controller.signal
-  });
+  try {
+    console.log('Making GraphQL request to:', GQL);
+    const res = await fetch(GQL, { 
+      method: "POST",
+      headers: { "Content-Type": "application/json" }, 
+      body: JSON.stringify({ query, variables }),
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    const txt = await res.text();
+    console.log('GraphQL response status:', res.status);
+    console.log('GraphQL response:', txt.substring(0, 200) + '...');
+    
+    const json = JSON.parse(txt);
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${txt.slice(0,200)}`);
+    if (json.errors?.length) {
+      // Log, but still try to return data when present
+      console.warn("GQL errors:", json.errors);
+    }
+    return json.data;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    console.error('GraphQL request failed:', error);
+    throw error;
+  }
+}
   
   clearTimeout(timeoutId);
   
@@ -129,19 +151,29 @@ class BigCommerceService {
     errorMessage?: string;
   }> {
     try {
+      console.log('Fetching products from BigCommerce...');
       const data = await gql(PRODUCTS_Q, { first: 250 });
+      console.log('Raw BigCommerce data:', data);
+      
       const edges = data?.site?.products?.edges ?? [];
+      console.log('Product edges found:', edges.length);
+      
       const products = edges.map((edge: any) => 
         transformBigCommerceProduct(edge.node)
       );
       
+      console.log('Transformed products:', products.length);
+      
       if (products.length === 0) {
-        return { products: [], errorMessage: "No products found in BigCommerce" };
+        const errorMessage = "No products found in BigCommerce. Check your store configuration.";
+        console.warn(errorMessage);
+        return { products: [], errorMessage };
       }
       
       return { products };
     } catch (error) {
-      const errorMessage = "BigCommerce API unavailable";
+      console.error('BigCommerce API Error:', error);
+      const errorMessage = `BigCommerce API Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
       if (logError) {
         logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
       }
@@ -154,17 +186,25 @@ class BigCommerceService {
     errorMessage?: string;
   }> {
     try {
+      console.log('Fetching categories from BigCommerce...');
       const data = await gql(CATEGORIES_Q, { root: 0 });
+      console.log('Raw category data:', data);
+      
       const categoryTree = data?.site?.categoryTree ?? [];
       const categories = categoryTree.map((cat: any) => cat.name);
       
+      console.log('Categories found:', categories);
+      
       if (categories.length === 0) {
-        return { categories: [], errorMessage: "No categories found in BigCommerce" };
+        const errorMessage = "No categories found in BigCommerce. Check your store configuration.";
+        console.warn(errorMessage);
+        return { categories: [], errorMessage };
       }
       
       return { categories };
     } catch (error) {
-      const errorMessage = "BigCommerce API unavailable";
+      console.error('BigCommerce Categories API Error:', error);
+      const errorMessage = `BigCommerce Categories API Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
       if (logError) {
         logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
       }
