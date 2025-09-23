@@ -130,11 +130,6 @@ const PRODUCTS_Q = /* GraphQL */ `
                 }
               }
             }
-                  key
-                  value
-                }
-              }
-            }
             reviewSummary {
               summationOfRatings
               numberOfReviews
