@@ -29,9 +29,9 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
 }
 
 const PRODUCTS_Q = /* GraphQL */ `
-  query ProductsDetailed($first: Int = 250) {
+  query ProductsDetailed($first: Int = 50, $after: String) {
     site {
-      products(first: $first) {
+      products(first: $first, after: $after) {
         edges {
           node {
             entityId
@@ -69,6 +69,10 @@ const PRODUCTS_Q = /* GraphQL */ `
               numberOfReviews
             }
           }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
         }
       }
     }
@@ -127,31 +131,66 @@ function transformBigCommerceProduct(bc: any): Product {
 }
 
 class BigCommerceService {
-  async getProducts(logError?: (message: string, error?: Error) => void): Promise<{
+  async getProducts(logError?: (message: string, error?: Error) => void, maxProducts: number = 1000): Promise<{
     products: Product[];
     errorMessage?: string;
   }> {
     try {
       console.log('Fetching products from BigCommerce...');
-      const data = await gql(PRODUCTS_Q, { first: 50 });
-      console.log('Raw BigCommerce data:', data);
       
-      const edges = data?.site?.products?.edges ?? [];
-      console.log('Product edges found:', edges.length);
+      let allProducts: Product[] = [];
+      let hasNextPage = true;
+      let cursor: string | null = null;
+      let fetchedCount = 0;
       
-      const products = edges.map((edge: any) => 
-        transformBigCommerceProduct(edge.node)
-      );
+      while (hasNextPage && fetchedCount < maxProducts) {
+        const remainingProducts = maxProducts - fetchedCount;
+        const batchSize = Math.min(50, remainingProducts);
+        
+        console.log(`Fetching batch: ${fetchedCount + 1}-${fetchedCount + batchSize}`);
+        
+        const variables: any = { first: batchSize };
+        if (cursor) {
+          variables.after = cursor;
+        }
+        
+        const data = await gql(PRODUCTS_Q, variables);
+        console.log(`Batch data received:`, data?.site?.products?.edges?.length || 0, 'products');
+        
+        const edges = data?.site?.products?.edges ?? [];
+        const pageInfo = data?.site?.products?.pageInfo;
+        
+        if (edges.length === 0) {
+          break;
+        }
+        
+        const batchProducts = edges.map((edge: any) => 
+          transformBigCommerceProduct(edge.node)
+        );
+        
+        allProducts = [...allProducts, ...batchProducts];
+        fetchedCount += edges.length;
+        
+        hasNextPage = pageInfo?.hasNextPage || false;
+        cursor = pageInfo?.endCursor || null;
+        
+        console.log(`Total products fetched so far: ${allProducts.length}`);
+        
+        if (!hasNextPage) {
+          console.log('No more pages available');
+          break;
+        }
+      }
       
-      console.log('Transformed products:', products.length);
+      console.log(`Final product count: ${allProducts.length}`);
       
-      if (products.length === 0) {
+      if (allProducts.length === 0) {
         const errorMessage = "No products found in BigCommerce. Check your store configuration.";
         console.warn(errorMessage);
         return { products: [], errorMessage };
       }
       
-      return { products };
+      return { products: allProducts };
     } catch (error) {
       console.error('BigCommerce API Error:', error);
       const errorMessage = `BigCommerce API Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
