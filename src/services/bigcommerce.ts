@@ -174,25 +174,17 @@ class BigCommerceService {
     errorMessage?: string;
   }> {
     try {
-      console.log('Fetching categories from BigCommerce...');
       const data = await gql(CATEGORIES_Q, { root: 0 });
-      console.log('Raw category data:', data);
-      
       const categoryTree = data?.site?.categoryTree ?? [];
       const categories = categoryTree.map((cat: any) => cat.name);
       
-      console.log('Categories found:', categories);
-      
       if (categories.length === 0) {
-        const errorMessage = "No categories found in BigCommerce. Check your store configuration.";
-        console.warn(errorMessage);
-        return { categories: [], errorMessage };
+        return { categories: [], errorMessage: "No categories found in BigCommerce" };
       }
       
       return { categories };
     } catch (error) {
-      console.error('BigCommerce Categories API Error:', error);
-      const errorMessage = `BigCommerce Categories API Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      const errorMessage = "BigCommerce API unavailable";
       if (logError) {
         logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
       }
