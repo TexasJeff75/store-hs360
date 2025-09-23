@@ -127,44 +127,8 @@ function AppContent() {
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Filter products by category
-  const getVisibleProducts = () => {
-    // Load product settings from localStorage
-    const savedSettings = localStorage.getItem('productSettings');
-    console.log('💾 Saved settings from localStorage:', savedSettings);
-    const productSettings = savedSettings ? JSON.parse(savedSettings) : [];
-    console.log('⚙️ Parsed product settings:', productSettings);
-    
-    const visibleProducts = products
-      .map(product => {
-        const settings = productSettings.find((s: any) => s.id === product.id);
-        if (settings) {
-          console.log(`🔧 Product ${product.id} (${product.name}) has custom settings:`, settings);
-        }
-        if (settings && !settings.isVisible) return null;
-        
-        // Apply custom settings if they exist
-        return {
-          ...product,
-          category: settings?.customCategory || product.category,
-          benefits: settings?.customBenefits || product.benefits,
-          rating: settings?.customRating || product.rating,
-          reviews: settings?.customReviews || product.reviews,
-          displayOrder: settings?.displayOrder || 0
-        };
-      })
-      .filter(Boolean)
-      .sort((a, b) => a.displayOrder - b.displayOrder);
-    
-    console.log('👁️ Visible products after filtering:', visibleProducts);
-    return visibleProducts;
-  };
-
-  const visibleProducts = getVisibleProducts();
-  console.log('📊 Final visible products:', visibleProducts);
-  
   // Group products by their actual BigCommerce categories
-  const productsByCategory = visibleProducts.reduce((acc, product) => {
+  const productsByCategory = products.reduce((acc, product) => {
     const category = product.category;
     if (!acc[category]) {
       acc[category] = [];
