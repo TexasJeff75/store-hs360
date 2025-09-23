@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, Edit, Trash2, Search, Eye, EyeOff, Star, Tag, Image, DollarSign } from 'lucide-react';
+import { Package, Plus, Edit, Trash2, Search, Eye, EyeOff, Star, Tag, Image, DollarSign, Save, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
 
 interface ProductSettings {
@@ -24,6 +24,9 @@ const ProductManagement: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [customBenefitInput, setCustomBenefitInput] = useState('');
+  const [pendingProductSettings, setPendingProductSettings] = useState<{ [key: number]: Partial<ProductSettings> }>({});
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchProducts();
@@ -97,22 +100,114 @@ const ProductManagement: React.FC = () => {
 
   const toggleProductVisibility = (productId: number) => {
     const currentSettings = getProductSettings(productId);
-    const updatedSettings = productSettings.filter(s => s.id !== productId);
-    updatedSettings.push({
-      ...currentSettings,
-      isVisible: !currentSettings.isVisible
-    });
-    saveProductSettings(updatedSettings);
+    setPendingProductSettings(prev => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        isVisible: !currentSettings.isVisible
+      }
+    }));
   };
 
   const updateDisplayOrder = (productId: number, order: number) => {
-    const currentSettings = getProductSettings(productId);
-    const updatedSettings = productSettings.filter(s => s.id !== productId);
-    updatedSettings.push({
-      ...currentSettings,
-      displayOrder: order
+    setPendingProductSettings(prev => ({
+      ...prev,
+      [productId]: {
+        ...prev[productId],
+        displayOrder: order
+      }
     });
+  };
+
+  const getEffectiveSettings = (productId: number): ProductSettings => {
+    const baseSettings = getProductSettings(productId);
+    const pendingChanges = pendingProductSettings[productId];
+    return {
+      ...baseSettings,
+      ...pendingChanges
+    };
+  };
+
+  const handleSaveAllProductSettings = async () => {
+    try {
+      setIsSaving(true);
+      setSaveMessage(null);
+      
+      const updatedSettings = [...productSettings];
+      
+      // Apply all pending changes
+      Object.entries(pendingProductSettings).forEach(([productIdStr, changes]) => {
+        const productId = parseInt(productIdStr);
+        const existingIndex = updatedSettings.findIndex(s => s.id === productId);
+        const currentSettings = getProductSettings(productId);
+        const newSettings = { ...currentSettings, ...changes };
+        
+        if (existingIndex >= 0) {
+          updatedSettings[existingIndex] = newSettings;
+        } else {
+          updatedSettings.push(newSettings);
+        }
+      });
+      
+      // Save to localStorage (in future this will be Supabase)
+      saveProductSettings(updatedSettings);
+      
+      // Clear pending changes
+      setPendingProductSettings({});
+      
+      setSaveMessage({ type: 'success', text: 'All changes saved successfully!' });
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => {
+        setSaveMessage(null);
+      }, 3000);
+    } catch (err) {
+      setSaveMessage({ 
+        type: 'error', 
+        text: err instanceof Error ? err.message : 'Failed to save changes' 
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDiscardChanges = () => {
+    setPendingProductSettings({});
+    setSaveMessage({ type: 'success', text: 'Changes discarded successfully!' });
+    
+    // Auto-hide message after 2 seconds
+    setTimeout(() => {
+      setSaveMessage(null);
+    }, 2000);
+  };
+
+  const hasPendingChanges = Object.keys(pendingProductSettings).length > 0;
+
+  const handleSaveProduct = () => {
+    if (!selectedProduct || !selectedSettings) return;
+
+    const updatedSettings = productSettings.filter(s => s.id !== selectedProduct.id);
+    const newSettings = {
+      ...selectedSettings,
+      customBenefits: customBenefitInput 
+        ? customBenefitInput.split(',').map(b => b.trim()).filter(Boolean)
+        : undefined
+    };
+    
+    updatedSettings.push(newSettings);
     saveProductSettings(updatedSettings);
+    
+    // Clear any pending changes for this product since we just saved via modal
+    setPendingProductSettings(prev => {
+      const updated = { ...prev };
+      delete updated[selectedProduct.id];
+      return updated;
+    });
+    
+    setIsModalOpen(false);
+    setSelectedProduct(null);
+    setSelectedSettings(null);
+    setCustomBenefitInput('');
   };
 
   const getCategories = () => {
@@ -123,26 +218,6 @@ const ProductManagement: React.FC = () => {
   const getEffectiveProduct = (product: Product): Product => {
     const settings = getProductSettings(product.id);
     return {
-      ...product,
-      category: settings.customCategory || product.category,
-      benefits: settings.customBenefits || product.benefits,
-      rating: settings.customRating || product.rating,
-      reviews: settings.customReviews || product.reviews
-    };
-  };
-
-  const filteredProducts = products
-    .filter(product => {
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = categoryFilter === 'all' || product.category === categoryFilter;
-      return matchesSearch && matchesCategory;
-    })
-    .sort((a, b) => {
-      const aSettings = getProductSettings(a.id);
-      const bSettings = getProductSettings(b.id);
-      return aSettings.displayOrder - bSettings.displayOrder;
-    });
-
   if (loading) {
     return (
       <div className="p-6">
@@ -165,6 +240,62 @@ const ProductManagement: React.FC = () => {
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-700">{error}</p>
+        </div>
+      )}
+
+      {/* Save Message */}
+      {saveMessage && (
+        <div className={`mb-4 p-4 rounded-lg flex items-center space-x-2 ${
+          saveMessage.type === 'success' 
+            ? 'bg-green-50 border border-green-200' 
+            : 'bg-red-50 border border-red-200'
+        }`}>
+          {saveMessage.type === 'success' ? (
+            <CheckCircle className="h-5 w-5 text-green-600" />
+          ) : (
+            <AlertCircle className="h-5 w-5 text-red-600" />
+          )}
+          <span className={`text-sm ${
+            saveMessage.type === 'success' ? 'text-green-700' : 'text-red-700'
+          }`}>
+            {saveMessage.text}
+          </span>
+        </div>
+      )}
+
+      {/* Save/Discard Actions */}
+      {hasPendingChanges && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
+              <span className="text-sm font-medium text-yellow-800">
+                You have unsaved changes ({Object.keys(pendingProductSettings).length} product{Object.keys(pendingProductSettings).length !== 1 ? 's' : ''})
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleDiscardChanges}
+                disabled={isSaving}
+                className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span>Discard Changes</span>
+              </button>
+              <button
+                onClick={handleSaveAllProductSettings}
+                disabled={isSaving}
+                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                <span>{isSaving ? 'Saving...' : 'Save All Changes'}</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -257,21 +388,32 @@ const ProductManagement: React.FC = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <input
                         type="number"
-                        value={settings.displayOrder}
+                        value={getEffectiveSettings(product.id).displayOrder}
                         onChange={(e) => updateDisplayOrder(product.id, parseInt(e.target.value) || 0)}
-                        className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        className={`w-20 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-purple-500 focus:border-transparent ${
+                          pendingProductSettings[product.id]?.displayOrder !== undefined
+                            ? 'border-yellow-400 bg-yellow-50'
+                            : 'border-gray-300'
+                        }`}
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
                         onClick={() => toggleProductVisibility(product.id)}
-                        className={`p-2 rounded-full transition-colors ${
-                          settings.isVisible
+                        className={`p-2 rounded-full transition-colors relative ${
+                          getEffectiveSettings(product.id).isVisible
                             ? 'text-green-600 hover:bg-green-100'
                             : 'text-gray-400 hover:bg-gray-100'
+                        } ${
+                          pendingProductSettings[product.id]?.isVisible !== undefined
+                            ? 'ring-2 ring-yellow-400 ring-offset-1'
+                            : ''
                         }`}
                       >
-                        {settings.isVisible ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                        {getEffectiveSettings(product.id).isVisible ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
+                        {pendingProductSettings[product.id]?.isVisible !== undefined && (
+                          <div className="absolute -top-1 -right-1 w-3 h-3 bg-yellow-400 rounded-full"></div>
+                        )}
                       </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
