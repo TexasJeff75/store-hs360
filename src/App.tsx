@@ -56,18 +56,21 @@ function AppContent() {
           timeoutPromise
         ]) as any;
         
+        console.log('🔍 Products fetched from BigCommerce:', productsData.products);
         setProducts(productsData.products);
         setCategories(categoriesData.categories);
         
         // Set error message if either API call failed
         if (productsData.errorMessage || categoriesData.errorMessage) {
           const errorMsg = productsData.errorMessage || categoriesData.errorMessage;
+          console.log('⚠️ API Error:', errorMsg);
           setError(errorMsg);
         }
       } catch (err) {
         const errorMessage = err instanceof Error && err.message === 'Request timeout' 
           ? 'Request timed out. Please check your connection and try again.'
           : 'Failed to load products. Please try again later.';
+        console.log('❌ Fetch error:', err);
         setError(errorMessage);
         logError(err, 'fetchData');
       } finally {
@@ -128,11 +131,16 @@ function AppContent() {
   const getVisibleProducts = () => {
     // Load product settings from localStorage
     const savedSettings = localStorage.getItem('productSettings');
+    console.log('💾 Saved settings from localStorage:', savedSettings);
     const productSettings = savedSettings ? JSON.parse(savedSettings) : [];
+    console.log('⚙️ Parsed product settings:', productSettings);
     
-    return products
+    const visibleProducts = products
       .map(product => {
         const settings = productSettings.find((s: any) => s.id === product.id);
+        if (settings) {
+          console.log(`🔧 Product ${product.id} (${product.name}) has custom settings:`, settings);
+        }
         if (settings && !settings.isVisible) return null;
         
         // Apply custom settings if they exist
@@ -147,20 +155,26 @@ function AppContent() {
       })
       .filter(Boolean)
       .sort((a, b) => a.displayOrder - b.displayOrder);
+    
+    console.log('👁️ Visible products after filtering:', visibleProducts);
+    return visibleProducts;
   };
 
   const visibleProducts = getVisibleProducts();
+  console.log('📊 Final visible products:', visibleProducts);
   
   const peptideProducts = visibleProducts.filter(product => 
     product.category.toLowerCase().includes('peptide') || 
     product.name.toLowerCase().includes('peptide')
   );
+  console.log('💊 Peptide products:', peptideProducts);
   
   const geneticTestingProducts = visibleProducts.filter(product => 
     product.category.toLowerCase().includes('genetic') || 
     product.name.toLowerCase().includes('genetic') ||
     product.category.toLowerCase().includes('testing') && product.name.toLowerCase().includes('genetic')
   );
+  console.log('🧬 Genetic testing products:', geneticTestingProducts);
   
   const clinicalTestingProducts = visibleProducts.filter(product => 
     (product.category.toLowerCase().includes('testing') || 
@@ -169,6 +183,7 @@ function AppContent() {
      product.name.toLowerCase().includes('lab')) &&
     !product.name.toLowerCase().includes('genetic')
   );
+  console.log('🔬 Clinical testing products:', clinicalTestingProducts);
 
   // Show loading or auth gate
   if (authLoading) {
