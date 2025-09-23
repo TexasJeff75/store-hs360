@@ -53,10 +53,12 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
 
   const fetchPricingEntries = async () => {
     try {
+      console.log('Fetching pricing entries...');
       const entries: PricingEntry[] = [];
       
       // Fetch individual contract pricing
       if (!organizationId) {
+        console.log('Fetching individual contract pricing...');
         const { data: contractPrices, error: contractError } = await supabase
           .from('contract_pricing')
           .select(`
@@ -64,9 +66,12 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
             profiles:user_id (email)
           `);
         
+        console.log('Contract prices data:', contractPrices, 'Error:', contractError);
+        
         if (!contractError && contractPrices) {
           contractPrices.forEach(price => {
             const product = products.find(p => p.id === price.product_id);
+            console.log('Processing contract price:', price, 'Found product:', product);
             if (product && price.profiles) {
               entries.push({
                 id: price.id,
@@ -86,17 +91,24 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       }
       
       // Fetch organization pricing
+      console.log('Fetching organization pricing...');
       const { data: orgPrices, error: orgError } = await supabase
         .from('organization_pricing')
         .select(`
           *,
           organizations (name)
-        `)
-        .eq(organizationId ? 'organization_id' : 'id', organizationId || 'all');
+        `);
+      
+      console.log('Organization prices data:', orgPrices, 'Error:', orgError);
       
       if (!orgError && orgPrices) {
-        orgPrices.forEach(price => {
+        const filteredOrgPrices = organizationId 
+          ? orgPrices.filter(price => price.organization_id === organizationId)
+          : orgPrices;
+          
+        filteredOrgPrices.forEach(price => {
           const product = products.find(p => p.id === price.product_id);
+          console.log('Processing org price:', price, 'Found product:', product);
           if (product && price.organizations) {
             entries.push({
               id: price.id,
@@ -115,6 +127,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       }
       
       // Fetch location pricing
+      console.log('Fetching location pricing...');
       const locationQuery = organizationId 
         ? supabase
             .from('location_pricing')
@@ -135,9 +148,12 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       
       const { data: locationPrices, error: locationError } = await locationQuery;
       
+      console.log('Location prices data:', locationPrices, 'Error:', locationError);
+      
       if (!locationError && locationPrices) {
         locationPrices.forEach(price => {
           const product = products.find(p => p.id === price.product_id);
+          console.log('Processing location price:', price, 'Found product:', product);
           if (product && price.locations) {
             entries.push({
               id: price.id,
@@ -155,14 +171,17 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
         });
       }
       
+      console.log('Final entries:', entries);
       setPricingEntries(entries);
     } catch (err) {
       console.error('Error fetching pricing entries:', err);
+      setError('Failed to load pricing entries: ' + (err instanceof Error ? err.message : 'Unknown error'));
     }
   };
 
   // Re-fetch pricing entries when products are loaded
   useEffect(() => {
+    console.log('Products changed, refetching pricing entries. Products length:', products.length);
     if (products.length > 0) {
       fetchPricingEntries();
     }
@@ -282,7 +301,11 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       setModalMessage({ type: 'success', text: 'Pricing saved successfully!' });
       setIsModalOpen(false);
       setSelectedEntry(null);
-      await fetchPricingEntries(); // Refresh pricing data
+      
+      // Refresh pricing data after a short delay to ensure database is updated
+      setTimeout(async () => {
+        await fetchPricingEntries();
+      }, 500);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save pricing';
       setModalMessage({ type: 'error', text: errorMessage });
@@ -305,6 +328,11 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       }
 
       await fetchPricingEntries(); // Refresh pricing data
+      
+      // Refresh pricing data after a short delay
+      setTimeout(async () => {
+        await fetchPricingEntries();
+      }, 500);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete pricing');
     }
