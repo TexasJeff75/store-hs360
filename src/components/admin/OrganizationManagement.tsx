@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit, Trash2, Search, MapPin, Users, Mail, Phone, AlertCircle, CheckCircle, Eye, Archive, ArrowLeft, Settings, DollarSign } from 'lucide-react';
+import { Building2, Plus, Edit, Trash2, Search, MapPin, Users, Mail, Phone, AlertCircle, CheckCircle, Eye, Archive, ArrowLeft, Settings, DollarSign, Save, RotateCcw } from 'lucide-react';
 import { multiTenantService } from '@/services/multiTenant';
 import LocationManagement from './LocationManagement';
 import PricingManagement from './PricingManagement';
@@ -22,6 +22,9 @@ const OrganizationManagement: React.FC = () => {
   const [orgStats, setOrgStats] = useState<{ [key: string]: { locations: number; users: number } }>({});
   const [selectedOrgForSubManagement, setSelectedOrgForSubManagement] = useState<Organization | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<SubManagementTab>('locations');
+  const [pendingChanges, setPendingChanges] = useState<{ [key: string]: Partial<Organization> }>({});
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetchOrganizations();
@@ -185,6 +188,49 @@ const OrganizationManagement: React.FC = () => {
     }
   };
 
+  const handleBulkSave = async () => {
+    try {
+      setIsSaving(true);
+      setSaveMessage(null);
+      
+      const updatePromises = Object.entries(pendingChanges).map(async ([orgId, changes]) => {
+        await multiTenantService.updateOrganization(orgId, changes);
+        
+        // Update local state
+        setOrganizations(prev => prev.map(org => 
+          org.id === orgId ? { ...org, ...changes } : org
+        ));
+      });
+      
+      await Promise.all(updatePromises);
+      
+      setPendingChanges({});
+      setSaveMessage({ type: 'success', text: 'All changes saved successfully!' });
+      
+      setTimeout(() => {
+        setSaveMessage(null);
+      }, 3000);
+    } catch (err) {
+      setSaveMessage({ 
+        type: 'error', 
+        text: err instanceof Error ? err.message : 'Failed to save changes' 
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDiscardChanges = () => {
+    setPendingChanges({});
+    setSaveMessage({ type: 'success', text: 'Changes discarded successfully!' });
+    
+    setTimeout(() => {
+      setSaveMessage(null);
+    }, 2000);
+  };
+
+  const hasPendingChanges = Object.keys(pendingChanges).length > 0;
+
   const filteredOrganizations = organizations.filter(org => {
     const matchesSearch = 
       org.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -306,6 +352,62 @@ const OrganizationManagement: React.FC = () => {
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-700">{error}</p>
+        </div>
+      )}
+
+      {/* Save Message */}
+      {saveMessage && (
+        <div className={`mb-4 p-4 rounded-lg flex items-center space-x-2 ${
+          saveMessage.type === 'success' 
+            ? 'bg-green-50 border border-green-200' 
+            : 'bg-red-50 border border-red-200'
+        }`}>
+          {saveMessage.type === 'success' ? (
+            <CheckCircle className="h-5 w-5 text-green-600" />
+          ) : (
+            <AlertCircle className="h-5 w-5 text-red-600" />
+          )}
+          <span className={`text-sm ${
+            saveMessage.type === 'success' ? 'text-green-700' : 'text-red-700'
+          }`}>
+            {saveMessage.text}
+          </span>
+        </div>
+      )}
+
+      {/* Save/Discard Actions */}
+      {hasPendingChanges && (
+        <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="h-5 w-5 text-yellow-600" />
+              <span className="text-sm font-medium text-yellow-800">
+                You have unsaved changes ({Object.keys(pendingChanges).length} organization{Object.keys(pendingChanges).length !== 1 ? 's' : ''})
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={handleDiscardChanges}
+                disabled={isSaving}
+                className="flex items-center space-x-2 px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <RotateCcw className="h-4 w-4" />
+                <span>Discard Changes</span>
+              </button>
+              <button
+                onClick={handleBulkSave}
+                disabled={isSaving}
+                className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-purple-600 border border-transparent rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isSaving ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                <span>{isSaving ? 'Saving...' : 'Save All Changes'}</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
