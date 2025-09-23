@@ -623,15 +623,6 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                               ...newEntryData,
                               productId
                             });
-                            setNewEntryData({
-                              ...newEntryData,
-                              entityId: e.target.value
-                            });
-                            setNewEntryData({
-                              ...newEntryData,
-                              type: newType,
-                              entityId: ''
-                            });
                           }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                         >
@@ -675,10 +666,6 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                               ...newEntryData,
                               contractPrice
                             });
-                            setNewEntryData({
-                              ...newEntryData,
-                              entityId: e.target.value
-                            });
                           }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           placeholder="0.00"
@@ -697,10 +684,6 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
                         />
                       </div>
-                            setNewEntryData({
-                              ...newEntryData,
-                              entityId: e.target.value
-                            });
                       
                       <div className="grid grid-cols-2 gap-4">
                         <div>
