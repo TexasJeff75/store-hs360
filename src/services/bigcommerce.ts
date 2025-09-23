@@ -117,19 +117,20 @@ export interface Product {
 }
 
 // Data transformation helpers
-function transformBigCommerceProduct(bcProduct: any): Product {
+function transformBigCommerceProduct(bc: any): Product {
+  const base = bc?.prices?.price?.value ?? 0;
+  const sale = bc?.prices?.salePrice?.value;
+
   return {
-    id: bcProduct.entityId,
-    name: bcProduct.name,
-    price: bcProduct.prices?.price?.value || bcProduct.defaultPrice || 0,
-    originalPrice: bcProduct.prices?.salePrice?.value !== bcProduct.prices?.price?.value 
-      ? bcProduct.prices?.price?.value 
-      : undefined,
-    image: bcProduct.defaultImage?.url || "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640",
-    rating: bcProduct.reviewSummary?.averageRating || 0,
-    reviews: bcProduct.reviewSummary?.numberOfReviews || 0,
-    category: bcProduct.categories?.edges?.[0]?.node?.name || "General",
-    benefits: bcProduct.customFields?.edges?.map((edge: any) => edge.node.value) || []
+    id: bc.entityId,
+    name: bc.name,
+    price: (typeof sale === "number" ? sale : base),
+    originalPrice: (typeof sale === "number" ? base : undefined),
+    image: bc.defaultImage?.url || "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640",
+    rating: bc.reviewSummary?.averageRating || 0,
+    reviews: bc.reviewSummary?.numberOfReviews || 0,
+    category: bc.categories?.edges?.[0]?.node?.name || "General",
+    benefits: (bc.customFields?.edges ?? []).map((e: any) => e?.node?.value).filter(Boolean)
   };
 }
 
