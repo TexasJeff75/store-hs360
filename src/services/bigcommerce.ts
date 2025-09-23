@@ -27,7 +27,7 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
 }
 
 const PRODUCTS_Q = /* GraphQL */ `
-  query ProductsBasic($first: Int = 20) {
+  query ProductsComplete($first: Int = 20) {
     site {
       products(first: $first) {
         edges {
@@ -35,7 +35,107 @@ const PRODUCTS_Q = /* GraphQL */ `
             entityId
             name
             path
-            defaultImage { url(width: 640) }
+            description
+            plainTextDescription
+            sku
+            upc
+            weight {
+              value
+              unit
+            }
+            height {
+              value
+              unit
+            }
+            width {
+              value
+              unit
+            }
+            depth {
+              value
+              unit
+            }
+            availabilityV2 {
+              status
+              description
+            }
+            condition
+            createdAt {
+              utc
+            }
+            defaultImage {
+              url(width: 640)
+              altText
+            }
+            images {
+              edges {
+                node {
+                  url(width: 640)
+                  altText
+                }
+              }
+            }
+            prices {
+              price {
+                value
+                currencyCode
+              }
+              salePrice {
+                value
+                currencyCode
+              }
+              basePrice {
+                value
+                currencyCode
+              }
+              retailPrice {
+                value
+                currencyCode
+              }
+            }
+            categories {
+              edges {
+                node {
+                  entityId
+                  name
+                  path
+                }
+              }
+            }
+            brand {
+              name
+              path
+            }
+            customFields {
+              edges {
+                node {
+                  entityId
+                  name
+                  value
+                }
+              }
+            }
+            metafields {
+              edges {
+                node {
+                  id
+                  namespace
+                  key
+                  value
+                }
+              }
+            }
+            reviewSummary {
+              summationOfRatings
+              numberOfReviews
+              averageRating
+            }
+            inventory {
+              aggregated {
+                availableToSell
+                warningLevel
+              }
+            }
           }
         }
       }
@@ -74,6 +174,25 @@ export interface Product {
   reviews: number;
   category: string;
   benefits: string[];
+  // Additional BigCommerce fields
+  description?: string;
+  plainTextDescription?: string;
+  sku?: string;
+  upc?: string;
+  brand?: string;
+  availability?: string;
+  condition?: string;
+  weight?: any;
+  dimensions?: {
+    height?: any;
+    width?: any;
+    depth?: any;
+  };
+  inventory?: number;
+  customFields?: any[];
+  allCategories?: any[];
+  allImages?: any[];
+  createdAt?: string;
 }
 
 // Mock data for fallback
@@ -137,13 +256,21 @@ class BigCommerceService {
     errorMessage?: string;
   }> {
     try {
-      const data = await gql(PRODUCTS_Q, { first: 20 });
+      const data = await gql(PRODUCTS_Q, { first: 50 });
       const edges = data?.site?.products?.edges ?? [];
       const products = edges.map((edge: any) => 
         transformBigCommerceProduct(edge.node)
       );
       
-      return { products: products.length > 0 ? products : mockProducts };
+      if (products.length === 0) {
+        const errorMessage = "No products found in BigCommerce store";
+        if (logError) {
+          logError(errorMessage);
+        }
+        return { products: mockProducts, errorMessage };
+      }
+      
+      return { products };
     } catch (error) {
       const errorMessage = "BigCommerce API unavailable, using sample data";
       if (logError) {
