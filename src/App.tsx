@@ -163,27 +163,18 @@ function AppContent() {
   const visibleProducts = getVisibleProducts();
   console.log('📊 Final visible products:', visibleProducts);
   
-  const peptideProducts = visibleProducts.filter(product => 
-    product.category.toLowerCase().includes('peptide') || 
-    product.name.toLowerCase().includes('peptide')
-  );
-  console.log('💊 Peptide products:', peptideProducts);
+  // Group products by their actual BigCommerce categories
+  const productsByCategory = visibleProducts.reduce((acc, product) => {
+    const category = product.category;
+    if (!acc[category]) {
+      acc[category] = [];
+    }
+    acc[category].push(product);
+    return acc;
+  }, {} as { [key: string]: Product[] });
   
-  const geneticTestingProducts = visibleProducts.filter(product => 
-    product.category.toLowerCase().includes('genetic') || 
-    product.name.toLowerCase().includes('genetic') ||
-    product.category.toLowerCase().includes('testing') && product.name.toLowerCase().includes('genetic')
-  );
-  console.log('🧬 Genetic testing products:', geneticTestingProducts);
-  
-  const clinicalTestingProducts = visibleProducts.filter(product => 
-    (product.category.toLowerCase().includes('testing') || 
-     product.name.toLowerCase().includes('test') ||
-     product.name.toLowerCase().includes('biomarker') ||
-     product.name.toLowerCase().includes('lab')) &&
-    !product.name.toLowerCase().includes('genetic')
-  );
-  console.log('🔬 Clinical testing products:', clinicalTestingProducts);
+  console.log('📂 Products grouped by category:', productsByCategory);
+  console.log('🏷️ Available categories:', Object.keys(productsByCategory));
 
   // Show loading or auth gate
   if (authLoading) {
@@ -287,26 +278,15 @@ function AppContent() {
             </div>
           ) : (
             <div className="space-y-16">
-              {/* Peptides Carousel */}
-              <ProductCarousel
-                title="Peptide Therapy"
-                products={peptideProducts}
-                onAddToCart={addToCart}
-              />
-              
-              {/* Genetic Testing Carousel */}
-              <ProductCarousel
-                title="Genetic Testing"
-                products={geneticTestingProducts}
-                onAddToCart={addToCart}
-              />
-              
-              {/* Clinical Testing Carousel */}
-              <ProductCarousel
-                title="Clinical Testing"
-                products={clinicalTestingProducts}
-                onAddToCart={addToCart}
-              />
+              {/* Dynamic Carousels based on actual BigCommerce categories */}
+              {Object.entries(productsByCategory).map(([category, categoryProducts]) => (
+                <ProductCarousel
+                  key={category}
+                  title={category}
+                  products={categoryProducts}
+                  onAddToCart={addToCart}
+                />
+              ))}
             </div>
           )}
           
