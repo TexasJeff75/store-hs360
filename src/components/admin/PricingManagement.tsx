@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Plus, Edit, Trash2, Search, User, Building2, MapPin } from 'lucide-react';
-import { supabase } from '@/services/supabase';
-import { contractPricingService } from '@/services/contractPricing';
+import { contractPricingService, type PricingType } from '@/services/contractPricing';
 import { multiTenantService } from '@/services/multiTenant';
 import { bigCommerceService } from '@/services/bigcommerce';
-import type { ContractPrice } from '@/services/contractPricing';
 import type { Organization, Location, Profile } from '@/services/supabase';
 
 interface PricingEntry {
   id: string;
-  type: 'individual' | 'organization' | 'location';
+  type: PricingType;
   entityId: string;
   entityName: string;
   productId: number;
@@ -17,6 +15,10 @@ interface PricingEntry {
   contractPrice: number;
   regularPrice: number;
   savings: number;
+  minQuantity: number;
+  maxQuantity?: number;
+  effectiveDate: string;
+  expiryDate?: string;
   createdAt: string;
 }
 
@@ -39,12 +41,14 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
   const [isEditing, setIsEditing] = useState(false);
   const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [newEntryData, setNewEntryData] = useState({
-    type: 'individual' as 'individual' | 'organization' | 'location',
+    type: 'individual' as PricingType,
     entityId: '',
     productId: 0,
     contractPrice: 0,
     minQuantity: 1,
-    maxQuantity: undefined as number | undefined
+    maxQuantity: undefined as number | undefined,
+    effectiveDate: new Date().toISOString().split('T')[0],
+    expiryDate: undefined as string | undefined
   });
 
   useEffect(() => {
@@ -54,124 +58,51 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
   const fetchPricingEntries = async () => {
     try {
       console.log('Fetching pricing entries...');
-      const entries: PricingEntry[] = [];
       
-      // Fetch individual contract pricing
-      if (!organizationId) {
-        console.log('Fetching individual contract pricing...');
-        const { data: contractPrices, error: contractError } = await supabase
-          .from('contract_pricing')
-          .select(`
-            *,
-            profiles:user_id (email)
-          `);
+      let pricingData;
+      if (organizationId) {
+        // Fetch pricing for specific organization and its locations
+        pricingData = await contractPricingService.getOrganizationPricingEntries(organizationId);
+      } else {
+        // Fetch all pricing entries
+        pricingData = await contractPricingService.getAllPricingEntries();
+      }
+      
+      console.log('Raw pricing data:', pricingData);
+      
+      // Transform the data into PricingEntry format
+      const entries: PricingEntry[] = pricingData.map(price => {
+        const product = products.find(p => p.id === price.product_id);
         
-        console.log('Contract prices data:', contractPrices, 'Error:', contractError);
-        
-        if (!contractError && contractPrices) {
-          contractPrices.forEach(price => {
-            const product = products.find(p => p.id === price.product_id);
-            console.log('Processing contract price:', price, 'Found product:', product);
-            if (product && price.profiles) {
-              entries.push({
-                id: price.id,
-                type: 'individual',
-                entityId: price.user_id,
-                entityName: price.profiles.email,
-                productId: price.product_id,
-                productName: product.name,
-                contractPrice: price.contract_price,
-                regularPrice: product.price,
-                savings: product.price - price.contract_price,
-                createdAt: price.created_at
-              });
-            }
-          });
+        // Get entity name based on pricing type
+        let entityName = 'Unknown';
+        if (price.pricing_type === 'individual' && price.profiles) {
+          entityName = price.profiles.email;
+        } else if (price.pricing_type === 'organization' && price.organizations) {
+          entityName = price.organizations.name;
+        } else if (price.pricing_type === 'location' && price.locations) {
+          entityName = price.locations.name;
         }
-      }
+        
+        return {
+          id: price.id,
+          type: price.pricing_type,
+          entityId: price.entity_id,
+          entityName,
+          productId: price.product_id,
+          productName: product?.name || `Product ${price.product_id}`,
+          contractPrice: price.contract_price,
+          regularPrice: product?.price || 0,
+          savings: (product?.price || 0) - price.contract_price,
+          minQuantity: price.min_quantity || 1,
+          maxQuantity: price.max_quantity,
+          effectiveDate: price.effective_date || price.created_at,
+          expiryDate: price.expiry_date,
+          createdAt: price.created_at
+        };
+      }).filter(entry => entry.productName !== `Product ${entry.productId}`); // Filter out entries without valid products
       
-      // Fetch organization pricing
-      console.log('Fetching organization pricing...');
-      const { data: orgPrices, error: orgError } = await supabase
-        .from('organization_pricing')
-        .select(`
-          *,
-          organizations (name)
-        `);
-      
-      console.log('Organization prices data:', orgPrices, 'Error:', orgError);
-      
-      if (!orgError && orgPrices) {
-        const filteredOrgPrices = organizationId 
-          ? orgPrices.filter(price => price.organization_id === organizationId)
-          : orgPrices;
-          
-        filteredOrgPrices.forEach(price => {
-          const product = products.find(p => p.id === price.product_id);
-          console.log('Processing org price:', price, 'Found product:', product);
-          if (product && price.organizations) {
-            entries.push({
-              id: price.id,
-              type: 'organization',
-              entityId: price.organization_id,
-              entityName: price.organizations.name,
-              productId: price.product_id,
-              productName: product.name,
-              contractPrice: price.contract_price,
-              regularPrice: product.price,
-              savings: product.price - price.contract_price,
-              createdAt: price.created_at
-            });
-          }
-        });
-      }
-      
-      // Fetch location pricing
-      console.log('Fetching location pricing...');
-      const locationQuery = organizationId 
-        ? supabase
-            .from('location_pricing')
-            .select(`
-              *,
-              locations!inner (
-                name,
-                organization_id
-              )
-            `)
-            .eq('locations.organization_id', organizationId)
-        : supabase
-            .from('location_pricing')
-            .select(`
-              *,
-              locations (name)
-            `);
-      
-      const { data: locationPrices, error: locationError } = await locationQuery;
-      
-      console.log('Location prices data:', locationPrices, 'Error:', locationError);
-      
-      if (!locationError && locationPrices) {
-        locationPrices.forEach(price => {
-          const product = products.find(p => p.id === price.product_id);
-          console.log('Processing location price:', price, 'Found product:', product);
-          if (product && price.locations) {
-            entries.push({
-              id: price.id,
-              type: 'location',
-              entityId: price.location_id,
-              entityName: price.locations.name,
-              productId: price.product_id,
-              productName: product.name,
-              contractPrice: price.contract_price,
-              regularPrice: product.price,
-              savings: product.price - price.contract_price,
-              createdAt: price.created_at
-            });
-          }
-        });
-      }
-      
-      console.log('Final entries:', entries);
+      console.log('Processed entries:', entries);
       setPricingEntries(entries);
     } catch (err) {
       console.error('Error fetching pricing entries:', err);
@@ -186,6 +117,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       fetchPricingEntries();
     }
   }, [products, organizationId]);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -220,10 +152,6 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
           setUsers(usersData || []);
         }
       }
-
-      // Fetch existing pricing entries
-      await fetchPricingEntries();
-      
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
@@ -241,15 +169,21 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       contractPrice: 0,
       regularPrice: products[0]?.price || 0,
       savings: 0,
+      minQuantity: 1,
+      maxQuantity: undefined,
+      effectiveDate: new Date().toISOString().split('T')[0],
+      expiryDate: undefined,
     };
     setSelectedEntry(defaultEntry);
     setNewEntryData({
-      type: defaultEntry.type,
+      type: defaultEntry.type as PricingType,
       entityId: '',
       productId: defaultEntry.productId,
       contractPrice: 0,
       minQuantity: 1,
-      maxQuantity: undefined
+      maxQuantity: undefined,
+      effectiveDate: new Date().toISOString().split('T')[0],
+      expiryDate: undefined
     });
     setIsEditing(false);
     setIsModalOpen(true);
@@ -264,6 +198,16 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
 
   const handleEditPricing = (entry: PricingEntry) => {
     setSelectedEntry(entry);
+    setNewEntryData({
+      type: entry.type,
+      entityId: entry.entityId,
+      productId: entry.productId,
+      contractPrice: entry.contractPrice,
+      minQuantity: entry.minQuantity,
+      maxQuantity: entry.maxQuantity,
+      effectiveDate: entry.effectiveDate.split('T')[0],
+      expiryDate: entry.expiryDate?.split('T')[0]
+    });
     setIsEditing(true);
     setIsModalOpen(true);
   };
@@ -274,42 +218,33 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     try {
       setModalMessage(null);
       
-      if (selectedEntry.type === 'individual') {
-        await contractPricingService.setContractPrice(
-          selectedEntry.entityId!,
-          selectedEntry.productId!,
-          selectedEntry.contractPrice!
-        );
-      } else if (selectedEntry.type === 'organization') {
-        await contractPricingService.setOrganizationPrice(
-          selectedEntry.entityId!,
-          selectedEntry.productId!,
-          selectedEntry.contractPrice!,
-          newEntryData.minQuantity,
-          newEntryData.maxQuantity
-        );
-      } else if (selectedEntry.type === 'location') {
-        await contractPricingService.setLocationPrice(
-          selectedEntry.entityId!,
-          selectedEntry.productId!,
-          selectedEntry.contractPrice!,
-          newEntryData.minQuantity,
-          newEntryData.maxQuantity
-        );
-      }
+      const result = await contractPricingService.setContractPrice(
+        selectedEntry.entityId!,
+        selectedEntry.productId!,
+        selectedEntry.contractPrice!,
+        selectedEntry.type as PricingType,
+        newEntryData.minQuantity,
+        newEntryData.maxQuantity,
+        newEntryData.effectiveDate,
+        newEntryData.expiryDate
+      );
 
-      setModalMessage({ type: 'success', text: 'Pricing saved successfully!' });
-      setIsModalOpen(false);
-      setSelectedEntry(null);
-      
-      // Refresh pricing data after a short delay to ensure database is updated
-      setTimeout(async () => {
-        await fetchPricingEntries();
-      }, 500);
+      if (result.success) {
+        setModalMessage({ type: 'success', text: 'Pricing saved successfully!' });
+        setIsModalOpen(false);
+        setSelectedEntry(null);
+        
+        // Refresh pricing data after a short delay to ensure database is updated
+        setTimeout(async () => {
+          await fetchPricingEntries();
+        }, 500);
+      } else {
+        setModalMessage({ type: 'error', text: result.error || 'Failed to save pricing' });
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save pricing';
       setModalMessage({ type: 'error', text: errorMessage });
-      setError(err instanceof Error ? err.message : 'Failed to save pricing');
+      setError(errorMessage);
     }
   };
 
@@ -319,20 +254,21 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     }
 
     try {
-      if (entry.type === 'individual') {
-        await contractPricingService.removeContractPrice(entry.entityId, entry.productId);
-      } else if (entry.type === 'organization') {
-        await contractPricingService.removeOrganizationPrice(entry.entityId, entry.productId);
-      } else if (entry.type === 'location') {
-        await contractPricingService.removeLocationPrice(entry.entityId, entry.productId);
-      }
+      const result = await contractPricingService.removeContractPrice(
+        entry.entityId, 
+        entry.productId, 
+        entry.type,
+        entry.effectiveDate
+      );
 
-      await fetchPricingEntries(); // Refresh pricing data
-      
-      // Refresh pricing data after a short delay
-      setTimeout(async () => {
-        await fetchPricingEntries();
-      }, 500);
+      if (result.success) {
+        // Refresh pricing data after a short delay
+        setTimeout(async () => {
+          await fetchPricingEntries();
+        }, 500);
+      } else {
+        setError(result.error || 'Failed to delete pricing');
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete pricing');
     }
@@ -454,6 +390,9 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Quantity Range
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Effective Date
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -489,8 +428,18 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {entry.minQuantity || 1}
+                        {entry.minQuantity}
                         {entry.maxQuantity ? ` - ${entry.maxQuantity}` : '+'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {new Date(entry.effectiveDate).toLocaleDateString()}
+                        {entry.expiryDate && (
+                          <div className="text-xs text-gray-500">
+                            Expires: {new Date(entry.expiryDate).toLocaleDateString()}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
@@ -544,7 +493,52 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                       {isEditing ? 'Edit Pricing' : 'Create Pricing'}
                     </h3>
                     
+                    {/* Modal Message */}
+                    {modalMessage && (
+                      <div className={`mb-4 p-3 rounded-lg flex items-center space-x-2 ${
+                        modalMessage.type === 'success' 
+                          ? 'bg-green-50 border border-green-200' 
+                          : 'bg-red-50 border border-red-200'
+                      }`}>
+                        <span className={`text-sm ${
+                          modalMessage.type === 'success' ? 'text-green-700' : 'text-red-700'
+                        }`}>
+                          {modalMessage.text}
+                        </span>
+                      </div>
+                    )}
+                    
                     <div className="space-y-4">
+                      {!organizationId && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Pricing Type *
+                          </label>
+                          <select
+                            value={selectedEntry.type}
+                            onChange={(e) => {
+                              const newType = e.target.value as PricingType;
+                              setSelectedEntry({
+                                ...selectedEntry, 
+                                type: newType,
+                                entityId: '',
+                                entityName: ''
+                              });
+                              setNewEntryData({
+                                ...newEntryData,
+                                type: newType,
+                                entityId: ''
+                              });
+                            }}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          >
+                            <option value="individual">Individual User</option>
+                            <option value="organization">Organization</option>
+                            <option value="location">Location</option>
+                          </select>
+                        </div>
+                      )}
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           {selectedEntry.type === 'individual' ? 'User *' : 
@@ -560,6 +554,10 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                                 ...selectedEntry,
                                 entityId: e.target.value,
                                 entityName: user?.email || ''
+                              });
+                              setNewEntryData({
+                                ...newEntryData,
+                                entityId: e.target.value
                               });
                             }}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -579,6 +577,10 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                                 entityId: e.target.value,
                                 entityName: org?.name || ''
                               });
+                              setNewEntryData({
+                                ...newEntryData,
+                                entityId: e.target.value
+                              });
                             }}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           >
@@ -597,6 +599,10 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                                 entityId: e.target.value,
                                 entityName: location?.name || ''
                               });
+                              setNewEntryData({
+                                ...newEntryData,
+                                entityId: e.target.value
+                              });
                             }}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           >
@@ -607,31 +613,6 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                           </select>
                         )}
                       </div>
-                      
-                      {!organizationId && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Pricing Type *
-                          </label>
-                          <select
-                            value={selectedEntry.type}
-                            onChange={(e) => {
-                              const newType = e.target.value as 'individual' | 'organization' | 'location';
-                              setSelectedEntry({
-                                ...selectedEntry, 
-                                type: newType,
-                                entityId: '',
-                                entityName: ''
-                              });
-                            }}
-                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          >
-                            <option value="individual">Individual User</option>
-                            <option value="organization">Organization</option>
-                            <option value="location">Location</option>
-                          </select>
-                        </div>
-                      )}
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -646,7 +627,8 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                               ...selectedEntry, 
                               productId,
                               productName: product?.name || '',
-                              regularPrice: product?.price || 0
+                              regularPrice: product?.price || 0,
+                              savings: (product?.price || 0) - selectedEntry.contractPrice
                             });
                             setNewEntryData({
                               ...newEntryData,
@@ -755,12 +737,48 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                           />
                         </div>
                       </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Effective Date *
+                          </label>
+                          <input
+                            type="date"
+                            value={newEntryData.effectiveDate}
+                            onChange={(e) => {
+                              setNewEntryData({
+                                ...newEntryData,
+                                effectiveDate: e.target.value
+                              });
+                            }}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Expiry Date
+                          </label>
+                          <input
+                            type="date"
+                            value={newEntryData.expiryDate || ''}
+                            onChange={(e) => {
+                              setNewEntryData({
+                                ...newEntryData,
+                                expiryDate: e.target.value || undefined
+                              });
+                            }}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
                       
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <p className="text-sm text-blue-800 font-medium mb-1">Quantity Tier Information</p>
+                        <p className="text-sm text-blue-800 font-medium mb-1">Pricing Information</p>
                         <p className="text-xs text-blue-700">
-                          This price will apply when ordering between {selectedEntry.minQuantity || 1} and {selectedEntry.maxQuantity || '∞'} units.
-                          {!selectedEntry.maxQuantity && ' Leave max quantity empty for unlimited quantities.'}
+                          This price will apply when ordering between {newEntryData.minQuantity} and {newEntryData.maxQuantity || '∞'} units
+                          from {newEntryData.effectiveDate} {newEntryData.expiryDate ? `until ${newEntryData.expiryDate}` : 'indefinitely'}.
                         </p>
                       </div>
                     </div>
@@ -771,7 +789,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                 <button
                   type="button"
                   onClick={handleSavePricing}
-                  disabled={!selectedEntry.contractPrice || !selectedEntry.productId || !selectedEntry.entityId || !newEntryData.minQuantity}
+                  disabled={!selectedEntry.contractPrice || !selectedEntry.productId || !selectedEntry.entityId || !newEntryData.minQuantity || !newEntryData.effectiveDate}
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isEditing ? 'Update' : 'Create'} Pricing
