@@ -221,8 +221,6 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       contractPrice: 0,
       regularPrice: products[0]?.price || 0,
       savings: 0,
-      minQuantity: 1,
-      maxQuantity: undefined
     };
     setSelectedEntry(defaultEntry);
     setNewEntryData({
@@ -254,6 +252,8 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     if (!selectedEntry) return;
 
     try {
+      setModalMessage(null);
+      
       if (selectedEntry.type === 'individual') {
         await contractPricingService.setContractPrice(
           selectedEntry.entityId!,
@@ -265,23 +265,26 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
           selectedEntry.entityId!,
           selectedEntry.productId!,
           selectedEntry.contractPrice!,
-          selectedEntry.minQuantity,
-          selectedEntry.maxQuantity
+          newEntryData.minQuantity,
+          newEntryData.maxQuantity
         );
       } else if (selectedEntry.type === 'location') {
         await contractPricingService.setLocationPrice(
           selectedEntry.entityId!,
           selectedEntry.productId!,
           selectedEntry.contractPrice!,
-          selectedEntry.minQuantity,
-          selectedEntry.maxQuantity
+          newEntryData.minQuantity,
+          newEntryData.maxQuantity
         );
       }
 
+      setModalMessage({ type: 'success', text: 'Pricing saved successfully!' });
       setIsModalOpen(false);
       setSelectedEntry(null);
       await fetchPricingEntries(); // Refresh pricing data
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save pricing';
+      setModalMessage({ type: 'error', text: errorMessage });
       setError(err instanceof Error ? err.message : 'Failed to save pricing');
     }
   };
@@ -616,6 +619,19 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                               productName: product?.name || '',
                               regularPrice: product?.price || 0
                             });
+                            setNewEntryData({
+                              ...newEntryData,
+                              productId
+                            });
+                            setNewEntryData({
+                              ...newEntryData,
+                              entityId: e.target.value
+                            });
+                            setNewEntryData({
+                              ...newEntryData,
+                              type: newType,
+                              entityId: ''
+                            });
                           }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                         >
@@ -655,6 +671,14 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                               contractPrice,
                               savings: (selectedEntry.regularPrice || 0) - contractPrice
                             });
+                            setNewEntryData({
+                              ...newEntryData,
+                              contractPrice
+                            });
+                            setNewEntryData({
+                              ...newEntryData,
+                              entityId: e.target.value
+                            });
                           }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           placeholder="0.00"
@@ -673,6 +697,10 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
                         />
                       </div>
+                            setNewEntryData({
+                              ...newEntryData,
+                              entityId: e.target.value
+                            });
                       
                       <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -682,11 +710,11 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                           <input
                             type="number"
                             min="1"
-                            value={selectedEntry.minQuantity || 1}
+                            value={newEntryData.minQuantity}
                             onChange={(e) => {
                               const minQuantity = parseInt(e.target.value) || 1;
-                              setSelectedEntry({
-                                ...selectedEntry, 
+                              setNewEntryData({
+                                ...newEntryData,
                                 minQuantity
                               });
                             }}
@@ -702,11 +730,11 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                           <input
                             type="number"
                             min="1"
-                            value={selectedEntry.maxQuantity || ''}
+                            value={newEntryData.maxQuantity || ''}
                             onChange={(e) => {
                               const maxQuantity = e.target.value ? parseInt(e.target.value) : undefined;
-                              setSelectedEntry({
-                                ...selectedEntry, 
+                              setNewEntryData({
+                                ...newEntryData,
                                 maxQuantity
                               });
                             }}
@@ -731,7 +759,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                 <button
                   type="button"
                   onClick={handleSavePricing}
-                  disabled={!selectedEntry.contractPrice || !selectedEntry.productId || !selectedEntry.entityId || !selectedEntry.minQuantity}
+                  disabled={!selectedEntry.contractPrice || !selectedEntry.productId || !selectedEntry.entityId || !newEntryData.minQuantity}
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isEditing ? 'Update' : 'Create'} Pricing
