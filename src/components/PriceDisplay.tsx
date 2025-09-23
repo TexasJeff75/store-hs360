@@ -55,7 +55,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   return (
     <div className={`flex items-center space-x-2 ${className}`}>
       <div className="flex items-center space-x-2">
-        <span className="text-lg font-bold text-gray-900">${price % 1 === 0 ? price.toFixed(0) : price.toFixed(2)}</span>
+        <span className="text-lg font-bold text-gray-900">${price.toFixed(2)}</span>
         
         {/* Contract Price Badge */}
         {isContractPrice && (
@@ -71,7 +71,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
         {/* Original/Regular Price Strikethrough */}
         {(originalPrice && originalPrice !== price) || (isContractPrice && regularPrice !== price) && (
           <span className="text-sm text-gray-500 line-through">
-            ${(originalPrice || regularPrice) % 1 === 0 ? (originalPrice || regularPrice).toFixed(0) : (originalPrice || regularPrice).toFixed(2)}
+            ${(originalPrice || regularPrice).toFixed(2)}
           </span>
         )}
       </div>
@@ -79,7 +79,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
       {/* Savings Display */}
       {showSavings && savings && savings > 0 && (
         <div className="text-sm text-green-600 font-medium">
-          Save ${savings % 1 === 0 ? savings.toFixed(0) : savings.toFixed(2)}
+          Save ${savings.toFixed(2)}
         </div>
       )}
 
