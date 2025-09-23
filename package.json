@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run dev:vite\" \"node server/gql.cjs\"",
-    "dev:vite": "vite",
+    "dev:vite": "node -r dotenv/config node_modules/.bin/vite",
     "build": "npm run build:netlify",
     "build:netlify": "vite build",
     "lint": "eslint .",
