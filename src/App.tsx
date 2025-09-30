@@ -31,6 +31,8 @@ function AppContent() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [showAllProducts, setShowAllProducts] = useState(false);
   const { errors, logError, clearErrors } = useErrorLogger();
   const { user, profile, loading: authLoading } = useAuth();
 
@@ -127,6 +129,16 @@ function AppContent() {
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
+  const handleSeeAllCategory = (category: string) => {
+    setSelectedCategory(category);
+    setShowAllProducts(true);
+  };
+
+  const handleBackToCarousels = () => {
+    setSelectedCategory(null);
+    setShowAllProducts(false);
+  };
+
   // Group products by their actual BigCommerce categories
   const productsByCategory = products.reduce((acc, product) => {
     const category = product.category;
@@ -215,12 +227,14 @@ function AppContent() {
 
         {/* Product Carousels Section */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          <div className="text-center mb-16">
+          {!showAllProducts && (
+            <div className="text-center mb-16">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Our Product Categories</h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
               Explore our comprehensive range of health and wellness solutions
             </p>
           </div>
+          )}
           
           {loading ? (
             <div className="space-y-16">
@@ -240,6 +254,91 @@ function AppContent() {
               <p className="text-red-500 text-lg mb-4">Error loading products</p>
               <p className="text-gray-600">{error}</p>
             </div>
+          ) : showAllProducts && selectedCategory ? (
+            <div>
+              {/* Back button and category header */}
+              <div className="mb-8">
+                <button
+                  onClick={handleBackToCarousels}
+                  className="flex items-center space-x-2 text-pink-600 hover:text-pink-700 font-medium mb-4 transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                  <span>Back to Categories</span>
+                </button>
+                <h2 className="text-3xl font-bold text-gray-900 mb-2">{selectedCategory}</h2>
+                <p className="text-gray-600">
+                  Showing all {productsByCategory[selectedCategory]?.length || 0} products in this category
+                </p>
+              </div>
+
+              {/* All products grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {productsByCategory[selectedCategory]?.map((product) => (
+                  <div
+                    key={product.id}
+                    className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 group"
+                  >
+                    <div className="relative overflow-hidden rounded-t-lg">
+                      <img 
+                        src={product.image} 
+                        alt={product.name}
+                        className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      <div className="absolute top-3 left-3">
+                        <span className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-2 py-1 rounded text-xs font-medium">
+                          {product.category}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-4">
+                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{product.name}</h3>
+                      
+                      {/* Benefits */}
+                      <div className="mb-3">
+                        <div className="flex flex-wrap gap-1">
+                          {product.benefits.slice(0, 2).map((benefit, index) => (
+                            <span 
+                              key={index}
+                              className="text-xs bg-pink-50 text-pink-700 px-2 py-1 rounded-full"
+                            >
+                              {benefit}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Price */}
+                      <div className="mb-3">
+                        <PriceDisplay 
+                          productId={product.id}
+                          regularPrice={product.price}
+                          originalPrice={product.originalPrice}
+                          showSavings={true}
+                        />
+                      </div>
+
+                      {/* Add to Cart Button */}
+                      <button 
+                        onClick={() => addToCart(product.id)}
+                        className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-2 px-4 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center space-x-2"
+                      >
+                        <ShoppingCart className="h-4 w-4" />
+                        <span>Add to Cart</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {productsByCategory[selectedCategory]?.length === 0 && (
+                <div className="text-center py-16">
+                  <p className="text-gray-500 text-lg">No products found in this category</p>
+                </div>
+              )}
+            </div>
           ) : (
             <div className="space-y-16">
               {/* Dynamic Carousels based on actual BigCommerce categories */}
@@ -249,6 +348,7 @@ function AppContent() {
                   title={category}
                   products={categoryProducts}
                   onAddToCart={addToCart}
+                  onSeeAll={handleSeeAllCategory}
                 />
               ))}
               
