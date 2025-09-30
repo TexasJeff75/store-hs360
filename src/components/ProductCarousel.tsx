@@ -78,6 +78,8 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ title, products, onAd
               </button>
             )}
             <div className="flex items-center space-x-2">
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -164,7 +166,6 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ title, products, onAd
                 <span>Add to Cart</span>
               </button>
             </div>
-          </div>
           </div>
         ))}
       </div>
