@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       clearTimeout(timeoutId);
 
       if (error && error.code !== 'PGRST116') {
-        console.error('Error fetching profile:', error);
+        console.log('Profile fetch error:', error.message);
         // Profile doesn't exist - this is handled in sign up
         if (error.code === 'PGRST116') {
           console.log('Profile not found, will be created on next sign up');
@@ -133,9 +133,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       if (error.name === 'AbortError') {
-        console.error('Profile fetch timed out');
+        console.log('Profile fetch timed out');
       } else {
-        console.error('Error fetching profile:', error);
+        console.log('Profile fetch failed:', error instanceof Error ? error.message : 'Unknown error');
       }
       setProfile(null);
     } finally {
