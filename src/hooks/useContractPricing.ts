@@ -44,8 +44,8 @@ export function useContractPricing(productId: number, regularPrice: number, quan
           setSource('regular');
         }
       } catch (err) {
-        console.log('Pricing fetch failed (using regular price):', err instanceof Error ? err.message : 'Unknown error');
-        // Don't set error state for pricing failures - just use regular price
+        console.error('Error fetching effective price:', err);
+        setError(err instanceof Error ? err.message : 'Failed to fetch pricing');
         setPrice(regularPrice);
         setSource('regular');
       } finally {

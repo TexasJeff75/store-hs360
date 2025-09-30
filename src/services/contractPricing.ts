@@ -28,13 +28,6 @@ class ContractPricingService {
     pricingType: PricingType = 'individual'
   ): Promise<ContractPrice | null> {
     try {
-      // Check if user is authenticated before making the query
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        console.log('User not authenticated or auth error:', authError?.message);
-        return null;
-      }
-      
       const { data, error } = await supabase
         .from('contract_pricing')
         .select('*')
@@ -47,13 +40,12 @@ class ContractPricingService {
         .maybeSingle();
 
       if (error) {
-        console.log('Contract price query error (expected for users without pricing):', error.message);
-        return null;
+        throw error;
       }
 
       return data;
     } catch (error) {
-      console.log('Contract price fetch failed (network/auth issue):', error instanceof Error ? error.message : 'Unknown error');
+      console.error('Error fetching contract price:', error);
       return null;
     }
   }
@@ -307,13 +299,6 @@ class ContractPricingService {
    */
   async getOrganizationPrice(userId: string, productId: number, quantity?: number): Promise<any | null> {
     try {
-      // Check if user is authenticated before making the query
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        console.log('User not authenticated for organization pricing:', authError?.message);
-        return null;
-      }
-
       // Get user's organizations through organization roles
       const { data: userRoles, error: rolesError } = await supabase
         .from('user_organization_roles')
@@ -324,7 +309,6 @@ class ContractPricingService {
         .eq('user_id', userId);
 
       if (rolesError || !userRoles?.length) {
-        console.log('No organization roles found or roles error:', rolesError?.message);
         return null;
       }
 
@@ -332,7 +316,6 @@ class ContractPricingService {
       
       // Check if organizationIds array is empty to prevent malformed query
       if (organizationIds.length === 0) {
-        console.log('No organization IDs found for user');
         return null;
       }
       
@@ -359,13 +342,12 @@ class ContractPricingService {
         .maybeSingle();
 
       if (error) {
-        console.log('Organization pricing query error:', error.message);
-        return null;
+        throw error;
       }
 
       return data;
     } catch (error) {
-      console.log('Organization price fetch failed:', error instanceof Error ? error.message : 'Unknown error');
+      console.error('Error fetching organization price:', error);
       return null;
     }
   }
