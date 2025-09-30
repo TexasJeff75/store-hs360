@@ -25,7 +25,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
 
   if (loading) {
     return (
-      <div className={`flex items-center space-x-2 ${className}`}>
+      <div className={`flex items-center space-x-2 min-h-[24px] ${className}`}>
         <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
         <span className="text-gray-500">Loading price...</span>
       </div>
@@ -53,13 +53,13 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   };
 
   return (
-    <div className={`flex items-center space-x-2 ${className}`}>
-      <div className="flex items-center space-x-2">
+    <div className={`flex flex-col space-y-1 ${className}`}>
+      <div className="flex items-center space-x-2 flex-wrap">
         <span className="text-lg font-bold text-gray-900">${price.toFixed(2)}</span>
         
         {/* Contract Price Badge */}
         {isContractPrice && (
-          <div className="flex items-center space-x-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium">
+          <div className="flex items-center space-x-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap">
             {getSourceIcon()}
             <span>
               {getSourceLabel()}
@@ -67,32 +67,34 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
             </span>
           </div>
         )}
+      </div>
         
+      <div className="flex items-center space-x-2 flex-wrap">
         {/* Original/Regular Price Strikethrough */}
         {(originalPrice && originalPrice !== price) || (isContractPrice && regularPrice !== price) && (
           <span className="text-sm text-gray-500 line-through">
             ${(originalPrice || regularPrice).toFixed(2)}
           </span>
         )}
-      </div>
 
-      {/* Savings Display */}
-      {showSavings && savings && savings > 0 && (
-        <div className="text-sm text-green-600 font-medium">
-          Save ${savings.toFixed(2)}
-        </div>
-      )}
+        {/* Savings Display */}
+        {showSavings && savings && savings > 0 && (
+          <div className="text-sm text-green-600 font-medium">
+            Save ${savings.toFixed(2)}
+          </div>
+        )}
+      </div>
 
       {/* Login Prompt for Better Pricing */}
       {!user && (
-        <div className="text-xs text-blue-600">
+        <div className="text-xs text-blue-600 mt-1">
           Sign in for special pricing
         </div>
       )}
 
       {/* Approval Pending Message */}
       {user && profile?.role === 'pending' && (
-        <div className="text-xs text-yellow-600">
+        <div className="text-xs text-yellow-600 mt-1">
           Account approval pending for special pricing
         </div>
       )}
