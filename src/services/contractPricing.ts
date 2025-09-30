@@ -256,6 +256,11 @@ class ContractPricingService {
 
       const locationIds = userRoles.map(role => role.location_id).filter(Boolean);
       
+      // Check if locationIds array is empty to prevent malformed query
+      if (locationIds.length === 0) {
+        return null;
+      }
+      
       let query = supabase
         .from('contract_pricing')
         .select('*')
@@ -308,6 +313,11 @@ class ContractPricingService {
       }
 
       const organizationIds = userRoles.map(role => role.organization_id).filter(Boolean);
+      
+      // Check if organizationIds array is empty to prevent malformed query
+      if (organizationIds.length === 0) {
+        return null;
+      }
       
       let query = supabase
         .from('contract_pricing')
