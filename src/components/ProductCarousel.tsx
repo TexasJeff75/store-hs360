@@ -7,6 +7,7 @@ interface ProductCarouselProps {
   title: string;
   products: Product[];
   onAddToCart: (id: number) => void;
+  onSeeAll?: (category: string) => void;
 }
 
 // Get product settings from localStorage (matches ProductManagement)
@@ -27,7 +28,7 @@ const getProductSettings = (productId: number) => {
   };
 };
 
-const ProductCarousel: React.FC<ProductCarouselProps> = ({ title, products, onAddToCart }) => {
+const ProductCarousel: React.FC<ProductCarouselProps> = ({ title, products, onAddToCart, onSeeAll }) => {
   const [currentIndex, setCurrentIndex] = React.useState(0);
   const carouselRef = React.useRef<HTMLDivElement>(null);
 
@@ -64,7 +65,19 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ title, products, onAd
       <div className="mb-16">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">{title}</h2>
         <div className="bg-gray-100 rounded-lg p-8 text-center">
-          <p className="text-gray-500">No products available in this category</p>
+          <div className="flex items-center space-x-4">
+            {onSeeAll && (
+              <button
+                onClick={() => onSeeAll(title)}
+                className="text-pink-600 hover:text-pink-700 font-medium text-sm transition-colors flex items-center space-x-1"
+              >
+                <span>See All</span>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
+            <div className="flex items-center space-x-2">
         </div>
       </div>
     );
@@ -151,6 +164,7 @@ const ProductCarousel: React.FC<ProductCarouselProps> = ({ title, products, onAd
                 <span>Add to Cart</span>
               </button>
             </div>
+          </div>
           </div>
         ))}
       </div>
