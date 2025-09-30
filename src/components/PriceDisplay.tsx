@@ -69,7 +69,9 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
         )}
       </div>
         
-      <div className="flex items-center space-x-2 flex-wrap">
+      {/* Only show savings/original price section if there's something to show */}
+      {((originalPrice && originalPrice !== price) || (isContractPrice && regularPrice !== price && showSavings && savings > 0)) && (
+        <div className="flex items-center space-x-2 flex-wrap">
         {/* Original/Regular Price Strikethrough */}
         {(originalPrice && originalPrice !== price) || (isContractPrice && regularPrice !== price) && (
           <span className="text-sm text-gray-500 line-through">
@@ -83,20 +85,26 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
             Save ${savings.toFixed(2)}
           </div>
         )}
-      </div>
-
-      {/* Login Prompt for Better Pricing */}
-      {!user && (
-        <div className="text-xs text-blue-600 mt-1">
-          Sign in for special pricing
         </div>
       )}
 
-      {/* Approval Pending Message */}
-      {user && profile?.role === 'pending' && (
-        <div className="text-xs text-yellow-600 mt-1">
-          Account approval pending for special pricing
-        </div>
+      {/* Only show status messages if user doesn't have contract pricing */}
+      {!isContractPrice && (
+        <>
+          {/* Login Prompt for Better Pricing */}
+          {!user && (
+            <div className="text-xs text-blue-600 mt-1">
+              Sign in for special pricing
+            </div>
+          )}
+
+          {/* Approval Pending Message */}
+          {user && profile?.role === 'pending' && (
+            <div className="text-xs text-yellow-600 mt-1">
+              Account approval pending for special pricing
+            </div>
+          )}
+        </>
       )}
     </div>
   );
