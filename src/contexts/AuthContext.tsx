@@ -114,9 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const { data, error } = await supabase
         .from('profiles')
-        .select('*')
+        .select('*', { signal: controller.signal })
         .eq('id', userId)
-        .abortSignal(controller.signal)
         .single();
       
       clearTimeout(timeoutId);
