@@ -152,12 +152,23 @@ function AppContent() {
       const result = await checkoutService.processCheckout(lineItems);
 
       if (result.success && result.checkoutUrl) {
+        console.log('Redirecting to checkout:', result.checkoutUrl);
+        
         // Clear local cart
         setCartItems([]);
         setIsCartOpen(false);
         
-        // Redirect to BigCommerce checkout
-        window.location.href = result.checkoutUrl;
+        // Try to open in new tab first, fallback to same window
+        try {
+          const newWindow = window.open(result.checkoutUrl, '_blank');
+          if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+            // Popup blocked, redirect in same window
+            window.location.href = result.checkoutUrl;
+          }
+        } catch (error) {
+          // Fallback to same window redirect
+          window.location.href = result.checkoutUrl;
+        }
       } else {
         // Show error message
         logError(new Error(result.error || 'Checkout failed'), 'checkout');
@@ -177,8 +188,19 @@ function AppContent() {
       const result = await checkoutService.checkoutSingleItem(productId, quantity);
 
       if (result.success && result.checkoutUrl) {
-        // Redirect to BigCommerce checkout
-        window.location.href = result.checkoutUrl;
+        console.log('Redirecting to buy now checkout:', result.checkoutUrl);
+        
+        // Try to open in new tab first, fallback to same window
+        try {
+          const newWindow = window.open(result.checkoutUrl, '_blank');
+          if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
+            // Popup blocked, redirect in same window
+            window.location.href = result.checkoutUrl;
+          }
+        } catch (error) {
+          // Fallback to same window redirect
+          window.location.href = result.checkoutUrl;
+        }
       } else {
         // Show error message
         logError(new Error(result.error || 'Buy now failed'), 'buyNow');

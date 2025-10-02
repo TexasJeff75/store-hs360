@@ -143,8 +143,9 @@ class CheckoutService {
       throw new Error('BigCommerce store hash not configured');
     }
     
-    // BigCommerce checkout URL format
-    return `https://store-${BC_STORE_HASH}.mybigcommerce.com/cart.php?action=load&id=${cartId}&redirect=checkout`;
+    // BigCommerce checkout URL format - try different approaches
+    // Option 1: Direct checkout URL
+    return `https://store-${BC_STORE_HASH}.mybigcommerce.com/checkout/${cartId}`;
   }
 
   /**
@@ -170,8 +171,19 @@ class CheckoutService {
         };
       }
 
-      // Generate checkout URL
-      const checkoutUrl = this.getCheckoutUrl(cartId);
+      // Generate checkout URL - try multiple formats
+      const checkoutUrls = [
+        `https://store-${BC_STORE_HASH}.mybigcommerce.com/checkout/${cartId}`,
+        `https://store-${BC_STORE_HASH}.mybigcommerce.com/cart.php?action=load&id=${cartId}`,
+        `https://${BC_STORE_HASH}.mybigcommerce.com/checkout/${cartId}`,
+        `https://checkout.bigcommerce.com/store-${BC_STORE_HASH}/checkout/${cartId}`
+      ];
+      
+      // Use the first URL format for now
+      const checkoutUrl = checkoutUrls[0];
+      
+      console.log('Attempting checkout with URL:', checkoutUrl);
+      console.log('Cart ID:', cartId);
 
       return {
         success: true,
