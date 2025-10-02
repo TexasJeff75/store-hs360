@@ -1,6 +1,10 @@
 // data-only helpers
 import { cacheService, CacheKeys, CacheTTL } from './cache';
 
+// Get BigCommerce configuration from environment
+const BC_STORE_HASH = import.meta.env.VITE_BC_STORE_HASH;
+const BC_STOREFRONT_TOKEN = import.meta.env.VITE_BC_STOREFRONT_TOKEN;
+
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const GQL = `${API_BASE}/gql`;
 

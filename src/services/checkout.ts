@@ -1,5 +1,7 @@
 import { gql } from './bigcommerce';
 
+// Get BigCommerce configuration from environment
+const BC_STORE_HASH = import.meta.env.VITE_BC_STORE_HASH;
 
 // GraphQL mutations for cart operations
 const ADD_CART_LINE_ITEMS = /* GraphQL */ `
