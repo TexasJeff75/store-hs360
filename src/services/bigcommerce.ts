@@ -148,18 +148,21 @@ class BigCommerceService {
     products: Product[];
     errorMessage?: string;
   }> {
+    // Check if credentials are configured
+    if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
+      console.warn('BigCommerce credentials not configured, using mock data');
+      if (logError) {
+        logError('BigCommerce credentials not configured. Please set up your store hash and storefront token.');
+      }
+      return this.getMockProducts();
+    }
+
     // Try to get from cache first
     const cacheKey = CacheKeys.products();
     const cached = cacheService.get<{ products: Product[]; errorMessage?: string }>(cacheKey);
     if (cached) {
       console.log('📦 Products loaded from cache');
       return cached;
-    }
-
-    // Check if credentials are configured
-    if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
-      console.warn('BigCommerce credentials not configured, using mock data');
-      return this.getMockProducts();
     }
 
     try {
@@ -253,21 +256,18 @@ class BigCommerceService {
     categories: string[];
     errorMessage?: string;
   }> {
-    // Check if credentials are configured
-    if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
-      console.warn('BigCommerce credentials not configured, using mock data');
-      if (logError) {
-        logError('BigCommerce credentials not configured. Please set up your store hash and storefront token.');
-      }
-      return this.getMockCategories();
-    }
-
     // Try to get from cache first
     const cacheKey = CacheKeys.categories();
     const cached = cacheService.get<{ categories: string[]; errorMessage?: string }>(cacheKey);
     if (cached) {
       console.log('📦 Categories loaded from cache');
       return cached;
+    }
+
+    // Check if credentials are configured
+    if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
+      console.warn('BigCommerce credentials not configured, using mock data');
+      return this.getMockCategories();
     }
 
     try {
