@@ -6,9 +6,10 @@ import PriceDisplay from './PriceDisplay';
 interface ProductGridProps {
   products: Product[];
   onAddToCart: (id: number) => void;
+  onProductClick: (product: Product) => void;
 }
 
-const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart }) => {
+const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProductClick }) => {
   if (products.length === 0) {
     return (
       <div className="text-center py-16">
@@ -34,7 +35,8 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart }) => {
             <img 
               src={product.image} 
               alt={product.name}
-              className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+              className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
+              onClick={() => onProductClick(product)}
             />
             <button className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors opacity-0 group-hover:opacity-100">
               <Heart className="h-5 w-5 text-gray-600" />
@@ -47,7 +49,12 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart }) => {
           </div>
 
           <div className="p-4">
-            <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{product.name}</h3>
+            <h3 
+              className="font-semibold text-gray-900 mb-2 line-clamp-2 cursor-pointer hover:text-pink-600 transition-colors"
+              onClick={() => onProductClick(product)}
+            >
+              {product.name}
+            </h3>
             
             {/* Rating */}
             {product.rating > 0 && (

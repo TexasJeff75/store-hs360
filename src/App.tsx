@@ -7,6 +7,7 @@ import AdminDashboard from '@/components/admin/AdminDashboard';
 import Hero from '@/components/Hero';
 import ProductGrid from '@/components/ProductGrid';
 import ProductFilter from '@/components/ProductFilter';
+import ProductModal from '@/components/ProductModal';
 import Cart from '@/components/Cart';
 import Footer from '@/components/Footer';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
@@ -33,6 +34,8 @@ function AppContent() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
@@ -97,7 +100,7 @@ function AppContent() {
   useEffect(() => {
     console.log('Auth state:', { user: user?.email, profile: profile?.role, authLoading });
   }, [user, profile, authLoading]);
-  const addToCart = (productId: number) => {
+  const addToCart = (productId: number, quantity: number = 1) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
 
@@ -106,7 +109,7 @@ function AppContent() {
       if (existingItem) {
         return prev.map(item =>
           item.id === productId
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: item.quantity + quantity }
             : item
         );
       } else {
@@ -114,13 +117,22 @@ function AppContent() {
           id: product.id,
           name: product.name,
           price: product.price,
-          quantity: 1,
+          quantity: quantity,
           image: product.image
         }];
       }
     });
   };
 
+  const handleProductClick = (product: Product) => {
+    setSelectedProduct(product);
+    setIsProductModalOpen(true);
+  };
+
+  const handleCloseProductModal = () => {
+    setIsProductModalOpen(false);
+    setSelectedProduct(null);
+  };
   const updateCartQuantity = (id: number, quantity: number) => {
     if (quantity === 0) {
       removeFromCart(id);
@@ -300,6 +312,7 @@ function AppContent() {
                   <ProductGrid
                     products={filteredProducts}
                     onAddToCart={addToCart}
+                    onProductClick={handleProductClick}
                   />
                 </div>
               </div>
@@ -388,6 +401,12 @@ function AppContent() {
           onClose={() => setIsAuthModalOpen(false)}
         />
 
+        <ProductModal
+          product={selectedProduct}
+          isOpen={isProductModalOpen}
+          onClose={handleCloseProductModal}
+          onAddToCart={addToCart}
+        />
         <UserProfile
           isOpen={isProfileOpen}
           onClose={() => setIsProfileOpen(false)}
