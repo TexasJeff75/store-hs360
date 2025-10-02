@@ -20,7 +20,7 @@ if (!supabaseUrl || !supabaseUrl.startsWith('https://')) {
 // Ensure the URL doesn't have any path components
 const cleanSupabaseUrl = supabaseUrl.replace(/\/rest.*$/, '').replace(/\/$/, '');
 
-if (!cleanSupabaseUrl.match(/^https:\/\/[a-z0-9]+\.supabase\.co$/)) {
+if (!cleanSupabaseUrl.match(/^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.supabase\.co$/)) {
   console.error('Invalid Supabase URL format:', supabaseUrl);
   throw new Error('VITE_SUPABASE_URL must be in format: https://your-project-ref.supabase.co');
 }
