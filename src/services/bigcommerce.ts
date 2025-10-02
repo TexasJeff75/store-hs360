@@ -147,7 +147,6 @@ class BigCommerceService {
   async getProducts(logError?: (message: string, error?: Error) => void, maxProducts: number = 1000): Promise<{
     products: Product[];
     errorMessage?: string;
-  }> {
     // Check if credentials are configured
     if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
       console.warn('BigCommerce credentials not configured, using mock data');
