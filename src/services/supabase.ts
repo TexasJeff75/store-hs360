@@ -4,20 +4,30 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Clean up the Supabase URL to ensure it's just the base URL
-const cleanSupabaseUrl = supabaseUrl?.replace(/\/rest.*$/, '');
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables:', {
-    VITE_SUPABASE_URL: !!supabaseUrl,
     VITE_SUPABASE_ANON_KEY: !!supabaseAnonKey
   });
   throw new Error('Missing required Supabase environment variables. Please check your .env file.');
 }
 
-if (!cleanSupabaseUrl || !cleanSupabaseUrl.startsWith('https://')) {
+if (!supabaseUrl || !supabaseUrl.startsWith('https://')) {
   console.error('Invalid Supabase URL format:', supabaseUrl);
   throw new Error('VITE_SUPABASE_URL must be a valid HTTPS URL (e.g., https://your-project.supabase.co)');
+if (!supabaseUrl || !supabaseUrl.startsWith('https://')) {
+
+// Ensure the URL doesn't have any path components
+const cleanSupabaseUrl = supabaseUrl.replace(/\/rest.*$/, '').replace(/\/$/, '');
+
+if (!cleanSupabaseUrl.match(/^https:\/\/[a-z0-9]+\.supabase\.co$/)) {
+  console.error('Invalid Supabase URL format:', supabaseUrl);
+  throw new Error('VITE_SUPABASE_URL must be in format: https://your-project-ref.supabase.co');
+}
+
+// Ensure the URL doesn't have any path components
+const cleanSupabaseUrl = supabaseUrl.replace(/\/rest.*$/, '').replace(/\/$/, '');
+
+if (!cleanSupabaseUrl.match(/^https:\/\/[a-z0-9]+\.supabase\.co$/)) {
+  console.error('Invalid Supabase URL format:', supabaseUrl);
+  throw new Error('VITE_SUPABASE_URL must be in format: https://your-project-ref.supabase.co');
 }
 
 // Create Supabase client
