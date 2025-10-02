@@ -5,7 +5,6 @@ const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const GQL = `${API_BASE}/gql`;
 
 // BigCommerce Store Hash for checkout URLs
-const BC_STORE_HASH = import.meta.env.VITE_BC_STORE_HASH;
 export async function gql<T>(query: string, variables?: Record<string, any>): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
