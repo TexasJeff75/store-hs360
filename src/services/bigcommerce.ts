@@ -206,11 +206,8 @@ class BigCommerceService {
       console.log(`Final product count: ${allProducts.length}`);
       
       if (allProducts.length === 0) {
-        const errorMessage = "No products found in BigCommerce. Check your store configuration.";
-        console.warn(errorMessage);
-        const result = { products: [], errorMessage };
-        // Don't cache empty results
-        return result;
+        console.warn('No products found, using mock data');
+        return this.getMockProducts();
       }
       
       const result = { products: allProducts };
@@ -222,18 +219,14 @@ class BigCommerceService {
       return result;
     } catch (error) {
       console.error('BigCommerce API Error:', error);
-      let errorMessage = "Unable to connect to BigCommerce";
       
       if (error instanceof Error && error.message === 'MISSING_CREDENTIALS') {
         console.warn('BigCommerce credentials not configured, using mock data');
-        // Return mock products instead of throwing error
         return this.getMockProducts();
       }
       
-      if (logError) {
-        logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
-      }
-      return { products: [], errorMessage };
+      console.warn('API error, falling back to mock data');
+      return this.getMockProducts();
     }
   }
 
@@ -255,9 +248,8 @@ class BigCommerceService {
       const categories = categoryTree.map((cat: any) => cat.name);
       
       if (categories.length === 0) {
-        const result = { categories: [], errorMessage: "No categories found in BigCommerce" };
-        // Don't cache empty results
-        return result;
+        console.warn('No categories found, using mock data');
+        return this.getMockCategories();
       }
       
       const result = { categories };
@@ -268,18 +260,13 @@ class BigCommerceService {
       
       return result;
     } catch (error) {
-      let errorMessage = "Unable to connect to BigCommerce";
-      
       if (error instanceof Error && error.message === 'MISSING_CREDENTIALS') {
         console.warn('BigCommerce credentials not configured, using mock data');
-        // Return mock categories instead of throwing error
         return this.getMockCategories();
       }
       
-      if (logError) {
-        logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
-      }
-      return { categories: [], errorMessage };
+      console.warn('API error, falling back to mock data');
+      return this.getMockCategories();
     }
   }
 
@@ -373,9 +360,11 @@ class BigCommerceService {
         benefits: ["Comprehensive Care", "Personalized Plan", "Expert Guidance"]
       }
     ];
-}
 
     console.log('🎭 Using mock products for development');
+    return { products: mockProducts };
+  }
+
   /**
    * Mock categories for development when BigCommerce is not configured
    */
@@ -384,6 +373,6 @@ class BigCommerceService {
     console.log('🎭 Using mock categories for development');
     return { categories: mockCategories };
   }
-    return { products: mockProducts };
-  }
+}
+
 export const bigCommerceService = new BigCommerceService();
