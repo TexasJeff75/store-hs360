@@ -215,9 +215,6 @@ class BigCommerceService {
       }
       
       console.log(`Final product count: ${allProducts.length}`);
-      
-      if (allProducts.length === 0) {
-        console.warn('No products found, using mock data');
         return this.getMockProducts();
       }
       
