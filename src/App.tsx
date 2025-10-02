@@ -12,6 +12,7 @@ import Footer from '@/components/Footer';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
 import { useErrorLogger } from '@/hooks/useErrorLogger';
+import { cacheService } from '@/services/cache';
 import { useAuth } from '@/contexts/AuthContext';
 
 interface CartItem {
@@ -46,6 +47,9 @@ function AppContent() {
         setLoading(true);
         setError(null);
         
+        console.log('🔄 Starting data fetch...');
+        console.log('📊 Cache stats:', cacheService.getStats());
+        
         // Add timeout to the entire fetch operation
         const fetchPromise = Promise.all([
           bigCommerceService.getProducts((err: unknown, ctx?: string) => logError(err, ctx)),
@@ -71,6 +75,9 @@ function AppContent() {
           console.log('⚠️ API Error:', errorMsg);
           setError(errorMsg);
         }
+        
+        console.log('✅ Data fetch completed');
+        console.log('📊 Updated cache stats:', cacheService.getStats());
       } catch (err) {
         const errorMessage = err instanceof Error && err.message === 'Request timeout' 
           ? 'Request timed out. Please check your connection and try again.'

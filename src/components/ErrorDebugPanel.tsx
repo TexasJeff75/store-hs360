@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { AlertTriangle, X, ChevronDown, ChevronUp, Copy, Trash2 } from 'lucide-react';
+import { cacheService } from '@/services/cache';
 
 interface ErrorLog {
   id: string;
@@ -26,6 +27,11 @@ const ErrorDebugPanel: React.FC<ErrorDebugPanelProps> = ({ errors, onClearErrors
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
+  };
+
+  const clearCache = () => {
+    cacheService.clear();
+    console.log('🗑️ Cache cleared from debug panel');
   };
 
   const formatTimestamp = (date: Date) => {
@@ -70,8 +76,18 @@ const ErrorDebugPanel: React.FC<ErrorDebugPanelProps> = ({ errors, onClearErrors
           <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded">
             DEV ONLY
           </span>
+          <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
+            Cache: {cacheService.getStats().totalSize} items
+          </span>
         </div>
         <div className="flex items-center space-x-2">
+          <button
+            onClick={clearCache}
+            className="p-1 hover:bg-red-100 rounded transition-colors text-xs px-2 py-1 bg-orange-100 text-orange-700"
+            title="Clear cache"
+          >
+            Clear Cache
+          </button>
           <button
             onClick={onClearErrors}
             className="p-1 hover:bg-red-100 rounded transition-colors"

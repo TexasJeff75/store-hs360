@@ -1,4 +1,5 @@
 import { supabase, ContractPricing } from './supabase';
+import { cacheService, CacheKeys, CacheTTL } from './cache';
 
 export type PricingType = 'individual' | 'organization' | 'location';
 
@@ -27,6 +28,13 @@ class ContractPricingService {
     productId: number, 
     pricingType: PricingType = 'individual'
   ): Promise<ContractPrice | null> {
+    // Try cache first
+    const cacheKey = `contract_price_${pricingType}_${entityId}_${productId}`;
+    const cached = cacheService.get<ContractPrice | null>(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+
     try {
       const { data, error } = await supabase
         .from('contract_pricing')
@@ -43,6 +51,9 @@ class ContractPricingService {
         throw error;
       }
 
+      // Cache the result (including null results)
+      cacheService.set(cacheKey, data, CacheTTL.pricing);
+
       return data;
     } catch (error) {
       console.error('Error fetching contract price:', error);
@@ -57,6 +68,13 @@ class ContractPricingService {
     entityId: string, 
     pricingType: PricingType = 'individual'
   ): Promise<ContractPrice[]> {
+    // Try cache first
+    const cacheKey = `entity_prices_${pricingType}_${entityId}`;
+    const cached = cacheService.get<ContractPrice[]>(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
     try {
       const { data, error } = await supabase
         .from('contract_pricing')
@@ -69,7 +87,12 @@ class ContractPricingService {
         throw error;
       }
 
-      return data || [];
+      const result = data || [];
+      
+      // Cache the result
+      cacheService.set(cacheKey, result, CacheTTL.pricing);
+      
+      return result;
     } catch (error) {
       console.error('Error fetching user contract prices:', error);
       return [];
@@ -111,6 +134,8 @@ class ContractPricingService {
         return { success: false, error: error.message };
       }
 
+      // Invalidate related cache entries
+      this.invalidatePricingCache(entityId, productId, pricingType);
       return { success: true };
     } catch (error) {
       console.error('Error setting contract price:', error);
@@ -148,6 +173,8 @@ class ContractPricingService {
         return { success: false, error: error.message };
       }
 
+      // Invalidate related cache entries
+      this.invalidatePricingCache(entityId, productId, pricingType);
       return { success: true };
     } catch (error) {
       console.error('Error removing contract price:', error);
@@ -194,6 +221,13 @@ class ContractPricingService {
     userRole?: string,
     quantity?: number
   ): Promise<{ price: number; source: 'regular' | 'individual' | 'organization' | 'location' } | null> {
+    // Try cache first
+    const cacheKey = CacheKeys.effectivePrice(userId, productId, quantity);
+    const cached = cacheService.get<{ price: number; source: 'regular' | 'individual' | 'organization' | 'location' } | null>(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+
     // If user is not logged in or not approved, return regular price
     if (!userId || (userRole && !['approved', 'admin'].includes(userRole))) {
       return null;
@@ -203,31 +237,39 @@ class ContractPricingService {
       // Check for location-specific pricing first (highest priority)
       const locationPrice = await this.getLocationPrice(userId, productId, quantity);
       if (locationPrice) {
-        return { 
+        const result = { 
           price: locationPrice.contract_price, 
           source: 'location' as const
         };
+        cacheService.set(cacheKey, result, CacheTTL.effectivePrice);
+        return result;
       }
 
       // Check for organization-level pricing
       const organizationPrice = await this.getOrganizationPrice(userId, productId, quantity);
       if (organizationPrice) {
-        return { 
+        const result = { 
           price: organizationPrice.contract_price, 
           source: 'organization' as const
         };
+        cacheService.set(cacheKey, result, CacheTTL.effectivePrice);
+        return result;
       }
 
       // Check for individual contract pricing (lowest priority)
       const contractPrice = await this.getContractPrice(userId, productId, 'individual');
       
       if (contractPrice) {
-        return { 
+        const result = { 
           price: contractPrice.contract_price, 
           source: 'individual' as const
         };
+        cacheService.set(cacheKey, result, CacheTTL.effectivePrice);
+        return result;
       }
 
+      // Cache null result too
+      cacheService.set(cacheKey, null, CacheTTL.effectivePrice);
       return null;
     } catch (error) {
       console.error('Error calculating effective price:', error);
@@ -236,9 +278,45 @@ class ContractPricingService {
   }
 
   /**
+   * Invalidate pricing cache entries for a specific entity/product
+   */
+  private invalidatePricingCache(entityId: string, productId: number, pricingType: PricingType): void {
+    // Clear specific cache entries
+    const contractPriceKey = `contract_price_${pricingType}_${entityId}_${productId}`;
+    const entityPricesKey = `entity_prices_${pricingType}_${entityId}`;
+    
+    cacheService.delete(contractPriceKey);
+    cacheService.delete(entityPricesKey);
+    
+    // Clear effective price cache for this user/product combination
+    // Note: We can't easily clear all quantity variations, so we'll let them expire naturally
+    const effectivePriceKey = CacheKeys.effectivePrice(entityId, productId);
+    cacheService.delete(effectivePriceKey);
+    
+    console.log('🗑️ Invalidated pricing cache for', pricingType, entityId, productId);
+  }
+
+  /**
+   * Clear all pricing cache (useful for admin operations)
+   */
+  clearPricingCache(): void {
+    // This is a simple implementation - in a more sophisticated system,
+    // we might track cache keys by category
+    cacheService.clear();
+    console.log('🗑️ All pricing cache cleared');
+  }
+
+  /**
    * Get location-specific pricing for a user and product (now uses unified table)
    */
   async getLocationPrice(userId: string, productId: number, quantity?: number): Promise<any | null> {
+    // Try cache first
+    const cacheKey = `location_price_${userId}_${productId}_${quantity || 1}`;
+    const cached = cacheService.get<any | null>(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+
     try {
       // Get user's locations through organization roles
       const { data: userRoles, error: rolesError } = await supabase
@@ -251,6 +329,7 @@ class ContractPricingService {
         .not('location_id', 'is', null);
 
       if (rolesError || !userRoles?.length) {
+        cacheService.set(cacheKey, null, CacheTTL.pricing);
         return null;
       }
 
@@ -258,6 +337,7 @@ class ContractPricingService {
       
       // Check if locationIds array is empty to prevent malformed query
       if (locationIds.length === 0) {
+        cacheService.set(cacheKey, null, CacheTTL.pricing);
         return null;
       }
       
@@ -287,6 +367,8 @@ class ContractPricingService {
         throw error;
       }
 
+      // Cache the result
+      cacheService.set(cacheKey, data, CacheTTL.pricing);
       return data;
     } catch (error) {
       console.error('Error fetching location price:', error);
@@ -298,6 +380,13 @@ class ContractPricingService {
    * Get organization-level pricing for a user and product (now uses unified table)
    */
   async getOrganizationPrice(userId: string, productId: number, quantity?: number): Promise<any | null> {
+    // Try cache first
+    const cacheKey = `org_price_${userId}_${productId}_${quantity || 1}`;
+    const cached = cacheService.get<any | null>(cacheKey);
+    if (cached !== null) {
+      return cached;
+    }
+
     try {
       // Get user's organizations through organization roles
       const { data: userRoles, error: rolesError } = await supabase
@@ -309,6 +398,7 @@ class ContractPricingService {
         .eq('user_id', userId);
 
       if (rolesError || !userRoles?.length) {
+        cacheService.set(cacheKey, null, CacheTTL.pricing);
         return null;
       }
 
@@ -316,6 +406,7 @@ class ContractPricingService {
       
       // Check if organizationIds array is empty to prevent malformed query
       if (organizationIds.length === 0) {
+        cacheService.set(cacheKey, null, CacheTTL.pricing);
         return null;
       }
       
@@ -345,6 +436,8 @@ class ContractPricingService {
         throw error;
       }
 
+      // Cache the result
+      cacheService.set(cacheKey, data, CacheTTL.pricing);
       return data;
     } catch (error) {
       console.error('Error fetching organization price:', error);

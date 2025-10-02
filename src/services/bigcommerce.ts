@@ -1,4 +1,6 @@
 // data-only helpers
+import { cacheService, CacheKeys, CacheTTL } from './cache';
+
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
 const GQL = `${API_BASE}/gql`;
 
@@ -135,6 +137,14 @@ class BigCommerceService {
     products: Product[];
     errorMessage?: string;
   }> {
+    // Try to get from cache first
+    const cacheKey = CacheKeys.products();
+    const cached = cacheService.get<{ products: Product[]; errorMessage?: string }>(cacheKey);
+    if (cached) {
+      console.log('📦 Products loaded from cache');
+      return cached;
+    }
+
     try {
       console.log('Fetching products from BigCommerce...');
       
@@ -187,15 +197,21 @@ class BigCommerceService {
       if (allProducts.length === 0) {
         const errorMessage = "No products found in BigCommerce. Check your store configuration.";
         console.warn(errorMessage);
-        return { products: [], errorMessage };
+        const result = { products: [], errorMessage };
+        // Don't cache empty results
+        return result;
       }
       
-      return { products: allProducts };
+      const result = { products: allProducts };
+      
+      // Cache successful results
+      cacheService.set(cacheKey, result, CacheTTL.products);
+      console.log('💾 Products cached for', CacheTTL.products / 1000 / 60, 'minutes');
+      
+      return result;
     } catch (error) {
       console.error('BigCommerce API Error:', error);
-      // Return empty array instead of throwing to prevent app crash
-      console.warn('Returning empty product array due to API error');
-      return [];
+      const errorMessage = "BigCommerce API unavailable";
       if (logError) {
         logError(errorMessage, error instanceof Error ? error : new Error(String(error)));
       }
@@ -207,16 +223,32 @@ class BigCommerceService {
     categories: string[];
     errorMessage?: string;
   }> {
+    // Try to get from cache first
+    const cacheKey = CacheKeys.categories();
+    const cached = cacheService.get<{ categories: string[]; errorMessage?: string }>(cacheKey);
+    if (cached) {
+      console.log('📦 Categories loaded from cache');
+      return cached;
+    }
+
     try {
       const data = await gql(CATEGORIES_Q, { root: 0 });
       const categoryTree = data?.site?.categoryTree ?? [];
       const categories = categoryTree.map((cat: any) => cat.name);
       
       if (categories.length === 0) {
-        return { categories: [], errorMessage: "No categories found in BigCommerce" };
+        const result = { categories: [], errorMessage: "No categories found in BigCommerce" };
+        // Don't cache empty results
+        return result;
       }
       
-      return { categories };
+      const result = { categories };
+      
+      // Cache successful results
+      cacheService.set(cacheKey, result, CacheTTL.categories);
+      console.log('💾 Categories cached for', CacheTTL.categories / 1000 / 60, 'minutes');
+      
+      return result;
     } catch (error) {
       const errorMessage = "BigCommerce API unavailable";
       if (logError) {
