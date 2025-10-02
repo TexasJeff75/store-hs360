@@ -62,7 +62,7 @@ function AppContent() {
         
         if (!hasCredentials) {
           console.log('⚠️ BigCommerce credentials not configured (missing VITE_BC_STORE_HASH or VITE_BC_STOREFRONT_TOKEN), skipping API calls');
-          setError('BigCommerce credentials not configured. Please set up VITE_BC_STORE_HASH and VITE_BC_STOREFRONT_TOKEN in your .env file.');
+          setError('BigCommerce credentials not configured. Please set up BC_STORE_HASH and BC_STOREFRONT_TOKEN in your .env file.');
           setProducts([]);
           setCategories([]);
           setLoading(false);
@@ -332,10 +332,10 @@ function AppContent() {
                       <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
                         <li>Get your store hash from BigCommerce admin (found in the URL: store-<strong>HASH</strong>.mybigcommerce.com)</li>
                         <li>Create a Storefront API token in BigCommerce Settings → API → Storefront API</li>
-                        <li>Add these to your <code className="bg-gray-100 px-1 rounded">.env</code> file (without VITE_ prefix):
+                        <li>Add these to your <code className="bg-gray-100 px-1 rounded">.env</code> file:
                           <div className="mt-2 bg-gray-50 p-2 rounded text-xs font-mono">
-                            BC_STORE_HASH=your_store_hash<br/>
-                            BC_STOREFRONT_TOKEN=your_storefront_token
+                            VITE_BC_STORE_HASH=your_store_hash<br/>
+                            VITE_BC_STOREFRONT_TOKEN=your_storefront_token
                           </div>
                         </li>
                         <li>Restart the development server</li>
