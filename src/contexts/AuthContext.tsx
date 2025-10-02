@@ -108,15 +108,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Fetching profile for user:', userId);
       setLoading(true);
       
+      // Check if Supabase is properly configured
+      if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+        console.error('Supabase environment variables not configured');
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+      
       // Add timeout to prevent hanging requests
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*', { signal: controller.signal })
-        .eq('id', userId)
-        .single();
+      let data, error;
+      try {
+        const result = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+        data = result.data;
+        error = result.error;
+      } catch (fetchError) {
+        console.error('Network error fetching profile:', fetchError);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
       
       clearTimeout(timeoutId);
 
@@ -131,8 +149,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setProfile(data);
       }
     } catch (error) {
-      if (error.name === 'AbortError') {
+      if (error instanceof Error && error.name === 'AbortError') {
         console.error('Profile fetch timed out');
+      } else if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+        console.error('Network connection failed - check Supabase URL and network connectivity');
       } else {
         console.error('Error fetching profile:', error);
       }
