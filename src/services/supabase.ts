@@ -17,12 +17,12 @@ if (!supabaseUrl || !supabaseUrl.startsWith('https://')) {
   throw new Error('VITE_SUPABASE_URL must be a valid HTTPS URL (e.g., https://your-project.supabase.co)');
 }
 
-// Ensure the URL doesn't have any path components
-const cleanSupabaseUrl = supabaseUrl.replace(/\/rest.*$/, '').replace(/\/$/, '');
+// Clean the URL by removing trailing slashes but preserve the base domain
+const cleanSupabaseUrl = supabaseUrl.replace(/\/$/, '');
 
-if (!cleanSupabaseUrl.match(/^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.supabase\.co$/)) {
+if (!cleanSupabaseUrl.match(/^https:\/\/[a-z0-9-]+\.supabase\.co$/)) {
   console.error('Invalid Supabase URL format:', supabaseUrl);
-  throw new Error('VITE_SUPABASE_URL must be in format: https://your-project-ref.supabase.co');
+  throw new Error('VITE_SUPABASE_URL must be in format: https://your-project-ref.supabase.co (without any paths)');
 }
 
 // Create Supabase client
