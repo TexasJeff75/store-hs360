@@ -4,6 +4,7 @@ import Header from '@/components/Header';
 import AuthModal from '@/components/AuthModal';
 import UserProfile from '@/components/UserProfile';
 import AdminDashboard from '@/components/admin/AdminDashboard';
+import SalesRepDashboard from '@/components/SalesRepDashboard';
 import Hero from '@/components/Hero';
 import ProductGrid from '@/components/ProductGrid';
 import ProductFilter from '@/components/ProductFilter';
@@ -35,6 +36,7 @@ function AppContent() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [isSalesRepOpen, setIsSalesRepOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -229,6 +231,7 @@ function AppContent() {
           onAuthClick={() => setIsAuthModalOpen(true)}
           onProfileClick={() => {}}
           onAdminClick={() => {}}
+         onSalesRepClick={() => {}}
         />
         
         <div className="min-h-screen flex items-center justify-center px-4">
@@ -276,6 +279,8 @@ function AppContent() {
           onAuthClick={() => setIsAuthModalOpen(true)}
           onProfileClick={() => setIsProfileOpen(true)}
           onAdminClick={() => setIsAdminOpen(true)}
+         onSalesRepClick={() => setIsSalesRepOpen(true)}
+          onSalesRepClick={() => setIsSalesRepOpen(true)}
         />
         
         <Hero />
@@ -451,6 +456,13 @@ function AppContent() {
           <AdminDashboard
             isOpen={isAdminOpen}
             onClose={() => setIsAdminOpen(false)}
+          />
+        )}
+        
+        {profile?.role === 'admin' && (
+          <SalesRepDashboard
+            isOpen={isSalesRepOpen}
+            onClose={() => setIsSalesRepOpen(false)}
           />
         )}
         <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />

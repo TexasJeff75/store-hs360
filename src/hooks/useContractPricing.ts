@@ -10,7 +10,7 @@ interface ContractPricingResult {
   error: string | null;
 }
 
-export function useContractPricing(productId: number, regularPrice: number, quantity?: number): ContractPricingResult {
+export function useContractPricing(productId: number, regularPrice: number, quantity?: number, organizationId?: string): ContractPricingResult {
   const { user, profile } = useAuth();
   const [price, setPrice] = useState(regularPrice);
   const [source, setSource] = useState<'regular' | 'individual' | 'organization' | 'location'>('regular');
@@ -19,7 +19,8 @@ export function useContractPricing(productId: number, regularPrice: number, quan
 
   useEffect(() => {
     const fetchEffectivePrice = async () => {
-      if (!user || !profile) {
+      // For sales rep mode, use organization pricing even without user profile
+      if (!user || (!profile && !organizationId)) {
         setPrice(regularPrice);
         setSource('regular');
         return;
@@ -29,12 +30,30 @@ export function useContractPricing(productId: number, regularPrice: number, quan
         setLoading(true);
         setError(null);
         
-        const effectivePrice = await contractPricingService.getEffectivePrice(
-          user.id,
-          productId,
-          profile?.role || 'pending',
-          quantity
-        );
+        let effectivePrice;
+        
+        if (organizationId) {
+          // Sales rep mode - get organization pricing directly
+          const orgPricing = await contractPricingService.getOrganizationPricing(organizationId);
+          const productPricing = orgPricing.find(p => p.product_id === productId);
+          
+          if (productPricing && 
+              (!quantity || (quantity >= (productPricing.min_quantity || 1) && 
+               (!productPricing.max_quantity || quantity <= productPricing.max_quantity)))) {
+            effectivePrice = {
+              price: productPricing.contract_price,
+              source: 'organization' as const
+            };
+          }
+        } else {
+          // Regular user mode
+          effectivePrice = await contractPricingService.getEffectivePrice(
+            user.id,
+            productId,
+            profile?.role || 'pending',
+            quantity
+          );
+        }
         
         if (effectivePrice) {
           setPrice(effectivePrice.price);
@@ -54,7 +73,7 @@ export function useContractPricing(productId: number, regularPrice: number, quan
     };
 
     fetchEffectivePrice();
-  }, [user, profile, productId, regularPrice, quantity]);
+  }, [user, profile, productId, regularPrice, quantity, organizationId]);
 
   const savings = regularPrice - price;
 

@@ -10,6 +10,7 @@ interface PriceDisplayProps {
   className?: string;
   showSavings?: boolean;
   quantity?: number;
+  organizationId?: string; // For sales rep pricing
 }
 
 const PriceDisplay: React.FC<PriceDisplayProps> = ({
@@ -18,10 +19,11 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   originalPrice,
   className = '',
   showSavings = true,
-  quantity
+  quantity,
+  organizationId
 }) => {
   const { user, profile } = useAuth();
-  const { price, source, savings, loading } = useContractPricing(productId, regularPrice, quantity);
+  const { price, source, savings, loading } = useContractPricing(productId, regularPrice, quantity, organizationId);
 
   if (loading) {
     return (

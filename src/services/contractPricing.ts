@@ -100,6 +100,31 @@ class ContractPricingService {
   }
 
   /**
+   * Get organization-specific pricing for sales rep orders
+   */
+  async getOrganizationPricing(organizationId: string): Promise<ContractPrice[]> {
+    try {
+      const { data, error } = await supabase
+        .from('contract_pricing')
+        .select('*')
+        .eq('pricing_type', 'organization')
+        .eq('entity_id', organizationId)
+        .lte('effective_date', new Date().toISOString())
+        .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString())
+        .order('effective_date', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      return data || [];
+    } catch (error) {
+      console.error('Error fetching organization pricing:', error);
+      return [];
+    }
+  }
+
+  /**
    * Set contract price for any entity and product (Admin only)
    */
   async setContractPrice(
