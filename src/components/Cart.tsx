@@ -1,6 +1,6 @@
 import React from 'react';
 import { X, Plus, Minus, ShoppingBag } from 'lucide-react';
-import { checkoutService } from '../services/checkout';
+import CheckoutModal from './checkout/CheckoutModal';
 
 interface CartItem {
   id: number;
@@ -16,7 +16,6 @@ interface CartProps {
   items: CartItem[];
   onUpdateQuantity: (id: number, quantity: number) => void;
   onRemoveItem: (id: number) => void;
-  onCheckout: () => void;
 }
 
 const Cart: React.FC<CartProps> = ({
@@ -25,9 +24,16 @@ const Cart: React.FC<CartProps> = ({
   items,
   onUpdateQuantity,
   onRemoveItem,
-  onCheckout
 }) => {
+  const [isCheckoutOpen, setIsCheckoutOpen] = React.useState(false);
+  
   const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  const handleOrderComplete = (orderId: string) => {
+    console.log('Order completed:', orderId);
+    // Clear cart, show success message, etc.
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -108,7 +114,7 @@ const Cart: React.FC<CartProps> = ({
               
               <div className="space-y-3">
                 <button 
-                  onClick={onCheckout}
+                  onClick={() => setIsCheckoutOpen(true)}
                   className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
                 >
                   Checkout
@@ -124,6 +130,13 @@ const Cart: React.FC<CartProps> = ({
           )}
         </div>
       </div>
+      
+      <CheckoutModal
+        isOpen={isCheckoutOpen}
+        onClose={() => setIsCheckoutOpen(false)}
+        items={items}
+        onOrderComplete={handleOrderComplete}
+      />
     </div>
   );
 };

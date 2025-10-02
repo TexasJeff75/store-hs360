@@ -45,7 +45,6 @@ function AppContent() {
   const { user, profile, loading: authLoading } = useAuth();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
 
-  // Fetch products and categories from BigCommerce
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -134,50 +133,6 @@ function AppContent() {
   const handleCloseProductModal = () => {
     setIsProductModalOpen(false);
     setSelectedProduct(null);
-  };
-
-  const handleCheckout = async () => {
-    if (cartItems.length === 0) return;
-
-    try {
-      setIsCheckingOut(true);
-      
-      // Convert cart items to BigCommerce format
-      const lineItems: CartLineItem[] = cartItems.map(item => ({
-        productId: item.id,
-        quantity: item.quantity
-      }));
-
-      // Process checkout
-      const result = await checkoutService.processCheckout(lineItems);
-
-      if (result.success && result.checkoutUrl) {
-        console.log('Redirecting to checkout:', result.checkoutUrl);
-        
-        // Clear local cart
-        setCartItems([]);
-        setIsCartOpen(false);
-        
-        // Try to open in new tab first, fallback to same window
-        try {
-          const newWindow = window.open(result.checkoutUrl, '_blank');
-          if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-            // Popup blocked, redirect in same window
-            window.location.href = result.checkoutUrl;
-          }
-        } catch (error) {
-          // Fallback to same window redirect
-          window.location.href = result.checkoutUrl;
-        }
-      } else {
-        // Show error message
-        logError(new Error(result.error || 'Checkout failed'), 'checkout');
-      }
-    } catch (error) {
-      logError(error, 'checkout');
-    } finally {
-      setIsCheckingOut(false);
-    }
   };
 
   const handleBuyNow = async (productId: number, quantity: number) => {
@@ -473,7 +428,6 @@ function AppContent() {
           items={cartItems}
           onUpdateQuantity={updateCartQuantity}
           onRemoveItem={removeFromCart}
-          onCheckout={handleCheckout}
         />
 
         <AuthModal
@@ -500,17 +454,6 @@ function AppContent() {
           />
         )}
         <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
-        
-        {/* Checkout Loading Overlay */}
-        {isCheckingOut && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
-            <div className="bg-white rounded-lg p-8 text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <p className="text-gray-700 font-medium">Preparing checkout...</p>
-              <p className="text-gray-500 text-sm mt-2">You'll be redirected to complete your purchase</p>
-            </div>
-          </div>
-        )}
       </div>
   );
 }
