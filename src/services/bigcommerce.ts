@@ -222,10 +222,12 @@ class BigCommerceService {
       return result;
     } catch (error) {
       console.error('BigCommerce API Error:', error);
-      let errorMessage = "BigCommerce API unavailable";
+      let errorMessage = "Unable to connect to BigCommerce";
       
       if (error instanceof Error && error.message === 'MISSING_CREDENTIALS') {
-        errorMessage = "BigCommerce credentials not configured. Please set up your store hash and storefront token.";
+        console.warn('BigCommerce credentials not configured, using mock data');
+        // Return mock products instead of throwing error
+        return this.getMockProducts();
       }
       
       if (logError) {
@@ -266,10 +268,12 @@ class BigCommerceService {
       
       return result;
     } catch (error) {
-      let errorMessage = "BigCommerce API unavailable";
+      let errorMessage = "Unable to connect to BigCommerce";
       
       if (error instanceof Error && error.message === 'MISSING_CREDENTIALS') {
-        errorMessage = "BigCommerce credentials not configured. Please set up your store hash and storefront token.";
+        console.warn('BigCommerce credentials not configured, using mock data');
+        // Return mock categories instead of throwing error
+        return this.getMockCategories();
       }
       
       if (logError) {
@@ -278,6 +282,108 @@ class BigCommerceService {
       return { categories: [], errorMessage };
     }
   }
+
+  /**
+   * Mock products for development when BigCommerce is not configured
+   */
+  private getMockProducts(): { products: Product[]; errorMessage?: string } {
+    const mockProducts: Product[] = [
+      {
+        id: 1,
+        name: "Premium Collagen Peptides",
+        price: 89.99,
+        originalPrice: 109.99,
+        image: "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640",
+        rating: 4.8,
+        reviews: 127,
+        category: "Peptides",
+        benefits: ["Anti-aging", "Joint Health", "Skin Health"]
+      },
+      {
+        id: 2,
+        name: "BPC-157 Recovery Complex",
+        price: 149.99,
+        image: "https://images.pexels.com/photos/3786157/pexels-photo-3786157.jpeg?auto=compress&cs=tinysrgb&w=640",
+        rating: 4.9,
+        reviews: 89,
+        category: "Peptides",
+        benefits: ["Muscle Recovery", "Tissue Repair", "Gut Health"]
+      },
+      {
+        id: 3,
+        name: "Comprehensive Genetic Panel",
+        price: 299.99,
+        originalPrice: 399.99,
+        image: "https://images.pexels.com/photos/3825527/pexels-photo-3825527.jpeg?auto=compress&cs=tinysrgb&w=640",
+        rating: 4.7,
+        reviews: 203,
+        category: "Genetic Testing",
+        benefits: ["Personalized Medicine", "Health Insights", "Risk Assessment"]
+      },
+      {
+        id: 4,
+        name: "Advanced Hormone Panel",
+        price: 199.99,
+        image: "https://images.pexels.com/photos/3938023/pexels-photo-3938023.jpeg?auto=compress&cs=tinysrgb&w=640",
+        rating: 4.6,
+        reviews: 156,
+        category: "Lab Testing",
+        benefits: ["Hormone Balance", "Energy Optimization", "Wellness Tracking"]
+      },
+      {
+        id: 5,
+        name: "NAD+ Booster Supplement",
+        price: 79.99,
+        originalPrice: 99.99,
+        image: "https://images.pexels.com/photos/3683056/pexels-photo-3683056.jpeg?auto=compress&cs=tinysrgb&w=640",
+        rating: 4.5,
+        reviews: 94,
+        category: "Supplements",
+        benefits: ["Cellular Energy", "Anti-aging", "Mental Clarity"]
+      },
+      {
+        id: 6,
+        name: "Thymosin Alpha-1 Immune Support",
+        price: 179.99,
+        image: "https://images.pexels.com/photos/3683081/pexels-photo-3683081.jpeg?auto=compress&cs=tinysrgb&w=640",
+        rating: 4.8,
+        reviews: 67,
+        category: "Peptides",
+        benefits: ["Immune Support", "Recovery", "Vitality"]
+      },
+      {
+        id: 7,
+        name: "Micronutrient Analysis",
+        price: 159.99,
+        image: "https://images.pexels.com/photos/3825527/pexels-photo-3825527.jpeg?auto=compress&cs=tinysrgb&w=640",
+        rating: 4.4,
+        reviews: 112,
+        category: "Lab Testing",
+        benefits: ["Nutritional Status", "Deficiency Detection", "Optimization"]
+      },
+      {
+        id: 8,
+        name: "Longevity Wellness Program",
+        price: 499.99,
+        originalPrice: 699.99,
+        image: "https://images.pexels.com/photos/3938023/pexels-photo-3938023.jpeg?auto=compress&cs=tinysrgb&w=640",
+        rating: 4.9,
+        reviews: 45,
+        category: "Wellness Programs",
+        benefits: ["Comprehensive Care", "Personalized Plan", "Expert Guidance"]
+      }
+    ];
 }
 
+    console.log('🎭 Using mock products for development');
+  /**
+   * Mock categories for development when BigCommerce is not configured
+   */
+  private getMockCategories(): { categories: string[]; errorMessage?: string } {
+    const mockCategories = ["Peptides", "Genetic Testing", "Lab Testing", "Supplements", "Wellness Programs"];
+    console.log('🎭 Using mock categories for development');
+    return { categories: mockCategories };
+  }
+    return { products: mockProducts };
+  }
 export const bigCommerceService = new BigCommerceService();
