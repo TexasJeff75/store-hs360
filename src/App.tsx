@@ -12,6 +12,7 @@ import Cart from '@/components/Cart';
 import Footer from '@/components/Footer';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
+import { checkoutService, CartLineItem } from '@/services/checkout';
 import { useErrorLogger } from '@/hooks/useErrorLogger';
 import { cacheService } from '@/services/cache';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,6 +43,7 @@ function AppContent() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { errors, logError, clearErrors } = useErrorLogger();
   const { user, profile, loading: authLoading } = useAuth();
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   // Fetch products and categories from BigCommerce
   useEffect(() => {
@@ -133,6 +135,61 @@ function AppContent() {
     setIsProductModalOpen(false);
     setSelectedProduct(null);
   };
+
+  const handleCheckout = async () => {
+    if (cartItems.length === 0) return;
+
+    try {
+      setIsCheckingOut(true);
+      
+      // Convert cart items to BigCommerce format
+      const lineItems: CartLineItem[] = cartItems.map(item => ({
+        productId: item.id,
+        quantity: item.quantity
+      }));
+
+      // Process checkout
+      const result = await checkoutService.processCheckout(lineItems);
+
+      if (result.success && result.checkoutUrl) {
+        // Clear local cart
+        setCartItems([]);
+        setIsCartOpen(false);
+        
+        // Redirect to BigCommerce checkout
+        window.location.href = result.checkoutUrl;
+      } else {
+        // Show error message
+        logError(new Error(result.error || 'Checkout failed'), 'checkout');
+      }
+    } catch (error) {
+      logError(error, 'checkout');
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+
+  const handleBuyNow = async (productId: number, quantity: number) => {
+    try {
+      setIsCheckingOut(true);
+      
+      // Process immediate checkout for single item
+      const result = await checkoutService.checkoutSingleItem(productId, quantity);
+
+      if (result.success && result.checkoutUrl) {
+        // Redirect to BigCommerce checkout
+        window.location.href = result.checkoutUrl;
+      } else {
+        // Show error message
+        logError(new Error(result.error || 'Buy now failed'), 'buyNow');
+      }
+    } catch (error) {
+      logError(error, 'buyNow');
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+
   const updateCartQuantity = (id: number, quantity: number) => {
     if (quantity === 0) {
       removeFromCart(id);
@@ -394,6 +451,7 @@ function AppContent() {
           items={cartItems}
           onUpdateQuantity={updateCartQuantity}
           onRemoveItem={removeFromCart}
+          onCheckout={handleCheckout}
         />
 
         <AuthModal
@@ -406,6 +464,7 @@ function AppContent() {
           isOpen={isProductModalOpen}
           onClose={handleCloseProductModal}
           onAddToCart={addToCart}
+          onBuyNow={handleBuyNow}
         />
         <UserProfile
           isOpen={isProfileOpen}
@@ -419,6 +478,17 @@ function AppContent() {
           />
         )}
         <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
+        
+        {/* Checkout Loading Overlay */}
+        {isCheckingOut && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+            <div className="bg-white rounded-lg p-8 text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-700 font-medium">Preparing checkout...</p>
+              <p className="text-gray-500 text-sm mt-2">You'll be redirected to complete your purchase</p>
+            </div>
+          </div>
+        )}
       </div>
   );
 }

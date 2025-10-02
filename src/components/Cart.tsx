@@ -1,5 +1,6 @@
 import React from 'react';
 import { X, Plus, Minus, ShoppingBag } from 'lucide-react';
+import { checkoutService } from '../services/checkout';
 
 interface CartItem {
   id: number;
@@ -15,6 +16,7 @@ interface CartProps {
   items: CartItem[];
   onUpdateQuantity: (id: number, quantity: number) => void;
   onRemoveItem: (id: number) => void;
+  onCheckout: () => void;
 }
 
 const Cart: React.FC<CartProps> = ({
@@ -22,7 +24,8 @@ const Cart: React.FC<CartProps> = ({
   onClose,
   items,
   onUpdateQuantity,
-  onRemoveItem
+  onRemoveItem,
+  onCheckout
 }) => {
   const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
@@ -104,7 +107,10 @@ const Cart: React.FC<CartProps> = ({
               </div>
               
               <div className="space-y-3">
-                <button className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
+                <button 
+                  onClick={onCheckout}
+                  className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                >
                   Checkout
                 </button>
                 <button 

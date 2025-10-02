@@ -8,13 +8,15 @@ interface ProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   onAddToCart: (productId: number, quantity: number) => void;
+  onBuyNow?: (productId: number, quantity: number) => void;
 }
 
 const ProductModal: React.FC<ProductModalProps> = ({
   product,
   isOpen,
   onClose,
-  onAddToCart
+  onAddToCart,
+  onBuyNow
 }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -228,6 +230,16 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     <ShoppingCart className="h-5 w-5" />
                     <span>Add {quantity} to Cart</span>
                   </button>
+                  
+                  {/* Buy Now Button */}
+                  {onBuyNow && (
+                    <button 
+                      onClick={() => onBuyNow(product.id, quantity)}
+                      className="w-full bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-lg font-semibold"
+                    >
+                      <span>Buy Now</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* Additional Product Info */}
