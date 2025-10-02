@@ -148,6 +148,15 @@ class BigCommerceService {
     products: Product[];
     errorMessage?: string;
   }> {
+    // Check if credentials are configured
+    if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
+      console.warn('BigCommerce credentials not configured, using mock data');
+      if (logError) {
+        logError('BigCommerce credentials not configured. Please set up your store hash and storefront token.');
+      }
+      return this.getMockProducts();
+    }
+
     // Try to get from cache first
     const cacheKey = CacheKeys.products();
     const cached = cacheService.get<{ products: Product[]; errorMessage?: string }>(cacheKey);
@@ -158,6 +167,8 @@ class BigCommerceService {
 
     try {
       console.log('Fetching products from BigCommerce...');
+      console.log('Using store hash:', BC_STORE_HASH);
+      console.log('Token configured:', !!BC_STOREFRONT_TOKEN);
       
       let allProducts: Product[] = [];
       let hasNextPage = true;
@@ -220,13 +231,27 @@ class BigCommerceService {
     } catch (error) {
       console.error('BigCommerce API Error:', error);
       
-      if (error instanceof Error && error.message === 'MISSING_CREDENTIALS') {
-        console.warn('BigCommerce credentials not configured, using mock data');
-        return this.getMockProducts();
+      // Log the actual error for debugging
+      if (logError) {
+        logError(error instanceof Error ? error.message : String(error), 'BigCommerce API');
       }
       
-      console.warn('API error, falling back to mock data');
-      return this.getMockProducts();
+      if (error instanceof Error && error.message === 'MISSING_CREDENTIALS') {
+        const errorMsg = 'BigCommerce credentials not configured. Please check your .env file for VITE_BC_STORE_HASH and VITE_BC_STOREFRONT_TOKEN';
+        console.warn(errorMsg);
+        return { 
+          products: [], 
+          errorMessage: errorMsg
+        };
+      }
+      
+      // For other API errors, return empty products with error message
+      const errorMsg = `Failed to fetch products from BigCommerce: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      console.warn(errorMsg);
+      return { 
+        products: [], 
+        errorMessage: errorMsg
+      };
     }
   }
 
@@ -234,6 +259,15 @@ class BigCommerceService {
     categories: string[];
     errorMessage?: string;
   }> {
+    // Check if credentials are configured
+    if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
+      console.warn('BigCommerce credentials not configured, using mock data');
+      if (logError) {
+        logError('BigCommerce credentials not configured. Please set up your store hash and storefront token.');
+      }
+      return this.getMockCategories();
+    }
+
     // Try to get from cache first
     const cacheKey = CacheKeys.categories();
     const cached = cacheService.get<{ categories: string[]; errorMessage?: string }>(cacheKey);
@@ -243,13 +277,17 @@ class BigCommerceService {
     }
 
     try {
+      console.log('Fetching categories from BigCommerce...');
       const data = await gql(CATEGORIES_Q, { root: 0 });
       const categoryTree = data?.site?.categoryTree ?? [];
       const categories = categoryTree.map((cat: any) => cat.name);
       
       if (categories.length === 0) {
-        console.warn('No categories found, using mock data');
-        return this.getMockCategories();
+        console.warn('No categories found from BigCommerce API');
+        return { 
+          categories: ['General'], 
+          errorMessage: 'No categories found in BigCommerce store'
+        };
       }
       
       const result = { categories };
@@ -260,13 +298,27 @@ class BigCommerceService {
       
       return result;
     } catch (error) {
-      if (error instanceof Error && error.message === 'MISSING_CREDENTIALS') {
-        console.warn('BigCommerce credentials not configured, using mock data');
-        return this.getMockCategories();
+      console.error('BigCommerce Categories API Error:', error);
+      
+      // Log the actual error for debugging
+      if (logError) {
+        logError(error instanceof Error ? error.message : String(error), 'BigCommerce Categories API');
       }
       
-      console.warn('API error, falling back to mock data');
-      return this.getMockCategories();
+      if (error instanceof Error && error.message === 'MISSING_CREDENTIALS') {
+        const errorMsg = 'BigCommerce credentials not configured. Please check your .env file for VITE_BC_STORE_HASH and VITE_BC_STOREFRONT_TOKEN';
+        return { 
+          categories: [], 
+          errorMessage: errorMsg
+        };
+      }
+      
+      // For other API errors, return empty categories with error message
+      const errorMsg = `Failed to fetch categories from BigCommerce: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      return { 
+        categories: [], 
+        errorMessage: errorMsg
+      };
     }
   }
 
