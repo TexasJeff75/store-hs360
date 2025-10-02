@@ -57,6 +57,18 @@ function AppContent() {
         console.log('🔄 Starting data fetch...');
         console.log('📊 Cache stats:', cacheService.getStats());
         
+        // Check if BigCommerce credentials are available before making API calls
+        const hasCredentials = !!(import.meta.env.VITE_BC_STORE_HASH && import.meta.env.VITE_BC_ACCESS_TOKEN);
+        
+        if (!hasCredentials) {
+          console.log('⚠️ BigCommerce credentials not configured, skipping API calls');
+          setError('BigCommerce credentials not configured. Please set up your store hash and storefront token.');
+          setProducts([]);
+          setCategories([]);
+          setLoading(false);
+          return;
+        }
+        
         // Add timeout to the entire fetch operation
         const fetchPromise = Promise.all([
           bigCommerceService.getProducts((err: unknown, ctx?: string) => logError(err, ctx)),
