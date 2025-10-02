@@ -203,6 +203,9 @@ class BigCommerceService {
         allProducts = [...allProducts, ...batchProducts];
         fetchedCount += edges.length;
         
+        hasNextPage = pageInfo?.hasNextPage || false;
+        cursor = pageInfo?.endCursor || null;
+        
         console.log(`Total products fetched so far: ${allProducts.length}`);
         
         if (!hasNextPage) {
@@ -212,9 +215,6 @@ class BigCommerceService {
       }
       
       console.log(`Final product count: ${allProducts.length}`);
-      
-      if (allProducts.length === 0) {
-        console.warn('No products found, using mock data');
         return this.getMockProducts();
       }
       
@@ -256,18 +256,18 @@ class BigCommerceService {
     categories: string[];
     errorMessage?: string;
   }> {
+    // Check if credentials are configured
+    if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
+      console.warn('BigCommerce credentials not configured, using mock data');
+      return this.getMockCategories();
+    }
+
     // Try to get from cache first
     const cacheKey = CacheKeys.categories();
     const cached = cacheService.get<{ categories: string[]; errorMessage?: string }>(cacheKey);
     if (cached) {
       console.log('📦 Categories loaded from cache');
       return cached;
-    }
-
-    // Check if credentials are configured
-    if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
-      console.warn('BigCommerce credentials not configured, using mock data');
-      return this.getMockCategories();
     }
 
     try {
