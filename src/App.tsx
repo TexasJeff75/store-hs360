@@ -142,12 +142,6 @@ function AppContent() {
     try {
       setIsCheckingOut(true);
       
-      // If we have missing credentials, don't log as an error since it's expected
-      if (productsData.errorMessage?.includes('credentials not configured')) {
-        // Clear any existing errors from the error logger for this specific case
-        clearErrors();
-      }
-      
       // Process immediate checkout for single item
       const result = await checkoutService.checkoutSingleItem(productId, quantity);
 
