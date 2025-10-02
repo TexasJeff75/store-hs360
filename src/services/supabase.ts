@@ -4,6 +4,15 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Clean up the Supabase URL to ensure it's just the base URL
+const cleanSupabaseUrl = supabaseUrl?.replace(/\/rest.*$/, '');
+
+// Clean up the Supabase URL to ensure it's just the base URL
+const cleanSupabaseUrl = supabaseUrl?.replace(/\/rest.*$/, '');
+
+// Clean up the Supabase URL to ensure it's just the base URL
+const cleanSupabaseUrl = supabaseUrl?.replace(/\/rest.*$/, '');
+
 if (!supabaseUrl || !supabaseAnonKey) {
   console.error('Missing Supabase environment variables:', {
     VITE_SUPABASE_URL: !!supabaseUrl,
@@ -12,8 +21,23 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing required Supabase environment variables. Please check your .env file.');
 }
 
+if (!cleanSupabaseUrl || !cleanSupabaseUrl.startsWith('https://')) {
+  console.error('Invalid Supabase URL format:', supabaseUrl);
+  throw new Error('VITE_SUPABASE_URL must be a valid HTTPS URL (e.g., https://your-project.supabase.co)');
+}
+
+if (!cleanSupabaseUrl || !cleanSupabaseUrl.startsWith('https://')) {
+  console.error('Invalid Supabase URL format:', supabaseUrl);
+  throw new Error('VITE_SUPABASE_URL must be a valid HTTPS URL (e.g., https://your-project.supabase.co)');
+}
+
+if (!cleanSupabaseUrl || !cleanSupabaseUrl.startsWith('https://')) {
+  console.error('Invalid Supabase URL format:', supabaseUrl);
+  throw new Error('VITE_SUPABASE_URL must be a valid HTTPS URL (e.g., https://your-project.supabase.co)');
+}
+
 // Create Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(cleanSupabaseUrl, supabaseAnonKey);
 
 // Database types
 export interface Profile {
