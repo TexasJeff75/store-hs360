@@ -144,15 +144,13 @@ function transformBigCommerceProduct(bc: any): Product {
 }
 
 class BigCommerceService {
-  async getProducts(logError?: (message: string, error?: Error) => void, maxProducts: number = 1000): Promise<{
+  async getProducts(): Promise<{
     products: Product[];
     errorMessage?: string;
+  }> {
     // Check if credentials are configured
     if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
       console.warn('BigCommerce credentials not configured, using mock data');
-      if (logError) {
-        logError('BigCommerce credentials not configured. Please set up your store hash and storefront token.');
-      }
       return this.getMockProducts();
     }
 
@@ -173,6 +171,7 @@ class BigCommerceService {
       let hasNextPage = true;
       let cursor: string | null = null;
       let fetchedCount = 0;
+      const maxProducts = 1000;
       
       while (hasNextPage && fetchedCount < maxProducts) {
         const remainingProducts = maxProducts - fetchedCount;
@@ -230,11 +229,6 @@ class BigCommerceService {
     } catch (error) {
       console.error('BigCommerce API Error:', error);
       
-      // Log the actual error for debugging
-      if (logError) {
-        logError(error instanceof Error ? error.message : String(error), error instanceof Error ? error : undefined);
-      }
-      
       if (error instanceof Error && error.message === 'MISSING_CREDENTIALS') {
         const errorMsg = 'BigCommerce credentials not configured. Please check your .env file for VITE_BC_STORE_HASH and VITE_BC_STOREFRONT_TOKEN';
         console.warn(errorMsg);
@@ -254,16 +248,13 @@ class BigCommerceService {
     }
   }
 
-  async getCategories(logError?: (message: string, error?: Error) => void): Promise<{
+  async getCategories(): Promise<{
     categories: string[];
     errorMessage?: string;
   }> {
     // Check if credentials are configured
     if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
       console.warn('BigCommerce credentials not configured, using mock data');
-      if (logError) {
-        logError('BigCommerce credentials not configured. Please set up your store hash and storefront token.');
-      }
       return this.getMockCategories();
     }
 
@@ -298,11 +289,6 @@ class BigCommerceService {
       return result;
     } catch (error) {
       console.error('BigCommerce Categories API Error:', error);
-      
-      // Log the actual error for debugging
-      if (logError) {
-        logError(error instanceof Error ? error.message : String(error), error instanceof Error ? error : undefined);
-      }
       
       if (error instanceof Error && error.message === 'MISSING_CREDENTIALS') {
         const errorMsg = 'BigCommerce credentials not configured. Please check your .env file for VITE_BC_STORE_HASH and VITE_BC_STOREFRONT_TOKEN';
