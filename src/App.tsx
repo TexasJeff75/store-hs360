@@ -328,8 +328,8 @@ function AppContent() {
                         <li>Create a Storefront API token in BigCommerce Settings → API → Storefront API</li>
                         <li>Add these to your <code className="bg-gray-100 px-1 rounded">.env</code> file:
                           <div className="mt-2 bg-gray-50 p-2 rounded text-xs font-mono">
-                            VITE_BC_STORE_HASH=your_store_hash<br/>
-                            VITE_BC_ACCESS_TOKEN=your_storefront_token
+                            BC_STORE_HASH=your_store_hash<br/>
+                            BC_STOREFRONT_TOKEN=your_storefront_token
                           </div>
                         </li>
                         <li>Restart the development server</li>
