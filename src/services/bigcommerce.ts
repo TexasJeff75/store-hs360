@@ -215,6 +215,9 @@ class BigCommerceService {
       }
       
       console.log(`Final product count: ${allProducts.length}`);
+      
+      if (allProducts.length === 0) {
+        console.warn('No products found from BigCommerce API');
         return this.getMockProducts();
       }
       
@@ -230,7 +233,7 @@ class BigCommerceService {
       
       // Log the actual error for debugging
       if (logError) {
-        logError(error instanceof Error ? error.message : String(error), 'BigCommerce API');
+        logError(error instanceof Error ? error.message : String(error), error instanceof Error ? error : undefined);
       }
       
       if (error instanceof Error && error.message === 'MISSING_CREDENTIALS') {
@@ -259,6 +262,9 @@ class BigCommerceService {
     // Check if credentials are configured
     if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
       console.warn('BigCommerce credentials not configured, using mock data');
+      if (logError) {
+        logError('BigCommerce credentials not configured. Please set up your store hash and storefront token.');
+      }
       return this.getMockCategories();
     }
 
@@ -296,7 +302,7 @@ class BigCommerceService {
       
       // Log the actual error for debugging
       if (logError) {
-        logError(error instanceof Error ? error.message : String(error), 'BigCommerce Categories API');
+        logError(error instanceof Error ? error.message : String(error), error instanceof Error ? error : undefined);
       }
       
       if (error instanceof Error && error.message === 'MISSING_CREDENTIALS') {
