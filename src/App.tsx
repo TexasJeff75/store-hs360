@@ -280,7 +280,6 @@ function AppContent() {
           onAuthClick={() => setIsAuthModalOpen(true)}
           onProfileClick={() => setIsProfileOpen(true)}
           onAdminClick={() => setIsAdminOpen(true)}
-         onSalesRepClick={() => setIsSalesRepOpen(true)}
           onSalesRepClick={() => setIsOrgSelectorOpen(true)}
         />
         
