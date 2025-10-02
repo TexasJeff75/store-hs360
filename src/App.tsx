@@ -142,6 +142,12 @@ function AppContent() {
     try {
       setIsCheckingOut(true);
       
+      // If we have missing credentials, don't log as an error since it's expected
+      if (productsData.errorMessage?.includes('credentials not configured')) {
+        // Clear any existing errors from the error logger for this specific case
+        clearErrors();
+      }
+      
       // Process immediate checkout for single item
       const result = await checkoutService.checkoutSingleItem(productId, quantity);
 
@@ -314,13 +320,19 @@ function AppContent() {
                   <p className="text-red-700 mb-4">{error}</p>
                   {error.includes('credentials not configured') && (
                     <div className="bg-white rounded border border-red-200 p-4">
-                      <p className="text-sm text-gray-700 mb-2">
+                      <p className="text-sm text-gray-700 mb-3">
                         <strong>To connect to BigCommerce:</strong>
                       </p>
-                      <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
-                        <li>Set up your BigCommerce store hash</li>
-                        <li>Generate a storefront API token</li>
-                        <li>Configure environment variables</li>
+                      <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+                        <li>Get your store hash from BigCommerce admin (found in the URL: store-<strong>HASH</strong>.mybigcommerce.com)</li>
+                        <li>Create a Storefront API token in BigCommerce Settings → API → Storefront API</li>
+                        <li>Add these to your <code className="bg-gray-100 px-1 rounded">.env</code> file:
+                          <div className="mt-2 bg-gray-50 p-2 rounded text-xs font-mono">
+                            VITE_BC_STORE_HASH=your_store_hash<br/>
+                            VITE_BC_ACCESS_TOKEN=your_storefront_token
+                          </div>
+                        </li>
+                        <li>Restart the development server</li>
                       </ol>
                     </div>
                   )}
