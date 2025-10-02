@@ -300,8 +300,29 @@ function AppContent() {
             </div>
           ) : error ? (
             <div className="text-center py-16">
-              <p className="text-red-500 text-lg mb-4">Error loading products</p>
-              <p className="text-gray-600">{error}</p>
+              <div className="max-w-md mx-auto">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                    <h3 className="text-lg font-semibold text-red-800">Configuration Required</h3>
+                  </div>
+                  <p className="text-red-700 mb-4">{error}</p>
+                  {error.includes('credentials not configured') && (
+                    <div className="bg-white rounded border border-red-200 p-4">
+                      <p className="text-sm text-gray-700 mb-2">
+                        <strong>To connect to BigCommerce:</strong>
+                      </p>
+                      <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                        <li>Set up your BigCommerce store hash</li>
+                        <li>Generate a storefront API token</li>
+                        <li>Configure environment variables</li>
+                      </ol>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
             <div>
