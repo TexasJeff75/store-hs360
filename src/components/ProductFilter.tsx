@@ -1,7 +1,7 @@
 import React from 'react';
 import { Filter, X } from 'lucide-react';
 
-interface FilterProps {
+interface ProductFilterProps {
   categories: string[];
   selectedCategory: string;
   onCategoryChange: (category: string) => void;
@@ -11,7 +11,7 @@ interface FilterProps {
   onToggle: () => void;
 }
 
-const ProductFilter: React.FC<FilterProps> = ({
+const ProductFilter: React.FC<ProductFilterProps> = ({
   categories,
   selectedCategory,
   onCategoryChange,
@@ -113,21 +113,6 @@ const ProductFilter: React.FC<FilterProps> = ({
             </div>
           </div>
 
-          {/* Benefits Filter */}
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Health Benefits</h3>
-            <div className="space-y-2">
-              {['Energy Support', 'Immune Boost', 'Heart Health', 'Brain Function', 'Joint Support', 'Digestive Health'].map(benefit => (
-                <label key={benefit} className="flex items-center space-x-3">
-                  <input 
-                    type="checkbox" 
-                    className="w-4 h-4 text-pink-600 bg-gray-100 border-gray-300 rounded focus:ring-pink-500"
-                  />
-                  <span className="text-gray-700">{benefit}</span>
-                </label>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 

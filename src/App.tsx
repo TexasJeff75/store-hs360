@@ -5,7 +5,8 @@ import AuthModal from '@/components/AuthModal';
 import UserProfile from '@/components/UserProfile';
 import AdminDashboard from '@/components/admin/AdminDashboard';
 import Hero from '@/components/Hero';
-import ProductCarousel from '@/components/ProductCarousel';
+import ProductGrid from '@/components/ProductGrid';
+import ProductFilter from '@/components/ProductFilter';
 import Cart from '@/components/Cart';
 import Footer from '@/components/Footer';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
@@ -31,8 +32,10 @@ function AppContent() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [showAllProducts, setShowAllProducts] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { errors, logError, clearErrors } = useErrorLogger();
   const { user, profile, loading: authLoading } = useAuth();
 
@@ -129,16 +132,6 @@ function AppContent() {
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
-  const handleSeeAllCategory = (category: string) => {
-    setSelectedCategory(category);
-    setShowAllProducts(true);
-  };
-
-  const handleBackToCarousels = () => {
-    setSelectedCategory(null);
-    setShowAllProducts(false);
-  };
-
   // Group products by their actual BigCommerce categories
   const productsByCategory = products.reduce((acc, product) => {
     const category = product.category;
@@ -151,6 +144,15 @@ function AppContent() {
   
   console.log('📂 Products grouped by category:', productsByCategory);
   console.log('🏷️ Available categories:', Object.keys(productsByCategory));
+
+  // Filter products based on search and filters
+  const filteredProducts = products.filter(product => {
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                         product.benefits.some(benefit => benefit.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
+    const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
+    return matchesSearch && matchesCategory && matchesPrice;
+  });
 
   // Show loading or auth gate
   if (authLoading) {
@@ -225,28 +227,19 @@ function AppContent() {
         
         <Hero />
 
-        {/* Product Carousels Section */}
+        {/* Products Section */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-          {!showAllProducts && (
-            <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Our Product Categories</h2>
+          <div className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">Our Products</h2>
             <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-              Explore our comprehensive range of health and wellness solutions
+              Discover our comprehensive range of health and wellness solutions
             </p>
           </div>
-          )}
           
           {loading ? (
-            <div className="space-y-16">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="animate-pulse">
-                  <div className="h-8 bg-gray-200 rounded w-64 mb-6"></div>
-                  <div className="flex space-x-6 overflow-hidden">
-                    {[...Array(4)].map((_, j) => (
-                      <div key={j} className="flex-shrink-0 w-80 bg-gray-200 rounded-lg h-96"></div>
-                    ))}
-                  </div>
-                </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[...Array(12)].map((_, i) => (
+                <div key={i} className="animate-pulse bg-gray-200 rounded-lg h-96"></div>
               ))}
             </div>
           ) : error ? (
@@ -254,110 +247,55 @@ function AppContent() {
               <p className="text-red-500 text-lg mb-4">Error loading products</p>
               <p className="text-gray-600">{error}</p>
             </div>
-          ) : showAllProducts && selectedCategory ? (
+          ) : (
             <div>
-              {/* Back button and category header */}
-              <div className="mb-8">
-                <button
-                  onClick={handleBackToCarousels}
-                  className="flex items-center space-x-2 text-pink-600 hover:text-pink-700 font-medium mb-4 transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                  <span>Back to Categories</span>
-                </button>
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">{selectedCategory}</h2>
-                <p className="text-gray-600">
-                  Showing all {productsByCategory[selectedCategory]?.length || 0} products in this category
-                </p>
-              </div>
-
-              {/* All products grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {productsByCategory[selectedCategory]?.map((product) => (
-                  <div
-                    key={product.id}
-                    className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 group"
-                  >
-                    <div className="relative overflow-hidden rounded-t-lg">
-                      <img 
-                        src={product.image} 
-                        alt={product.name}
-                        className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+              {/* Filters and Search */}
+              <div className="flex flex-col lg:flex-row gap-8 mb-8">
+                <div className="lg:w-64 flex-shrink-0">
+                  <ProductFilter
+                    categories={Object.keys(productsByCategory)}
+                    selectedCategory={selectedCategory}
+                    onCategoryChange={setSelectedCategory}
+                    priceRange={priceRange}
+                    onPriceRangeChange={setPriceRange}
+                    isOpen={isFilterOpen}
+                    onToggle={() => setIsFilterOpen(!isFilterOpen)}
+                  />
+                </div>
+                
+                <div className="flex-1">
+                  {/* Search Bar */}
+                  <div className="mb-6">
+                    <div className="relative">
+                      <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                      <input
+                        type="text"
+                        placeholder="Search products..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent text-lg"
                       />
-                      <div className="absolute top-3 left-3">
-                        <span className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-2 py-1 rounded text-xs font-medium">
-                          {product.category}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-4">
-                      <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{product.name}</h3>
-                      
-                      {/* Benefits */}
-                      <div className="mb-3">
-                        <div className="flex flex-wrap gap-1">
-                          {product.benefits.slice(0, 2).map((benefit, index) => (
-                            <span 
-                              key={index}
-                              className="text-xs bg-pink-50 text-pink-700 px-2 py-1 rounded-full"
-                            >
-                              {benefit}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Price */}
-                      <div className="mb-3">
-                        <PriceDisplay 
-                          productId={product.id}
-                          regularPrice={product.price}
-                          originalPrice={product.originalPrice}
-                          showSavings={true}
-                        />
-                      </div>
-
-                      {/* Add to Cart Button */}
-                      <button 
-                        onClick={() => addToCart(product.id)}
-                        className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-2 px-4 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center space-x-2"
-                      >
-                        <ShoppingCart className="h-4 w-4" />
-                        <span>Add to Cart</span>
-                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
 
-              {productsByCategory[selectedCategory]?.length === 0 && (
-                <div className="text-center py-16">
-                  <p className="text-gray-500 text-lg">No products found in this category</p>
+                  {/* Results Summary */}
+                  <div className="mb-6 flex items-center justify-between">
+                    <p className="text-gray-600">
+                      Showing {filteredProducts.length} of {products.length} products
+                      {selectedCategory !== 'all' && ` in ${selectedCategory}`}
+                      {searchTerm && ` matching "${searchTerm}"`}
+                    </p>
+                  </div>
+
+                  {/* Product Grid */}
+                  <ProductGrid
+                    products={filteredProducts}
+                    onAddToCart={addToCart}
+                  />
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-16">
-              {/* Dynamic Carousels based on actual BigCommerce categories */}
-              {Object.entries(productsByCategory).map(([category, categoryProducts]) => (
-                <ProductCarousel
-                  key={category}
-                  title={category}
-                  products={categoryProducts}
-                  onAddToCart={addToCart}
-                  onSeeAll={handleSeeAllCategory}
-                />
-              ))}
-              
-              {Object.keys(productsByCategory).length === 0 && (
-                <div className="text-center py-16">
-                  <p className="text-gray-500 text-lg">No product categories available</p>
-                  <p className="text-gray-400 text-sm mt-2">Please check your BigCommerce configuration</p>
-                </div>
-              )}
+              </div>
             </div>
           )}
         </section>
