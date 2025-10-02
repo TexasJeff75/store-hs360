@@ -10,6 +10,7 @@ import ProductFilter from '@/components/ProductFilter';
 import ProductModal from '@/components/ProductModal';
 import Cart from '@/components/Cart';
 import Footer from '@/components/Footer';
+import OrganizationSelector from '@/components/OrganizationSelector';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
 import { checkoutService, CartLineItem } from '@/services/checkout';
@@ -44,6 +45,8 @@ function AppContent() {
   const { errors, logError, clearErrors } = useErrorLogger();
   const { user, profile, loading: authLoading } = useAuth();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [isOrgSelectorOpen, setIsOrgSelectorOpen] = useState(false);
+  const [selectedOrganization, setSelectedOrganization] = useState<any>(null);
 
   useEffect(() => {
     const fetchData = async () => {
