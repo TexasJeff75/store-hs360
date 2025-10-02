@@ -58,7 +58,7 @@ function AppContent() {
         console.log('📊 Cache stats:', cacheService.getStats());
         
         // Check if BigCommerce credentials are available before making API calls
-        const hasCredentials = !!(import.meta.env.VITE_BC_STORE_HASH && import.meta.env.VITE_BC_ACCESS_TOKEN);
+        const hasCredentials = !!(import.meta.env.VITE_BC_STORE_HASH && import.meta.env.VITE_BC_STOREFRONT_TOKEN);
         
         if (!hasCredentials) {
           console.log('⚠️ BigCommerce credentials not configured (missing VITE_BC_STORE_HASH or VITE_BC_ACCESS_TOKEN), skipping API calls');
