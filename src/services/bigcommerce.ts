@@ -162,6 +162,9 @@ class BigCommerceService {
         products: [], 
         errorMessage: errorMsg
       };
+        products: [], 
+        errorMessage: errorMsg
+      };
     }
 
     // Try to get from cache first
@@ -270,6 +273,9 @@ class BigCommerceService {
       const errorMsg = 'BigCommerce credentials not configured. Please set up your store hash and storefront token.';
       console.error('❌', errorMsg);
       return { 
+        categories: [], 
+        errorMessage: errorMsg
+      };
         categories: [], 
         errorMessage: errorMsg
       };
