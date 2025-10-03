@@ -137,24 +137,21 @@ class CheckoutService {
   }
 
   /**
-   * Get BigCommerce checkout URL
+   * Get BigCommerce embedded checkout URL
    */
-  getCheckoutUrl(cartId: string): string {
+  getEmbeddedCheckoutUrl(cartId: string): string {
     if (!BC_STORE_HASH) {
       throw new Error('BigCommerce store hash not configured');
     }
-    
-    // BigCommerce checkout URL format - try different approaches
-    // Option 1: Direct checkout URL
-    return `https://store-${BC_STORE_HASH}.mybigcommerce.com/checkout/${cartId}`;
+
+    return `https://store-${BC_STORE_HASH}.mybigcommerce.com/embedded-checkout/${cartId}`;
   }
 
   /**
-   * Process checkout - create cart and redirect to BigCommerce
+   * Process checkout - create cart and return embedded checkout URL
    */
   async processCheckout(lineItems: CartLineItem[]): Promise<CheckoutResult> {
     try {
-      // Validate store configuration
       if (!BC_STORE_HASH) {
         return {
           success: false,
@@ -162,9 +159,8 @@ class CheckoutService {
         };
       }
 
-      // Create cart with items
       const { cartId, error } = await this.createCart(lineItems);
-      
+
       if (!cartId || error) {
         return {
           success: false,
@@ -172,19 +168,9 @@ class CheckoutService {
         };
       }
 
-      // Generate checkout URL - try multiple formats
-      const checkoutUrls = [
-        `https://store-${BC_STORE_HASH}.mybigcommerce.com/checkout/${cartId}`,
-        `https://store-${BC_STORE_HASH}.mybigcommerce.com/cart.php?action=load&id=${cartId}`,
-        `https://${BC_STORE_HASH}.mybigcommerce.com/checkout/${cartId}`,
-        `https://checkout.bigcommerce.com/store-${BC_STORE_HASH}/checkout/${cartId}`
-      ];
-      
-      // Use the first URL format for now
-      const checkoutUrl = checkoutUrls[0];
-      
-      console.log('Attempting checkout with URL:', checkoutUrl);
-      console.log('Cart ID:', cartId);
+      const checkoutUrl = this.getEmbeddedCheckoutUrl(cartId);
+
+      console.log('Created embedded checkout:', { cartId, checkoutUrl });
 
       return {
         success: true,

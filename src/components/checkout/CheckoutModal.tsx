@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { X, CreditCard, Truck, MapPin, User, Lock, ArrowLeft, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, CreditCard, Truck, MapPin, User, Lock, ArrowLeft, ArrowRight, Loader } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import PriceDisplay from '../PriceDisplay';
+import { checkoutService } from '@/services/checkout';
 
 interface CartItem {
   id: number;
@@ -35,7 +36,7 @@ interface BillingAddress extends ShippingAddress {
   email: string;
 }
 
-type CheckoutStep = 'shipping' | 'billing' | 'payment' | 'review';
+type CheckoutStep = 'shipping' | 'billing' | 'payment' | 'review' | 'embedded-checkout';
 
 const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
@@ -44,9 +45,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOrderComplete
 }) => {
   const { user, profile } = useAuth();
-  const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping');
+  const [currentStep, setCurrentStep] = useState<CheckoutStep>('embedded-checkout');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
+  const [cartId, setCartId] = useState<string | null>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
   
   // Form data
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
@@ -88,8 +92,14 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shippingCost = shippingMethods.find(m => m.id === selectedShippingMethod)?.price || 0;
-  const tax = subtotal * 0.08; // Mock 8% tax - in real implementation, calculate via BigCommerce
+  const tax = subtotal * 0.08;
   const total = subtotal + shippingCost + tax;
+
+  useEffect(() => {
+    if (isOpen && items.length > 0 && !checkoutUrl) {
+      initializeCheckout();
+    }
+  }, [isOpen, items]);
 
   useEffect(() => {
     if (sameAsShipping) {
@@ -99,6 +109,33 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       });
     }
   }, [sameAsShipping, shippingAddress, user?.email]);
+
+  const initializeCheckout = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const lineItems = items.map(item => ({
+        productId: item.id,
+        quantity: item.quantity
+      }));
+
+      const result = await checkoutService.processCheckout(lineItems);
+
+      if (result.success && result.checkoutUrl && result.cartId) {
+        setCheckoutUrl(result.checkoutUrl);
+        setCartId(result.cartId);
+        setCurrentStep('embedded-checkout');
+      } else {
+        setError(result.error || 'Failed to initialize checkout');
+      }
+    } catch (err) {
+      setError('Failed to initialize checkout. Please try again.');
+      console.error('Checkout initialization error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const validateStep = (step: CheckoutStep): boolean => {
     switch (step) {
@@ -158,31 +195,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   if (!isOpen) return null;
-
-  const renderStepIndicator = () => (
-    <div className="flex items-center justify-center mb-8">
-      {['shipping', 'billing', 'payment', 'review'].map((step, index) => (
-        <React.Fragment key={step}>
-          <div className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
-            currentStep === step 
-              ? 'bg-pink-600 text-white' 
-              : index < ['shipping', 'billing', 'payment', 'review'].indexOf(currentStep)
-                ? 'bg-green-600 text-white'
-                : 'bg-gray-300 text-gray-600'
-          }`}>
-            {index + 1}
-          </div>
-          {index < 3 && (
-            <div className={`w-12 h-0.5 mx-2 ${
-              index < ['shipping', 'billing', 'payment', 'review'].indexOf(currentStep)
-                ? 'bg-green-600'
-                : 'bg-gray-300'
-            }`} />
-          )}
-        </React.Fragment>
-      ))}
-    </div>
-  );
 
   const renderShippingStep = () => (
     <div className="space-y-6">
@@ -453,6 +465,50 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     </div>
   );
 
+  const renderEmbeddedCheckout = () => {
+    if (loading) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[600px] space-y-4">
+          <Loader className="h-12 w-12 text-blue-600 animate-spin" />
+          <p className="text-gray-600">Initializing secure checkout...</p>
+        </div>
+      );
+    }
+
+    if (error) {
+      return (
+        <div className="flex flex-col items-center justify-center h-[600px] space-y-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+            <h3 className="text-lg font-semibold text-red-900 mb-2">Checkout Error</h3>
+            <p className="text-red-700 mb-4">{error}</p>
+            <button
+              onClick={initializeCheckout}
+              className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (!checkoutUrl) {
+      return null;
+    }
+
+    return (
+      <div className="h-[600px] w-full">
+        <iframe
+          ref={iframeRef}
+          src={checkoutUrl}
+          className="w-full h-full border-0 rounded-lg"
+          title="BigCommerce Checkout"
+          allow="payment"
+        />
+      </div>
+    );
+  };
+
   const renderReviewStep = () => (
     <div className="space-y-6">
       <h3 className="text-lg font-semibold mb-4">Order Review</h3>
@@ -552,65 +608,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
           {/* Content */}
           <div className="p-6">
-            {renderStepIndicator()}
-            
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                {error}
-              </div>
-            )}
-
-            <div className="min-h-[400px]">
-              {currentStep === 'shipping' && renderShippingStep()}
-              {currentStep === 'billing' && renderBillingStep()}
-              {currentStep === 'payment' && renderPaymentStep()}
-              {currentStep === 'review' && renderReviewStep()}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="bg-gray-50 px-6 py-4 flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              {currentStep !== 'shipping' && (
-                <button
-                  onClick={handleBack}
-                  className="flex items-center space-x-2 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  <span>Back</span>
-                </button>
-              )}
-            </div>
-            
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm text-gray-600">Total</p>
-                <p className="text-lg font-semibold">${total.toFixed(2)}</p>
-              </div>
-              
-              {currentStep === 'review' ? (
-                <button
-                  onClick={handlePlaceOrder}
-                  disabled={loading}
-                  className="flex items-center space-x-2 bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
-                >
-                  {loading ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  ) : (
-                    <Lock className="h-4 w-4" />
-                  )}
-                  <span>{loading ? 'Processing...' : 'Place Order'}</span>
-                </button>
-              ) : (
-                <button
-                  onClick={handleNext}
-                  className="flex items-center space-x-2 bg-pink-600 text-white px-6 py-2 rounded-lg hover:bg-pink-700 transition-colors"
-                >
-                  <span>Continue</span>
-                  <ArrowRight className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            {renderEmbeddedCheckout()}
           </div>
         </div>
       </div>
