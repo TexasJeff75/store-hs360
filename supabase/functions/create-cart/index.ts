@@ -24,13 +24,17 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const BC_STORE_URL = Deno.env.get("VITE_BC_STORE_URL");
-    const BC_ACCESS_TOKEN = Deno.env.get("BC_ACCESS_TOKEN");
+    const BC_STORE_HASH = Deno.env.get("VITE_BC_STORE_HASH");
+    const BC_STOREFRONT_TOKEN = Deno.env.get("VITE_BC_STOREFRONT_TOKEN");
 
-    if (!BC_STORE_URL || !BC_ACCESS_TOKEN) {
+    if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
       return new Response(
         JSON.stringify({
           error: "BigCommerce credentials not configured",
+          debug: {
+            hasStoreHash: !!BC_STORE_HASH,
+            hasToken: !!BC_STOREFRONT_TOKEN,
+          }
         }),
         {
           status: 500,
@@ -38,6 +42,8 @@ Deno.serve(async (req: Request) => {
         }
       );
     }
+
+    const BC_STORE_URL = `https://store-${BC_STORE_HASH}.mybigcommerce.com`;
 
     const body: CreateCartRequest = await req.json();
 
@@ -85,7 +91,7 @@ Deno.serve(async (req: Request) => {
       {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${BC_ACCESS_TOKEN}`,
+          "Authorization": `Bearer ${BC_STOREFRONT_TOKEN}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
