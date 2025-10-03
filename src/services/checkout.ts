@@ -156,6 +156,16 @@ class CheckoutService {
 
       console.log('Creating cart via edge function with items:', lineItems);
 
+      const bcStoreHash = import.meta.env.VITE_BC_STORE_HASH;
+      const bcStorefrontToken = import.meta.env.VITE_BC_STOREFRONT_TOKEN;
+
+      if (!bcStoreHash || !bcStorefrontToken) {
+        return {
+          success: false,
+          error: 'BigCommerce not configured'
+        };
+      }
+
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: {
@@ -167,6 +177,8 @@ class CheckoutService {
             product_id: item.productId,
             quantity: item.quantity,
           })),
+          store_hash: bcStoreHash,
+          storefront_token: bcStorefrontToken,
         }),
       });
 

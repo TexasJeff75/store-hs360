@@ -13,6 +13,8 @@ interface LineItem {
 
 interface CreateCartRequest {
   line_items: LineItem[];
+  store_hash: string;
+  storefront_token: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -24,28 +26,28 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const BC_STORE_HASH = Deno.env.get("VITE_BC_STORE_HASH");
-    const BC_STOREFRONT_TOKEN = Deno.env.get("VITE_BC_STOREFRONT_TOKEN");
+    const body: CreateCartRequest = await req.json();
+
+    const BC_STORE_HASH = body.store_hash;
+    const BC_STOREFRONT_TOKEN = body.storefront_token;
 
     if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
       return new Response(
         JSON.stringify({
-          error: "BigCommerce credentials not configured",
+          error: "BigCommerce credentials not provided",
           debug: {
             hasStoreHash: !!BC_STORE_HASH,
             hasToken: !!BC_STOREFRONT_TOKEN,
           }
         }),
         {
-          status: 500,
+          status: 400,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
 
     const BC_STORE_URL = `https://store-${BC_STORE_HASH}.mybigcommerce.com`;
-
-    const body: CreateCartRequest = await req.json();
 
     if (!body.line_items || body.line_items.length === 0) {
       return new Response(
