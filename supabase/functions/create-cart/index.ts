@@ -53,50 +53,86 @@ Deno.serve(async (req: Request) => {
 
     console.log("Creating cart with items:", body.line_items);
 
-    const cartResponse = await fetch(
-      `https://api.bigcommerce.com/stores/${BC_STORE_HASH}/v3/carts`,
+    const mutation = `
+      mutation CreateCartRedirectUrls($createCartInput: CreateCartInput!) {
+        cart {
+          createCart(input: $createCartInput) {
+            cart {
+              entityId
+              redirectUrls {
+                checkout_url: checkoutUrl
+              }
+            }
+          }
+        }
+      }
+    `;
+
+    const variables = {
+      createCartInput: {
+        lineItems: body.line_items.map(item => ({
+          productEntityId: item.product_id,
+          quantity: item.quantity,
+        })),
+      },
+    };
+
+    const graphqlResponse = await fetch(
+      `https://store-${BC_STORE_HASH}.mybigcommerce.com/graphql`,
       {
         method: "POST",
         headers: {
-          "X-Auth-Token": BC_ACCESS_TOKEN,
+          "Authorization": `Bearer ${BC_ACCESS_TOKEN}`,
           "Content-Type": "application/json",
-          "Accept": "application/json",
         },
         body: JSON.stringify({
-          line_items: body.line_items.map(item => ({
-            product_id: item.product_id,
-            quantity: item.quantity,
-          })),
+          query: mutation,
+          variables: variables,
         }),
       }
     );
 
-    const cartData = await cartResponse.json();
+    const result = await graphqlResponse.json();
 
-    if (!cartResponse.ok) {
-      console.error("BigCommerce cart creation failed:", cartData);
+    if (!graphqlResponse.ok || result.errors) {
+      console.error("BigCommerce GraphQL cart creation failed:", result);
       return new Response(
         JSON.stringify({
           error: "Failed to create cart",
-          details: cartData,
+          details: result.errors || result,
         }),
         {
-          status: cartResponse.status,
+          status: graphqlResponse.status || 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
 
-    console.log("Cart created successfully:", cartData.data.id);
+    const cartData = result.data?.cart?.createCart?.cart;
 
-    const redirectUrl = cartData.data.redirect_urls?.checkout_url;
+    if (!cartData) {
+      console.error("No cart data in response:", result);
+      return new Response(
+        JSON.stringify({
+          error: "Cart creation failed - no data returned",
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    console.log("Cart created successfully:", cartData.entityId);
+
+    const redirectUrl = cartData.redirectUrls?.checkout_url;
 
     if (!redirectUrl) {
       console.error("No redirect URL in cart response:", cartData);
       return new Response(
         JSON.stringify({
           error: "Cart created but no checkout URL returned",
-          cart_id: cartData.data.id,
+          cart_id: cartData.entityId,
         }),
         {
           status: 500,
@@ -108,7 +144,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        cart_id: cartData.data.id,
+        cart_id: cartData.entityId,
         checkout_url: redirectUrl,
       }),
       {
