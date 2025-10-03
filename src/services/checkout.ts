@@ -143,10 +143,12 @@ class CheckoutService {
   async processCheckout(lineItems: CartLineItem[]): Promise<CheckoutResult> {
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      if (!supabaseUrl) {
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !supabaseAnonKey) {
         return {
           success: false,
-          error: 'Supabase URL not configured'
+          error: 'Supabase not configured'
         };
       }
 
@@ -158,6 +160,7 @@ class CheckoutService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseAnonKey}`,
         },
         body: JSON.stringify({
           line_items: lineItems.map(item => ({
