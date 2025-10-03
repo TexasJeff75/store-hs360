@@ -24,10 +24,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const BC_STORE_HASH = Deno.env.get("VITE_BC_STORE_HASH");
+    const BC_STORE_URL = Deno.env.get("VITE_BC_STORE_URL");
     const BC_ACCESS_TOKEN = Deno.env.get("BC_ACCESS_TOKEN");
 
-    if (!BC_STORE_HASH || !BC_ACCESS_TOKEN) {
+    if (!BC_STORE_URL || !BC_ACCESS_TOKEN) {
       return new Response(
         JSON.stringify({
           error: "BigCommerce credentials not configured",
@@ -77,8 +77,11 @@ Deno.serve(async (req: Request) => {
       },
     };
 
+    const graphqlEndpoint = `${BC_STORE_URL}/graphql`;
+    console.log("Using GraphQL endpoint:", graphqlEndpoint);
+
     const graphqlResponse = await fetch(
-      `https://store-${BC_STORE_HASH}.mybigcommerce.com/graphql`,
+      graphqlEndpoint,
       {
         method: "POST",
         headers: {
