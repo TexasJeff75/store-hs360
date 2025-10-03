@@ -62,14 +62,11 @@ Deno.serve(async (req: Request) => {
     console.log("Creating cart with items:", body.line_items);
 
     const mutation = `
-      mutation CreateCartRedirectUrls($createCartInput: CreateCartInput!) {
+      mutation CreateCart($createCartInput: CreateCartInput!) {
         cart {
           createCart(input: $createCartInput) {
             cart {
               entityId
-              redirectUrls {
-                checkout_url: checkoutUrl
-              }
             }
           }
         }
@@ -155,27 +152,13 @@ Deno.serve(async (req: Request) => {
 
     console.log("Cart created successfully:", cartData.entityId);
 
-    const redirectUrl = cartData.redirectUrls?.checkout_url;
-
-    if (!redirectUrl) {
-      console.error("No redirect URL in cart response:", cartData);
-      return new Response(
-        JSON.stringify({
-          error: "Cart created but no checkout URL returned",
-          cart_id: cartData.entityId,
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        }
-      );
-    }
+    const checkoutUrl = `${BC_STORE_URL}/cart.php?action=loadInCheckout&id=${cartData.entityId}`;
 
     return new Response(
       JSON.stringify({
         success: true,
         cart_id: cartData.entityId,
-        checkout_url: redirectUrl,
+        checkout_url: checkoutUrl,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
