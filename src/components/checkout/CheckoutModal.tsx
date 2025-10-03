@@ -28,15 +28,25 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const { user } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [cartId, setCartId] = useState<string | null>(null);
+  const [checkoutId, setCheckoutId] = useState<string | null>(null);
   const checkoutContainerRef = useRef<HTMLDivElement>(null);
   const checkoutServiceRef = useRef<any>(null);
+  const isInitializedRef = useRef(false);
 
   useEffect(() => {
-    if (isOpen && items.length > 0 && !cartId) {
+    if (isOpen && items.length > 0 && !checkoutId && !isInitializedRef.current) {
+      isInitializedRef.current = true;
       initializeCheckout();
     }
-  }, [isOpen, items]);
+  }, [isOpen, items, checkoutId]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      isInitializedRef.current = false;
+      setCheckoutId(null);
+      setError(null);
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     return () => {
@@ -51,51 +61,62 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setError(null);
 
     try {
+      console.log('Initializing checkout with items:', items);
+
       const lineItems = items.map(item => ({
         productId: item.id,
         quantity: item.quantity
       }));
 
       const result = await checkoutService.processCheckout(lineItems);
+      console.log('Checkout service result:', result);
 
-      if (result.success && result.cartId) {
-        setCartId(result.cartId);
-        await loadCheckoutSDK(result.cartId);
+      if (result.success && result.checkoutId) {
+        setCheckoutId(result.checkoutId);
+        setTimeout(() => loadCheckoutSDK(result.checkoutId!), 100);
       } else {
         setError(result.error || 'Failed to initialize checkout');
+        setLoading(false);
       }
     } catch (err) {
-      setError('Failed to initialize checkout. Please try again.');
       console.error('Checkout initialization error:', err);
-    } finally {
+      setError(`Failed to initialize checkout: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setLoading(false);
     }
   };
 
-  const loadCheckoutSDK = async (checkoutId: string) => {
-    if (!checkoutContainerRef.current) return;
-
+  const loadCheckoutSDK = async (checkoutIdValue: string) => {
     try {
+      console.log('Loading checkout SDK with ID:', checkoutIdValue);
+
       const service = createCheckoutService();
       checkoutServiceRef.current = service;
 
-      const state = await service.loadCheckout(checkoutId);
+      console.log('Loading checkout state...');
+      const state = await service.loadCheckout(checkoutIdValue);
+      console.log('Checkout state loaded:', state);
 
+      console.log('Rendering checkout...');
       await service.renderCheckout({
         containerId: 'checkout-container',
       });
+      console.log('Checkout rendered successfully');
 
       service.subscribe((state) => {
+        console.log('Checkout state change:', state);
         if (state.data.getOrder()) {
           const order = state.data.getOrder();
           console.log('Order completed:', order);
-          onOrderComplete(order?.orderId?.toString() || checkoutId);
+          onOrderComplete(order?.orderId?.toString() || checkoutIdValue);
           onClose();
         }
       });
+
+      setLoading(false);
     } catch (err) {
       console.error('Error loading checkout SDK:', err);
-      setError('Failed to load checkout. Please try again.');
+      setError(`Failed to load checkout: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setLoading(false);
     }
   };
 

@@ -75,6 +75,7 @@ export interface CheckoutResult {
   success: boolean;
   checkoutUrl?: string;
   cartId?: string;
+  checkoutId?: string;
   error?: string;
 }
 
@@ -137,18 +138,7 @@ class CheckoutService {
   }
 
   /**
-   * Get BigCommerce embedded checkout URL
-   */
-  getEmbeddedCheckoutUrl(cartId: string): string {
-    if (!BC_STORE_HASH) {
-      throw new Error('BigCommerce store hash not configured');
-    }
-
-    return `https://store-${BC_STORE_HASH}.mybigcommerce.com/embedded-checkout/${cartId}`;
-  }
-
-  /**
-   * Process checkout - create cart and return embedded checkout URL
+   * Process checkout - create cart and return checkout ID for SDK
    */
   async processCheckout(lineItems: CartLineItem[]): Promise<CheckoutResult> {
     try {
@@ -168,14 +158,12 @@ class CheckoutService {
         };
       }
 
-      const checkoutUrl = this.getEmbeddedCheckoutUrl(cartId);
-
-      console.log('Created embedded checkout:', { cartId, checkoutUrl });
+      console.log('Created cart for checkout:', { cartId });
 
       return {
         success: true,
-        checkoutUrl,
-        cartId
+        cartId,
+        checkoutId: cartId
       };
     } catch (error) {
       console.error('Checkout process error:', error);
