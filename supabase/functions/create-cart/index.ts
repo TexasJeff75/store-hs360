@@ -95,7 +95,26 @@ Deno.serve(async (req: Request) => {
       }
     );
 
-    const result = await graphqlResponse.json();
+    const responseText = await graphqlResponse.text();
+    console.log("GraphQL Response Status:", graphqlResponse.status);
+    console.log("GraphQL Response:", responseText.substring(0, 500));
+
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse response as JSON:", responseText.substring(0, 1000));
+      return new Response(
+        JSON.stringify({
+          error: "Invalid response from BigCommerce",
+          details: responseText.substring(0, 500),
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
 
     if (!graphqlResponse.ok || result.errors) {
       console.error("BigCommerce GraphQL cart creation failed:", result);
