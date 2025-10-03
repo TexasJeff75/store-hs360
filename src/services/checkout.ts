@@ -138,7 +138,17 @@ class CheckoutService {
   }
 
   /**
-   * Process checkout - create cart and return checkout ID for SDK
+   * Get redirect URL for BigCommerce hosted checkout
+   */
+  getCheckoutRedirectUrl(cartId: string): string {
+    if (!BC_STORE_HASH) {
+      throw new Error('BigCommerce store hash not configured');
+    }
+    return `https://store-${BC_STORE_HASH}.mybigcommerce.com/cart.php?action=loadInCheckout&id=${cartId}`;
+  }
+
+  /**
+   * Process checkout - create cart and return redirect URL
    */
   async processCheckout(lineItems: CartLineItem[]): Promise<CheckoutResult> {
     try {
@@ -158,12 +168,13 @@ class CheckoutService {
         };
       }
 
-      console.log('Created cart for checkout:', { cartId });
+      const checkoutUrl = this.getCheckoutRedirectUrl(cartId);
+      console.log('Created cart for checkout:', { cartId, checkoutUrl });
 
       return {
         success: true,
         cartId,
-        checkoutId: cartId
+        checkoutUrl
       };
     } catch (error) {
       console.error('Checkout process error:', error);
