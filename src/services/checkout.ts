@@ -138,43 +138,51 @@ class CheckoutService {
   }
 
   /**
-   * Get redirect URL for BigCommerce hosted checkout
-   */
-  getCheckoutRedirectUrl(cartId: string): string {
-    if (!BC_STORE_HASH) {
-      throw new Error('BigCommerce store hash not configured');
-    }
-    return `https://store-${BC_STORE_HASH}.mybigcommerce.com/cart.php?action=loadInCheckout&id=${cartId}`;
-  }
-
-  /**
-   * Process checkout - create cart and return redirect URL
+   * Process checkout using REST API edge function
    */
   async processCheckout(lineItems: CartLineItem[]): Promise<CheckoutResult> {
     try {
-      if (!BC_STORE_HASH) {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      if (!supabaseUrl) {
         return {
           success: false,
-          error: 'BigCommerce store not configured. Please check your environment variables.'
+          error: 'Supabase URL not configured'
         };
       }
 
-      const { cartId, error } = await this.createCart(lineItems);
+      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/create-cart`;
 
-      if (!cartId || error) {
+      console.log('Creating cart via edge function with items:', lineItems);
+
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          line_items: lineItems.map(item => ({
+            product_id: item.productId,
+            quantity: item.quantity,
+          })),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        console.error('Cart creation failed:', data);
         return {
           success: false,
-          error: error || 'Failed to create checkout cart'
+          error: data.error || 'Failed to create cart'
         };
       }
 
-      const checkoutUrl = this.getCheckoutRedirectUrl(cartId);
-      console.log('Created cart for checkout:', { cartId, checkoutUrl });
+      console.log('Cart created successfully:', data);
 
       return {
         success: true,
-        cartId,
-        checkoutUrl
+        cartId: data.cart_id,
+        checkoutUrl: data.checkout_url
       };
     } catch (error) {
       console.error('Checkout process error:', error);
