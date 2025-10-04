@@ -57,7 +57,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
       if (result.success && result.checkoutUrl) {
         setCheckoutUrl(result.checkoutUrl);
-        window.location.href = result.checkoutUrl;
+        window.open(result.checkoutUrl, '_blank', 'noopener,noreferrer');
       } else {
         setError(result.error || 'Failed to initialize checkout');
       }
@@ -102,14 +102,27 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (checkoutUrl) {
       return (
         <div className="flex flex-col items-center justify-center h-[400px] space-y-4">
-          <ExternalLink className="h-12 w-12 text-blue-600" />
-          <p className="text-gray-600">Redirecting to checkout...</p>
-          <a
-            href={checkoutUrl}
-            className="text-blue-600 hover:underline"
-          >
-            Click here if you are not redirected automatically
-          </a>
+          <div className="bg-green-50 border border-green-200 rounded-lg p-6 max-w-md">
+            <div className="flex items-center justify-center mb-4">
+              <ExternalLink className="h-12 w-12 text-green-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-green-900 mb-2 text-center">Checkout Ready</h3>
+            <p className="text-gray-700 mb-4 text-center">Your checkout page has been opened in a new tab.</p>
+            <a
+              href={checkoutUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block w-full bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 transition-colors text-center font-medium"
+            >
+              Open Checkout Again
+            </a>
+            <button
+              onClick={onClose}
+              className="block w-full mt-3 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors text-center"
+            >
+              Close
+            </button>
+          </div>
         </div>
       );
     }
