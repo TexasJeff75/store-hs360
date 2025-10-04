@@ -1,5 +1,5 @@
-import { X, Plus, Minus, ShoppingBag } from 'lucide-react';
-import { useCart } from '../hooks/useCart';
+import { X, Plus, Minus, ShoppingBag, ExternalLink } from 'lucide-react';
+import { useBCCart } from '../hooks/useBCCart';
 
 interface CartProps {
   isOpen: boolean;
@@ -7,7 +7,19 @@ interface CartProps {
 }
 
 export default function Cart({ isOpen, onClose }: CartProps) {
-  const { items, updateQuantity, removeItem, total, itemCount } = useCart();
+  const { cart, updateItemQuantity, removeItem, total, itemCount, getCheckoutUrl, loading } = useBCCart();
+
+  const items = cart?.line_items.physical_items || [];
+
+  const handleCheckout = async () => {
+    try {
+      const checkoutUrl = await getCheckoutUrl();
+      window.location.href = checkoutUrl;
+    } catch (err) {
+      console.error('Failed to get checkout URL:', err);
+      alert('Failed to proceed to checkout. Please try again.');
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -41,12 +53,12 @@ export default function Cart({ isOpen, onClose }: CartProps) {
             <div className="space-y-4">
               {items.map((item) => (
                 <div
-                  key={item.productId}
+                  key={item.id}
                   className="flex gap-4 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg"
                 >
-                  {item.image && (
+                  {item.image_url && (
                     <img
-                      src={item.image}
+                      src={item.image_url}
                       alt={item.name}
                       className="w-20 h-20 object-cover rounded"
                     />
@@ -56,14 +68,15 @@ export default function Cart({ isOpen, onClose }: CartProps) {
                       {item.name}
                     </h3>
                     <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-                      ${item.price.toFixed(2)}
+                      ${item.sale_price.toFixed(2)}
                     </p>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() =>
-                          updateQuantity(item.productId, item.quantity - 1)
+                          updateItemQuantity(item.id, item.product_id, item.quantity - 1)
                         }
-                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                        disabled={loading}
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded disabled:opacity-50"
                       >
                         <Minus className="w-4 h-4" />
                       </button>
@@ -72,15 +85,17 @@ export default function Cart({ isOpen, onClose }: CartProps) {
                       </span>
                       <button
                         onClick={() =>
-                          updateQuantity(item.productId, item.quantity + 1)
+                          updateItemQuantity(item.id, item.product_id, item.quantity + 1)
                         }
-                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded"
+                        disabled={loading}
+                        className="p-1 hover:bg-gray-200 dark:hover:bg-gray-700 rounded disabled:opacity-50"
                       >
                         <Plus className="w-4 h-4" />
                       </button>
                       <button
-                        onClick={() => removeItem(item.productId)}
-                        className="ml-auto p-1 hover:bg-red-100 dark:hover:bg-red-900 text-red-600 rounded"
+                        onClick={() => removeItem(item.id)}
+                        disabled={loading}
+                        className="ml-auto p-1 hover:bg-red-100 dark:hover:bg-red-900 text-red-600 rounded disabled:opacity-50"
                       >
                         <X className="w-4 h-4" />
                       </button>
@@ -100,8 +115,13 @@ export default function Cart({ isOpen, onClose }: CartProps) {
                 ${total.toFixed(2)}
               </span>
             </div>
-            <button className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors">
-              Checkout
+            <button
+              onClick={handleCheckout}
+              disabled={loading}
+              className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading ? 'Processing...' : 'Proceed to Checkout'}
+              <ExternalLink className="w-4 h-4" />
             </button>
           </div>
         )}

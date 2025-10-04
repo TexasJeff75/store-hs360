@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
 import { fetchProducts } from './lib/bigcommerce';
 import { Product } from './types/bigcommerce';
-import { useCart } from './hooks/useCart';
+import { useBCCart } from './hooks/useBCCart';
 import Header from './components/Header';
 import ProductCard from './components/ProductCard';
 import Cart from './components/Cart';
@@ -12,7 +12,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
-  const { addItem, itemCount } = useCart();
+  const { addItem, itemCount } = useBCCart();
 
   useEffect(() => {
     loadProducts();
@@ -32,14 +32,12 @@ export default function App() {
     }
   }
 
-  const handleAddToCart = (product: Product) => {
-    const price = product.prices.salePrice || product.prices.price;
-    addItem({
-      productId: product.entityId,
-      name: product.name,
-      price: price.value,
-      image: product.defaultImage?.url,
-    });
+  const handleAddToCart = async (product: Product) => {
+    try {
+      await addItem(product.entityId, 1);
+    } catch (err) {
+      console.error('Failed to add to cart:', err);
+    }
   };
 
   return (

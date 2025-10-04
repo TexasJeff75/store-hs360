@@ -44,3 +44,26 @@ export interface CartItem {
   quantity: number;
   image?: string;
 }
+
+export interface BCCart {
+  id: string;
+  line_items: {
+    physical_items: BCCartItem[];
+  };
+  cart_amount: number;
+  redirect_urls: {
+    checkout_url: string;
+    embedded_checkout_url: string;
+    cart_url: string;
+  };
+}
+
+export interface BCCartItem {
+  id: string;
+  product_id: number;
+  name: string;
+  quantity: number;
+  sale_price: number;
+  list_price: number;
+  image_url: string;
+}
