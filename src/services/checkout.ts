@@ -75,7 +75,6 @@ export interface CheckoutResult {
   success: boolean;
   checkoutUrl?: string;
   cartId?: string;
-  checkoutId?: string;
   error?: string;
 }
 
@@ -138,66 +137,45 @@ class CheckoutService {
   }
 
   /**
-   * Process checkout using REST API edge function
+   * Get BigCommerce embedded checkout URL
+   */
+  getEmbeddedCheckoutUrl(cartId: string): string {
+    if (!BC_STORE_HASH) {
+      throw new Error('BigCommerce store hash not configured');
+    }
+
+    return `https://store-${BC_STORE_HASH}.mybigcommerce.com/embedded-checkout/${cartId}`;
+  }
+
+  /**
+   * Process checkout - create cart and return embedded checkout URL
    */
   async processCheckout(lineItems: CartLineItem[]): Promise<CheckoutResult> {
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-      if (!supabaseUrl || !supabaseAnonKey) {
+      if (!BC_STORE_HASH) {
         return {
           success: false,
-          error: 'Supabase not configured'
+          error: 'BigCommerce store not configured. Please check your environment variables.'
         };
       }
 
-      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/create-cart`;
+      const { cartId, error } = await this.createCart(lineItems);
 
-      console.log('Creating cart via edge function with items:', lineItems);
-
-      const bcStoreHash = import.meta.env.VITE_BC_STORE_HASH;
-      const bcStorefrontToken = import.meta.env.VITE_BC_STOREFRONT_TOKEN;
-
-      if (!bcStoreHash || !bcStorefrontToken) {
+      if (!cartId || error) {
         return {
           success: false,
-          error: 'BigCommerce not configured'
+          error: error || 'Failed to create checkout cart'
         };
       }
 
-      const response = await fetch(edgeFunctionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${supabaseAnonKey}`,
-        },
-        body: JSON.stringify({
-          line_items: lineItems.map(item => ({
-            product_id: item.productId,
-            quantity: item.quantity,
-          })),
-          store_hash: bcStoreHash,
-          storefront_token: bcStorefrontToken,
-        }),
-      });
+      const checkoutUrl = this.getEmbeddedCheckoutUrl(cartId);
 
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        console.error('Cart creation failed:', data);
-        return {
-          success: false,
-          error: data.error || 'Failed to create cart'
-        };
-      }
-
-      console.log('Cart created successfully:', data);
+      console.log('Created embedded checkout:', { cartId, checkoutUrl });
 
       return {
         success: true,
-        cartId: data.cart_id,
-        checkoutUrl: data.checkout_url
+        checkoutUrl,
+        cartId
       };
     } catch (error) {
       console.error('Checkout process error:', error);

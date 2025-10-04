@@ -4,12 +4,6 @@
   functions = "netlify/functions"
   environment = { SECRETS_SCAN_ENABLED = "false" }
 
-[dev]
-  command = "npm run dev:vite"
-  targetPort = 5173
-  port = 8888
-  autoLaunch = false
-
 [[redirects]]
   from = "/api/gql"
   to = "/.netlify/functions/gql"

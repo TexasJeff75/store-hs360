@@ -1,7 +1,5 @@
 require('dotenv').config();
 const express = require("express");
-const https = require('https');
-const http = require('http');
 const app = express();
 app.use(express.json());
 
@@ -21,48 +19,17 @@ app.post("/api/gql", async (req, res) => {
   }
 
   try {
-    console.log('📤 Proxying GraphQL request to:', ENDPOINT);
-
-    // Use node-fetch style with agent for better compatibility
-    const url = new URL(ENDPOINT);
-    const requestBody = JSON.stringify(req.body || {});
-
-    const options = {
+    const r = await fetch(ENDPOINT, {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "authorization": `Bearer ${process.env.VITE_BC_STOREFRONT_TOKEN}`,
-        "content-length": Buffer.byteLength(requestBody)
-      }
-    };
-
-    const r = await fetch(ENDPOINT, {
-      ...options,
-      body: requestBody
+      },
+      body: JSON.stringify(req.body || {})
     });
-
-    const responseText = await r.text();
-    console.log('📥 BigCommerce response status:', r.status);
-    console.log('📥 Response length:', responseText.length, 'bytes');
-
-    if (!responseText || responseText.trim().length === 0) {
-      console.error('❌ Empty response from BigCommerce');
-      return res.status(502).json({
-        error: "EMPTY_RESPONSE",
-        detail: "BigCommerce returned an empty response"
-      });
-    }
-
-    res.status(r.status).type("application/json").send(responseText);
+    res.status(r.status).type("application/json").send(await r.text());
   } catch (e) {
-    console.error('❌ GraphQL proxy error:', e);
-    console.error('Error details:', e.message, e.cause);
-    res.status(502).json({
-      error: "GQL_PROXY_FAILED",
-      detail: String(e),
-      message: e.message,
-      cause: e.cause ? String(e.cause) : undefined
-    });
+    res.status(502).json({ error: "GQL_PROXY_FAILED", detail: String(e) });
   }
 });
 app.listen(4000, () => console.log("GQL proxy :4000 ->", ENDPOINT));

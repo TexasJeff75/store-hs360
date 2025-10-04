@@ -4,9 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "netlify dev",
+    "dev": "concurrently \"npm run dev:vite\" \"node server/gql.cjs\"",
     "dev:vite": "node -r dotenv/config node_modules/.bin/vite",
-    "dev:old": "concurrently \"npm run dev:vite\" \"node server/gql.cjs\"",
     "build": "npm run build:netlify",
     "build:netlify": "vite build",
     "lint": "eslint .",
@@ -14,7 +13,6 @@
     "start": "vite preview"
   },
   "dependencies": {
-    "@bigcommerce/checkout-sdk": "^1.806.0",
     "@supabase/supabase-js": "^2.57.4",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
