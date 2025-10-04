@@ -25,9 +25,9 @@ exports.handler = async (event, context) => {
     };
   }
 
-  // Get environment variables
-  const BC_STORE_HASH = process.env.BC_STORE_HASH;
-  const BC_STOREFRONT_TOKEN = process.env.BC_STOREFRONT_TOKEN;
+  // Get environment variables (support both with and without VITE_ prefix)
+  const BC_STORE_HASH = process.env.VITE_BC_STORE_HASH || process.env.BC_STORE_HASH;
+  const BC_STOREFRONT_TOKEN = process.env.VITE_BC_STOREFRONT_TOKEN || process.env.BC_STOREFRONT_TOKEN;
 
   // Validate environment variables
   if (!BC_STORE_HASH) {

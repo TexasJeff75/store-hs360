@@ -1,5 +1,7 @@
 require('dotenv').config();
 const express = require("express");
+const https = require('https');
+const http = require('http');
 const app = express();
 app.use(express.json());
 
@@ -20,13 +22,23 @@ app.post("/api/gql", async (req, res) => {
 
   try {
     console.log('📤 Proxying GraphQL request to:', ENDPOINT);
-    const r = await fetch(ENDPOINT, {
+
+    // Use node-fetch style with agent for better compatibility
+    const url = new URL(ENDPOINT);
+    const requestBody = JSON.stringify(req.body || {});
+
+    const options = {
       method: "POST",
       headers: {
         "content-type": "application/json",
         "authorization": `Bearer ${process.env.VITE_BC_STOREFRONT_TOKEN}`,
-      },
-      body: JSON.stringify(req.body || {})
+        "content-length": Buffer.byteLength(requestBody)
+      }
+    };
+
+    const r = await fetch(ENDPOINT, {
+      ...options,
+      body: requestBody
     });
 
     const responseText = await r.text();
@@ -44,7 +56,13 @@ app.post("/api/gql", async (req, res) => {
     res.status(r.status).type("application/json").send(responseText);
   } catch (e) {
     console.error('❌ GraphQL proxy error:', e);
-    res.status(502).json({ error: "GQL_PROXY_FAILED", detail: String(e) });
+    console.error('Error details:', e.message, e.cause);
+    res.status(502).json({
+      error: "GQL_PROXY_FAILED",
+      detail: String(e),
+      message: e.message,
+      cause: e.cause ? String(e.cause) : undefined
+    });
   }
 });
 app.listen(4000, () => console.log("GQL proxy :4000 ->", ENDPOINT));
