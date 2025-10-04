@@ -152,13 +152,101 @@ Deno.serve(async (req: Request) => {
 
     console.log("Cart created successfully:", cartData.entityId);
 
-    const checkoutUrl = `${BC_STORE_URL}/cart.php?action=loadInCheckout&id=${cartData.entityId}`;
+    const redirectUrlMutation = `
+      mutation CreateCartRedirectUrls($input: CreateCartRedirectUrlsInput!) {
+        cart {
+          createCartRedirectUrls(input: $input) {
+            redirectUrls {
+              redirectedCheckoutUrl
+              embeddedCheckoutUrl
+            }
+          }
+        }
+      }
+    `;
+
+    const redirectUrlVariables = {
+      input: {
+        cartEntityId: cartData.entityId,
+      },
+    };
+
+    console.log("Getting checkout redirect URLs...");
+
+    const redirectResponse = await fetch(
+      graphqlEndpoint,
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${BC_STOREFRONT_TOKEN}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: redirectUrlMutation,
+          variables: redirectUrlVariables,
+        }),
+      }
+    );
+
+    const redirectText = await redirectResponse.text();
+    console.log("Redirect URL Response Status:", redirectResponse.status);
+    console.log("Redirect URL Response:", redirectText.substring(0, 500));
+
+    let redirectResult;
+    try {
+      redirectResult = JSON.parse(redirectText);
+    } catch (parseError) {
+      console.error("Failed to parse redirect response:", redirectText.substring(0, 1000));
+      return new Response(
+        JSON.stringify({
+          error: "Failed to get checkout URL",
+          details: redirectText.substring(0, 500),
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    if (!redirectResponse.ok || redirectResult.errors) {
+      console.error("Failed to get redirect URLs:", redirectResult);
+      return new Response(
+        JSON.stringify({
+          error: "Failed to get checkout URL",
+          details: redirectResult.errors || redirectResult,
+        }),
+        {
+          status: redirectResponse.status || 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const redirectUrls = redirectResult.data?.cart?.createCartRedirectUrls?.redirectUrls;
+
+    if (!redirectUrls?.redirectedCheckoutUrl) {
+      console.error("No checkout URL in response:", redirectResult);
+      return new Response(
+        JSON.stringify({
+          error: "No checkout URL returned",
+          cart_id: cartData.entityId,
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    console.log("Checkout URL retrieved successfully:", redirectUrls.redirectedCheckoutUrl);
 
     return new Response(
       JSON.stringify({
         success: true,
         cart_id: cartData.entityId,
-        checkout_url: checkoutUrl,
+        checkout_url: redirectUrls.redirectedCheckoutUrl,
+        embedded_checkout_url: redirectUrls.embeddedCheckoutUrl,
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
