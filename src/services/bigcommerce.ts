@@ -28,14 +28,25 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
     clearTimeout(timeoutId);
 
     const txt = await res.text();
-    const json = JSON.parse(txt);
+
+    if (!txt || txt.trim().length === 0) {
+      throw new Error('Empty response from GraphQL server');
+    }
+
+    let json;
+    try {
+      json = JSON.parse(txt);
+    } catch (parseError) {
+      console.error('Failed to parse response:', txt);
+      throw new Error(`Invalid JSON response: ${txt.slice(0, 200)}`);
+    }
 
     if (!res.ok) {
       // Handle missing credentials specifically
       if (res.status === 500 && json.error === 'MISSING_CREDENTIALS') {
         throw new Error('MISSING_CREDENTIALS');
       }
-      throw new Error(`HTTP ${res.status}: ${txt.slice(0,200)}`);
+      throw new Error(`HTTP ${res.status}: ${JSON.stringify(json).slice(0,200)}`);
     }
     if (json.errors?.length) console.warn("GQL errors:", json.errors);
 
