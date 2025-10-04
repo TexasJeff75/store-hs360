@@ -1,59 +1,68 @@
-const express = require('express');
-const fetch = require('node-fetch');
 require('dotenv').config();
-
+const express = require("express");
+const https = require('https');
+const http = require('http');
 const app = express();
 app.use(express.json());
 
-const BC_STORE_HASH = process.env.VITE_BC_STORE_HASH;
-const BC_STOREFRONT_TOKEN = process.env.VITE_BC_STOREFRONT_TOKEN;
-
-if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
-  console.error('❌ Missing environment variables:');
-  if (!BC_STORE_HASH) console.error('   - VITE_BC_STORE_HASH');
-  if (!BC_STOREFRONT_TOKEN) console.error('   - VITE_BC_STOREFRONT_TOKEN');
-  process.exit(1);
+// Check for required environment variables
+if (!process.env.VITE_BC_STORE_HASH || !process.env.VITE_BC_STOREFRONT_TOKEN) {
+  console.error('Missing required environment variables: BC_STORE_HASH and/or BC_STOREFRONT_TOKEN');
 }
 
-const ENDPOINT = `https://store-${BC_STORE_HASH}.mybigcommerce.com/graphql`;
+const ENDPOINT = `https://store-${process.env.VITE_BC_STORE_HASH}.mybigcommerce.com/graphql`;
+app.post("/api/gql", async (req, res) => {
+  // Check for required environment variables
+  if (!process.env.VITE_BC_STORE_HASH || !process.env.VITE_BC_STOREFRONT_TOKEN) {
+    return res.status(500).json({ 
+      error: "MISSING_CREDENTIALS", 
+      detail: "BigCommerce store hash or storefront token not configured" 
+    });
+  }
 
-console.log('✅ GraphQL Proxy Server Configuration:');
-console.log('   Store Hash:', BC_STORE_HASH);
-console.log('   Token:', BC_STOREFRONT_TOKEN.substring(0, 20) + '...');
-console.log('   Endpoint:', ENDPOINT);
-
-app.post('/gql', async (req, res) => {
   try {
-    console.log('📡 Proxying GraphQL request...');
+    console.log('📤 Proxying GraphQL request to:', ENDPOINT);
 
-    const response = await fetch(ENDPOINT, {
-      method: 'POST',
+    // Use node-fetch style with agent for better compatibility
+    const url = new URL(ENDPOINT);
+    const requestBody = JSON.stringify(req.body || {});
+
+    const options = {
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${BC_STOREFRONT_TOKEN}`,
-      },
-      body: JSON.stringify(req.body),
+        "content-type": "application/json",
+        "authorization": `Bearer ${process.env.VITE_BC_STOREFRONT_TOKEN}`,
+        "content-length": Buffer.byteLength(requestBody)
+      }
+    };
+
+    const r = await fetch(ENDPOINT, {
+      ...options,
+      body: requestBody
     });
 
-    const data = await response.json();
+    const responseText = await r.text();
+    console.log('📥 BigCommerce response status:', r.status);
+    console.log('📥 Response length:', responseText.length, 'bytes');
 
-    if (data.errors) {
-      console.error('❌ GraphQL errors:', data.errors);
-    } else {
-      console.log('✅ GraphQL request successful');
+    if (!responseText || responseText.trim().length === 0) {
+      console.error('❌ Empty response from BigCommerce');
+      return res.status(502).json({
+        error: "EMPTY_RESPONSE",
+        detail: "BigCommerce returned an empty response"
+      });
     }
 
-    res.json(data);
-  } catch (error) {
-    console.error('❌ Proxy error:', error);
-    res.status(500).json({
-      errors: [{ message: 'Failed to proxy GraphQL request' }],
+    res.status(r.status).type("application/json").send(responseText);
+  } catch (e) {
+    console.error('❌ GraphQL proxy error:', e);
+    console.error('Error details:', e.message, e.cause);
+    res.status(502).json({
+      error: "GQL_PROXY_FAILED",
+      detail: String(e),
+      message: e.message,
+      cause: e.cause ? String(e.cause) : undefined
     });
   }
 });
-
-const PORT = 4000;
-app.listen(PORT, () => {
-  console.log(`\n🚀 GraphQL Proxy running on http://localhost:${PORT}`);
-  console.log(`   Endpoint: POST http://localhost:${PORT}/gql\n`);
-});
+app.listen(4000, () => console.log("GQL proxy :4000 ->", ENDPOINT));

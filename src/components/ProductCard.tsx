@@ -1,78 +1,105 @@
-import { ShoppingCart } from 'lucide-react';
-import { Product } from '../types/bigcommerce';
+import React from 'react';
+import { Star, Heart, ShoppingCart } from 'lucide-react';
+import PriceDisplay from './PriceDisplay';
 
 interface ProductCardProps {
-  product: Product;
-  onAddToCart: () => void;
+  id: number;
+  name: string;
+  price: number;
+  originalPrice?: number;
+  image: string;
+  rating: number;
+  reviews: number;
+  category: string;
+  benefits: string[];
+  onAddToCart: (id: number) => void;
 }
 
-export default function ProductCard({ product, onAddToCart }: ProductCardProps) {
-  const price = product.prices.salePrice || product.prices.price;
-  const originalPrice = product.prices.retailPrice || product.prices.price;
-  const hasDiscount = product.prices.salePrice &&
-    product.prices.salePrice.value < originalPrice.value;
-
+const ProductCard: React.FC<ProductCardProps> = ({
+  id,
+  name,
+  price,
+  originalPrice,
+  image,
+  rating,
+  reviews,
+  category,
+  benefits,
+  onAddToCart
+}) => {
   return (
-    <div className="group bg-white dark:bg-gray-800 rounded-lg overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300">
-      <div className="aspect-square overflow-hidden bg-gray-100 dark:bg-gray-700">
-        {product.defaultImage ? (
-          <img
-            src={product.defaultImage.url}
-            alt={product.defaultImage.altText || product.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center text-gray-400">
-            No Image
-          </div>
-        )}
+    <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 group">
+      <div className="relative overflow-hidden rounded-t-lg">
+        <img 
+          src={image} 
+          alt={name}
+          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+        />
+        <button className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors opacity-0 group-hover:opacity-100">
+          <Heart className="h-5 w-5 text-gray-600" />
+        </button>
+        <div className="absolute top-3 left-3">
+          <span className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-2 py-1 rounded text-xs font-medium">
+            {category}
+          </span>
+        </div>
       </div>
 
       <div className="p-4">
-        {product.brand && (
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">
-            {product.brand.name}
-          </p>
-        )}
-
-        <h3 className="font-semibold text-lg mb-2 line-clamp-2 text-gray-900 dark:text-white">
-          {product.name}
-        </h3>
-
-        {product.description && (
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-3 line-clamp-2">
-            {product.description.replace(/<[^>]*>/g, '')}
-          </p>
-        )}
-
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-gray-900 dark:text-white">
-              ${price.value.toFixed(2)}
-            </span>
-            {hasDiscount && (
-              <span className="text-sm text-gray-500 dark:text-gray-400 line-through">
-                ${originalPrice.value.toFixed(2)}
-              </span>
-            )}
+        <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">{name}</h3>
+        
+        {/* Rating */}
+        <div className="flex items-center mb-2">
+          <div className="flex items-center">
+            {[...Array(5)].map((_, i) => (
+              <Star
+                key={i}
+                className={`h-4 w-4 ${
+                  i < Math.floor(rating) 
+                    ? 'text-yellow-400 fill-current' 
+                    : 'text-gray-300'
+                }`}
+              />
+            ))}
           </div>
-
-          <button
-            onClick={onAddToCart}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2 transition-colors duration-200"
-            disabled={product.availabilityV2.status !== 'Available'}
-          >
-            <ShoppingCart className="w-4 h-4" />
-            Add
-          </button>
+          <span className="text-sm text-gray-600 ml-2">({reviews})</span>
         </div>
 
-        {product.availabilityV2.status !== 'Available' && (
-          <p className="text-sm text-red-600 dark:text-red-400 mt-2">
-            Out of Stock
-          </p>
-        )}
+        {/* Benefits */}
+        <div className="mb-3">
+          <div className="flex flex-wrap gap-1">
+            {benefits.slice(0, 2).map((benefit, index) => (
+              <span 
+                key={index}
+                className="text-xs bg-pink-50 text-pink-700 px-2 py-1 rounded-full"
+              >
+                {benefit}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Price */}
+        <div className="mb-3">
+          <PriceDisplay 
+            productId={id}
+            regularPrice={price}
+            originalPrice={originalPrice}
+            showSavings={true}
+          />
+        </div>
+
+        {/* Add to Cart Button */}
+        <button 
+          onClick={() => onAddToCart(id)}
+          className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-2 px-4 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center space-x-2"
+        >
+          <ShoppingCart className="h-4 w-4" />
+          <span>Add to Cart</span>
+        </button>
       </div>
     </div>
   );
-}
+};
+
+export default ProductCard;
