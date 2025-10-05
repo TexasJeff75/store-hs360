@@ -135,9 +135,48 @@ function AppContent() {
       setShowOnlyContractPricing(false);
     }
   }, [user, selectedOrganization]);
-  const addToCart = (productId: number, quantity: number = 1) => {
+  const addToCart = async (productId: number, quantity: number = 1) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
+
+    // Fetch the effective price (contract or regular)
+    let effectivePrice = product.price;
+
+    if (user && (profile || selectedOrganization)) {
+      try {
+        let priceResult;
+
+        if (selectedOrganization) {
+          // Sales rep mode - get organization pricing
+          const orgPricing = await contractPricingService.getOrganizationPricing(selectedOrganization.id);
+          const productPricing = orgPricing.find(p => p.product_id === productId);
+
+          if (productPricing &&
+              quantity >= (productPricing.min_quantity || 1) &&
+              (!productPricing.max_quantity || quantity <= productPricing.max_quantity)) {
+            priceResult = {
+              price: productPricing.contract_price,
+              source: 'organization' as const
+            };
+          }
+        } else if (profile) {
+          // Regular user mode
+          priceResult = await contractPricingService.getEffectivePrice(
+            user.id,
+            productId,
+            profile.role,
+            quantity
+          );
+        }
+
+        if (priceResult) {
+          effectivePrice = priceResult.price;
+        }
+      } catch (error) {
+        console.error('Error fetching contract price for cart:', error);
+        // Fall back to regular price
+      }
+    }
 
     setCartItems(prev => {
       const existingItem = prev.find(item => item.id === productId);
@@ -151,7 +190,7 @@ function AppContent() {
         return [...prev, {
           id: product.id,
           name: product.name,
-          price: product.price,
+          price: effectivePrice,
           quantity: quantity,
           image: product.image
         }];
