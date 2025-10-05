@@ -129,6 +129,11 @@ function AppContent() {
     };
 
     fetchContractPricingProducts();
+
+    // Clear the contract pricing filter if no organization is selected
+    if (!selectedOrganization) {
+      setShowOnlyContractPricing(false);
+    }
   }, [user, selectedOrganization]);
   const addToCart = (productId: number, quantity: number = 1) => {
     const product = products.find(p => p.id === productId);
@@ -413,14 +418,18 @@ function AppContent() {
                         </div>
                       )}
 
-                      <label className="flex items-center space-x-2 cursor-pointer">
+                      <label className={`flex items-center space-x-2 ${selectedOrganization ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
                         <input
                           type="checkbox"
                           checked={showOnlyContractPricing}
                           onChange={(e) => setShowOnlyContractPricing(e.target.checked)}
-                          className="rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                          disabled={!selectedOrganization}
+                          className="rounded border-gray-300 text-pink-600 focus:ring-pink-500 disabled:cursor-not-allowed"
                         />
-                        <span className="text-sm text-gray-700">Only show contract pricing</span>
+                        <span className="text-sm text-gray-700">
+                          Only show contract pricing
+                          {!selectedOrganization && ' (select organization first)'}
+                        </span>
                       </label>
                     </div>
                   </div>
