@@ -60,14 +60,31 @@ const ProductsManagement: React.FC = () => {
     if (!user || !profile) return;
 
     try {
-      let query = supabase
-        .from('contract_pricing')
-        .select('product_id');
+      const counts: Record<number, number> = {};
 
-      // Role-based filtering
-      if (profile.role === 'customer') {
-        // Customers only see their own pricing
-        query = query.eq('user_id', user.id);
+      if (profile.role === 'admin') {
+        // Admins see all pricing from all tables
+        const [individualRes, orgRes, locationRes] = await Promise.all([
+          supabase.from('contract_pricing').select('product_id').not('user_id', 'is', null),
+          supabase.from('organization_pricing').select('product_id'),
+          supabase.from('location_pricing').select('product_id')
+        ]);
+
+        // Count individual pricing
+        individualRes.data?.forEach(item => {
+          counts[item.product_id] = (counts[item.product_id] || 0) + 1;
+        });
+
+        // Count organization pricing
+        orgRes.data?.forEach(item => {
+          counts[item.product_id] = (counts[item.product_id] || 0) + 1;
+        });
+
+        // Count location pricing
+        locationRes.data?.forEach(item => {
+          counts[item.product_id] = (counts[item.product_id] || 0) + 1;
+        });
+
       } else if (profile.role === 'sales_rep') {
         // Sales reps see pricing for organizations they belong to
         const { data: userOrgs } = await supabase
@@ -84,23 +101,39 @@ const ProductsManagement: React.FC = () => {
             .select('product_id')
             .in('organization_id', orgIds);
 
-          if (orgPricing) {
-            const productIds = [...new Set(orgPricing.map(p => p.product_id))];
-            query = query.in('product_id', productIds);
+          orgPricing?.forEach(item => {
+            counts[item.product_id] = (counts[item.product_id] || 0) + 1;
+          });
+
+          // Get location pricing for those organizations
+          const { data: locations } = await supabase
+            .from('locations')
+            .select('id')
+            .in('organization_id', orgIds);
+
+          if (locations && locations.length > 0) {
+            const locationIds = locations.map(l => l.id);
+            const { data: locationPricing } = await supabase
+              .from('location_pricing')
+              .select('product_id')
+              .in('location_id', locationIds);
+
+            locationPricing?.forEach(item => {
+              counts[item.product_id] = (counts[item.product_id] || 0) + 1;
+            });
           }
         }
+      } else if (profile.role === 'customer') {
+        // Customers only see their own individual pricing
+        const { data } = await supabase
+          .from('contract_pricing')
+          .select('product_id')
+          .eq('user_id', user.id);
+
+        data?.forEach(item => {
+          counts[item.product_id] = (counts[item.product_id] || 0) + 1;
+        });
       }
-      // Admins see all pricing (no filter)
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      // Count occurrences of each product_id
-      const counts: Record<number, number> = {};
-      data?.forEach(item => {
-        counts[item.product_id] = (counts[item.product_id] || 0) + 1;
-      });
 
       setContractPricingCounts(counts);
     } catch (err) {
@@ -193,6 +226,7 @@ const ProductsManagement: React.FC = () => {
         if (userOrgs && userOrgs.length > 0) {
           const orgIds = userOrgs.map(o => o.organization_id);
 
+          // Get organization pricing
           const { data: orgPricing } = await supabase
             .from('organization_pricing')
             .select(`
@@ -213,6 +247,37 @@ const ProductsManagement: React.FC = () => {
               pricing_type: 'organization'
             });
           });
+
+          // Get location pricing for those organizations
+          const { data: locations } = await supabase
+            .from('locations')
+            .select('id')
+            .in('organization_id', orgIds);
+
+          if (locations && locations.length > 0) {
+            const locationIds = locations.map(l => l.id);
+            const { data: locationPricing } = await supabase
+              .from('location_pricing')
+              .select(`
+                contract_price,
+                min_quantity,
+                max_quantity,
+                locations(name, organization_id, organizations(name))
+              `)
+              .eq('product_id', productId)
+              .in('location_id', locationIds);
+
+            locationPricing?.forEach(pricing => {
+              details.push({
+                organization_name: pricing.locations?.organizations?.name || 'Unknown',
+                location_name: pricing.locations?.name,
+                contract_price: Number(pricing.contract_price),
+                min_quantity: pricing.min_quantity,
+                max_quantity: pricing.max_quantity,
+                pricing_type: 'location'
+              });
+            });
+          }
         }
       } else if (profile.role === 'customer') {
         // Customers only see their own pricing
