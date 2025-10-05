@@ -5,6 +5,7 @@ import PriceDisplay from '../PriceDisplay';
 import { restCheckoutService } from '@/services/restCheckout';
 import CustomerSelector from './CustomerSelector';
 import AddressSelector from './AddressSelector';
+import BigCommercePaymentForm from './BigCommercePaymentForm';
 import { CustomerAddress, customerAddressService } from '@/services/customerAddresses';
 import { supabase } from '@/services/supabase';
 
@@ -846,42 +847,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         <CreditCard className="h-5 w-5 text-pink-600" />
         <h3 className="text-lg font-semibold">Payment Information</h3>
       </div>
-      
-      {/* BigCommerce Payment Form will be embedded here */}
-      <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-        <Lock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-        <h4 className="text-lg font-semibold text-gray-700 mb-2">Secure Payment Form</h4>
-        <p className="text-gray-600 mb-4">
-          BigCommerce's secure payment form will be embedded here
-        </p>
-        <div className="bg-white rounded-lg p-6 border border-gray-200">
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Card Number</label>
-              <div className="w-full h-10 bg-gray-100 rounded border border-gray-300 flex items-center px-3">
-                <span className="text-gray-500 text-sm">•••• •••• •••• ••••</span>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Expiry</label>
-                <div className="w-full h-10 bg-gray-100 rounded border border-gray-300 flex items-center px-3">
-                  <span className="text-gray-500 text-sm">MM/YY</span>
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CVV</label>
-                <div className="w-full h-10 bg-gray-100 rounded border border-gray-300 flex items-center px-3">
-                  <span className="text-gray-500 text-sm">•••</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <p className="text-xs text-gray-500 mt-4">
-          This is a placeholder. In production, BigCommerce's secure payment form would be embedded here.
-        </p>
-      </div>
+
+      <BigCommercePaymentForm
+        onPaymentReady={(ready) => console.log('Payment ready:', ready)}
+        onPaymentSubmit={(paymentData) => {
+          console.log('Payment submitted:', paymentData);
+          setCurrentStep('review');
+        }}
+        billingAddress={billingAddress}
+        total={total}
+        organizationId={organizationId}
+        locationId={selectedLocationId}
+      />
     </div>
   );
 

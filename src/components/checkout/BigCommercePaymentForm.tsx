@@ -1,11 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Lock, CreditCard, AlertCircle } from 'lucide-react';
+import { Lock, CreditCard, AlertCircle, Save } from 'lucide-react';
 
 interface BigCommercePaymentFormProps {
   onPaymentReady: (isReady: boolean) => void;
   onPaymentSubmit: (paymentData: any) => void;
   billingAddress: any;
   total: number;
+  organizationId?: string;
+  locationId?: string;
 }
 
 // This component will integrate with BigCommerce's Checkout SDK
@@ -14,68 +16,97 @@ const BigCommercePaymentForm: React.FC<BigCommercePaymentFormProps> = ({
   onPaymentReady,
   onPaymentSubmit,
   billingAddress,
-  total
+  total,
+  organizationId,
+  locationId
 }) => {
   const paymentFormRef = useRef<HTMLDivElement>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [paymentMethods, setPaymentMethods] = useState<string[]>(['credit_card', 'paypal']);
+  const [selectedMethod, setSelectedMethod] = useState('credit_card');
+  const [savePaymentMethod, setSavePaymentMethod] = useState(false);
+  const [paymentMethodLabel, setPaymentMethodLabel] = useState('');
+
+  const [cardData, setCardData] = useState({
+    cardholderName: '',
+    cardNumber: '',
+    expiryMonth: '',
+    expiryYear: '',
+    cvv: ''
+  });
 
   useEffect(() => {
-    // Initialize BigCommerce Checkout SDK
-    initializeBigCommerceCheckout();
+    onPaymentReady(true);
   }, []);
 
-  const initializeBigCommerceCheckout = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-
-      // In a real implementation, you would:
-      // 1. Load BigCommerce Checkout SDK
-      // 2. Create a checkout session
-      // 3. Initialize payment forms
-      // 4. Handle payment method selection
-
-      // Simulating SDK initialization
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Mock successful initialization
-      setIsLoading(false);
-      onPaymentReady(true);
-
-      console.log('BigCommerce Checkout SDK initialized');
-      console.log('Billing Address:', billingAddress);
-      console.log('Total Amount:', total);
-
-    } catch (err) {
-      setError('Failed to initialize payment form');
-      setIsLoading(false);
-      onPaymentReady(false);
+  const validateCardData = () => {
+    if (!cardData.cardholderName.trim()) {
+      setError('Cardholder name is required');
+      return false;
     }
+    if (cardData.cardNumber.replace(/\s/g, '').length !== 16) {
+      setError('Invalid card number');
+      return false;
+    }
+    if (!cardData.expiryMonth || parseInt(cardData.expiryMonth) < 1 || parseInt(cardData.expiryMonth) > 12) {
+      setError('Invalid expiry month');
+      return false;
+    }
+    if (!cardData.expiryYear || cardData.expiryYear.length !== 2) {
+      setError('Invalid expiry year');
+      return false;
+    }
+    if (cardData.cvv.length < 3 || cardData.cvv.length > 4) {
+      setError('Invalid CVV');
+      return false;
+    }
+    if (savePaymentMethod && !paymentMethodLabel.trim()) {
+      setError('Please provide a label for this payment method');
+      return false;
+    }
+    setError(null);
+    return true;
   };
 
   const handlePaymentMethodSelect = (method: string) => {
-    console.log('Payment method selected:', method);
-    // In real implementation, this would switch the payment form
+    setSelectedMethod(method);
+    setError(null);
+  };
+
+  const formatCardNumber = (value: string) => {
+    const cleaned = value.replace(/\s/g, '');
+    const chunks = cleaned.match(/.{1,4}/g) || [];
+    return chunks.join(' ').substring(0, 19);
+  };
+
+  const handleCardNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    setCardData({ ...cardData, cardNumber: value.substring(0, 16) });
   };
 
   const handleSubmitPayment = async () => {
-    try {
-      // In real implementation, this would:
-      // 1. Validate payment form
-      // 2. Tokenize payment data
-      // 3. Submit to BigCommerce
-      // 4. Return payment result
+    if (!validateCardData()) {
+      return;
+    }
 
-      const mockPaymentData = {
-        method: 'credit_card',
-        token: 'mock_payment_token_' + Date.now(),
-        last4: '4242',
-        brand: 'visa'
+    try {
+      const paymentData = {
+        instrument: {
+          type: 'card' as const,
+          cardholder_name: cardData.cardholderName,
+          number: cardData.cardNumber.replace(/\s/g, ''),
+          expiry_month: parseInt(cardData.expiryMonth),
+          expiry_year: parseInt('20' + cardData.expiryYear),
+          verification_value: cardData.cvv
+        },
+        savePaymentMethod,
+        paymentMethodLabel: savePaymentMethod ? paymentMethodLabel : undefined,
+        organizationId,
+        locationId
       };
 
-      onPaymentSubmit(mockPaymentData);
+      onPaymentSubmit(paymentData);
     } catch (err) {
       setError('Payment processing failed');
     }
@@ -145,34 +176,103 @@ const BigCommercePaymentForm: React.FC<BigCommercePaymentFormProps> = ({
           <span className="text-sm text-green-600 font-medium">Secured by BigCommerce</span>
         </div>
 
-        {/* This div would contain the actual BigCommerce payment form */}
+        {/* Credit Card Input Form */}
         <div ref={paymentFormRef} className="space-y-4">
-          {/* Mock payment form - in production, BigCommerce SDK would render here */}
-          <div className="bg-gray-50 rounded-lg p-4 border-2 border-dashed border-gray-300">
-            <div className="text-center text-gray-600">
-              <CreditCard className="h-12 w-12 mx-auto mb-3 text-gray-400" />
-              <p className="font-medium mb-2">BigCommerce Secure Payment Form</p>
-              <p className="text-sm">
-                In production, BigCommerce's PCI-compliant payment form would be embedded here.
-              </p>
-              <div className="mt-4 space-y-3">
-                <div className="bg-white rounded border p-3 text-left">
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Card Number</label>
-                  <div className="text-gray-400">•••• •••• •••• ••••</div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white rounded border p-3 text-left">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Expiry</label>
-                    <div className="text-gray-400">MM/YY</div>
-                  </div>
-                  <div className="bg-white rounded border p-3 text-left">
-                    <label className="block text-xs font-medium text-gray-700 mb-1">CVV</label>
-                    <div className="text-gray-400">•••</div>
-                  </div>
-                </div>
-              </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Cardholder Name</label>
+            <input
+              type="text"
+              value={cardData.cardholderName}
+              onChange={(e) => setCardData({ ...cardData, cardholderName: e.target.value })}
+              placeholder="John Doe"
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Card Number</label>
+            <input
+              type="text"
+              value={formatCardNumber(cardData.cardNumber)}
+              onChange={handleCardNumberChange}
+              placeholder="1234 5678 9012 3456"
+              maxLength={19}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent font-mono"
+            />
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Month</label>
+              <input
+                type="text"
+                value={cardData.expiryMonth}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '');
+                  setCardData({ ...cardData, expiryMonth: value.substring(0, 2) });
+                }}
+                placeholder="MM"
+                maxLength={2}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Year</label>
+              <input
+                type="text"
+                value={cardData.expiryYear}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '');
+                  setCardData({ ...cardData, expiryYear: value.substring(0, 2) });
+                }}
+                placeholder="YY"
+                maxLength={2}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent font-mono"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">CVV</label>
+              <input
+                type="text"
+                value={cardData.cvv}
+                onChange={(e) => {
+                  const value = e.target.value.replace(/\D/g, '');
+                  setCardData({ ...cardData, cvv: value.substring(0, 4) });
+                }}
+                placeholder="123"
+                maxLength={4}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent font-mono"
+              />
             </div>
           </div>
+
+          {(organizationId || locationId) && (
+            <div className="border-t pt-4">
+              <label className="flex items-center space-x-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={savePaymentMethod}
+                  onChange={(e) => setSavePaymentMethod(e.target.checked)}
+                  className="w-4 h-4 text-pink-600 border-gray-300 rounded focus:ring-pink-500"
+                />
+                <div className="flex items-center space-x-2">
+                  <Save className="h-4 w-4 text-gray-600" />
+                  <span className="text-sm font-medium text-gray-700">
+                    Save for {locationId ? 'this location' : 'this organization'}
+                  </span>
+                </div>
+              </label>
+              {savePaymentMethod && (
+                <input
+                  type="text"
+                  value={paymentMethodLabel}
+                  onChange={(e) => setPaymentMethodLabel(e.target.value)}
+                  placeholder="e.g., Corporate Card, Location Card"
+                  className="mt-2 w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent text-sm"
+                />
+              )}
+            </div>
+          )}
         </div>
 
         {/* Security Badges */}
@@ -190,15 +290,19 @@ const BigCommercePaymentForm: React.FC<BigCommercePaymentFormProps> = ({
         </div>
       </div>
 
-      {/* Development Note */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+          <p className="text-red-600 text-sm">{error}</p>
+        </div>
+      )}
+
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
         <div className="flex items-start space-x-2">
-          <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
-          <div className="text-blue-800">
-            <p className="font-medium text-sm">Development Note</p>
+          <AlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
+          <div className="text-yellow-800">
+            <p className="font-medium text-sm">Test Mode</p>
             <p className="text-xs mt-1">
-              This is a placeholder for BigCommerce's Checkout SDK integration. 
-              In production, you would integrate with BigCommerce's actual payment processing system.
+              Use test card: 4111 1111 1111 1111 with any future expiry date and CVV
             </p>
           </div>
         </div>
