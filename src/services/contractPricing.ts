@@ -217,12 +217,7 @@ class ContractPricingService {
     try {
       const { data, error } = await supabase
         .from('contract_pricing')
-        .select(`
-          *,
-          profiles:entity_id (email, role),
-          organizations:entity_id (name, code),
-          locations:entity_id (name, code)
-        `)
+        .select('*')
         .eq('product_id', productId)
         .order('created_at', { ascending: false });
 
@@ -230,7 +225,36 @@ class ContractPricingService {
         throw error;
       }
 
-      return data || [];
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      const profileIds = data.filter(p => p.pricing_type === 'individual').map(p => p.entity_id);
+      const orgIds = data.filter(p => p.pricing_type === 'organization').map(p => p.entity_id);
+      const locationIds = data.filter(p => p.pricing_type === 'location').map(p => p.entity_id);
+
+      const [profiles, organizations, locations] = await Promise.all([
+        profileIds.length > 0
+          ? supabase.from('profiles').select('id, email, role').in('id', profileIds)
+          : Promise.resolve({ data: [] }),
+        orgIds.length > 0
+          ? supabase.from('organizations').select('id, name, code').in('id', orgIds)
+          : Promise.resolve({ data: [] }),
+        locationIds.length > 0
+          ? supabase.from('locations').select('id, name, code').in('id', locationIds)
+          : Promise.resolve({ data: [] })
+      ]);
+
+      const profileMap = new Map((profiles.data || []).map(p => [p.id, p]));
+      const orgMap = new Map((organizations.data || []).map(o => [o.id, o]));
+      const locationMap = new Map((locations.data || []).map(l => [l.id, l]));
+
+      return data.map(pricing => ({
+        ...pricing,
+        profiles: pricing.pricing_type === 'individual' ? profileMap.get(pricing.entity_id) : undefined,
+        organizations: pricing.pricing_type === 'organization' ? orgMap.get(pricing.entity_id) : undefined,
+        locations: pricing.pricing_type === 'location' ? locationMap.get(pricing.entity_id) : undefined
+      }));
     } catch (error) {
       console.error('Error fetching product contract prices:', error);
       return [];
@@ -563,19 +587,43 @@ class ContractPricingService {
     try {
       const { data, error } = await supabase
         .from('contract_pricing')
-        .select(`
-          *,
-          profiles:entity_id (email),
-          organizations:entity_id (name, code),
-          locations:entity_id (name, code)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
         throw error;
       }
 
-      return data || [];
+      if (!data || data.length === 0) {
+        return [];
+      }
+
+      const profileIds = data.filter(p => p.pricing_type === 'individual').map(p => p.entity_id);
+      const orgIds = data.filter(p => p.pricing_type === 'organization').map(p => p.entity_id);
+      const locationIds = data.filter(p => p.pricing_type === 'location').map(p => p.entity_id);
+
+      const [profiles, organizations, locations] = await Promise.all([
+        profileIds.length > 0
+          ? supabase.from('profiles').select('id, email').in('id', profileIds)
+          : Promise.resolve({ data: [] }),
+        orgIds.length > 0
+          ? supabase.from('organizations').select('id, name, code').in('id', orgIds)
+          : Promise.resolve({ data: [] }),
+        locationIds.length > 0
+          ? supabase.from('locations').select('id, name, code').in('id', locationIds)
+          : Promise.resolve({ data: [] })
+      ]);
+
+      const profileMap = new Map((profiles.data || []).map(p => [p.id, p]));
+      const orgMap = new Map((organizations.data || []).map(o => [o.id, o]));
+      const locationMap = new Map((locations.data || []).map(l => [l.id, l]));
+
+      return data.map(pricing => ({
+        ...pricing,
+        profiles: pricing.pricing_type === 'individual' ? profileMap.get(pricing.entity_id) : undefined,
+        organizations: pricing.pricing_type === 'organization' ? orgMap.get(pricing.entity_id) : undefined,
+        locations: pricing.pricing_type === 'location' ? locationMap.get(pricing.entity_id) : undefined
+      }));
     } catch (error) {
       console.error('Error fetching all pricing entries:', error);
       return [];
@@ -587,19 +635,14 @@ class ContractPricingService {
    */
   async getOrganizationPricingEntries(organizationId: string): Promise<ContractPrice[]> {
     try {
-      // Get organization pricing
       const { data: orgPricing, error: orgError } = await supabase
         .from('contract_pricing')
-        .select(`
-          *,
-          organizations:entity_id (name, code)
-        `)
+        .select('*')
         .eq('pricing_type', 'organization')
         .eq('entity_id', organizationId);
 
       if (orgError) throw orgError;
 
-      // Get location pricing for this organization's locations
       const { data: locations, error: locError } = await supabase
         .from('locations')
         .select('id')
@@ -608,15 +651,12 @@ class ContractPricingService {
       if (locError) throw locError;
 
       const locationIds = locations?.map(loc => loc.id) || [];
-      
+
       let locationPricing: any[] = [];
       if (locationIds.length > 0) {
         const { data: locPricing, error: locPricingError } = await supabase
           .from('contract_pricing')
-          .select(`
-            *,
-            locations:entity_id (name, code)
-          `)
+          .select('*')
           .eq('pricing_type', 'location')
           .in('entity_id', locationIds);
 
@@ -624,7 +664,26 @@ class ContractPricingService {
         locationPricing = locPricing || [];
       }
 
-      return [...(orgPricing || []), ...locationPricing];
+      const allPricing = [...(orgPricing || []), ...locationPricing];
+
+      if (allPricing.length === 0) {
+        return [];
+      }
+
+      const [orgData, locationData] = await Promise.all([
+        supabase.from('organizations').select('id, name, code').eq('id', organizationId).maybeSingle(),
+        locationIds.length > 0
+          ? supabase.from('locations').select('id, name, code').in('id', locationIds)
+          : Promise.resolve({ data: [] })
+      ]);
+
+      const locationMap = new Map((locationData.data || []).map(l => [l.id, l]));
+
+      return allPricing.map(pricing => ({
+        ...pricing,
+        organizations: pricing.pricing_type === 'organization' ? orgData.data : undefined,
+        locations: pricing.pricing_type === 'location' ? locationMap.get(pricing.entity_id) : undefined
+      }));
     } catch (error) {
       console.error('Error fetching organization pricing entries:', error);
       return [];
