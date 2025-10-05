@@ -7,9 +7,10 @@ interface ProductGridProps {
   products: Product[];
   onAddToCart: (id: number) => void;
   onProductClick: (product: Product) => void;
+  organizationId?: string;
 }
 
-const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProductClick }) => {
+const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProductClick, organizationId }) => {
   if (products.length === 0) {
     return (
       <div className="text-center py-16">
@@ -98,11 +99,12 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
 
             {/* Price */}
             <div className="mb-3">
-              <PriceDisplay 
+              <PriceDisplay
                 productId={product.id}
                 regularPrice={product.price}
                 originalPrice={product.originalPrice}
                 showSavings={true}
+                organizationId={organizationId}
               />
             </div>
 

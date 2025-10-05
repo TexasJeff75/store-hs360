@@ -689,6 +689,41 @@ class ContractPricingService {
       return [];
     }
   }
+
+  /**
+   * Get list of product IDs that have contract pricing available
+   * Can filter by user, organization, or get all products with any contract pricing
+   */
+  async getProductsWithContractPricing(userId?: string, organizationId?: string): Promise<number[]> {
+    try {
+      let query = supabase
+        .from('contract_pricing')
+        .select('product_id');
+
+      if (userId) {
+        query = query.eq('pricing_type', 'individual').eq('entity_id', userId);
+      } else if (organizationId) {
+        const { data: locations } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('organization_id', organizationId);
+
+        const locationIds = locations?.map(loc => loc.id) || [];
+
+        query = query.or(`and(pricing_type.eq.organization,entity_id.eq.${organizationId}),and(pricing_type.eq.location,entity_id.in.(${locationIds.join(',')}))`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const uniqueProductIds = [...new Set(data?.map(p => p.product_id) || [])];
+      return uniqueProductIds;
+    } catch (error) {
+      console.error('Error fetching products with contract pricing:', error);
+      return [];
+    }
+  }
 }
 
 export const contractPricingService = new ContractPricingService();

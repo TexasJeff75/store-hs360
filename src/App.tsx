@@ -17,6 +17,7 @@ import { checkoutService, CartLineItem } from '@/services/checkout';
 import { useErrorLogger } from '@/hooks/useErrorLogger';
 import { cacheService } from '@/services/cache';
 import { useAuth } from '@/contexts/AuthContext';
+import { contractPricingService } from '@/services/contractPricing';
 
 interface CartItem {
   id: number;
@@ -47,6 +48,8 @@ function AppContent() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isOrgSelectorOpen, setIsOrgSelectorOpen] = useState(false);
   const [selectedOrganization, setSelectedOrganization] = useState<any>(null);
+  const [showOnlyContractPricing, setShowOnlyContractPricing] = useState(false);
+  const [productsWithContractPricing, setProductsWithContractPricing] = useState<number[]>([]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -104,6 +107,29 @@ function AppContent() {
   useEffect(() => {
     console.log('Auth state:', { user: user?.email, profile: profile?.role, authLoading });
   }, [user, profile, authLoading]);
+
+  // Fetch products with contract pricing when organization or user changes
+  useEffect(() => {
+    const fetchContractPricingProducts = async () => {
+      if (!user) {
+        setProductsWithContractPricing([]);
+        return;
+      }
+
+      try {
+        const productIds = await contractPricingService.getProductsWithContractPricing(
+          selectedOrganization ? undefined : user.id,
+          selectedOrganization?.id
+        );
+        setProductsWithContractPricing(productIds);
+      } catch (error) {
+        console.error('Error fetching contract pricing products:', error);
+        setProductsWithContractPricing([]);
+      }
+    };
+
+    fetchContractPricingProducts();
+  }, [user, selectedOrganization]);
   const addToCart = (productId: number, quantity: number = 1) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
@@ -207,7 +233,8 @@ function AppContent() {
                          product.benefits.some(benefit => benefit.toLowerCase().includes(searchTerm.toLowerCase()));
     const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
     const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
-    return matchesSearch && matchesCategory && matchesPrice;
+    const matchesContractPricing = !showOnlyContractPricing || productsWithContractPricing.includes(product.id);
+    return matchesSearch && matchesCategory && matchesPrice && matchesContractPricing;
   });
 
   // Show loading or auth gate
@@ -365,13 +392,37 @@ function AppContent() {
                     </div>
                   </div>
 
-                  {/* Results Summary */}
-                  <div className="mb-6 flex items-center justify-between">
+                  {/* Results Summary and Filters */}
+                  <div className="mb-6 flex items-center justify-between flex-wrap gap-4">
                     <p className="text-gray-600">
                       Showing {filteredProducts.length} of {products.length} products
                       {selectedCategory !== 'all' && ` in ${selectedCategory}`}
                       {searchTerm && ` matching "${searchTerm}"`}
                     </p>
+
+                    <div className="flex items-center space-x-4">
+                      {selectedOrganization && (
+                        <div className="flex items-center space-x-2 bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm">
+                          <span className="font-medium">{selectedOrganization.name}</span>
+                          <button
+                            onClick={() => setSelectedOrganization(null)}
+                            className="text-blue-600 hover:text-blue-800"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      )}
+
+                      <label className="flex items-center space-x-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={showOnlyContractPricing}
+                          onChange={(e) => setShowOnlyContractPricing(e.target.checked)}
+                          className="rounded border-gray-300 text-pink-600 focus:ring-pink-500"
+                        />
+                        <span className="text-sm text-gray-700">Only show contract pricing</span>
+                      </label>
+                    </div>
                   </div>
 
                   {/* Product Grid */}
@@ -379,6 +430,7 @@ function AppContent() {
                     products={filteredProducts}
                     onAddToCart={addToCart}
                     onProductClick={handleProductClick}
+                    organizationId={selectedOrganization?.id}
                   />
                 </div>
               </div>
@@ -485,6 +537,14 @@ function AppContent() {
             onClose={() => setIsAdminOpen(false)}
           />
         )}
+
+        <OrganizationSelector
+          isOpen={isOrgSelectorOpen}
+          onClose={() => setIsOrgSelectorOpen(false)}
+          onSelectOrganization={setSelectedOrganization}
+          selectedOrganization={selectedOrganization}
+        />
+
         <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
       </div>
   );
