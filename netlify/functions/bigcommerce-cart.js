@@ -78,12 +78,24 @@ exports.handler = async (event, context) => {
           throw new Error(errorMsg);
         }
 
+        const cartId = result.data.id;
+        const redirectUrls = result.data.redirect_urls || {};
+
+        console.log('[BigCommerce Cart Function] Cart ID:', cartId);
+        console.log('[BigCommerce Cart Function] Redirect URLs:', JSON.stringify(redirectUrls));
+
+        const checkoutUrl = redirectUrls.checkout_url ||
+                           redirectUrls.embedded_checkout_url ||
+                           redirectUrls.cart_url ||
+                           `https://store-${BC_STORE_HASH}.mybigcommerce.com/cart.php?action=loadInCheckout&id=${cartId}`;
+
         return {
           statusCode: 200,
           headers: corsHeaders,
           body: JSON.stringify({
-            cartId: result.data.id,
-            redirectUrl: result.data.redirect_urls?.embedded_checkout_url,
+            cartId: cartId,
+            redirectUrl: checkoutUrl,
+            redirectUrls: redirectUrls,
           }),
         };
       }
