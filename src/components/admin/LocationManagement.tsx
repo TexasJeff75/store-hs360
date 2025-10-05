@@ -299,9 +299,11 @@ const LocationManagement: React.FC<LocationManagementProps> = ({ organizationId 
                             onChange={(e) => setSelectedLocation({...selectedLocation, organization_id: e.target.value})}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           >
-                            {organizations.map(org => (
-                              <option key={org.id} value={org.id}>{org.name}</option>
-                            ))}
+                            {[...organizations]
+                              .sort((a, b) => a.name.localeCompare(b.name))
+                              .map(org => (
+                                <option key={org.id} value={org.id}>{org.name}</option>
+                              ))}
                           </select>
                         )}
                       </div>
