@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus } from 'lucide-react';
 
 interface OrderItem {
@@ -56,12 +57,14 @@ interface Order {
 }
 
 const OrderManagement: React.FC = () => {
+  const { user, profile } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showAddShipment, setShowAddShipment] = useState(false);
+  const [canManageOrders, setCanManageOrders] = useState(false);
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -73,7 +76,35 @@ const OrderManagement: React.FC = () => {
 
   useEffect(() => {
     fetchOrders();
-  }, []);
+    checkManagementPermissions();
+  }, [user, profile]);
+
+  const checkManagementPermissions = async () => {
+    if (!user) {
+      setCanManageOrders(false);
+      return;
+    }
+
+    if (profile?.role === 'admin') {
+      setCanManageOrders(true);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('user_organization_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .in('role', ['admin', 'manager']);
+
+      if (error) throw error;
+
+      setCanManageOrders(data && data.length > 0);
+    } catch (error) {
+      console.error('Error checking permissions:', error);
+      setCanManageOrders(false);
+    }
+  };
 
   const fetchOrders = async () => {
     try {
@@ -257,17 +288,23 @@ const OrderManagement: React.FC = () => {
                   <div>
                     <span className="text-gray-600">Status:</span>
                     <div className="mt-1">
-                      <select
-                        value={order.status}
-                        onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                        className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(order.status)}`}
-                      >
-                        <option value="pending">Pending</option>
-                        <option value="processing">Processing</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                        <option value="refunded">Refunded</option>
-                      </select>
+                      {canManageOrders ? (
+                        <select
+                          value={order.status}
+                          onChange={(e) => updateOrderStatus(order.id, e.target.value)}
+                          className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(order.status)}`}
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="processing">Processing</option>
+                          <option value="completed">Completed</option>
+                          <option value="cancelled">Cancelled</option>
+                          <option value="refunded">Refunded</option>
+                        </select>
+                      ) : (
+                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getStatusColor(order.status)}`}>
+                          {order.status}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -378,7 +415,7 @@ const OrderManagement: React.FC = () => {
                   <Truck className="h-4 w-4 mr-2" />
                   Shipment Tracking
                 </h4>
-                {!showAddShipment && (
+                {canManageOrders && !showAddShipment && (
                   <button
                     onClick={() => setShowAddShipment(true)}
                     className="flex items-center space-x-1 px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 transition-colors"
@@ -527,13 +564,15 @@ const OrderManagement: React.FC = () => {
                             <p className="text-sm text-gray-600 mt-2 italic">{shipment.notes}</p>
                           )}
                         </div>
-                        <button
-                          onClick={() => removeShipment(order.id, shipment.tracking_number)}
-                          className="text-red-600 hover:text-red-800 p-1"
-                          title="Remove tracking"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
+                        {canManageOrders && (
+                          <button
+                            onClick={() => removeShipment(order.id, shipment.tracking_number)}
+                            className="text-red-600 hover:text-red-800 p-1"
+                            title="Remove tracking"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))}
