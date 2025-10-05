@@ -3,6 +3,12 @@ import { gql } from './bigcommerce';
 // Get BigCommerce configuration from environment
 const BC_STORE_HASH = import.meta.env.VITE_BC_STORE_HASH;
 
+console.log('[Checkout Service] Environment check:', {
+  storeHash: BC_STORE_HASH ? '✓ Configured' : '✗ Missing',
+  storeHashValue: BC_STORE_HASH || 'undefined',
+  allEnvVars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_BC'))
+});
+
 // GraphQL mutations for cart operations
 const ADD_CART_LINE_ITEMS = /* GraphQL */ `
   mutation AddCartLineItems($cartId: String!, $data: AddCartLineItemsInput!) {
@@ -86,10 +92,14 @@ class CheckoutService {
    */
   async createCart(lineItems: CartLineItem[]): Promise<{ cartId: string | null; error?: string }> {
     try {
+      console.log('[Checkout Service] Creating cart with line items:', lineItems);
+      console.log('[Checkout Service] BC_STORE_HASH:', BC_STORE_HASH);
+
       if (!BC_STORE_HASH) {
+        console.error('[Checkout Service] BigCommerce credentials missing!');
         return {
           cartId: null,
-          error: 'BigCommerce store not configured. Please add VITE_BC_STORE_HASH to your .env file.'
+          error: 'BigCommerce store not configured. Please add VITE_BC_STORE_HASH and VITE_BC_STOREFRONT_TOKEN to your .env file and restart the dev server.'
         };
       }
 

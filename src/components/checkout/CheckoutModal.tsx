@@ -163,15 +163,19 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         quantity: item.quantity
       }));
 
+      console.log('[CheckoutModal] Processing embedded checkout...');
       const checkoutResult = await bulletproofCheckoutService.processEmbeddedCheckout(
         sessionResult.sessionId,
         lineItems
       );
 
+      console.log('[CheckoutModal] Checkout result:', checkoutResult);
+
       if (checkoutResult.success && checkoutResult.checkoutUrl) {
         setCheckoutUrl(checkoutResult.checkoutUrl);
         setCurrentStep('embedded-checkout');
       } else {
+        console.error('[CheckoutModal] Checkout failed:', checkoutResult.error);
         setError(checkoutResult.error || 'Failed to initialize checkout');
         setCanRetry(checkoutResult.canRetry || false);
       }
