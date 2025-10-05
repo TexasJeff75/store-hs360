@@ -866,7 +866,20 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const renderReviewStep = () => (
     <div className="space-y-6">
       <h3 className="text-lg font-semibold mb-4">Order Review</h3>
-      
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="flex items-start space-x-2">
+          <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+          <div className="text-blue-800">
+            <p className="font-medium text-sm">Test Mode</p>
+            <p className="text-xs mt-1">
+              This order will be created in the system but payment is simulated.
+              No actual charge will be made to the test card.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {/* Order Items */}
       <div className="bg-gray-50 rounded-lg p-4">
         <h4 className="font-semibold mb-3">Items ({items.length})</h4>

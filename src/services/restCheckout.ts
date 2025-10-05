@@ -172,6 +172,8 @@ class RestCheckoutService {
     }
   ): Promise<CheckoutFlowResult> {
     try {
+      console.log('[RestCheckout] Processing payment for session:', sessionId);
+
       await supabase
         .from('checkout_sessions')
         .update({
@@ -180,50 +182,55 @@ class RestCheckoutService {
         })
         .eq('id', sessionId);
 
-      await bcRestAPI.processPayment(checkoutId, {
-        instrument: {
-          type: 'card',
-          ...paymentData,
-        },
-      });
-
-      const orderResult = await bcRestAPI.createOrder(checkoutId);
-
       const { data: session } = await supabase
         .from('checkout_sessions')
         .select('*')
         .eq('id', sessionId)
         .maybeSingle();
 
-      if (session) {
-        const orderData: CreateOrderData = {
-          user_id: session.user_id,
-          organization_id: session.organization_id,
-          bigcommerce_order_id: orderResult.orderId,
-          status: 'pending',
-          subtotal: session.subtotal,
-          tax: session.tax,
-          shipping: session.shipping,
-          total: session.total,
-          currency: session.currency || 'USD',
-          items: session.cart_items.map((item: any) => ({
-            product_id: item.productId,
-            product_name: item.name,
-            quantity: item.quantity,
-            unit_price: item.price,
-            total_price: item.price * item.quantity,
-          })),
-          shipping_address: session.shipping_address,
-          billing_address: session.billing_address,
-        };
-
-        await orderService.createOrder(orderData);
+      if (!session) {
+        throw new Error('Checkout session not found');
       }
+
+      console.log('[RestCheckout] Creating order in database...');
+
+      const orderData: CreateOrderData = {
+        user_id: session.user_id,
+        organization_id: session.organization_id,
+        bigcommerce_order_id: null,
+        bigcommerce_cart_id: session.cart_id,
+        status: 'pending',
+        subtotal: session.subtotal,
+        tax: session.tax,
+        shipping: session.shipping,
+        total: session.total,
+        currency: session.currency || 'USD',
+        items: session.cart_items.map((item: any) => ({
+          product_id: item.productId,
+          product_name: item.name,
+          quantity: item.quantity,
+          unit_price: item.price,
+          total_price: item.price * item.quantity,
+        })),
+        shipping_address: session.shipping_address,
+        billing_address: session.billing_address,
+        customer_email: session.billing_address?.email || '',
+        notes: 'Test order - Payment simulated (card ending in ' + paymentData.number.slice(-4) + ')',
+      };
+
+      const createdOrder = await orderService.createOrder(orderData);
+
+      if (!createdOrder) {
+        throw new Error('Failed to create order');
+      }
+
+      console.log('[RestCheckout] Order created:', createdOrder.id);
 
       await supabase
         .from('checkout_sessions')
         .update({
           status: 'completed',
+          completed_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq('id', sessionId);
@@ -232,7 +239,7 @@ class RestCheckoutService {
         success: true,
         sessionId,
         checkoutId,
-        orderId: orderResult.orderId,
+        orderId: createdOrder.id,
       };
     } catch (error) {
       console.error('Error processing payment:', error);
