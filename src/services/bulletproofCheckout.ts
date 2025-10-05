@@ -50,7 +50,8 @@ export interface ErrorLogEntry {
 export interface CheckoutResult {
   success: boolean;
   sessionId?: string;
-  checkoutUrl?: string;
+  cartId?: string;
+  checkoutId?: string;
   orderId?: string;
   error?: string;
   canRetry?: boolean;
@@ -230,7 +231,7 @@ class BulletproofCheckoutService {
           retry_count: attempt,
         });
 
-        const { cartId, redirectUrl } = await bcRestAPI.createCart(lineItems);
+        const { cartId } = await bcRestAPI.createCart(lineItems);
 
         if (cartId) {
           console.log('[Bulletproof Checkout] Cart created successfully:', cartId);
@@ -242,7 +243,7 @@ class BulletproofCheckoutService {
           return {
             success: true,
             sessionId,
-            checkoutUrl: redirectUrl || bcRestAPI.getCheckoutUrl(cartId),
+            cartId,
           };
         } else {
           lastError = new Error('Failed to create cart - no cart ID returned');
@@ -293,21 +294,11 @@ class BulletproofCheckoutService {
 
     if (session.cart_id) {
       console.log('[Bulletproof Checkout] Using existing cart:', session.cart_id);
-      try {
-        const checkoutUrl = bcRestAPI.getCheckoutUrl(session.cart_id);
-        return {
-          success: true,
-          sessionId,
-          checkoutUrl,
-        };
-      } catch (error) {
-        console.error('[Bulletproof Checkout] Failed to get checkout URL:', error);
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : 'Failed to generate checkout URL',
-          canRetry: false,
-        };
-      }
+      return {
+        success: true,
+        sessionId,
+        cartId: session.cart_id,
+      };
     }
 
     console.log('[Bulletproof Checkout] Creating new cart...');
@@ -351,7 +342,7 @@ class BulletproofCheckoutService {
           return {
             success: true,
             sessionId,
-            checkoutUrl: result.checkoutId,
+            checkoutId: result.checkoutId,
           };
         } else {
           lastError = new Error(result.error || 'Checkout failed');
@@ -502,11 +493,11 @@ class BulletproofCheckoutService {
       case 'address_entry':
       case 'payment':
         if (session.cart_id) {
-          const checkoutUrl = checkoutService.getEmbeddedCheckoutUrl(session.cart_id);
           return {
             success: true,
             sessionId,
-            checkoutUrl,
+            cartId: session.cart_id,
+            checkoutId: session.checkout_id,
           };
         }
         return {

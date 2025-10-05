@@ -153,18 +153,8 @@ class CheckoutService {
   }
 
   /**
-   * Get BigCommerce embedded checkout URL
-   */
-  getEmbeddedCheckoutUrl(cartId: string): string {
-    if (!BC_STORE_HASH) {
-      throw new Error('BigCommerce store not configured. Add VITE_BC_STORE_HASH and VITE_BC_STOREFRONT_TOKEN to .env');
-    }
-
-    return `https://store-${BC_STORE_HASH}.mybigcommerce.com/embedded-checkout/${cartId}`;
-  }
-
-  /**
-   * Process checkout - create cart and return embedded checkout URL
+   * Process checkout - create cart (use REST API for checkout flow)
+   * @deprecated Use restCheckoutService for full checkout flow
    */
   async processCheckout(lineItems: CartLineItem[]): Promise<CheckoutResult> {
     try {
@@ -184,13 +174,10 @@ class CheckoutService {
         };
       }
 
-      const checkoutUrl = this.getEmbeddedCheckoutUrl(cartId);
-
-      console.log('Created embedded checkout:', { cartId, checkoutUrl });
+      console.log('Created cart for checkout:', { cartId });
 
       return {
         success: true,
-        checkoutUrl,
         cartId
       };
     } catch (error) {
