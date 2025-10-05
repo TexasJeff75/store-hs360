@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
-import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard } from 'lucide-react';
+import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus } from 'lucide-react';
 
 interface OrderItem {
   productId: number;
@@ -23,6 +23,15 @@ interface Address {
   email?: string;
 }
 
+interface Shipment {
+  carrier: string;
+  tracking_number: string;
+  shipped_date?: string;
+  estimated_delivery?: string;
+  status: string;
+  notes?: string;
+}
+
 interface Order {
   id: string;
   user_id: string;
@@ -41,6 +50,7 @@ interface Order {
   billing_address?: Address;
   customer_email: string;
   notes?: string;
+  shipments?: Shipment[];
   created_at: string;
   updated_at: string;
 }
@@ -51,6 +61,15 @@ const OrderManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [showAddShipment, setShowAddShipment] = useState(false);
+  const [newShipment, setNewShipment] = useState<Shipment>({
+    carrier: '',
+    tracking_number: '',
+    shipped_date: '',
+    estimated_delivery: '',
+    status: 'in_transit',
+    notes: ''
+  });
 
   useEffect(() => {
     fetchOrders();
@@ -91,6 +110,82 @@ const OrderManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating order status:', error);
+    }
+  };
+
+  const addShipment = async (orderId: string) => {
+    if (!newShipment.carrier || !newShipment.tracking_number) {
+      alert('Carrier and tracking number are required');
+      return;
+    }
+
+    try {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const existingShipments = order.shipments || [];
+      const updatedShipments = [...existingShipments, newShipment];
+
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          shipments: updatedShipments,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      await fetchOrders();
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder({ ...selectedOrder, shipments: updatedShipments });
+      }
+
+      setNewShipment({
+        carrier: '',
+        tracking_number: '',
+        shipped_date: '',
+        estimated_delivery: '',
+        status: 'in_transit',
+        notes: ''
+      });
+      setShowAddShipment(false);
+    } catch (error) {
+      console.error('Error adding shipment:', error);
+      alert('Failed to add shipment tracking');
+    }
+  };
+
+  const removeShipment = async (orderId: string, trackingNumber: string) => {
+    if (!confirm('Are you sure you want to remove this shipment tracking?')) {
+      return;
+    }
+
+    try {
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const updatedShipments = (order.shipments || []).filter(
+        s => s.tracking_number !== trackingNumber
+      );
+
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          shipments: updatedShipments,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      await fetchOrders();
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder({ ...selectedOrder, shipments: updatedShipments });
+      }
+    } catch (error) {
+      console.error('Error removing shipment:', error);
+      alert('Failed to remove shipment tracking');
     }
   };
 
@@ -273,6 +368,175 @@ const OrderManagement: React.FC = () => {
                     <p>{order.billing_address.country}</p>
                     {order.billing_address.phone && <p className="mt-2">Phone: {order.billing_address.phone}</p>}
                   </div>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold text-gray-900 flex items-center">
+                  <Truck className="h-4 w-4 mr-2" />
+                  Shipment Tracking
+                </h4>
+                {!showAddShipment && (
+                  <button
+                    onClick={() => setShowAddShipment(true)}
+                    className="flex items-center space-x-1 px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 transition-colors"
+                  >
+                    <Plus className="h-4 w-4" />
+                    <span>Add Tracking</span>
+                  </button>
+                )}
+              </div>
+
+              {showAddShipment && (
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Carrier *</label>
+                      <input
+                        type="text"
+                        placeholder="e.g., FedEx, UPS, USPS"
+                        value={newShipment.carrier}
+                        onChange={(e) => setNewShipment({ ...newShipment, carrier: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Tracking Number *</label>
+                      <input
+                        type="text"
+                        placeholder="Enter tracking number"
+                        value={newShipment.tracking_number}
+                        onChange={(e) => setNewShipment({ ...newShipment, tracking_number: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Shipped Date</label>
+                      <input
+                        type="date"
+                        value={newShipment.shipped_date}
+                        onChange={(e) => setNewShipment({ ...newShipment, shipped_date: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Estimated Delivery</label>
+                      <input
+                        type="date"
+                        value={newShipment.estimated_delivery}
+                        onChange={(e) => setNewShipment({ ...newShipment, estimated_delivery: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                      <select
+                        value={newShipment.status}
+                        onChange={(e) => setNewShipment({ ...newShipment, status: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      >
+                        <option value="pending">Pending</option>
+                        <option value="in_transit">In Transit</option>
+                        <option value="out_for_delivery">Out for Delivery</option>
+                        <option value="delivered">Delivered</option>
+                        <option value="exception">Exception</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                      <input
+                        type="text"
+                        placeholder="Optional notes"
+                        value={newShipment.notes}
+                        onChange={(e) => setNewShipment({ ...newShipment, notes: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex justify-end space-x-2">
+                    <button
+                      onClick={() => {
+                        setShowAddShipment(false);
+                        setNewShipment({
+                          carrier: '',
+                          tracking_number: '',
+                          shipped_date: '',
+                          estimated_delivery: '',
+                          status: 'in_transit',
+                          notes: ''
+                        });
+                      }}
+                      className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={() => addShipment(order.id)}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                    >
+                      Add Tracking
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {(!order.shipments || order.shipments.length === 0) && !showAddShipment ? (
+                <div className="text-center py-8 bg-gray-50 rounded-lg">
+                  <Truck className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                  <p className="text-gray-500 text-sm">No shipment tracking added yet</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {order.shipments?.map((shipment, index) => (
+                    <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <span className="font-semibold text-gray-900">{shipment.carrier}</span>
+                            <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                              shipment.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                              shipment.status === 'in_transit' ? 'bg-blue-100 text-blue-800' :
+                              shipment.status === 'out_for_delivery' ? 'bg-yellow-100 text-yellow-800' :
+                              shipment.status === 'exception' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {shipment.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-700">
+                            <div>
+                              <span className="text-gray-500">Tracking:</span>
+                              <span className="ml-2 font-mono font-medium">{shipment.tracking_number}</span>
+                            </div>
+                            {shipment.shipped_date && (
+                              <div>
+                                <span className="text-gray-500">Shipped:</span>
+                                <span className="ml-2">{new Date(shipment.shipped_date).toLocaleDateString()}</span>
+                              </div>
+                            )}
+                            {shipment.estimated_delivery && (
+                              <div>
+                                <span className="text-gray-500">Est. Delivery:</span>
+                                <span className="ml-2">{new Date(shipment.estimated_delivery).toLocaleDateString()}</span>
+                              </div>
+                            )}
+                          </div>
+                          {shipment.notes && (
+                            <p className="text-sm text-gray-600 mt-2 italic">{shipment.notes}</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => removeShipment(order.id, shipment.tracking_number)}
+                          className="text-red-600 hover:text-red-800 p-1"
+                          title="Remove tracking"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
