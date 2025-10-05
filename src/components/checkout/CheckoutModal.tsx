@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, CreditCard, Truck, MapPin, User, Lock, ArrowLeft, ArrowRight, Loader, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import PriceDisplay from '../PriceDisplay';
-import { bulletproofCheckoutService, CheckoutSession } from '@/services/bulletproofCheckout';
+import { restCheckoutService } from '@/services/restCheckout';
 
 interface CartItem {
   id: number;
@@ -36,7 +36,7 @@ interface BillingAddress extends ShippingAddress {
   email: string;
 }
 
-type CheckoutStep = 'shipping' | 'billing' | 'payment' | 'review' | 'redirect-checkout';
+type CheckoutStep = 'shipping' | 'billing' | 'payment' | 'review' | 'processing';
 
 const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
@@ -45,15 +45,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOrderComplete
 }) => {
   const { user, profile } = useAuth();
-  const [currentStep, setCurrentStep] = useState<CheckoutStep>('redirect-checkout');
+  const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
-  const [session, setSession] = useState<CheckoutSession | null>(null);
-  const [canRetry, setCanRetry] = useState(false);
-  const [retrying, setRetrying] = useState(false);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [cartId, setCartId] = useState<string | null>(null);
+  const [checkoutId, setCheckoutId] = useState<string | null>(null);
   
   // Form data
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
@@ -104,18 +101,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   }, [isOpen, items]);
 
-  useEffect(() => {
-    if (sessionId) {
-      const interval = setInterval(async () => {
-        const updatedSession = await bulletproofCheckoutService.getSession(sessionId);
-        if (updatedSession) {
-          setSession(updatedSession);
-        }
-      }, 5000);
-
-      return () => clearInterval(interval);
-    }
-  }, [sessionId]);
 
   useEffect(() => {
     if (sameAsShipping) {
@@ -145,77 +130,26 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         image: item.image
       }));
 
-      const sessionResult = await bulletproofCheckoutService.createSession(
+      const sessionResult = await restCheckoutService.createCheckoutSession(
         user.id,
         cartItems
       );
 
       if (!sessionResult.success || !sessionResult.sessionId) {
         setError(sessionResult.error || 'Failed to create checkout session');
-        setCanRetry(sessionResult.canRetry || false);
         return;
       }
 
       setSessionId(sessionResult.sessionId);
-
-      const lineItems = items.map(item => ({
-        product_id: item.id,
-        quantity: item.quantity
-      }));
-
-      console.log('[CheckoutModal] Processing REST API checkout...');
-      const checkoutResult = await bulletproofCheckoutService.processRestAPICheckout(
-        sessionResult.sessionId,
-        lineItems
-      );
-
-      console.log('[CheckoutModal] Checkout result:', checkoutResult);
-
-      if (checkoutResult.success && checkoutResult.checkoutUrl) {
-        setCheckoutUrl(checkoutResult.checkoutUrl);
-        setCurrentStep('redirect-checkout');
-      } else {
-        console.error('[CheckoutModal] Checkout failed:', checkoutResult.error);
-        setError(checkoutResult.error || 'Failed to initialize checkout');
-        setCanRetry(checkoutResult.canRetry || false);
-      }
+      console.log('[CheckoutModal] Checkout session created:', sessionResult.sessionId);
     } catch (err) {
       setError('Failed to initialize checkout. Please try again.');
-      setCanRetry(true);
       console.error('Checkout initialization error:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRetry = async () => {
-    if (!sessionId) {
-      initializeCheckout();
-      return;
-    }
-
-    setRetrying(true);
-    setError(null);
-
-    try {
-      const result = await bulletproofCheckoutService.recoverSession(sessionId);
-
-      if (result.success && result.checkoutUrl) {
-        setCheckoutUrl(result.checkoutUrl);
-        setCurrentStep('redirect-checkout');
-        setError(null);
-      } else {
-        setError(result.error || 'Failed to recover checkout session');
-        setCanRetry(result.canRetry || false);
-      }
-    } catch (err) {
-      setError('Failed to retry checkout. Please try again.');
-      setCanRetry(true);
-      console.error('Checkout retry error:', err);
-    } finally {
-      setRetrying(false);
-    }
-  };
 
   const validateStep = (step: CheckoutStep): boolean => {
     switch (step) {
