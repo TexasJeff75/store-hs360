@@ -159,12 +159,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setSessionId(sessionResult.sessionId);
 
       const lineItems = items.map(item => ({
-        productId: item.id,
+        product_id: item.id,
         quantity: item.quantity
       }));
 
-      console.log('[CheckoutModal] Processing checkout redirect...');
-      const checkoutResult = await bulletproofCheckoutService.processEmbeddedCheckout(
+      console.log('[CheckoutModal] Processing REST API checkout...');
+      const checkoutResult = await bulletproofCheckoutService.processRestAPICheckout(
         sessionResult.sessionId,
         lineItems
       );

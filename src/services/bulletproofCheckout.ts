@@ -1,6 +1,5 @@
 import { supabase } from './supabase';
-import { checkoutService, CartLineItem } from './checkout';
-import { bigCommerceCheckoutService, CheckoutData } from './bigcommerceCheckout';
+import { bcRestAPI, CartLineItem as RestCartLineItem, AddressData } from './bigcommerceRestAPI';
 import { orderService, CreateOrderData, OrderItem, Address } from './orderService';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -206,7 +205,7 @@ class BulletproofCheckoutService {
 
   async createCartWithRetry(
     sessionId: string,
-    lineItems: CartLineItem[]
+    lineItems: RestCartLineItem[]
   ): Promise<CheckoutResult> {
     console.log('[Bulletproof Checkout] Creating cart with retry for session:', sessionId);
 
@@ -231,21 +230,22 @@ class BulletproofCheckoutService {
           retry_count: attempt,
         });
 
-        const result = await checkoutService.createCart(lineItems);
+        const { cartId } = await bcRestAPI.createCart(lineItems);
 
-        if (result.cartId) {
-          console.log('[Bulletproof Checkout] Cart created successfully:', result.cartId);
+        if (cartId) {
+          console.log('[Bulletproof Checkout] Cart created successfully:', cartId);
           await this.updateSession(sessionId, {
-            cart_id: result.cartId,
+            cart_id: cartId,
             step: 'address_entry',
           });
 
           return {
             success: true,
             sessionId,
+            checkoutUrl: bcRestAPI.getCheckoutUrl(cartId),
           };
         } else {
-          lastError = new Error(result.error || 'Failed to create cart');
+          lastError = new Error('Failed to create cart - no cart ID returned');
           console.error('[Bulletproof Checkout] Cart creation failed:', lastError.message);
           this.logError(session, 'cart_creation', lastError);
         }
@@ -276,11 +276,11 @@ class BulletproofCheckoutService {
     };
   }
 
-  async processEmbeddedCheckout(
+  async processRestAPICheckout(
     sessionId: string,
-    lineItems: CartLineItem[]
+    lineItems: RestCartLineItem[]
   ): Promise<CheckoutResult> {
-    console.log('[Bulletproof Checkout] Processing embedded checkout for session:', sessionId);
+    console.log('[Bulletproof Checkout] Processing REST API checkout for session:', sessionId);
 
     const session = await this.getSession(sessionId);
     if (!session) {
@@ -294,7 +294,7 @@ class BulletproofCheckoutService {
     if (session.cart_id) {
       console.log('[Bulletproof Checkout] Using existing cart:', session.cart_id);
       try {
-        const checkoutUrl = checkoutService.getEmbeddedCheckoutUrl(session.cart_id);
+        const checkoutUrl = bcRestAPI.getCheckoutUrl(session.cart_id);
         return {
           success: true,
           sessionId,
@@ -312,42 +312,8 @@ class BulletproofCheckoutService {
 
     console.log('[Bulletproof Checkout] Creating new cart...');
     const cartResult = await this.createCartWithRetry(sessionId, lineItems);
-    if (!cartResult.success) {
-      return cartResult;
-    }
 
-    const updatedSession = await this.getSession(sessionId);
-    if (!updatedSession?.cart_id) {
-      return {
-        success: false,
-        error: 'Failed to retrieve cart ID after creation',
-        canRetry: true,
-      };
-    }
-
-    console.log('[Bulletproof Checkout] Generating checkout URL...');
-    try {
-      const checkoutUrl = checkoutService.getEmbeddedCheckoutUrl(updatedSession.cart_id);
-
-      await this.updateSession(sessionId, {
-        step: 'payment',
-      });
-
-      console.log('[Bulletproof Checkout] Checkout URL generated:', checkoutUrl);
-
-      return {
-        success: true,
-        sessionId,
-        checkoutUrl,
-      };
-    } catch (error) {
-      console.error('[Bulletproof Checkout] Failed to get checkout URL:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to generate checkout URL',
-        canRetry: false,
-      };
-    }
+    return cartResult;
   }
 
   async processFullCheckout(
