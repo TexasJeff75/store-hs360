@@ -1,8 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Search, Eye, ExternalLink, DollarSign, Star, Tag, Image, Calendar, Hash, BarChart3, ChevronUp, ChevronDown } from 'lucide-react';
+import { Package, Search, Eye, ExternalLink, DollarSign, Star, Tag, Image, Calendar, Hash, BarChart3, ChevronUp, ChevronDown, Building2 } from 'lucide-react';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
+import { supabase } from '@/services/supabase';
+import { useAuth } from '@/contexts/AuthContext';
+
+interface ContractPricingInfo {
+  organization_name: string;
+  location_name?: string;
+  contract_price: number;
+  min_quantity?: number;
+  max_quantity?: number;
+  pricing_type: 'individual' | 'organization' | 'location';
+}
 
 const ProductsManagement: React.FC = () => {
+  const { user, profile } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -12,9 +24,13 @@ const ProductsManagement: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sortField, setSortField] = useState<keyof Product | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [contractPricingCounts, setContractPricingCounts] = useState<Record<number, number>>({});
+  const [contractPricingDetails, setContractPricingDetails] = useState<ContractPricingInfo[]>([]);
+  const [loadingPricingDetails, setLoadingPricingDetails] = useState(false);
 
   useEffect(() => {
     fetchProducts();
+    fetchContractPricingCounts();
   }, []);
 
   const fetchProducts = async () => {
@@ -34,9 +50,195 @@ const ProductsManagement: React.FC = () => {
     }
   };
 
-  const handleViewProduct = (product: Product) => {
+  const handleViewProduct = async (product: Product) => {
     setSelectedProduct(product);
     setIsModalOpen(true);
+    await fetchContractPricingDetails(product.id);
+  };
+
+  const fetchContractPricingCounts = async () => {
+    if (!user || !profile) return;
+
+    try {
+      let query = supabase
+        .from('contract_pricing')
+        .select('product_id');
+
+      // Role-based filtering
+      if (profile.role === 'customer') {
+        // Customers only see their own pricing
+        query = query.eq('user_id', user.id);
+      } else if (profile.role === 'sales_rep') {
+        // Sales reps see pricing for organizations they belong to
+        const { data: userOrgs } = await supabase
+          .from('user_organization_roles')
+          .select('organization_id')
+          .eq('user_id', user.id);
+
+        if (userOrgs && userOrgs.length > 0) {
+          const orgIds = userOrgs.map(o => o.organization_id);
+
+          // Get organization pricing
+          const { data: orgPricing } = await supabase
+            .from('organization_pricing')
+            .select('product_id')
+            .in('organization_id', orgIds);
+
+          if (orgPricing) {
+            const productIds = [...new Set(orgPricing.map(p => p.product_id))];
+            query = query.in('product_id', productIds);
+          }
+        }
+      }
+      // Admins see all pricing (no filter)
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      // Count occurrences of each product_id
+      const counts: Record<number, number> = {};
+      data?.forEach(item => {
+        counts[item.product_id] = (counts[item.product_id] || 0) + 1;
+      });
+
+      setContractPricingCounts(counts);
+    } catch (err) {
+      console.error('Error fetching contract pricing counts:', err);
+    }
+  };
+
+  const fetchContractPricingDetails = async (productId: number) => {
+    if (!user || !profile) return;
+
+    setLoadingPricingDetails(true);
+    try {
+      const details: ContractPricingInfo[] = [];
+
+      if (profile.role === 'admin') {
+        // Admins see all pricing types
+
+        // Individual pricing
+        const { data: individualPricing } = await supabase
+          .from('contract_pricing')
+          .select(`
+            contract_price,
+            min_quantity,
+            max_quantity,
+            user_id,
+            profiles!contract_pricing_user_id_fkey(email)
+          `)
+          .eq('product_id', productId)
+          .not('user_id', 'is', null);
+
+        individualPricing?.forEach(pricing => {
+          details.push({
+            organization_name: `Individual: ${pricing.profiles?.email || 'Unknown'}`,
+            contract_price: Number(pricing.contract_price),
+            min_quantity: pricing.min_quantity,
+            max_quantity: pricing.max_quantity,
+            pricing_type: 'individual'
+          });
+        });
+
+        // Organization pricing
+        const { data: orgPricing } = await supabase
+          .from('organization_pricing')
+          .select(`
+            contract_price,
+            min_quantity,
+            max_quantity,
+            organizations(name)
+          `)
+          .eq('product_id', productId);
+
+        orgPricing?.forEach(pricing => {
+          details.push({
+            organization_name: pricing.organizations?.name || 'Unknown',
+            contract_price: Number(pricing.contract_price),
+            min_quantity: pricing.min_quantity,
+            max_quantity: pricing.max_quantity,
+            pricing_type: 'organization'
+          });
+        });
+
+        // Location pricing
+        const { data: locationPricing } = await supabase
+          .from('location_pricing')
+          .select(`
+            contract_price,
+            min_quantity,
+            max_quantity,
+            locations(name, organization_id, organizations(name))
+          `)
+          .eq('product_id', productId);
+
+        locationPricing?.forEach(pricing => {
+          details.push({
+            organization_name: pricing.locations?.organizations?.name || 'Unknown',
+            location_name: pricing.locations?.name,
+            contract_price: Number(pricing.contract_price),
+            min_quantity: pricing.min_quantity,
+            max_quantity: pricing.max_quantity,
+            pricing_type: 'location'
+          });
+        });
+      } else if (profile.role === 'sales_rep') {
+        // Sales reps see pricing for their organizations
+        const { data: userOrgs } = await supabase
+          .from('user_organization_roles')
+          .select('organization_id')
+          .eq('user_id', user.id);
+
+        if (userOrgs && userOrgs.length > 0) {
+          const orgIds = userOrgs.map(o => o.organization_id);
+
+          const { data: orgPricing } = await supabase
+            .from('organization_pricing')
+            .select(`
+              contract_price,
+              min_quantity,
+              max_quantity,
+              organizations(name)
+            `)
+            .eq('product_id', productId)
+            .in('organization_id', orgIds);
+
+          orgPricing?.forEach(pricing => {
+            details.push({
+              organization_name: pricing.organizations?.name || 'Unknown',
+              contract_price: Number(pricing.contract_price),
+              min_quantity: pricing.min_quantity,
+              max_quantity: pricing.max_quantity,
+              pricing_type: 'organization'
+            });
+          });
+        }
+      } else if (profile.role === 'customer') {
+        // Customers only see their own pricing
+        const { data: individualPricing } = await supabase
+          .from('contract_pricing')
+          .select('contract_price, min_quantity, max_quantity')
+          .eq('product_id', productId)
+          .eq('user_id', user.id);
+
+        individualPricing?.forEach(pricing => {
+          details.push({
+            organization_name: 'Your Contract Pricing',
+            contract_price: Number(pricing.contract_price),
+            min_quantity: pricing.min_quantity,
+            max_quantity: pricing.max_quantity,
+            pricing_type: 'individual'
+          });
+        });
+      }
+
+      setContractPricingDetails(details);
+    } catch (err) {
+      console.error('Error fetching contract pricing details:', err);
+    } finally {
+      setLoadingPricingDetails(false);
+    }
   };
 
   const handleSort = (field: keyof Product) => {
@@ -239,6 +441,9 @@ const ProductsManagement: React.FC = () => {
                     {getSortIcon('reviews')}
                   </button>
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Contract Pricing
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -302,6 +507,18 @@ const ProductsManagement: React.FC = () => {
                       <BarChart3 className="h-4 w-4 text-gray-400 mr-1" />
                       {product.reviews}
                     </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {contractPricingCounts[product.id] > 0 ? (
+                      <div className="flex items-center">
+                        <DollarSign className="h-4 w-4 text-green-600 mr-1" />
+                        <span className="font-medium text-green-700">
+                          {contractPricingCounts[product.id]}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
@@ -469,6 +686,80 @@ const ProductsManagement: React.FC = () => {
                           </div>
                         </div>
                       </div>
+                    </div>
+
+                    {/* Contract Pricing Section */}
+                    <div className="mt-6 border-t pt-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-lg font-semibold text-gray-900 flex items-center">
+                          <Building2 className="h-5 w-5 mr-2 text-green-600" />
+                          Contract Pricing
+                        </h4>
+                        {contractPricingCounts[selectedProduct.id] > 0 && (
+                          <span className="inline-flex px-3 py-1 text-sm font-semibold rounded-full bg-green-100 text-green-800">
+                            {contractPricingCounts[selectedProduct.id]} {contractPricingCounts[selectedProduct.id] === 1 ? 'contract' : 'contracts'}
+                          </span>
+                        )}
+                      </div>
+
+                      {loadingPricingDetails ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                        </div>
+                      ) : contractPricingDetails.length > 0 ? (
+                        <div className="space-y-3">
+                          {contractPricingDetails.map((pricing, index) => (
+                            <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <div className="flex items-center space-x-2 mb-2">
+                                    <span className="font-medium text-gray-900">{pricing.organization_name}</span>
+                                    <span className={`inline-flex px-2 py-0.5 text-xs font-medium rounded ${
+                                      pricing.pricing_type === 'individual'
+                                        ? 'bg-blue-100 text-blue-700'
+                                        : pricing.pricing_type === 'organization'
+                                        ? 'bg-purple-100 text-purple-700'
+                                        : 'bg-green-100 text-green-700'
+                                    }`}>
+                                      {pricing.pricing_type}
+                                    </span>
+                                  </div>
+                                  {pricing.location_name && (
+                                    <div className="text-sm text-gray-600 mb-2">
+                                      Location: {pricing.location_name}
+                                    </div>
+                                  )}
+                                  <div className="flex items-center space-x-4 text-sm">
+                                    <div>
+                                      <span className="text-gray-600">Price:</span>
+                                      <span className="ml-2 font-semibold text-green-700">
+                                        ${pricing.contract_price.toFixed(2)}
+                                      </span>
+                                    </div>
+                                    {pricing.min_quantity && (
+                                      <div>
+                                        <span className="text-gray-600">Min Qty:</span>
+                                        <span className="ml-2 font-medium text-gray-900">{pricing.min_quantity}</span>
+                                      </div>
+                                    )}
+                                    {pricing.max_quantity && (
+                                      <div>
+                                        <span className="text-gray-600">Max Qty:</span>
+                                        <span className="ml-2 font-medium text-gray-900">{pricing.max_quantity}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <DollarSign className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                          <p>No contract pricing available for this product</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
