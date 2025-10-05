@@ -1,7 +1,11 @@
-const fetch = require('node-fetch');
-
 const BC_STORE_HASH = process.env.BC_STORE_HASH;
 const BC_ACCESS_TOKEN = process.env.BC_ACCESS_TOKEN;
+
+if (!BC_STORE_HASH || !BC_ACCESS_TOKEN) {
+  console.error('[BigCommerce Cart Function] Missing environment variables');
+  console.error('BC_STORE_HASH:', BC_STORE_HASH ? 'present' : 'missing');
+  console.error('BC_ACCESS_TOKEN:', BC_ACCESS_TOKEN ? 'present' : 'missing');
+}
 
 const headers = {
   'X-Auth-Token': BC_ACCESS_TOKEN,
@@ -33,9 +37,21 @@ exports.handler = async (event, context) => {
   }
 
   try {
+    if (!BC_STORE_HASH || !BC_ACCESS_TOKEN) {
+      console.error('[BigCommerce Cart Function] Environment variables not configured');
+      return {
+        statusCode: 500,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          error: 'Server configuration error: Missing BigCommerce credentials',
+        }),
+      };
+    }
+
     const { action, data } = JSON.parse(event.body);
 
     console.log('[BigCommerce Cart Function] Action:', action);
+    console.log('[BigCommerce Cart Function] Store Hash:', BC_STORE_HASH);
 
     switch (action) {
       case 'createCart': {
@@ -53,8 +69,13 @@ exports.handler = async (event, context) => {
 
         const result = await response.json();
 
+        console.log('[BigCommerce Cart Function] Response status:', response.status);
+        console.log('[BigCommerce Cart Function] Response data:', JSON.stringify(result));
+
         if (!response.ok) {
-          throw new Error(result.title || 'Failed to create cart');
+          const errorMsg = result.title || result.detail || 'Failed to create cart';
+          console.error('[BigCommerce Cart Function] API Error:', errorMsg);
+          throw new Error(errorMsg);
         }
 
         return {

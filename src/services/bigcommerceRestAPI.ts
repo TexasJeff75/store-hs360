@@ -2,20 +2,41 @@ const BC_STORE_HASH = import.meta.env.VITE_BC_STORE_HASH;
 const API_BASE = import.meta.env.VITE_API_BASE || '/.netlify/functions';
 
 async function callServerlessFunction(action: string, data: any) {
-  const response = await fetch(`${API_BASE}/bigcommerce-cart`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ action, data }),
-  });
+  const url = `${API_BASE}/bigcommerce-cart`;
+  console.log('[BC REST API] Calling serverless function:', url);
+  console.log('[BC REST API] Action:', action);
 
-  if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'API request failed');
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action, data }),
+    });
+
+    console.log('[BC REST API] Response status:', response.status);
+    console.log('[BC REST API] Response headers:', Object.fromEntries(response.headers.entries()));
+
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('[BC REST API] Non-JSON response:', text.substring(0, 500));
+      throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
+    }
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      console.error('[BC REST API] Error response:', result);
+      throw new Error(result.error || 'API request failed');
+    }
+
+    return result;
+  } catch (error) {
+    console.error('[BC REST API] Request failed:', error);
+    throw error;
   }
-
-  return response.json();
 }
 
 export interface CartLineItem {
