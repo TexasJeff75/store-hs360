@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart, User, Settings, Users } from 'lucide-react';
+import { ShoppingCart, User, Settings, Users, Home } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface HeaderProps {
@@ -37,18 +37,54 @@ const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
 
-          {/* Navigation */}
-          <nav className="hidden md:flex space-x-8">
-            <a href="#" className="text-gray-700 hover:text-pink-600 transition-colors">
-              Products
+          {/* Center Navigation */}
+          <div className="flex items-center space-x-6">
+            {/* Home Button */}
+            <a href="#" className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors">
+              <Home className="w-5 h-5" />
+              <span className="hidden sm:inline">Home</span>
             </a>
-            <a href="#" className="text-gray-700 hover:text-pink-600 transition-colors">
-              About
-            </a>
-            <a href="#" className="text-gray-700 hover:text-pink-600 transition-colors">
-              Contact
-            </a>
-          </nav>
+
+            {/* User Actions - Middle */}
+            {loading ? (
+              <div className="flex items-center space-x-2">
+                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-pink-600"></div>
+                <span className="text-sm text-gray-600">Loading...</span>
+              </div>
+            ) : user ? (
+              <div className="flex items-center space-x-4">
+                {profile?.role === 'admin' && (
+                  <button
+                    onClick={onSalesRepClick}
+                    className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
+                  >
+                    <Users className="w-5 h-5" />
+                    <span className="hidden sm:inline">Select Organization</span>
+                  </button>
+                )}
+
+                {profile?.role === 'admin' && (
+                  <button
+                    onClick={onAdminClick}
+                    className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
+                  >
+                    <Settings className="w-5 h-5" />
+                    <span className="hidden sm:inline">Admin</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={onProfileClick}
+                  className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
+                >
+                  <User className="w-5 h-5" />
+                  <span className="hidden sm:inline">
+                    {profile?.email?.split('@')[0] || user.email?.split('@')[0] || 'Profile'}
+                  </span>
+                </button>
+              </div>
+            ) : null}
+          </div>
 
           {/* Right side actions */}
           <div className="flex items-center space-x-4">
@@ -65,45 +101,8 @@ const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
-            {/* User Authentication */}
-            {loading ? (
-              <div className="flex items-center space-x-2">
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-pink-600"></div>
-                <span className="text-sm text-gray-600">Loading...</span>
-              </div>
-            ) : user ? (
-              <div className="flex items-center space-x-2">
-                <button
-                  onClick={onProfileClick}
-                  className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
-                >
-                  <User className="w-5 h-5" />
-                  <span className="hidden sm:inline">
-                    {profile?.email?.split('@')[0] || user.email?.split('@')[0] || 'Profile'}
-                  </span>
-                </button>
-                
-                {profile?.role === 'admin' && (
-                  <button
-                    onClick={onAdminClick}
-                    className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
-                  >
-                    <Settings className="w-5 h-5" />
-                    <span className="hidden sm:inline">Admin</span>
-                  </button>
-                )}
-                
-                {profile?.role === 'admin' && (
-                  <button
-                    onClick={onSalesRepClick}
-                    className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
-                  >
-                    <Users className="w-5 h-5" />
-                    <span className="hidden sm:inline">Select Organization</span>
-                  </button>
-                )}
-              </div>
-            ) : (
+            {/* Sign In Button */}
+            {!loading && !user && (
               <button
                 type="button"
                 onClick={onAuthClick}
