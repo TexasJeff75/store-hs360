@@ -8,7 +8,7 @@ export interface CheckoutSessionData {
   organization_id?: string;
   cart_id?: string;
   checkout_id?: string;
-  status: 'pending' | 'address_entered' | 'payment_pending' | 'completed' | 'failed';
+  status: 'pending' | 'processing' | 'completed' | 'failed' | 'abandoned';
   cart_items: any[];
   shipping_address?: AddressData;
   billing_address?: AddressData;
@@ -127,7 +127,7 @@ class RestCheckoutService {
           checkout_id: checkoutResult.checkoutId,
           billing_address: billingAddress,
           shipping_address: shippingAddress,
-          status: 'address_entered',
+          status: 'processing',
           updated_at: new Date().toISOString(),
         })
         .eq('id', sessionId);
@@ -177,7 +177,7 @@ class RestCheckoutService {
       await supabase
         .from('checkout_sessions')
         .update({
-          status: 'payment_pending',
+          status: 'processing',
           updated_at: new Date().toISOString(),
         })
         .eq('id', sessionId);
@@ -195,36 +195,32 @@ class RestCheckoutService {
       console.log('[RestCheckout] Creating order in database...');
 
       const orderData: CreateOrderData = {
-        user_id: session.user_id,
-        organization_id: session.organization_id,
-        bigcommerce_order_id: null,
-        bigcommerce_cart_id: session.cart_id,
-        status: 'pending',
+        userId: session.user_id,
+        bigcommerceCartId: session.cart_id || '',
+        items: session.cart_items.map((item: any) => ({
+          productId: item.productId,
+          name: item.name,
+          quantity: item.quantity,
+          price: item.price,
+        })),
         subtotal: session.subtotal,
         tax: session.tax,
         shipping: session.shipping,
         total: session.total,
-        currency: session.currency || 'USD',
-        items: session.cart_items.map((item: any) => ({
-          product_id: item.productId,
-          product_name: item.name,
-          quantity: item.quantity,
-          unit_price: item.price,
-          total_price: item.price * item.quantity,
-        })),
-        shipping_address: session.shipping_address,
-        billing_address: session.billing_address,
-        customer_email: session.billing_address?.email || '',
+        shippingAddress: session.shipping_address,
+        billingAddress: session.billing_address,
+        customerEmail: session.billing_address?.email || '',
+        organizationId: session.organization_id,
         notes: 'Test order - Payment simulated (card ending in ' + paymentData.number.slice(-4) + ')',
       };
 
-      const createdOrder = await orderService.createOrder(orderData);
+      const result = await orderService.createOrder(orderData);
 
-      if (!createdOrder) {
-        throw new Error('Failed to create order');
+      if (!result.order) {
+        throw new Error(result.error || 'Failed to create order');
       }
 
-      console.log('[RestCheckout] Order created:', createdOrder.id);
+      console.log('[RestCheckout] Order created:', result.order.id);
 
       await supabase
         .from('checkout_sessions')
@@ -239,7 +235,7 @@ class RestCheckoutService {
         success: true,
         sessionId,
         checkoutId,
-        orderId: createdOrder.id,
+        orderId: result.order.id,
       };
     } catch (error) {
       console.error('Error processing payment:', error);
