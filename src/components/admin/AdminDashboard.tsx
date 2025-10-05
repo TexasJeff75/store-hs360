@@ -5,7 +5,6 @@ import OrganizationManagement from './OrganizationManagement';
 import LocationManagement from './LocationManagement';
 import PricingManagement from './PricingManagement';
 import ProductsManagement from './ProductsManagement';
-import ProductManagement from './ProductManagement';
 import OrderManagement from './OrderManagement';
 
 interface AdminDashboardProps {
@@ -13,7 +12,7 @@ interface AdminDashboardProps {
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'carousel-products' | 'orders' | 'analytics';
+type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'analytics';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('organizations');
@@ -25,7 +24,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     { id: 'users' as AdminTab, label: 'Users', icon: Users },
     { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart },
     { id: 'products' as AdminTab, label: 'Products', icon: Package },
-    { id: 'carousel-products' as AdminTab, label: 'Carousel Products', icon: Package },
     { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3 },
   ];
 
@@ -39,8 +37,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
         return <OrderManagement />;
       case 'products':
         return <ProductsManagement />;
-      case 'carousel-products':
-        return <ProductManagement />;
       case 'analytics':
         return (
           <div className="p-6 text-center text-gray-500">
