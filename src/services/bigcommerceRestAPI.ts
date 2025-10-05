@@ -31,7 +31,16 @@ async function callServerlessFunction(action: string, data: any) {
 
     if (!response.ok) {
       console.error('[BC REST API] Error response:', result);
-      throw new Error(result.error || 'API request failed');
+      const errorMsg = result.error || 'API request failed';
+
+      if (errorMsg.toLowerCase().includes('scope') || errorMsg.toLowerCase().includes('unauthorized')) {
+        console.error('❌ BigCommerce API Scope Error');
+        console.error('📖 See BIGCOMMERCE_SCOPES.md for help configuring token scopes');
+        console.error('   Your BC_ACCESS_TOKEN may be missing Carts/Checkouts/Orders scopes');
+        throw new Error(`${errorMsg}. Check your BC_ACCESS_TOKEN scopes - see BIGCOMMERCE_SCOPES.md for help`);
+      }
+
+      throw new Error(errorMsg);
     }
 
     return result;

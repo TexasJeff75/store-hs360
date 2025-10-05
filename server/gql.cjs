@@ -48,8 +48,17 @@ app.post("/api/gql", async (req, res) => {
       },
       body: JSON.stringify(req.body || {})
     });
-    res.status(r.status).type("application/json").send(await r.text());
+
+    const responseText = await r.text();
+
+    if (!r.ok && responseText.toLowerCase().includes('scope')) {
+      console.error('❌ BigCommerce Scope Error - Storefront token missing permissions');
+      console.error('📖 See BIGCOMMERCE_SCOPES.md for configuration help');
+    }
+
+    res.status(r.status).type("application/json").send(responseText);
   } catch (e) {
+    console.error('GraphQL Proxy Error:', e);
     res.status(502).json({ error: "GQL_PROXY_FAILED", detail: String(e) });
   }
 });
@@ -98,6 +107,12 @@ app.post("/api/bigcommerce-cart", async (req, res) => {
         if (!response.ok) {
           const errorMsg = result.title || result.detail || 'Failed to create cart';
           console.error('[Cart Function] API Error:', errorMsg);
+
+          if (errorMsg.toLowerCase().includes('scope') || response.status === 401) {
+            console.error('❌ BigCommerce Scope Error - BC_ACCESS_TOKEN missing permissions');
+            console.error('📖 See BIGCOMMERCE_SCOPES.md - Your token needs Carts-Modify scope');
+          }
+
           throw new Error(errorMsg);
         }
 

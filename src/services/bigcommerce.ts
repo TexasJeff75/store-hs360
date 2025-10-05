@@ -28,13 +28,23 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
     const json = JSON.parse(txt);
 
     if (!res.ok) {
-      // Handle missing credentials specifically
       if (res.status === 500 && json.error === 'MISSING_CREDENTIALS') {
         throw new Error('MISSING_CREDENTIALS');
       }
       throw new Error(`HTTP ${res.status}: ${txt.slice(0,200)}`);
     }
-    if (json.errors?.length) console.warn("GQL errors:", json.errors);
+
+    if (json.errors?.length) {
+      const errorMessages = json.errors.map((e: any) => e.message).join(', ');
+
+      if (errorMessages.toLowerCase().includes('scope')) {
+        console.error('❌ BigCommerce API Scope Error:', errorMessages);
+        console.error('📖 See BIGCOMMERCE_SCOPES.md for help configuring token scopes');
+        throw new Error(`Scope Error: ${errorMessages}. Your Storefront API token may be missing required permissions. Check BIGCOMMERCE_SCOPES.md`);
+      }
+
+      console.warn("GQL errors:", json.errors);
+    }
 
     return json.data as T;
   } catch (e) {

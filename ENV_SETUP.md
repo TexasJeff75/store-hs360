@@ -43,6 +43,8 @@ VITE_API_BASE=/.netlify/functions
 
 ## How to Get BigCommerce Credentials
 
+> **⚠️ IMPORTANT:** If you get "required scope" errors, see [BIGCOMMERCE_SCOPES.md](./BIGCOMMERCE_SCOPES.md) for detailed troubleshooting.
+
 ### 1. Store Hash
 
 1. Log into your BigCommerce store admin
@@ -51,24 +53,34 @@ VITE_API_BASE=/.netlify/functions
 
 ### 2. Storefront Token (GraphQL API)
 
+This token is used for fetching products and categories (read-only operations).
+
 1. Go to **Advanced Settings > API Accounts**
-2. Click **"Create API Account"** > **"Create V2/V3 API Token"**
+2. Click **"Create API Account"** > **"Storefront API Token"** (not V2/V3)
 3. Name it (e.g., "Storefront API")
 4. Select **Storefront API** scopes:
-   - Products: Read-only
-   - Categories: Read-only
-5. Save and copy the generated JWT token
+   - ✅ **Products** - Read-only
+   - ✅ **Categories** - Read-only
+5. Save and copy the generated JWT token (starts with `eyJ`)
+6. This token is safe to expose in the browser
 
-### 3. Access Token (REST API for Carts)
+### 3. Access Token (REST API for Carts & Checkout)
+
+This token is used for cart operations, checkout, and orders. **Never expose this in the browser!**
 
 1. Same page as above (**API Accounts**)
-2. Create another API account or use the same one
-3. Enable these OAuth scopes:
-   - **Carts**: Modify
-   - **Checkouts**: Modify
-   - **Orders**: Modify
-   - **Products**: Read-only
-4. Save and copy the **Access Token**
+2. Click **"Create API Account"** > **"V2/V3 API Token"**
+3. Name it (e.g., "REST API - Carts & Orders")
+4. Enable these **OAuth scopes** (critical - must have all):
+   - ✅ **Carts** - Modify
+   - ✅ **Checkouts** - Modify
+   - ✅ **Orders** - Modify
+   - ✅ **Customers** - Modify (if using customer features)
+   - ✅ **Products** - Read-only (recommended)
+5. Save and copy the **Access Token** immediately (you can't view it again!)
+6. **Security:** This token has full access - use only in backend functions
+
+**📖 For detailed scope requirements and troubleshooting, see [BIGCOMMERCE_SCOPES.md](./BIGCOMMERCE_SCOPES.md)**
 
 ## Local Development Setup
 
