@@ -85,7 +85,7 @@ const OrderManagement: React.FC = () => {
       return;
     }
 
-    if (profile?.role === 'admin') {
+    if (profile?.role === 'admin' || profile?.role === 'sales_rep') {
       setCanManageOrders(true);
       return;
     }

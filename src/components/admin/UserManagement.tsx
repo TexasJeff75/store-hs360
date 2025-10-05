@@ -14,7 +14,7 @@ const UserManagement: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'pending' | 'approved' | 'admin'>('approved');
+  const [newUserRole, setNewUserRole] = useState<'admin' | 'sales_rep' | 'customer'>('customer');
   const [newUserApproved, setNewUserApproved] = useState(true);
   const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [sendingPasswordReset, setSendingPasswordReset] = useState(false);
@@ -258,7 +258,7 @@ const UserManagement: React.FC = () => {
         setIsCreateModalOpen(false);
         setNewUserEmail('');
         setNewUserPassword('');
-        setNewUserRole('approved');
+        setNewUserRole('customer');
         setNewUserApproved(true);
         setModalMessage(null);
       }, 2000);
@@ -277,8 +277,8 @@ const UserManagement: React.FC = () => {
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'admin': return 'bg-purple-100 text-purple-800';
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'sales_rep': return 'bg-blue-100 text-blue-800';
+      case 'customer': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -286,8 +286,8 @@ const UserManagement: React.FC = () => {
   const getRoleIcon = (role: string) => {
     switch (role) {
       case 'admin': return Shield;
-      case 'approved': return CheckCircle;
-      case 'pending': return Clock;
+      case 'sales_rep': return Mail;
+      case 'customer': return User;
       default: return User;
     }
   };
@@ -408,8 +408,8 @@ const UserManagement: React.FC = () => {
             className="pl-10 pr-8 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           >
             <option value="all">All Roles</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
+            <option value="customer">Customer</option>
+            <option value="sales_rep">Sales Rep</option>
             <option value="admin">Admin</option>
           </select>
         </div>
@@ -767,7 +767,7 @@ const UserManagement: React.FC = () => {
                     setIsCreateModalOpen(false);
                     setNewUserEmail('');
                     setNewUserPassword('');
-                    setNewUserRole('approved');
+                    setNewUserRole('customer');
                     setNewUserApproved(true);
                     setModalMessage(null);
                   }}

@@ -33,7 +33,7 @@ export interface Profile {
   id: string;
   email: string;
   is_approved: boolean;
-  role: 'pending' | 'approved' | 'admin';
+  role: 'admin' | 'sales_rep' | 'customer';
   created_at: string;
   updated_at: string;
 }
