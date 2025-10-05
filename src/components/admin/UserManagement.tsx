@@ -578,8 +578,8 @@ const UserManagement: React.FC = () => {
                           onChange={(e) => setSelectedUser({...selectedUser, role: e.target.value as any})}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                         >
-                          <option value="pending">Pending</option>
-                          <option value="approved">Approved</option>
+                          <option value="customer">Customer</option>
+                          <option value="sales_rep">Sales Rep</option>
                           <option value="admin">Admin</option>
                         </select>
                       </div>
@@ -724,8 +724,8 @@ const UserManagement: React.FC = () => {
                           onChange={(e) => setNewUserRole(e.target.value as any)}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
-                          <option value="pending">Pending</option>
-                          <option value="approved">Approved</option>
+                          <option value="customer">Customer</option>
+                          <option value="sales_rep">Sales Rep</option>
                           <option value="admin">Admin</option>
                         </select>
                       </div>
