@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Shield, Clock, CheckCircle, Edit, Trash2, Search, Filter, Key, AlertCircle, Save, RotateCcw } from 'lucide-react';
+import { User, Mail, Shield, Clock, CheckCircle, CreditCard as Edit, Trash2, Search, Filter, Key, AlertCircle, Save, RotateCcw, Plus } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import type { Profile } from '@/services/supabase';
 
@@ -11,11 +11,17 @@ const UserManagement: React.FC = () => {
   const [roleFilter, setRoleFilter] = useState<string>('all');
   const [selectedUser, setSelectedUser] = useState<Profile | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [newUserRole, setNewUserRole] = useState<'pending' | 'approved' | 'admin'>('approved');
+  const [newUserApproved, setNewUserApproved] = useState(true);
   const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [sendingPasswordReset, setSendingPasswordReset] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<{ [key: string]: Partial<Profile> }>({});
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
 
   useEffect(() => {
     fetchUsers();
@@ -190,10 +196,80 @@ const UserManagement: React.FC = () => {
   const handleDiscardChanges = () => {
     setPendingChanges({});
     setSaveMessage({ type: 'success', text: 'Changes discarded successfully!' });
-    
+
     setTimeout(() => {
       setSaveMessage(null);
     }, 2000);
+  };
+
+  const handleCreateUser = async () => {
+    if (!newUserEmail.trim() || !newUserPassword.trim()) {
+      setModalMessage({ type: 'error', text: 'Email and password are required' });
+      return;
+    }
+
+    if (newUserPassword.length < 6) {
+      setModalMessage({ type: 'error', text: 'Password must be at least 6 characters' });
+      return;
+    }
+
+    try {
+      setIsCreatingUser(true);
+      setModalMessage(null);
+
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: newUserEmail,
+        password: newUserPassword,
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            role: newUserRole,
+            is_approved: newUserApproved
+          }
+        }
+      });
+
+      if (authError) throw authError;
+
+      if (!authData.user) {
+        throw new Error('User creation failed - no user returned');
+      }
+
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({
+          role: newUserRole,
+          is_approved: newUserApproved
+        })
+        .eq('id', authData.user.id);
+
+      if (profileError) {
+        console.warn('Profile update error:', profileError);
+      }
+
+      setModalMessage({
+        type: 'success',
+        text: 'User created successfully!'
+      });
+
+      await fetchUsers();
+
+      setTimeout(() => {
+        setIsCreateModalOpen(false);
+        setNewUserEmail('');
+        setNewUserPassword('');
+        setNewUserRole('approved');
+        setNewUserApproved(true);
+        setModalMessage(null);
+      }, 2000);
+
+    } catch (err) {
+      console.error('Error creating user:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to create user';
+      setModalMessage({ type: 'error', text: errorMessage });
+    } finally {
+      setIsCreatingUser(false);
+    }
   };
 
   const hasPendingChanges = Object.keys(pendingChanges).length > 0;
@@ -236,9 +312,18 @@ const UserManagement: React.FC = () => {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">User Management</h2>
-        <p className="text-gray-600">Manage user accounts, roles, and permissions</p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">User Management</h2>
+          <p className="text-gray-600">Manage user accounts, roles, and permissions</p>
+        </div>
+        <button
+          onClick={() => setIsCreateModalOpen(true)}
+          className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+        >
+          <Plus className="h-5 w-5" />
+          <span>Create User</span>
+        </button>
       </div>
 
       {error && (
@@ -558,6 +643,136 @@ const UserManagement: React.FC = () => {
                     setModalMessage(null);
                   }}
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create User Modal */}
+      {isCreateModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsCreateModalOpen(false)}></div>
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
+                      Create New User
+                    </h3>
+
+                    {modalMessage && (
+                      <div className={`mb-4 p-3 rounded-lg flex items-center space-x-2 ${
+                        modalMessage.type === 'success'
+                          ? 'bg-green-50 border border-green-200'
+                          : 'bg-red-50 border border-red-200'
+                      }`}>
+                        {modalMessage.type === 'success' ? (
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                        ) : (
+                          <AlertCircle className="h-5 w-5 text-red-600" />
+                        )}
+                        <span className={`text-sm ${
+                          modalMessage.type === 'success' ? 'text-green-700' : 'text-red-700'
+                        }`}>
+                          {modalMessage.text}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Email Address *
+                        </label>
+                        <input
+                          type="email"
+                          value={newUserEmail}
+                          onChange={(e) => setNewUserEmail(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="user@example.com"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Password *
+                        </label>
+                        <input
+                          type="password"
+                          value={newUserPassword}
+                          onChange={(e) => setNewUserPassword(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="Minimum 6 characters"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">
+                          Password must be at least 6 characters long
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Role
+                        </label>
+                        <select
+                          value={newUserRole}
+                          onChange={(e) => setNewUserRole(e.target.value as any)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="approved">Approved</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={newUserApproved}
+                            onChange={(e) => setNewUserApproved(e.target.checked)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">Account Approved</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={handleCreateUser}
+                  disabled={isCreatingUser || !newUserEmail.trim() || !newUserPassword.trim()}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCreatingUser ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      <span>Creating...</span>
+                    </div>
+                  ) : (
+                    'Create User'
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreateModalOpen(false);
+                    setNewUserEmail('');
+                    setNewUserPassword('');
+                    setNewUserRole('approved');
+                    setNewUserApproved(true);
+                    setModalMessage(null);
+                  }}
+                  disabled={isCreatingUser}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
