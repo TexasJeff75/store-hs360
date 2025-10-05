@@ -1,33 +1,18 @@
 const BC_STORE_HASH = import.meta.env.VITE_BC_STORE_HASH;
-const BC_ACCESS_TOKEN = import.meta.env.VITE_BC_ACCESS_TOKEN;
+const API_BASE = import.meta.env.VITE_API_BASE || '/.netlify/functions';
 
-const BASE_URL = `https://api.bigcommerce.com/stores/${BC_STORE_HASH}/v3`;
-
-interface RestAPIOptions {
-  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
-  body?: any;
-}
-
-async function callRestAPI(endpoint: string, options: RestAPIOptions = {}) {
-  if (!BC_STORE_HASH || !BC_ACCESS_TOKEN) {
-    throw new Error('BigCommerce REST API credentials not configured. Add VITE_BC_STORE_HASH and VITE_BC_ACCESS_TOKEN to .env');
-  }
-
-  const url = `${BASE_URL}${endpoint}`;
-
-  const response = await fetch(url, {
-    method: options.method || 'GET',
+async function callServerlessFunction(action: string, data: any) {
+  const response = await fetch(`${API_BASE}/bigcommerce-cart`, {
+    method: 'POST',
     headers: {
-      'X-Auth-Token': BC_ACCESS_TOKEN,
       'Content-Type': 'application/json',
-      'Accept': 'application/json',
     },
-    body: options.body ? JSON.stringify(options.body) : undefined,
+    body: JSON.stringify({ action, data }),
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`BigCommerce API error: ${response.status} - ${errorText}`);
+    const error = await response.json();
+    throw new Error(error.error || 'API request failed');
   }
 
   return response.json();
@@ -75,30 +60,24 @@ class BigCommerceRestAPIService {
   async createCart(items: CartLineItem[]) {
     console.log('[BC REST API] Creating cart with items:', items);
 
-    const requestBody: CreateCartRequest = {
+    const response = await callServerlessFunction('createCart', {
       line_items: items,
-      channel_id: 1,
-    };
-
-    const response = await callRestAPI('/carts', {
-      method: 'POST',
-      body: requestBody,
     });
 
-    console.log('[BC REST API] Cart created:', response.data?.id);
+    console.log('[BC REST API] Cart created:', response.cartId);
 
     return {
-      cartId: response.data?.id,
-      cart: response.data,
+      cartId: response.cartId,
+      redirectUrl: response.redirectUrl,
     };
   }
 
   async getCart(cartId: string) {
     console.log('[BC REST API] Getting cart:', cartId);
 
-    const response = await callRestAPI(`/carts/${cartId}`);
+    const response = await callServerlessFunction('getCart', { cartId });
 
-    return response.data;
+    return response;
   }
 
   async createCheckout(cartId: string, billingAddress: AddressData, shippingAddress: AddressData) {

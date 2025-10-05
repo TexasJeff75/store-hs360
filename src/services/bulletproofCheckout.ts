@@ -230,7 +230,7 @@ class BulletproofCheckoutService {
           retry_count: attempt,
         });
 
-        const { cartId } = await bcRestAPI.createCart(lineItems);
+        const { cartId, redirectUrl } = await bcRestAPI.createCart(lineItems);
 
         if (cartId) {
           console.log('[Bulletproof Checkout] Cart created successfully:', cartId);
@@ -242,7 +242,7 @@ class BulletproofCheckoutService {
           return {
             success: true,
             sessionId,
-            checkoutUrl: bcRestAPI.getCheckoutUrl(cartId),
+            checkoutUrl: redirectUrl || bcRestAPI.getCheckoutUrl(cartId),
           };
         } else {
           lastError = new Error('Failed to create cart - no cart ID returned');
