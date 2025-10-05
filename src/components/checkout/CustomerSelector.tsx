@@ -29,9 +29,10 @@ interface CustomerSelectorProps {
     customerEmail: string;
   }) => void;
   currentUserId: string;
+  preSelectedOrganizationId?: string;
 }
 
-const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUserId }) => {
+const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUserId, preSelectedOrganizationId }) => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -44,6 +45,13 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
   useEffect(() => {
     fetchOrganizations();
   }, []);
+
+  useEffect(() => {
+    if (preSelectedOrganizationId && organizations.length > 0) {
+      setSelectedOrg(preSelectedOrganizationId);
+      setOrderingFor('organization');
+    }
+  }, [preSelectedOrganizationId, organizations]);
 
   useEffect(() => {
     if (selectedOrg) {

@@ -575,6 +575,7 @@ function AppContent() {
           items={cartItems}
           onUpdateQuantity={updateCartQuantity}
           onRemoveItem={removeFromCart}
+          organizationId={selectedOrganization?.id}
         />
 
         <AuthModal

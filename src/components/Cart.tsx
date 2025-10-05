@@ -16,6 +16,7 @@ interface CartProps {
   items: CartItem[];
   onUpdateQuantity: (id: number, quantity: number) => void;
   onRemoveItem: (id: number) => void;
+  organizationId?: string;
 }
 
 const Cart: React.FC<CartProps> = ({
@@ -24,6 +25,7 @@ const Cart: React.FC<CartProps> = ({
   items,
   onUpdateQuantity,
   onRemoveItem,
+  organizationId,
 }) => {
   const [isCheckoutOpen, setIsCheckoutOpen] = React.useState(false);
   
@@ -136,6 +138,7 @@ const Cart: React.FC<CartProps> = ({
         onClose={() => setIsCheckoutOpen(false)}
         items={items}
         onOrderComplete={handleOrderComplete}
+        organizationId={organizationId}
       />
     </div>
   );

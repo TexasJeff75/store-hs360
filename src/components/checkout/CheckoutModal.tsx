@@ -21,6 +21,7 @@ interface CheckoutModalProps {
   onClose: () => void;
   items: CartItem[];
   onOrderComplete: (orderId: string) => void;
+  organizationId?: string;
 }
 
 interface ShippingAddress {
@@ -46,7 +47,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
   onClose,
   items,
-  onOrderComplete
+  onOrderComplete,
+  organizationId
 }) => {
   const { user, profile } = useAuth();
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('customer');
@@ -133,6 +135,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     const isAdmin = !!data;
     setIsAdminOrManager(isAdmin);
+
+    // If organization is selected, pre-populate it
+    if (organizationId) {
+      setSelectedOrgId(organizationId);
+    }
 
     if (!isAdmin) {
       setSelectedCustomerId(user.id);
@@ -496,6 +503,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       <CustomerSelector
         onSelect={handleCustomerSelection}
         currentUserId={user?.id || ''}
+        preSelectedOrganizationId={organizationId}
       />
     </div>
   );
