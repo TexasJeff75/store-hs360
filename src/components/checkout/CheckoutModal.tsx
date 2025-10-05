@@ -139,6 +139,19 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     // If organization is selected, pre-populate it
     if (organizationId) {
       setSelectedOrgId(organizationId);
+
+      // Fetch organization's first location
+      const { data: locations } = await supabase
+        .from('locations')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('is_active', true)
+        .limit(1);
+
+      if (locations && locations.length > 0) {
+        setSelectedLocationId(locations[0].id);
+        await fetchLocationAddress(locations[0].id);
+      }
     }
 
     if (!isAdmin) {
@@ -509,7 +522,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   );
 
   const renderShippingStep = () => {
-    if (!useManualAddress && showAddressSelector && !selectedLocationId) {
+    // If a location is selected and address is populated, skip AddressSelector
+    const hasLocationAddress = selectedLocationId && shippingAddress.address1;
+
+    if (!useManualAddress && showAddressSelector && !hasLocationAddress) {
       return (
         <div className="space-y-6">
           <AddressSelector
