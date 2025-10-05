@@ -76,12 +76,14 @@ const LocationManagement: React.FC<LocationManagementProps> = ({ organizationId 
     try {
       setError(null);
       if (isEditing) {
-        await multiTenantService.updateLocation(selectedLocation.id, selectedLocation);
+        const { id, created_at, updated_at, ...updates } = selectedLocation;
+        await multiTenantService.updateLocation(id, updates);
         setLocations(prev => prev.map(loc =>
           loc.id === selectedLocation.id ? selectedLocation : loc
         ));
       } else {
-        const newLocation = await multiTenantService.createLocation(selectedLocation);
+        const { id, created_at, updated_at, ...locationData } = selectedLocation;
+        const newLocation = await multiTenantService.createLocation(locationData);
         setLocations(prev => [newLocation, ...prev]);
       }
       setIsModalOpen(false);
