@@ -116,18 +116,9 @@ app.post("/api/bigcommerce-cart", async (req, res) => {
           throw new Error(errorMsg);
         }
 
-        const cartId = result.data.id;
-        const redirectUrls = result.data.redirect_urls || {};
-
-        const checkoutUrl = redirectUrls.checkout_url ||
-                           redirectUrls.embedded_checkout_url ||
-                           redirectUrls.cart_url ||
-                           `https://store-${BC_STORE_HASH}.mybigcommerce.com/cart.php?action=loadInCheckout&id=${cartId}`;
-
         return res.status(200).json({
-          cartId: cartId,
-          redirectUrl: checkoutUrl,
-          redirectUrls: redirectUrls,
+          cartId: result.data.id,
+          cart: result.data,
         });
       }
 
@@ -147,6 +138,43 @@ app.post("/api/bigcommerce-cart", async (req, res) => {
         }
 
         return res.status(200).json(result.data);
+      }
+
+      case 'createCheckout':
+      case 'updateCheckout':
+      case 'getCheckout':
+      case 'checkoutAction': {
+        const method = data.method || 'GET';
+        const endpoint = data.endpoint || '';
+        const fullUrl = endpoint.startsWith('http')
+          ? endpoint
+          : `https://api.bigcommerce.com/stores/${BC_STORE_HASH}/v3${endpoint}`;
+
+        const fetchOptions = {
+          method,
+          headers,
+        };
+
+        if (data.body && (method === 'POST' || method === 'PUT')) {
+          fetchOptions.body = JSON.stringify(data.body);
+        }
+
+        const response = await fetch(fullUrl, fetchOptions);
+        const result = await response.json();
+
+        if (!response.ok) {
+          const errorMsg = result.title || result.detail || `Failed to ${action}`;
+          console.error(`[Cart Function] ${action} Error:`, errorMsg);
+
+          if (errorMsg.toLowerCase().includes('scope') || response.status === 401) {
+            console.error('❌ BigCommerce Scope Error - BC_ACCESS_TOKEN missing permissions');
+            console.error('📖 See BIGCOMMERCE_SCOPES.md for required scopes');
+          }
+
+          throw new Error(errorMsg);
+        }
+
+        return res.status(200).json(result);
       }
 
       default:

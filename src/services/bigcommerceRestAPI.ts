@@ -50,6 +50,20 @@ async function callServerlessFunction(action: string, data: any) {
   }
 }
 
+async function callRestAPI(endpoint: string, options?: { method?: string; body?: any }) {
+  const action = options?.method === 'POST' ? 'createCheckout' :
+                 options?.method === 'PUT' ? 'updateCheckout' :
+                 options?.method === 'GET' ? 'getCheckout' : 'checkoutAction';
+
+  const data = {
+    endpoint,
+    method: options?.method || 'GET',
+    body: options?.body
+  };
+
+  return callServerlessFunction(action, data);
+}
+
 export interface CartLineItem {
   product_id: number;
   quantity: number;
@@ -100,7 +114,7 @@ class BigCommerceRestAPIService {
 
     return {
       cartId: response.cartId,
-      redirectUrl: response.redirectUrl,
+      cart: response.cart || response,
     };
   }
 
@@ -207,12 +221,28 @@ class BigCommerceRestAPIService {
     };
   }
 
-  getCheckoutUrl(checkoutId: string): string {
-    if (!BC_STORE_HASH) {
-      throw new Error('BC_STORE_HASH not configured');
-    }
+  async processPayment(checkoutId: string, paymentData: {
+    instrument: {
+      type: 'card';
+      cardholder_name: string;
+      number: string;
+      expiry_month: number;
+      expiry_year: number;
+      verification_value: string;
+    };
+  }) {
+    console.log('[BC REST API] Processing payment for checkout:', checkoutId);
 
-    return `https://store-${BC_STORE_HASH}.mybigcommerce.com/checkout/${checkoutId}`;
+    const response = await callRestAPI(`/checkouts/${checkoutId}/payments`, {
+      method: 'POST',
+      body: {
+        payment: paymentData,
+      },
+    });
+
+    console.log('[BC REST API] Payment processed');
+
+    return response.data;
   }
 }
 

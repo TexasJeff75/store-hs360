@@ -104,6 +104,7 @@ curl http://localhost:4000/api/gql -X POST \
 ## Documentation Index
 
 - **[BIGCOMMERCE_SCOPES.md](./BIGCOMMERCE_SCOPES.md)** - Token scope errors and permissions
+- **[REST_API_CHECKOUT.md](./REST_API_CHECKOUT.md)** - REST API checkout flow (no redirects)
 - **[ENV_SETUP.md](./ENV_SETUP.md)** - Complete environment variable setup
 - **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Development workflow and architecture
 - **[README.md](./README.md)** - Project overview
@@ -118,3 +119,4 @@ curl http://localhost:4000/api/gql -X POST \
 **Missing credentials?** → Check `.env` file
 **Need to set up from scratch?** → [ENV_SETUP.md](./ENV_SETUP.md)
 **First time setup?** → [DEVELOPMENT.md](./DEVELOPMENT.md)
+**Want to understand checkout?** → [REST_API_CHECKOUT.md](./REST_API_CHECKOUT.md)
