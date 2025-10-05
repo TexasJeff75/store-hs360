@@ -18,6 +18,7 @@ import { useErrorLogger } from '@/hooks/useErrorLogger';
 import { cacheService } from '@/services/cache';
 import { useAuth } from '@/contexts/AuthContext';
 import { contractPricingService } from '@/services/contractPricing';
+import { supabase } from '@/services/supabase';
 
 interface CartItem {
   id: number;
@@ -107,6 +108,33 @@ function AppContent() {
   useEffect(() => {
     console.log('Auth state:', { user: user?.email, profile: profile?.role, authLoading });
   }, [user, profile, authLoading]);
+
+  // Auto-load user's organization
+  useEffect(() => {
+    const loadUserOrganization = async () => {
+      if (!user?.id || selectedOrganization) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('user_organization_roles')
+          .select(`
+            organization_id,
+            organizations!inner(id, name, code)
+          `)
+          .eq('user_id', user.id)
+          .limit(1)
+          .maybeSingle();
+
+        if (!error && data) {
+          setSelectedOrganization(data.organizations);
+        }
+      } catch (error) {
+        console.error('Error loading user organization:', error);
+      }
+    };
+
+    loadUserOrganization();
+  }, [user?.id, selectedOrganization]);
 
   // Fetch products with contract pricing when organization or user changes
   useEffect(() => {
