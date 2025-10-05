@@ -549,6 +549,7 @@ function AppContent() {
           onClose={handleCloseProductModal}
           onAddToCart={addToCart}
           onBuyNow={handleBuyNow}
+          organizationId={selectedOrganization?.id}
         />
         <UserProfile
           isOpen={isProfileOpen}

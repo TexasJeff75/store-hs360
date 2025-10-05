@@ -9,6 +9,7 @@ interface ProductModalProps {
   onClose: () => void;
   onAddToCart: (productId: number, quantity: number) => void;
   onBuyNow?: (productId: number, quantity: number) => void;
+  organizationId?: string;
 }
 
 const ProductModal: React.FC<ProductModalProps> = ({
@@ -16,7 +17,8 @@ const ProductModal: React.FC<ProductModalProps> = ({
   isOpen,
   onClose,
   onAddToCart,
-  onBuyNow
+  onBuyNow,
+  organizationId
 }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
@@ -154,12 +156,13 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
                 {/* Pricing */}
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <PriceDisplay 
+                  <PriceDisplay
                     productId={product.id}
                     regularPrice={product.price}
                     originalPrice={product.originalPrice}
                     showSavings={true}
                     quantity={quantity}
+                    organizationId={organizationId}
                     className="text-lg"
                   />
                 </div>
