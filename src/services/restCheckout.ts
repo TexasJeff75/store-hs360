@@ -194,6 +194,14 @@ class RestCheckoutService {
 
       console.log('[RestCheckout] Creating order in database...');
 
+      // NOTE: This creates the order in the local Supabase database only.
+      // To sync orders to BigCommerce, you would need to:
+      // 1. Use BigCommerce Orders V2/V3 API to create the order
+      // 2. Handle inventory management
+      // 3. Process payment through BigCommerce Payments API or external gateway
+      // 4. Store the BigCommerce order ID in the database
+      // For development/testing, orders are stored locally with simulated payment.
+
       const orderData: CreateOrderData = {
         userId: session.user_id,
         bigcommerceCartId: session.cart_id || '',

@@ -42,7 +42,7 @@ interface BillingAddress extends ShippingAddress {
   email: string;
 }
 
-type CheckoutStep = 'customer' | 'shipping' | 'billing' | 'payment' | 'review' | 'processing';
+type CheckoutStep = 'customer' | 'shipping' | 'billing' | 'payment' | 'review' | 'processing' | 'confirmation';
 
 const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
@@ -67,6 +67,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
   const [cartId, setCartId] = useState<string | null>(null);
   const [checkoutId, setCheckoutId] = useState<string | null>(null);
   
@@ -470,8 +471,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       );
 
       if (result.success && result.orderId) {
-        onOrderComplete(result.orderId);
-        onClose();
+        setCompletedOrderId(result.orderId);
+        setCurrentStep('confirmation');
       } else {
         setError(result.error || 'Failed to process payment');
       }
@@ -959,6 +960,60 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     </div>
   );
 
+  const renderConfirmationStep = () => (
+    <div className="space-y-6 text-center py-8">
+      <div className="flex justify-center">
+        <div className="rounded-full bg-green-100 p-6">
+          <svg className="h-16 w-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        </div>
+      </div>
+
+      <div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">Order Placed Successfully!</h3>
+        <p className="text-gray-600">Your order has been received and is being processed.</p>
+      </div>
+
+      <div className="bg-gray-50 rounded-lg p-6 max-w-md mx-auto">
+        <div className="space-y-3 text-left">
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Order ID:</span>
+            <span className="font-mono font-medium text-gray-900">{completedOrderId?.slice(0, 8)}...</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Order Total:</span>
+            <span className="font-semibold text-gray-900">${total.toFixed(2)}</span>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-gray-600">Email:</span>
+            <span className="text-gray-900">{billingAddress.email}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+        <p className="text-sm text-blue-800">
+          A confirmation email will be sent to <strong>{billingAddress.email}</strong>
+        </p>
+      </div>
+
+      <div className="flex justify-center space-x-4">
+        <button
+          onClick={() => {
+            if (completedOrderId) {
+              onOrderComplete(completedOrderId);
+            }
+            onClose();
+          }}
+          className="px-6 py-3 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors font-medium"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -1005,10 +1060,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             {!loading && !error && currentStep === 'billing' && renderBillingStep()}
             {!loading && !error && currentStep === 'payment' && renderPaymentStep()}
             {!loading && !error && currentStep === 'review' && renderReviewStep()}
+            {!loading && !error && currentStep === 'confirmation' && renderConfirmationStep()}
           </div>
 
           {/* Footer Navigation */}
-          {!loading && !error && currentStep !== 'customer' && (
+          {!loading && !error && currentStep !== 'customer' && currentStep !== 'confirmation' && (
             <div className="border-t border-gray-200 p-6 bg-gray-50">
               <div className="flex items-center justify-between">
                 <button
