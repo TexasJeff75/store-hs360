@@ -142,11 +142,28 @@ This ensures:
 
 ## Troubleshooting
 
+### 404 Error: "Server returned non-JSON response"
+
+This usually means the local Express server (port 4000) isn't running or the proxy isn't working.
+
+**Solution:**
+1. Make sure you're running `npm run dev` (not just `npm run dev:vite`)
+2. Check that you see TWO processes starting:
+   - Vite dev server on port 3000
+   - Local API server on port 4000
+3. Test the API server directly: `curl http://localhost:4000/api/health`
+4. If the API server isn't starting, check for port conflicts:
+   ```bash
+   lsof -i :4000
+   ```
+5. Kill any conflicting processes and restart
+
 ### "Missing credentials" error in development
 
 1. Check that `.env` file exists in project root
 2. Verify all required variables are set (see `.env.example`)
 3. Restart your dev server: `npm run dev`
+4. Check the API server startup logs - it will show if credentials are missing
 
 ### Functions not working in Netlify
 
@@ -159,12 +176,21 @@ This ensures:
 1. Check that `VITE_BC_STOREFRONT_TOKEN` is a valid JWT (starts with `eyJ`)
 2. Verify the token has Storefront API scopes enabled
 3. Check that `VITE_BC_STORE_HASH` matches your store
+4. Test the GraphQL endpoint: `curl http://localhost:4000/api/gql -X POST -H "Content-Type: application/json" -d '{"query": "{ site { settings { storeName } } }"}'`
 
 ### Cart/Checkout errors
 
 1. Verify `BC_ACCESS_TOKEN` is set (this is different from storefront token)
 2. Check that the token has Carts and Checkouts modify permissions
 3. Test the token directly using BigCommerce API documentation
+
+### Dev Server Issues
+
+**Both servers must run simultaneously:**
+- **Vite** (port 3000): Serves the frontend and proxies API requests
+- **Express** (port 4000): Handles backend API requests
+
+If only one is running, API calls will fail. The `npm run dev` command uses `concurrently` to start both.
 
 ## Security Notes
 

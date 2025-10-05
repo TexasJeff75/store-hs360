@@ -1,6 +1,21 @@
 require('dotenv').config();
 const express = require("express");
 const app = express();
+
+// Enable CORS for all routes
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+
+  // Handle preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
+  next();
+});
+
 app.use(express.json());
 
 // Get environment variables (with fallback for both VITE_ and non-prefixed)
@@ -129,11 +144,29 @@ app.post("/api/bigcommerce-cart", async (req, res) => {
     });
   }
 });
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    config: {
+      storeHash: BC_STORE_HASH ? 'configured' : 'missing',
+      storefrontToken: BC_STOREFRONT_TOKEN ? 'configured' : 'missing',
+      accessToken: BC_ACCESS_TOKEN ? 'configured' : 'missing'
+    }
+  });
+});
+
 app.listen(4000, () => {
-  console.log("Local API server running on :4000");
-  console.log("  - GraphQL proxy:", ENDPOINT);
-  console.log("  - Cart API: /api/bigcommerce-cart");
-  console.log("  - Store Hash:", BC_STORE_HASH || 'NOT SET');
-  console.log("  - Storefront Token:", BC_STOREFRONT_TOKEN ? 'CONFIGURED' : 'NOT SET');
-  console.log("  - Access Token:", BC_ACCESS_TOKEN ? 'CONFIGURED' : 'NOT SET');
+  console.log("\n" + "=".repeat(60));
+  console.log("Local API server running on http://localhost:4000");
+  console.log("=".repeat(60));
+  console.log("  GraphQL proxy:", ENDPOINT);
+  console.log("  Cart API: /api/bigcommerce-cart");
+  console.log("  Health check: /api/health");
+  console.log("\nConfiguration:");
+  console.log("  Store Hash:", BC_STORE_HASH || '❌ NOT SET');
+  console.log("  Storefront Token:", BC_STOREFRONT_TOKEN ? '✅ CONFIGURED' : '❌ NOT SET');
+  console.log("  Access Token:", BC_ACCESS_TOKEN ? '✅ CONFIGURED' : '❌ NOT SET');
+  console.log("=".repeat(60) + "\n");
 });
