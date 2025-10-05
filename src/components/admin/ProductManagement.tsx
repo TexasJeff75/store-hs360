@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Plus, Edit, Trash2, Search, Eye, EyeOff, Star, Tag, Image, DollarSign, Save, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react';
+import { Package, Plus, CreditCard as Edit, Trash2, Search, Eye, EyeOff, Star, Tag, Image, DollarSign, Save, RotateCcw, AlertCircle, CheckCircle } from 'lucide-react';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
 
 interface ProductSettings {
@@ -227,8 +227,8 @@ const ProductManagement: React.FC = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Carousel Product Management</h2>
-        <p className="text-gray-600">Manage which products appear in carousels and customize their display</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Product Management</h2>
+        <p className="text-gray-600">Manage product visibility and display settings</p>
       </div>
 
       {error && (
@@ -576,7 +576,7 @@ const ProductManagement: React.FC = () => {
                               })}
                               className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                             />
-                            <span className="ml-2 text-sm text-gray-700">Visible in Carousels</span>
+                            <span className="ml-2 text-sm text-gray-700">Visible to Users</span>
                           </label>
                         </div>
                       </div>
