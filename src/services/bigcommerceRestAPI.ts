@@ -128,26 +128,35 @@ class BigCommerceRestAPIService {
 
   async createCheckout(cartId: string, billingAddress: AddressData, shippingAddress: AddressData) {
     console.log('[BC REST API] Creating checkout for cart:', cartId);
+    console.log('[BC REST API] Note: Using cart-based checkout flow (V3 checkouts API is deprecated)');
 
     const cart = await this.getCart(cartId);
+
+    if (!cart.line_items?.physical_items || cart.line_items.physical_items.length === 0) {
+      console.error('[BC REST API] No physical items in cart');
+      throw new Error('Cart has no physical items');
+    }
 
     const lineItems = cart.line_items.physical_items.map((item: any) => ({
       item_id: item.id,
       quantity: item.quantity,
     }));
 
-    const requestBody: CreateCheckoutRequest = {
-      cart_id: cartId,
+    const requestBody = {
+      customer_id: 0,
       billing_address: billingAddress,
       consignments: [
         {
           address: shippingAddress,
-          line_items: lineItems,
+          line_items: lineItems.map((item: any) => ({
+            item_id: item.item_id,
+            quantity: item.quantity,
+          })),
         },
       ],
     };
 
-    const response = await callRestAPI('/checkouts', {
+    const response = await callRestAPI(`/checkouts/${cartId}`, {
       method: 'POST',
       body: requestBody,
     });
@@ -155,7 +164,7 @@ class BigCommerceRestAPIService {
     console.log('[BC REST API] Checkout created:', response.data?.id);
 
     return {
-      checkoutId: response.data?.id,
+      checkoutId: response.data?.id || cartId,
       checkout: response.data,
     };
   }
