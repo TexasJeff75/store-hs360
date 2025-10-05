@@ -1,5 +1,7 @@
-const BC_STORE_HASH = import.meta.env.VITE_BC_STORE_HASH;
-const API_BASE = import.meta.env.VITE_API_BASE || '/.netlify/functions';
+import { ENV } from '../config/env';
+
+const BC_STORE_HASH = ENV.BC_STORE_HASH;
+const API_BASE = ENV.API_BASE;
 
 async function callServerlessFunction(action: string, data: any) {
   const url = `${API_BASE}/bigcommerce-cart`;

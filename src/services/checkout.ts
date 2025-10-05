@@ -1,12 +1,11 @@
 import { gql } from './bigcommerce';
+import { ENV } from '../config/env';
 
-// Get BigCommerce configuration from environment
-const BC_STORE_HASH = import.meta.env.VITE_BC_STORE_HASH;
+const BC_STORE_HASH = ENV.BC_STORE_HASH;
 
 console.log('[Checkout Service] Environment check:', {
   storeHash: BC_STORE_HASH ? '✓ Configured' : '✗ Missing',
-  storeHashValue: BC_STORE_HASH || 'undefined',
-  allEnvVars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_BC'))
+  storeHashValue: BC_STORE_HASH || 'undefined'
 });
 
 // GraphQL mutations for cart operations

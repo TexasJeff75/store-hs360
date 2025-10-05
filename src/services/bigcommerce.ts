@@ -1,18 +1,15 @@
-// data-only helpers
 import { cacheService, CacheKeys, CacheTTL } from './cache';
+import { ENV } from '../config/env';
 
-// Get BigCommerce configuration from environment
-const BC_STORE_HASH = import.meta.env.VITE_BC_STORE_HASH;
-const BC_STOREFRONT_TOKEN = import.meta.env.VITE_BC_STOREFRONT_TOKEN;
-
-// Debug environment variables
-console.log('🔧 BigCommerce Environment Variables:');
-console.log('  VITE_BC_STORE_HASH:', BC_STORE_HASH ? `"${BC_STORE_HASH}"` : 'undefined');
-console.log('  VITE_BC_STOREFRONT_TOKEN:', BC_STOREFRONT_TOKEN ? `"${BC_STOREFRONT_TOKEN.substring(0, 20)}..."` : 'undefined');
-console.log('  Both configured:', !!(BC_STORE_HASH && BC_STOREFRONT_TOKEN));
-
-const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+const BC_STORE_HASH = ENV.BC_STORE_HASH;
+const BC_STOREFRONT_TOKEN = ENV.BC_STOREFRONT_TOKEN;
+const API_BASE = ENV.API_BASE;
 const GQL = `${API_BASE}/gql`;
+
+console.log('🔧 BigCommerce Environment Variables:');
+console.log('  BC_STORE_HASH:', BC_STORE_HASH ? `"${BC_STORE_HASH}"` : 'undefined');
+console.log('  BC_STOREFRONT_TOKEN:', BC_STOREFRONT_TOKEN ? `"${BC_STOREFRONT_TOKEN.substring(0, 20)}..."` : 'undefined');
+console.log('  Both configured:', !!(BC_STORE_HASH && BC_STOREFRONT_TOKEN));
 
 // BigCommerce Store Hash for checkout URLs
 export async function gql<T>(query: string, variables?: Record<string, any>): Promise<T> {

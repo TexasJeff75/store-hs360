@@ -4,6 +4,14 @@
   functions = "netlify/functions"
   environment = { SECRETS_SCAN_ENABLED = "false" }
 
+[functions]
+  # Make environment variables available to functions
+  # Note: In Netlify UI, set these environment variables without the VITE_ prefix:
+  # - BC_STORE_HASH
+  # - BC_STOREFRONT_TOKEN
+  # - BC_ACCESS_TOKEN
+  included_files = ["netlify/functions/**"]
+
 [[redirects]]
   from = "/api/gql"
   to = "/.netlify/functions/gql"
