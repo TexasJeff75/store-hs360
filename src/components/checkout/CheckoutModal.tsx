@@ -166,17 +166,88 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!validateStep(currentStep)) {
       setError('Please fill in all required fields');
       return;
     }
-    
+
     setError(null);
-    const steps: CheckoutStep[] = ['shipping', 'billing', 'payment', 'review'];
-    const currentIndex = steps.indexOf(currentStep);
-    if (currentIndex < steps.length - 1) {
-      setCurrentStep(steps[currentIndex + 1]);
+    setLoading(true);
+
+    try {
+      if (currentStep === 'shipping' && sessionId && !cartId) {
+        const lineItems = items.map(item => ({
+          product_id: item.id,
+          quantity: item.quantity
+        }));
+
+        const cartResult = await restCheckoutService.createCart(sessionId, lineItems);
+
+        if (cartResult.success && cartResult.cartId) {
+          setCartId(cartResult.cartId);
+        } else {
+          setError(cartResult.error || 'Failed to create cart');
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (currentStep === 'billing' && sessionId && cartId && !checkoutId) {
+        const billingAddr = {
+          first_name: billingAddress.firstName,
+          last_name: billingAddress.lastName,
+          email: billingAddress.email,
+          company: billingAddress.company,
+          address1: billingAddress.address1,
+          address2: billingAddress.address2,
+          city: billingAddress.city,
+          state_or_province: billingAddress.state,
+          postal_code: billingAddress.postalCode,
+          country_code: billingAddress.country,
+          phone: billingAddress.phone,
+        };
+
+        const shippingAddr = {
+          first_name: shippingAddress.firstName,
+          last_name: shippingAddress.lastName,
+          email: user?.email || '',
+          company: shippingAddress.company,
+          address1: shippingAddress.address1,
+          address2: shippingAddress.address2,
+          city: shippingAddress.city,
+          state_or_province: shippingAddress.state,
+          postal_code: shippingAddress.postalCode,
+          country_code: shippingAddress.country,
+          phone: shippingAddress.phone,
+        };
+
+        const checkoutResult = await restCheckoutService.addAddresses(
+          sessionId,
+          cartId,
+          billingAddr,
+          shippingAddr
+        );
+
+        if (checkoutResult.success && checkoutResult.checkoutId) {
+          setCheckoutId(checkoutResult.checkoutId);
+        } else {
+          setError(checkoutResult.error || 'Failed to create checkout');
+          setLoading(false);
+          return;
+        }
+      }
+
+      const steps: CheckoutStep[] = ['shipping', 'billing', 'payment', 'review'];
+      const currentIndex = steps.indexOf(currentStep);
+      if (currentIndex < steps.length - 1) {
+        setCurrentStep(steps[currentIndex + 1]);
+      }
+    } catch (err) {
+      console.error('Error during checkout step:', err);
+      setError('An error occurred. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -189,19 +260,39 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handlePlaceOrder = async () => {
+    if (!sessionId || !checkoutId) {
+      setError('Checkout session not found. Please try again.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    
+
     try {
-      // Here you would integrate with BigCommerce's payment processing
-      // For now, we'll simulate the order placement
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // Mock order ID
-      const orderId = `ORD-${Date.now()}`;
-      onOrderComplete(orderId);
-      onClose();
+      // This would collect payment information from the payment step form
+      // For now, using test card data
+      const paymentData = {
+        cardholder_name: `${billingAddress.firstName} ${billingAddress.lastName}`,
+        number: '4111111111111111',
+        expiry_month: 12,
+        expiry_year: 2025,
+        verification_value: '123',
+      };
+
+      const result = await restCheckoutService.processPayment(
+        sessionId,
+        checkoutId,
+        paymentData
+      );
+
+      if (result.success && result.orderId) {
+        onOrderComplete(result.orderId);
+        onClose();
+      } else {
+        setError(result.error || 'Failed to process payment');
+      }
     } catch (err) {
+      console.error('Order placement error:', err);
       setError('Failed to place order. Please try again.');
     } finally {
       setLoading(false);
@@ -479,129 +570,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     </div>
   );
 
-  const renderRedirectCheckout = () => {
-    if (loading) {
-      return (
-        <div className="flex flex-col items-center justify-center h-[600px] space-y-4">
-          <Loader className="h-12 w-12 text-blue-600 animate-spin" />
-          <p className="text-gray-600">Preparing your checkout...</p>
-        </div>
-      );
-    }
-
-    if (error) {
-      return (
-        <div className="flex flex-col items-center justify-center h-[600px] space-y-4">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-            <div className="flex items-center space-x-2 mb-3">
-              <AlertCircle className="h-6 w-6 text-red-600" />
-              <h3 className="text-lg font-semibold text-red-900">Checkout Error</h3>
-            </div>
-            <p className="text-red-700 mb-4">{error}</p>
-
-            {session && session.retry_count > 0 && (
-              <div className="bg-red-100 border border-red-300 rounded p-3 mb-4">
-                <p className="text-xs text-red-800">
-                  Retry attempt {session.retry_count} of 3
-                </p>
-              </div>
-            )}
-
-            {canRetry ? (
-              <button
-                onClick={handleRetry}
-                disabled={retrying}
-                className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
-              >
-                {retrying ? (
-                  <>
-                    <Loader className="h-4 w-4 animate-spin" />
-                    <span>Retrying...</span>
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4" />
-                    <span>Try Again</span>
-                  </>
-                )}
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-sm text-red-600 mb-2">Unable to retry automatically. Please:</p>
-                <button
-                  onClick={() => {
-                    setError(null);
-                    setSessionId(null);
-                    initializeCheckout();
-                  }}
-                  className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
-                >
-                  Start New Checkout
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      );
-    }
-
-    if (!checkoutUrl) {
-      return null;
-    }
-
-    return (
-      <div className="flex flex-col items-center justify-center h-[500px] space-y-6 p-8">
-        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-full p-6">
-          <CreditCard className="h-16 w-16 text-blue-600" />
-        </div>
-        <div className="text-center space-y-2">
-          <h3 className="text-2xl font-bold text-gray-900">Ready to Complete Your Order</h3>
-          <p className="text-gray-600 max-w-md">
-            Your checkout session is ready. Click below to securely complete your payment.
-          </p>
-        </div>
-
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md">
-          <div className="flex items-start space-x-3">
-            <Lock className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-            <div className="text-sm text-blue-800">
-              <p className="font-medium mb-1">Secure Checkout</p>
-              <p className="text-blue-700">You'll be redirected to our secure payment page. Your session is saved and you can return anytime.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex space-x-3">
-          <button
-            onClick={() => {
-              window.location.href = checkoutUrl;
-            }}
-            className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-2"
-          >
-            <CreditCard className="h-5 w-5" />
-            <span>Continue to Checkout</span>
-            <ArrowRight className="h-5 w-5" />
-          </button>
-
-          <button
-            onClick={() => {
-              window.open(checkoutUrl, '_blank');
-            }}
-            className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
-          >
-            Open in New Tab
-          </button>
-        </div>
-
-        <button
-          onClick={onClose}
-          className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
-        >
-          I'll complete this later
-        </button>
-      </div>
-    );
-  };
 
   const renderReviewStep = () => (
     <div className="space-y-6">
@@ -702,7 +670,35 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
           {/* Content */}
           <div className="p-6">
-            {renderRedirectCheckout()}
+            {loading && (
+              <div className="flex flex-col items-center justify-center h-[400px] space-y-4">
+                <Loader className="h-12 w-12 text-blue-600 animate-spin" />
+                <p className="text-gray-600">Initializing checkout...</p>
+              </div>
+            )}
+
+            {error && !loading && (
+              <div className="flex flex-col items-center justify-center h-[400px] space-y-4">
+                <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
+                  <div className="flex items-center space-x-2 mb-3">
+                    <AlertCircle className="h-6 w-6 text-red-600" />
+                    <h3 className="text-lg font-semibold text-red-900">Checkout Error</h3>
+                  </div>
+                  <p className="text-red-700 mb-4">{error}</p>
+                  <button
+                    onClick={initializeCheckout}
+                    className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!loading && !error && currentStep === 'shipping' && renderShippingStep()}
+            {!loading && !error && currentStep === 'billing' && renderBillingStep()}
+            {!loading && !error && currentStep === 'payment' && renderPaymentStep()}
+            {!loading && !error && currentStep === 'review' && renderReviewStep()}
           </div>
         </div>
       </div>
