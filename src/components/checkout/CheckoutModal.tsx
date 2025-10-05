@@ -36,7 +36,7 @@ interface BillingAddress extends ShippingAddress {
   email: string;
 }
 
-type CheckoutStep = 'shipping' | 'billing' | 'payment' | 'review' | 'embedded-checkout';
+type CheckoutStep = 'shipping' | 'billing' | 'payment' | 'review' | 'redirect-checkout';
 
 const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
@@ -45,7 +45,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOrderComplete
 }) => {
   const { user, profile } = useAuth();
-  const [currentStep, setCurrentStep] = useState<CheckoutStep>('embedded-checkout');
+  const [currentStep, setCurrentStep] = useState<CheckoutStep>('redirect-checkout');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
@@ -163,7 +163,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         quantity: item.quantity
       }));
 
-      console.log('[CheckoutModal] Processing embedded checkout...');
+      console.log('[CheckoutModal] Processing checkout redirect...');
       const checkoutResult = await bulletproofCheckoutService.processEmbeddedCheckout(
         sessionResult.sessionId,
         lineItems
@@ -173,7 +173,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
       if (checkoutResult.success && checkoutResult.checkoutUrl) {
         setCheckoutUrl(checkoutResult.checkoutUrl);
-        setCurrentStep('embedded-checkout');
+        setCurrentStep('redirect-checkout');
       } else {
         console.error('[CheckoutModal] Checkout failed:', checkoutResult.error);
         setError(checkoutResult.error || 'Failed to initialize checkout');
@@ -202,7 +202,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
       if (result.success && result.checkoutUrl) {
         setCheckoutUrl(result.checkoutUrl);
-        setCurrentStep('embedded-checkout');
+        setCurrentStep('redirect-checkout');
         setError(null);
       } else {
         setError(result.error || 'Failed to recover checkout session');
@@ -545,12 +545,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     </div>
   );
 
-  const renderEmbeddedCheckout = () => {
+  const renderRedirectCheckout = () => {
     if (loading) {
       return (
         <div className="flex flex-col items-center justify-center h-[600px] space-y-4">
           <Loader className="h-12 w-12 text-blue-600 animate-spin" />
-          <p className="text-gray-600">Initializing secure checkout...</p>
+          <p className="text-gray-600">Preparing your checkout...</p>
         </div>
       );
     }
@@ -616,14 +616,55 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
 
     return (
-      <div className="h-[600px] w-full">
-        <iframe
-          ref={iframeRef}
-          src={checkoutUrl}
-          className="w-full h-full border-0 rounded-lg"
-          title="BigCommerce Checkout"
-          allow="payment"
-        />
+      <div className="flex flex-col items-center justify-center h-[500px] space-y-6 p-8">
+        <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-full p-6">
+          <CreditCard className="h-16 w-16 text-blue-600" />
+        </div>
+        <div className="text-center space-y-2">
+          <h3 className="text-2xl font-bold text-gray-900">Ready to Complete Your Order</h3>
+          <p className="text-gray-600 max-w-md">
+            Your checkout session is ready. Click below to securely complete your payment.
+          </p>
+        </div>
+
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md">
+          <div className="flex items-start space-x-3">
+            <Lock className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-blue-800">
+              <p className="font-medium mb-1">Secure Checkout</p>
+              <p className="text-blue-700">You'll be redirected to our secure payment page. Your session is saved and you can return anytime.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex space-x-3">
+          <button
+            onClick={() => {
+              window.location.href = checkoutUrl;
+            }}
+            className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center space-x-2"
+          >
+            <CreditCard className="h-5 w-5" />
+            <span>Continue to Checkout</span>
+            <ArrowRight className="h-5 w-5" />
+          </button>
+
+          <button
+            onClick={() => {
+              window.open(checkoutUrl, '_blank');
+            }}
+            className="px-6 py-3 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+          >
+            Open in New Tab
+          </button>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="text-sm text-gray-500 hover:text-gray-700 transition-colors"
+        >
+          I'll complete this later
+        </button>
       </div>
     );
   };
@@ -727,7 +768,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
           {/* Content */}
           <div className="p-6">
-            {renderEmbeddedCheckout()}
+            {renderRedirectCheckout()}
           </div>
         </div>
       </div>
