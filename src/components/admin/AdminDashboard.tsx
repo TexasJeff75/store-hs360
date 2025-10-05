@@ -1,18 +1,19 @@
 import React, { useState } from 'react';
-import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package } from 'lucide-react';
+import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart } from 'lucide-react';
 import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
 import LocationManagement from './LocationManagement';
 import PricingManagement from './PricingManagement';
 import ProductsManagement from './ProductsManagement';
 import ProductManagement from './ProductManagement';
+import OrderManagement from './OrderManagement';
 
 interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'carousel-products' | 'analytics';
+type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'carousel-products' | 'orders' | 'analytics';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('organizations');
@@ -22,6 +23,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const tabs = [
     { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2 },
     { id: 'users' as AdminTab, label: 'Users', icon: Users },
+    { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart },
     { id: 'products' as AdminTab, label: 'Products', icon: Package },
     { id: 'carousel-products' as AdminTab, label: 'Carousel Products', icon: Package },
     { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3 },
@@ -33,6 +35,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
         return <OrganizationManagement />;
       case 'users':
         return <UserManagement />;
+      case 'orders':
+        return <OrderManagement />;
       case 'products':
         return <ProductsManagement />;
       case 'carousel-products':
