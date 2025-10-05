@@ -143,7 +143,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
-  const handleCustomerSelection = (selection: {
+  const handleCustomerSelection = async (selection: {
     customerId: string;
     organizationId?: string;
     locationId?: string;
@@ -153,7 +153,43 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setSelectedOrgId(selection.organizationId);
     setSelectedLocationId(selection.locationId);
     setCustomerEmail(selection.customerEmail);
+
+    if (selection.locationId) {
+      await fetchLocationAddress(selection.locationId);
+    }
+
     setCurrentStep('shipping');
+  };
+
+  const fetchLocationAddress = async (locationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('address, name')
+        .eq('id', locationId)
+        .single();
+
+      if (error) throw error;
+
+      if (data?.address) {
+        const addr = data.address as any;
+        setShippingAddress({
+          firstName: addr.firstName || addr.first_name || '',
+          lastName: addr.lastName || addr.last_name || '',
+          company: addr.company || data.name || '',
+          address1: addr.address1 || addr.street || '',
+          address2: addr.address2 || '',
+          city: addr.city || '',
+          state: addr.state || addr.state_or_province || '',
+          postalCode: addr.postalCode || addr.postal_code || addr.zip || '',
+          country: addr.country || addr.country_code || 'US',
+          phone: addr.phone || ''
+        });
+        setShowAddressSelector(false);
+      }
+    } catch (error) {
+      console.error('Error fetching location address:', error);
+    }
   };
 
 
@@ -465,7 +501,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   );
 
   const renderShippingStep = () => {
-    if (!useManualAddress && showAddressSelector) {
+    if (!useManualAddress && showAddressSelector && !selectedLocationId) {
       return (
         <div className="space-y-6">
           <AddressSelector
@@ -482,9 +518,16 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     return (
     <div className="space-y-6">
-      <div className="flex items-center space-x-2 mb-4">
-        <Truck className="h-5 w-5 text-pink-600" />
-        <h3 className="text-lg font-semibold">Shipping Address</h3>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-2">
+          <Truck className="h-5 w-5 text-pink-600" />
+          <h3 className="text-lg font-semibold">Shipping Address</h3>
+        </div>
+        {selectedLocationId && (
+          <span className="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
+            Using Location Address
+          </span>
+        )}
       </div>
       
       <div className="grid grid-cols-2 gap-4">

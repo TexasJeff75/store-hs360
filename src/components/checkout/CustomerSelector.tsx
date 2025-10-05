@@ -253,20 +253,23 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center space-x-2">
                 <MapPin className="h-4 w-4" />
-                <span>Select Location (Optional)</span>
+                <span>Shipping Destination *</span>
               </label>
               <select
                 value={selectedLocation}
                 onChange={(e) => setSelectedLocation(e.target.value)}
                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               >
-                <option value="">No specific location</option>
+                <option value="">Select shipping location...</option>
                 {locations.map(loc => (
                   <option key={loc.id} value={loc.id}>
                     {loc.name} ({loc.code})
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                The location's stored address will be used for shipping
+              </p>
             </div>
           )}
 
@@ -331,6 +334,9 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                The location's stored address will be used for shipping
+              </p>
             </div>
           )}
 
@@ -352,6 +358,9 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
                   </option>
                 ))}
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                The location's stored address will be used for shipping
+              </p>
             </div>
           )}
 
