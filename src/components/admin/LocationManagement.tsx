@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Plus, Edit, Trash2, Search, Building2, Mail, Phone } from 'lucide-react';
+import { MapPin, Plus, CreditCard as Edit, Trash2, Search, Building2, Mail, Phone } from 'lucide-react';
 import { multiTenantService } from '@/services/multiTenant';
 import type { Location, Organization } from '@/services/supabase';
 
@@ -202,6 +202,20 @@ const LocationManagement: React.FC<LocationManagementProps> = ({ organizationId 
             </div>
 
             <div className="space-y-2">
+              {location.address && (
+                <div className="mb-3 p-3 bg-gray-50 rounded-lg">
+                  <div className="text-xs font-semibold text-gray-700 mb-1">Shipping Address:</div>
+                  <div className="text-sm text-gray-600 space-y-0.5">
+                    <div>{(location.address as any)?.firstName} {(location.address as any)?.lastName}</div>
+                    {(location.address as any)?.company && <div>{(location.address as any)?.company}</div>}
+                    <div>{(location.address as any)?.address1}</div>
+                    {(location.address as any)?.address2 && <div>{(location.address as any)?.address2}</div>}
+                    <div>
+                      {(location.address as any)?.city}, {(location.address as any)?.state} {(location.address as any)?.postalCode}
+                    </div>
+                  </div>
+                </div>
+              )}
               {location.contact_email && (
                 <div className="flex items-center space-x-2 text-sm text-gray-600">
                   <Mail className="h-4 w-4" />
@@ -253,7 +267,7 @@ const LocationManagement: React.FC<LocationManagementProps> = ({ organizationId 
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsModalOpen(false)}></div>
             
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-2xl sm:w-full max-h-[90vh] overflow-y-auto">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
                   <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
@@ -337,7 +351,170 @@ const LocationManagement: React.FC<LocationManagementProps> = ({ organizationId 
                           placeholder="+1 (555) 123-4567"
                         />
                       </div>
-                      
+
+                      {/* Shipping Address Section */}
+                      <div className="pt-4 border-t border-gray-200">
+                        <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center space-x-2">
+                          <MapPin className="h-4 w-4" />
+                          <span>Shipping Address</span>
+                        </h4>
+
+                        <div className="space-y-3">
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                First Name *
+                              </label>
+                              <input
+                                type="text"
+                                value={(selectedLocation.address as any)?.firstName || ''}
+                                onChange={(e) => setSelectedLocation({
+                                  ...selectedLocation,
+                                  address: {...(selectedLocation.address as any || {}), firstName: e.target.value}
+                                })}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Last Name *
+                              </label>
+                              <input
+                                type="text"
+                                value={(selectedLocation.address as any)?.lastName || ''}
+                                onChange={(e) => setSelectedLocation({
+                                  ...selectedLocation,
+                                  address: {...(selectedLocation.address as any || {}), lastName: e.target.value}
+                                })}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Company
+                            </label>
+                            <input
+                              type="text"
+                              value={(selectedLocation.address as any)?.company || ''}
+                              onChange={(e) => setSelectedLocation({
+                                ...selectedLocation,
+                                address: {...(selectedLocation.address as any || {}), company: e.target.value}
+                              })}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Street Address *
+                            </label>
+                            <input
+                              type="text"
+                              value={(selectedLocation.address as any)?.address1 || ''}
+                              onChange={(e) => setSelectedLocation({
+                                ...selectedLocation,
+                                address: {...(selectedLocation.address as any || {}), address1: e.target.value}
+                              })}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="123 Main St"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Address Line 2
+                            </label>
+                            <input
+                              type="text"
+                              value={(selectedLocation.address as any)?.address2 || ''}
+                              onChange={(e) => setSelectedLocation({
+                                ...selectedLocation,
+                                address: {...(selectedLocation.address as any || {}), address2: e.target.value}
+                              })}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="Suite, Unit, etc."
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                City *
+                              </label>
+                              <input
+                                type="text"
+                                value={(selectedLocation.address as any)?.city || ''}
+                                onChange={(e) => setSelectedLocation({
+                                  ...selectedLocation,
+                                  address: {...(selectedLocation.address as any || {}), city: e.target.value}
+                                })}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                State *
+                              </label>
+                              <input
+                                type="text"
+                                value={(selectedLocation.address as any)?.state || ''}
+                                onChange={(e) => setSelectedLocation({
+                                  ...selectedLocation,
+                                  address: {...(selectedLocation.address as any || {}), state: e.target.value}
+                                })}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                ZIP *
+                              </label>
+                              <input
+                                type="text"
+                                value={(selectedLocation.address as any)?.postalCode || ''}
+                                onChange={(e) => setSelectedLocation({
+                                  ...selectedLocation,
+                                  address: {...(selectedLocation.address as any || {}), postalCode: e.target.value}
+                                })}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Country *
+                            </label>
+                            <input
+                              type="text"
+                              value={(selectedLocation.address as any)?.country || 'US'}
+                              onChange={(e) => setSelectedLocation({
+                                ...selectedLocation,
+                                address: {...(selectedLocation.address as any || {}), country: e.target.value}
+                              })}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Phone
+                            </label>
+                            <input
+                              type="tel"
+                              value={(selectedLocation.address as any)?.phone || ''}
+                              onChange={(e) => setSelectedLocation({
+                                ...selectedLocation,
+                                address: {...(selectedLocation.address as any || {}), phone: e.target.value}
+                              })}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
                       <div>
                         <label className="flex items-center">
                           <input
@@ -357,7 +534,17 @@ const LocationManagement: React.FC<LocationManagementProps> = ({ organizationId 
                 <button
                   type="button"
                   onClick={handleSaveLocation}
-                  disabled={!selectedLocation.name || !selectedLocation.code || !selectedLocation.organization_id}
+                  disabled={
+                    !selectedLocation.name ||
+                    !selectedLocation.code ||
+                    !selectedLocation.organization_id ||
+                    !(selectedLocation.address as any)?.firstName ||
+                    !(selectedLocation.address as any)?.lastName ||
+                    !(selectedLocation.address as any)?.address1 ||
+                    !(selectedLocation.address as any)?.city ||
+                    !(selectedLocation.address as any)?.state ||
+                    !(selectedLocation.address as any)?.postalCode
+                  }
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isEditing ? 'Update' : 'Create'} Location
