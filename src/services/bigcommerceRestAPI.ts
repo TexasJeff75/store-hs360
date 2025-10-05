@@ -127,8 +127,8 @@ class BigCommerceRestAPIService {
   }
 
   async createCheckout(cartId: string, billingAddress: AddressData, shippingAddress: AddressData) {
-    console.log('[BC REST API] Creating checkout for cart:', cartId);
-    console.log('[BC REST API] Note: Using cart-based checkout flow (V3 checkouts API is deprecated)');
+    console.log('[BC REST API] Adding addresses to checkout:', cartId);
+    console.log('[BC REST API] Note: Cart ID and Checkout ID are the same in BigCommerce');
 
     const cart = await this.getCart(cartId);
 
@@ -142,30 +142,33 @@ class BigCommerceRestAPIService {
       quantity: item.quantity,
     }));
 
-    const requestBody = {
-      customer_id: 0,
-      billing_address: billingAddress,
-      consignments: [
-        {
-          address: shippingAddress,
-          line_items: lineItems.map((item: any) => ({
-            item_id: item.item_id,
-            quantity: item.quantity,
-          })),
-        },
-      ],
-    };
-
-    const response = await callRestAPI(`/checkouts/${cartId}`, {
+    // Add billing address to checkout
+    const billingResponse = await callRestAPI(`/checkouts/${cartId}/billing-address`, {
       method: 'POST',
-      body: requestBody,
+      body: billingAddress,
     });
 
-    console.log('[BC REST API] Checkout created:', response.data?.id);
+    console.log('[BC REST API] Billing address added');
+
+    // Add consignment (shipping address + line items)
+    const consignmentBody = [
+      {
+        address: shippingAddress,
+        line_items: lineItems,
+      },
+    ];
+
+    const consignmentResponse = await callRestAPI(`/checkouts/${cartId}/consignments?include=consignments.available_shipping_options`, {
+      method: 'POST',
+      body: consignmentBody,
+    });
+
+    console.log('[BC REST API] Shipping consignment added');
 
     return {
-      checkoutId: response.data?.id || cartId,
-      checkout: response.data,
+      checkoutId: cartId,
+      checkout: consignmentResponse.data,
+      consignments: consignmentResponse.data?.consignments,
     };
   }
 
