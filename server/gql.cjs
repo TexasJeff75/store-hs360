@@ -159,12 +159,28 @@ app.post("/api/bigcommerce-cart", async (req, res) => {
           fetchOptions.body = JSON.stringify(data.body);
         }
 
+        console.log('[Cart Function] Request URL:', fullUrl);
+        console.log('[Cart Function] Request method:', method);
+
         const response = await fetch(fullUrl, fetchOptions);
+
+        console.log('[Cart Function] Response status:', response.status);
+        console.log('[Cart Function] Response headers:', Object.fromEntries(response.headers.entries()));
+
+        const contentType = response.headers.get('content-type');
+
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text();
+          console.error('[Cart Function] Non-JSON response:', text.substring(0, 500));
+          throw new Error(`BigCommerce returned non-JSON response: ${text.substring(0, 200)}`);
+        }
+
         const result = await response.json();
 
         if (!response.ok) {
-          const errorMsg = result.title || result.detail || `Failed to ${action}`;
+          const errorMsg = result.title || result.detail || result.message || `Failed to ${action}`;
           console.error(`[Cart Function] ${action} Error:`, errorMsg);
+          console.error('[Cart Function] Full error response:', JSON.stringify(result));
 
           if (errorMsg.toLowerCase().includes('scope') || response.status === 401) {
             console.error('❌ BigCommerce Scope Error - BC_ACCESS_TOKEN missing permissions');

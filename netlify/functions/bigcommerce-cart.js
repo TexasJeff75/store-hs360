@@ -131,19 +131,31 @@ exports.handler = async (event, context) => {
 
         console.log('[BigCommerce Cart Function] API Request:', method, url);
 
+        console.log('[BigCommerce Cart Function] Request URL:', url);
+        console.log('[BigCommerce Cart Function] Request method:', method);
+
         const response = await fetch(url, {
           method: method || 'GET',
           headers,
           body: body ? JSON.stringify(body) : undefined,
         });
 
-        const result = await response.json();
-
         console.log('[BigCommerce Cart Function] API Response status:', response.status);
+        console.log('[BigCommerce Cart Function] Response headers:', Object.fromEntries(response.headers.entries()));
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+          const text = await response.text();
+          console.error('[BigCommerce Cart Function] Non-JSON response:', text.substring(0, 500));
+          throw new Error(`BigCommerce returned non-JSON response: ${text.substring(0, 200)}`);
+        }
+
+        const result = await response.json();
 
         if (!response.ok) {
           const errorMsg = result.title || result.detail || result.message || 'API request failed';
           console.error('[BigCommerce Cart Function] API Error:', errorMsg);
+          console.error('[BigCommerce Cart Function] Full error response:', JSON.stringify(result));
           throw new Error(errorMsg);
         }
 
