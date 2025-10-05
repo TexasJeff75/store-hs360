@@ -107,6 +107,9 @@ class BulletproofCheckoutService {
     organizationId?: string
   ): Promise<CheckoutResult> {
     try {
+      console.log('[Bulletproof Checkout] Creating session for user:', userId);
+      console.log('[Bulletproof Checkout] Cart items:', cartItems);
+
       const idempotencyKey = uuidv4();
       const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
       const tax = subtotal * 0.08;
@@ -135,20 +138,22 @@ class BulletproofCheckoutService {
         .single();
 
       if (error) {
-        console.error('Failed to create checkout session:', error);
+        console.error('[Bulletproof Checkout] Failed to create checkout session:', error);
         return {
           success: false,
-          error: 'Failed to initialize checkout session',
+          error: `Database error: ${error.message}`,
           canRetry: true,
         };
       }
+
+      console.log('[Bulletproof Checkout] Session created:', session.id);
 
       return {
         success: true,
         sessionId: session.id,
       };
     } catch (error) {
-      console.error('Error creating checkout session:', error);
+      console.error('[Bulletproof Checkout] Error creating checkout session:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to create session',
@@ -203,6 +208,8 @@ class BulletproofCheckoutService {
     sessionId: string,
     lineItems: CartLineItem[]
   ): Promise<CheckoutResult> {
+    console.log('[Bulletproof Checkout] Creating cart with retry for session:', sessionId);
+
     const session = await this.getSession(sessionId);
     if (!session) {
       return {
@@ -216,6 +223,8 @@ class BulletproofCheckoutService {
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
+        console.log(`[Bulletproof Checkout] Cart creation attempt ${attempt + 1}/${MAX_RETRIES + 1}`);
+
         await this.updateSession(sessionId, {
           status: 'processing',
           step: 'cart_creation',
@@ -225,6 +234,7 @@ class BulletproofCheckoutService {
         const result = await checkoutService.createCart(lineItems);
 
         if (result.cartId) {
+          console.log('[Bulletproof Checkout] Cart created successfully:', result.cartId);
           await this.updateSession(sessionId, {
             cart_id: result.cartId,
             step: 'address_entry',
@@ -236,18 +246,23 @@ class BulletproofCheckoutService {
           };
         } else {
           lastError = new Error(result.error || 'Failed to create cart');
+          console.error('[Bulletproof Checkout] Cart creation failed:', lastError.message);
           this.logError(session, 'cart_creation', lastError);
         }
       } catch (error) {
         lastError = error;
+        console.error('[Bulletproof Checkout] Cart creation error:', error);
         this.logError(session, 'cart_creation', error);
 
         if (this.isRetryableError(error) && attempt < MAX_RETRIES) {
+          console.log('[Bulletproof Checkout] Error is retryable, backing off...');
           await this.exponentialBackoff(attempt);
           continue;
         }
       }
     }
+
+    console.error('[Bulletproof Checkout] All retry attempts exhausted');
 
     await this.updateSession(sessionId, {
       status: 'failed',
@@ -265,6 +280,8 @@ class BulletproofCheckoutService {
     sessionId: string,
     lineItems: CartLineItem[]
   ): Promise<CheckoutResult> {
+    console.log('[Bulletproof Checkout] Processing embedded checkout for session:', sessionId);
+
     const session = await this.getSession(sessionId);
     if (!session) {
       return {
@@ -275,16 +292,27 @@ class BulletproofCheckoutService {
     }
 
     if (session.cart_id) {
-      const checkoutUrl = checkoutService.getEmbeddedCheckoutUrl(session.cart_id);
-      return {
-        success: true,
-        sessionId,
-        checkoutUrl,
-      };
+      console.log('[Bulletproof Checkout] Using existing cart:', session.cart_id);
+      try {
+        const checkoutUrl = checkoutService.getEmbeddedCheckoutUrl(session.cart_id);
+        return {
+          success: true,
+          sessionId,
+          checkoutUrl,
+        };
+      } catch (error) {
+        console.error('[Bulletproof Checkout] Failed to get checkout URL:', error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Failed to generate checkout URL',
+          canRetry: false,
+        };
+      }
     }
 
+    console.log('[Bulletproof Checkout] Creating new cart...');
     const cartResult = await this.createCartWithRetry(sessionId, lineItems);
-    if (!cartResult.success || !session.cart_id) {
+    if (!cartResult.success) {
       return cartResult;
     }
 
@@ -292,22 +320,34 @@ class BulletproofCheckoutService {
     if (!updatedSession?.cart_id) {
       return {
         success: false,
-        error: 'Failed to get cart ID',
+        error: 'Failed to retrieve cart ID after creation',
         canRetry: true,
       };
     }
 
-    const checkoutUrl = checkoutService.getEmbeddedCheckoutUrl(updatedSession.cart_id);
+    console.log('[Bulletproof Checkout] Generating checkout URL...');
+    try {
+      const checkoutUrl = checkoutService.getEmbeddedCheckoutUrl(updatedSession.cart_id);
 
-    await this.updateSession(sessionId, {
-      step: 'payment',
-    });
+      await this.updateSession(sessionId, {
+        step: 'payment',
+      });
 
-    return {
-      success: true,
-      sessionId,
-      checkoutUrl,
-    };
+      console.log('[Bulletproof Checkout] Checkout URL generated:', checkoutUrl);
+
+      return {
+        success: true,
+        sessionId,
+        checkoutUrl,
+      };
+    } catch (error) {
+      console.error('[Bulletproof Checkout] Failed to get checkout URL:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to generate checkout URL',
+        canRetry: false,
+      };
+    }
   }
 
   async processFullCheckout(

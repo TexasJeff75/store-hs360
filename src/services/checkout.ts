@@ -86,6 +86,13 @@ class CheckoutService {
    */
   async createCart(lineItems: CartLineItem[]): Promise<{ cartId: string | null; error?: string }> {
     try {
+      if (!BC_STORE_HASH) {
+        return {
+          cartId: null,
+          error: 'BigCommerce store not configured. Please add VITE_BC_STORE_HASH to your .env file.'
+        };
+      }
+
       const createCartInput = {
         lineItems: lineItems.map(item => ({
           productEntityId: item.productId,
@@ -95,7 +102,7 @@ class CheckoutService {
       };
 
       const data = await gql(CREATE_CART, { createCartInput });
-      
+
       const cart = data?.cart?.createCart?.cart;
       if (cart?.entityId) {
         this.cartId = cart.entityId;
@@ -105,9 +112,9 @@ class CheckoutService {
       }
     } catch (error) {
       console.error('Error creating cart:', error);
-      return { 
-        cartId: null, 
-        error: error instanceof Error ? error.message : 'Failed to create cart' 
+      return {
+        cartId: null,
+        error: error instanceof Error ? error.message : 'Failed to create cart'
       };
     }
   }
@@ -141,7 +148,7 @@ class CheckoutService {
    */
   getEmbeddedCheckoutUrl(cartId: string): string {
     if (!BC_STORE_HASH) {
-      throw new Error('BigCommerce store hash not configured');
+      throw new Error('BigCommerce store not configured. Add VITE_BC_STORE_HASH and VITE_BC_STOREFRONT_TOKEN to .env');
     }
 
     return `https://store-${BC_STORE_HASH}.mybigcommerce.com/embedded-checkout/${cartId}`;
