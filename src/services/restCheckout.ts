@@ -101,7 +101,7 @@ class RestCheckoutService {
         .from('checkout_sessions')
         .update({
           status: 'failed',
-          error: error instanceof Error ? error.message : 'Failed to create cart',
+          last_error: error instanceof Error ? error.message : 'Failed to create cart',
         })
         .eq('id', sessionId);
 
@@ -149,7 +149,7 @@ class RestCheckoutService {
         .from('checkout_sessions')
         .update({
           status: 'failed',
-          error: error instanceof Error ? error.message : 'Failed to add addresses',
+          last_error: error instanceof Error ? error.message : 'Failed to add addresses',
         })
         .eq('id', sessionId);
 
@@ -241,7 +241,7 @@ class RestCheckoutService {
         .from('checkout_sessions')
         .update({
           status: 'failed',
-          error: error instanceof Error ? error.message : 'Payment failed',
+          last_error: error instanceof Error ? error.message : 'Payment failed',
         })
         .eq('id', sessionId);
 

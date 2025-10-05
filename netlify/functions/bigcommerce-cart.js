@@ -122,6 +122,38 @@ exports.handler = async (event, context) => {
         };
       }
 
+      case 'createCheckout':
+      case 'updateCheckout':
+      case 'getCheckout':
+      case 'checkoutAction': {
+        const { endpoint, method, body } = data;
+        const url = `https://api.bigcommerce.com/stores/${BC_STORE_HASH}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+
+        console.log('[BigCommerce Cart Function] API Request:', method, url);
+
+        const response = await fetch(url, {
+          method: method || 'GET',
+          headers,
+          body: body ? JSON.stringify(body) : undefined,
+        });
+
+        const result = await response.json();
+
+        console.log('[BigCommerce Cart Function] API Response status:', response.status);
+
+        if (!response.ok) {
+          const errorMsg = result.title || result.detail || result.message || 'API request failed';
+          console.error('[BigCommerce Cart Function] API Error:', errorMsg);
+          throw new Error(errorMsg);
+        }
+
+        return {
+          statusCode: 200,
+          headers: corsHeaders,
+          body: JSON.stringify(result),
+        };
+      }
+
       default:
         return {
           statusCode: 400,
