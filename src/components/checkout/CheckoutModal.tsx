@@ -119,7 +119,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
     setLoading(true);
     setError(null);
-    setCanRetry(false);
 
     try {
       const cartItems = items.map(item => ({
