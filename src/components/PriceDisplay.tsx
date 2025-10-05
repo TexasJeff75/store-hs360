@@ -25,14 +25,8 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   const { user, profile } = useAuth();
   const { price, source, savings, loading } = useContractPricing(productId, regularPrice, quantity, organizationId);
 
-  if (loading) {
-    return (
-      <div className={`flex items-center space-x-2 min-h-[24px] ${className}`}>
-        <Loader2 className="h-4 w-4 animate-spin text-gray-400" />
-        <span className="text-gray-500">Loading price...</span>
-      </div>
-    );
-  }
+  // Don't show loading state - just show the current price to prevent flickering
+  // The price will update when loaded
 
   const isContractPrice = source !== 'regular';
   

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { contractPricingService } from '../services/contractPricing';
 
@@ -10,25 +10,55 @@ interface ContractPricingResult {
   error: string | null;
 }
 
+// Cache for pricing data to prevent flickering
+const pricingCache = new Map<string, { price: number; source: string; timestamp: number }>();
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 export function useContractPricing(productId: number, regularPrice: number, quantity?: number, organizationId?: string): ContractPricingResult {
   const { user, profile } = useAuth();
   const [price, setPrice] = useState(regularPrice);
   const [source, setSource] = useState<'regular' | 'individual' | 'organization' | 'location'>('regular');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    isMounted.current = true;
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const fetchEffectivePrice = async () => {
       // For sales rep mode, use organization pricing even without user profile
       if (!user || (!profile && !organizationId)) {
-        setPrice(regularPrice);
-        setSource('regular');
+        if (isMounted.current) {
+          setPrice(regularPrice);
+          setSource('regular');
+          setLoading(false);
+        }
+        return;
+      }
+
+      // Create cache key
+      const cacheKey = `${productId}-${organizationId || user.id}-${quantity || 1}`;
+      const cached = pricingCache.get(cacheKey);
+
+      // Use cached data if available and not expired
+      if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+        if (isMounted.current) {
+          setPrice(cached.price);
+          setSource(cached.source as any);
+          setLoading(false);
+        }
         return;
       }
 
       try {
-        setLoading(true);
-        setError(null);
+        if (isMounted.current) {
+          setError(null);
+        }
         
         let effectivePrice;
         
@@ -54,21 +84,43 @@ export function useContractPricing(productId: number, regularPrice: number, quan
             quantity
           );
         }
-        
+
         if (effectivePrice) {
-          setPrice(effectivePrice.price);
-          setSource(effectivePrice.source);
+          // Cache the result
+          pricingCache.set(cacheKey, {
+            price: effectivePrice.price,
+            source: effectivePrice.source,
+            timestamp: Date.now()
+          });
+
+          if (isMounted.current) {
+            setPrice(effectivePrice.price);
+            setSource(effectivePrice.source);
+          }
         } else {
-          setPrice(regularPrice);
-          setSource('regular');
+          // Cache the regular price result
+          pricingCache.set(cacheKey, {
+            price: regularPrice,
+            source: 'regular',
+            timestamp: Date.now()
+          });
+
+          if (isMounted.current) {
+            setPrice(regularPrice);
+            setSource('regular');
+          }
         }
       } catch (err) {
         console.error('Error fetching effective price:', err);
-        setError(err instanceof Error ? err.message : 'Failed to fetch pricing');
-        setPrice(regularPrice);
-        setSource('regular');
+        if (isMounted.current) {
+          setError(err instanceof Error ? err.message : 'Failed to fetch pricing');
+          setPrice(regularPrice);
+          setSource('regular');
+        }
       } finally {
-        setLoading(false);
+        if (isMounted.current) {
+          setLoading(false);
+        }
       }
     };
 
