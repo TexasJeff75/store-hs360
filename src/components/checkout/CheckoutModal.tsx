@@ -5,7 +5,7 @@ import PriceDisplay from '../PriceDisplay';
 import { restCheckoutService } from '@/services/restCheckout';
 import CustomerSelector from './CustomerSelector';
 import AddressSelector from './AddressSelector';
-import { CustomerAddress } from '@/services/customerAddresses';
+import { CustomerAddress, customerAddressService } from '@/services/customerAddresses';
 import { supabase } from '@/services/supabase';
 
 interface CartItem {
@@ -57,6 +57,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [showAddressSelector, setShowAddressSelector] = useState(true);
   const [useManualAddress, setUseManualAddress] = useState(false);
   const [isAdminOrManager, setIsAdminOrManager] = useState(false);
+  const [saveShippingAddress, setSaveShippingAddress] = useState(false);
+  const [saveBillingAddress, setSaveBillingAddress] = useState(false);
+  const [shippingAddressLabel, setShippingAddressLabel] = useState('');
+  const [billingAddressLabel, setBillingAddressLabel] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -204,16 +208,67 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const validateStep = (step: CheckoutStep): boolean => {
     switch (step) {
       case 'shipping':
-        return !!(shippingAddress.firstName && shippingAddress.lastName && 
-                 shippingAddress.address1 && shippingAddress.city && 
+        const shippingValid = !!(shippingAddress.firstName && shippingAddress.lastName &&
+                 shippingAddress.address1 && shippingAddress.city &&
                  shippingAddress.state && shippingAddress.postalCode);
+        if (!shippingValid) return false;
+        if (saveShippingAddress && !shippingAddressLabel.trim()) {
+          setError('Please provide a label for the address');
+          return false;
+        }
+        return true;
       case 'billing':
-        return !!(billingAddress.firstName && billingAddress.lastName && 
-                 billingAddress.address1 && billingAddress.city && 
+        const billingValid = !!(billingAddress.firstName && billingAddress.lastName &&
+                 billingAddress.address1 && billingAddress.city &&
                  billingAddress.state && billingAddress.postalCode && billingAddress.email);
+        if (!billingValid) return false;
+        if (saveBillingAddress && !billingAddressLabel.trim()) {
+          setError('Please provide a label for the billing address');
+          return false;
+        }
+        return true;
       default:
         return true;
     }
+  };
+
+  const saveAddressToDatabase = async (
+    addressData: ShippingAddress | BillingAddress,
+    addressType: 'shipping' | 'billing',
+    label: string
+  ) => {
+    if (!label.trim()) {
+      setError('Please provide a label for the address');
+      return false;
+    }
+
+    const addressToSave = {
+      user_id: selectedCustomerId,
+      organization_id: selectedOrgId,
+      location_id: selectedLocationId,
+      address_type: addressType,
+      label: label.trim(),
+      first_name: addressData.firstName,
+      last_name: addressData.lastName,
+      company: addressData.company,
+      address1: addressData.address1,
+      address2: addressData.address2,
+      city: addressData.city,
+      state_or_province: addressData.state,
+      postal_code: addressData.postalCode,
+      country_code: addressData.country,
+      phone: addressData.phone,
+      email: 'email' in addressData ? addressData.email : undefined,
+    };
+
+    const savedAddress = await customerAddressService.createAddress(addressToSave);
+
+    if (!savedAddress) {
+      setError('Failed to save address. Please try again.');
+      return false;
+    }
+
+    return true;
   };
 
   const handleNext = async () => {
@@ -226,6 +281,22 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setLoading(true);
 
     try {
+      if (currentStep === 'shipping' && saveShippingAddress && shippingAddressLabel) {
+        const saved = await saveAddressToDatabase(shippingAddress, 'shipping', shippingAddressLabel);
+        if (!saved) {
+          setLoading(false);
+          return;
+        }
+      }
+
+      if (currentStep === 'billing' && saveBillingAddress && billingAddressLabel) {
+        const saved = await saveAddressToDatabase(billingAddress, 'billing', billingAddressLabel);
+        if (!saved) {
+          setLoading(false);
+          return;
+        }
+      }
+
       if (currentStep === 'shipping' && sessionId && !cartId) {
         const lineItems = items.map(item => ({
           product_id: item.id,
@@ -509,6 +580,39 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         />
       </div>
 
+      {/* Save Address Option */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 space-y-3">
+        <label className="flex items-center space-x-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={saveShippingAddress}
+            onChange={(e) => setSaveShippingAddress(e.target.checked)}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="text-sm font-medium text-gray-700">
+            Save this address for future orders
+          </span>
+        </label>
+
+        {saveShippingAddress && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Address Label *
+            </label>
+            <input
+              type="text"
+              value={shippingAddressLabel}
+              onChange={(e) => setShippingAddressLabel(e.target.value)}
+              placeholder="e.g., Home, Office, Warehouse"
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Give this address a memorable name
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Shipping Methods */}
       <div className="mt-8">
         <h4 className="text-lg font-semibold mb-4">Shipping Method</h4>
@@ -631,6 +735,41 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
         />
       </div>
+
+      {/* Save Billing Address Option */}
+      {!sameAsShipping && (
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 space-y-3">
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={saveBillingAddress}
+              onChange={(e) => setSaveBillingAddress(e.target.checked)}
+              className="rounded border-gray-300 text-green-600 focus:ring-green-500"
+            />
+            <span className="text-sm font-medium text-gray-700">
+              Save this billing address for future orders
+            </span>
+          </label>
+
+          {saveBillingAddress && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Address Label *
+              </label>
+              <input
+                type="text"
+                value={billingAddressLabel}
+                onChange={(e) => setBillingAddressLabel(e.target.value)}
+                placeholder="e.g., Business Address, Corporate HQ"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                Give this billing address a memorable name
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 
