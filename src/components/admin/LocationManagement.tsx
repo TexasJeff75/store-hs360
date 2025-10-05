@@ -74,9 +74,10 @@ const LocationManagement: React.FC<LocationManagementProps> = ({ organizationId 
     if (!selectedLocation) return;
 
     try {
+      setError(null);
       if (isEditing) {
         await multiTenantService.updateLocation(selectedLocation.id, selectedLocation);
-        setLocations(prev => prev.map(loc => 
+        setLocations(prev => prev.map(loc =>
           loc.id === selectedLocation.id ? selectedLocation : loc
         ));
       } else {
@@ -86,7 +87,10 @@ const LocationManagement: React.FC<LocationManagementProps> = ({ organizationId 
       setIsModalOpen(false);
       setSelectedLocation(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save location');
+      console.error('Error saving location:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to save location';
+      setError(errorMessage);
+      alert(`Failed to save location: ${errorMessage}`);
     }
   };
 

@@ -55,13 +55,17 @@ export const multiTenantService = {
   },
 
   async createLocation(location: Omit<Location, 'id' | 'created_at' | 'updated_at'>) {
+    console.log('Creating location:', location);
     const { data, error } = await supabase
       .from('locations')
       .insert(location)
       .select()
       .single();
-    
-    if (error) throw error;
+
+    if (error) {
+      console.error('Supabase error creating location:', error);
+      throw new Error(`Failed to create location: ${error.message} (Code: ${error.code})`);
+    }
     return data;
   },
 
