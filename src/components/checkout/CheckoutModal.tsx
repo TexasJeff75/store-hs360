@@ -3,6 +3,10 @@ import { X, CreditCard, Truck, MapPin, User, Lock, ArrowLeft, ArrowRight, Loader
 import { useAuth } from '@/contexts/AuthContext';
 import PriceDisplay from '../PriceDisplay';
 import { restCheckoutService } from '@/services/restCheckout';
+import CustomerSelector from './CustomerSelector';
+import AddressSelector from './AddressSelector';
+import { CustomerAddress } from '@/services/customerAddresses';
+import { supabase } from '@/services/supabase';
 
 interface CartItem {
   id: number;
@@ -36,7 +40,7 @@ interface BillingAddress extends ShippingAddress {
   email: string;
 }
 
-type CheckoutStep = 'shipping' | 'billing' | 'payment' | 'review' | 'processing';
+type CheckoutStep = 'customer' | 'shipping' | 'billing' | 'payment' | 'review' | 'processing';
 
 const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
@@ -45,7 +49,14 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   onOrderComplete
 }) => {
   const { user, profile } = useAuth();
-  const [currentStep, setCurrentStep] = useState<CheckoutStep>('shipping');
+  const [currentStep, setCurrentStep] = useState<CheckoutStep>('customer');
+  const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
+  const [selectedOrgId, setSelectedOrgId] = useState<string | undefined>();
+  const [selectedLocationId, setSelectedLocationId] = useState<string | undefined>();
+  const [customerEmail, setCustomerEmail] = useState<string>('');
+  const [showAddressSelector, setShowAddressSelector] = useState(true);
+  const [useManualAddress, setUseManualAddress] = useState(false);
+  const [isAdminOrManager, setIsAdminOrManager] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -96,10 +107,50 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const total = subtotal + shippingCost + tax;
 
   useEffect(() => {
-    if (isOpen && items.length > 0 && !sessionId) {
+    checkUserRole();
+  }, [user]);
+
+  useEffect(() => {
+    if (isOpen && items.length > 0 && !sessionId && selectedCustomerId) {
       initializeCheckout();
     }
-  }, [isOpen, items]);
+  }, [isOpen, items, selectedCustomerId]);
+
+  const checkUserRole = async () => {
+    if (!user?.id) return;
+
+    const { data } = await supabase
+      .from('user_organization_roles')
+      .select('role')
+      .eq('user_id', user.id)
+      .in('role', ['admin', 'manager'])
+      .limit(1)
+      .maybeSingle();
+
+    const isAdmin = !!data;
+    setIsAdminOrManager(isAdmin);
+
+    if (!isAdmin) {
+      setSelectedCustomerId(user.id);
+      setCustomerEmail(user.email || '');
+      setCurrentStep('shipping');
+    } else {
+      setCurrentStep('customer');
+    }
+  };
+
+  const handleCustomerSelection = (selection: {
+    customerId: string;
+    organizationId?: string;
+    locationId?: string;
+    customerEmail: string;
+  }) => {
+    setSelectedCustomerId(selection.customerId);
+    setSelectedOrgId(selection.organizationId);
+    setSelectedLocationId(selection.locationId);
+    setCustomerEmail(selection.customerEmail);
+    setCurrentStep('shipping');
+  };
 
 
   useEffect(() => {
@@ -237,7 +288,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         }
       }
 
-      const steps: CheckoutStep[] = ['shipping', 'billing', 'payment', 'review'];
+      const steps: CheckoutStep[] = ['customer', 'shipping', 'billing', 'payment', 'review'];
       const currentIndex = steps.indexOf(currentStep);
       if (currentIndex < steps.length - 1) {
         setCurrentStep(steps[currentIndex + 1]);
@@ -251,7 +302,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handleBack = () => {
-    const steps: CheckoutStep[] = ['shipping', 'billing', 'payment', 'review'];
+    if (currentStep === 'shipping' && !useManualAddress && showAddressSelector) {
+      setShowAddressSelector(false);
+      setUseManualAddress(true);
+      return;
+    }
+
+    const steps: CheckoutStep[] = ['customer', 'shipping', 'billing', 'payment', 'review'];
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex > 0) {
       setCurrentStep(steps[currentIndex - 1]);
@@ -298,9 +355,61 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     }
   };
 
+  const handleAddressSelect = (address: CustomerAddress | 'new', type: 'shipping' | 'billing') => {
+    if (address === 'new') {
+      setUseManualAddress(true);
+      return;
+    }
+
+    const addressData = {
+      firstName: address.first_name,
+      lastName: address.last_name,
+      company: address.company || '',
+      address1: address.address1,
+      address2: address.address2 || '',
+      city: address.city,
+      state: address.state_or_province,
+      postalCode: address.postal_code,
+      country: address.country_code,
+      phone: address.phone || ''
+    };
+
+    if (type === 'shipping') {
+      setShippingAddress(addressData);
+      setShowAddressSelector(false);
+    } else {
+      setBillingAddress({ ...addressData, email: address.email || customerEmail });
+    }
+  };
+
   if (!isOpen) return null;
 
-  const renderShippingStep = () => (
+  const renderCustomerStep = () => (
+    <div className="space-y-6">
+      <CustomerSelector
+        onSelect={handleCustomerSelection}
+        currentUserId={user?.id || ''}
+      />
+    </div>
+  );
+
+  const renderShippingStep = () => {
+    if (!useManualAddress && showAddressSelector) {
+      return (
+        <div className="space-y-6">
+          <AddressSelector
+            userId={selectedCustomerId}
+            organizationId={selectedOrgId}
+            locationId={selectedLocationId}
+            addressType="shipping"
+            onSelect={(addr) => handleAddressSelect(addr, 'shipping')}
+            onAddNew={() => setUseManualAddress(true)}
+          />
+        </div>
+      );
+    }
+
+    return (
     <div className="space-y-6">
       <div className="flex items-center space-x-2 mb-4">
         <Truck className="h-5 w-5 text-pink-600" />
@@ -426,7 +535,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   const renderBillingStep = () => (
     <div className="space-y-6">
@@ -694,6 +804,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               </div>
             )}
 
+            {!loading && !error && currentStep === 'customer' && renderCustomerStep()}
             {!loading && !error && currentStep === 'shipping' && renderShippingStep()}
             {!loading && !error && currentStep === 'billing' && renderBillingStep()}
             {!loading && !error && currentStep === 'payment' && renderPaymentStep()}
