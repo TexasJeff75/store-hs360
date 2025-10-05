@@ -1016,6 +1016,59 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             {!loading && !error && currentStep === 'payment' && renderPaymentStep()}
             {!loading && !error && currentStep === 'review' && renderReviewStep()}
           </div>
+
+          {/* Footer Navigation */}
+          {!loading && !error && currentStep !== 'customer' && (
+            <div className="border-t border-gray-200 p-6 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={handleBack}
+                  className="flex items-center space-x-2 px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  <span>Back</span>
+                </button>
+
+                {currentStep === 'review' ? (
+                  <button
+                    onClick={handlePlaceOrder}
+                    disabled={loading}
+                    className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader className="h-4 w-4 animate-spin" />
+                        <span>Processing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Place Order</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleNext}
+                    disabled={loading}
+                    className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader className="h-4 w-4 animate-spin" />
+                        <span>Loading...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Continue</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
