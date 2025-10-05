@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, CreditCard, Truck, MapPin, User, Lock, ArrowLeft, ArrowRight, Building2, AlertCircle, CheckCircle, DollarSign } from 'lucide-react';
+import { X, CreditCard, Truck, MapPin, User, Lock, ArrowLeft, ArrowRight, Building2, AlertCircle, CheckCircle, DollarSign, Loader, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { bigCommerceCustomerService } from '@/services/bigCommerceCustomer';
+import { bulletproofCheckoutService, CheckoutSession } from '@/services/bulletproofCheckout';
+import { orderService } from '@/services/orderService';
 import PriceDisplay from '../PriceDisplay';
 import type { Organization } from '@/services/supabase';
 
@@ -51,6 +53,10 @@ const OrganizationCheckoutModal: React.FC<OrganizationCheckoutModalProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('online');
   const [syncingCustomer, setSyncingCustomer] = useState(false);
   const [customerSynced, setCustomerSynced] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [session, setSession] = useState<CheckoutSession | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   
   // Form data - pre-populate with organization data
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
@@ -81,27 +87,106 @@ const OrganizationCheckoutModal: React.FC<OrganizationCheckoutModalProps> = ({
   const total = subtotal + shippingCost + tax;
 
   useEffect(() => {
-    if (isOpen && organization) {
-      syncCustomerData();
+    if (isOpen && organization && user?.id && !sessionId) {
+      initializeCheckout();
     }
-  }, [isOpen, organization]);
+  }, [isOpen, organization, user]);
 
-  const syncCustomerData = async () => {
+  useEffect(() => {
+    if (sessionId) {
+      const interval = setInterval(async () => {
+        const updatedSession = await bulletproofCheckoutService.getSession(sessionId);
+        if (updatedSession) {
+          setSession(updatedSession);
+        }
+      }, 5000);
+
+      return () => clearInterval(interval);
+    }
+  }, [sessionId]);
+
+  const initializeCheckout = async () => {
+    if (!user?.id) {
+      setError('User not authenticated');
+      return;
+    }
+
     try {
       setSyncingCustomer(true);
       setError(null);
-      
-      const result = await bigCommerceCustomerService.syncOrganizationCustomer(organization);
-      
-      if (result.success) {
-        setCustomerSynced(true);
-      } else {
-        setError(`Failed to sync customer data: ${result.error}`);
+      setCanRetry(false);
+
+      const syncResult = await bigCommerceCustomerService.syncOrganizationCustomer(organization);
+
+      if (!syncResult.success) {
+        setError(`Failed to sync customer data: ${syncResult.error}`);
+        setCanRetry(true);
+        return;
       }
+
+      setCustomerSynced(true);
+
+      const cartItems = items.map(item => ({
+        productId: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        image: item.image
+      }));
+
+      const sessionResult = await bulletproofCheckoutService.createSession(
+        user.id,
+        cartItems,
+        organization.id
+      );
+
+      if (!sessionResult.success || !sessionResult.sessionId) {
+        setError(sessionResult.error || 'Failed to create checkout session');
+        setCanRetry(sessionResult.canRetry || false);
+        return;
+      }
+
+      setSessionId(sessionResult.sessionId);
+
+      await bulletproofCheckoutService.updateSession(sessionResult.sessionId, {
+        shipping_address: shippingAddress,
+        payment_method: paymentMethod,
+      });
+
     } catch (err) {
-      setError('Failed to sync customer data with BigCommerce');
+      setError('Failed to initialize checkout');
+      setCanRetry(true);
+      console.error('Checkout initialization error:', err);
     } finally {
       setSyncingCustomer(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    if (!sessionId) {
+      initializeCheckout();
+      return;
+    }
+
+    setRetrying(true);
+    setError(null);
+
+    try {
+      const result = await bulletproofCheckoutService.recoverSession(sessionId);
+
+      if (result.success) {
+        setError(null);
+        setCanRetry(false);
+      } else {
+        setError(result.error || 'Failed to recover checkout session');
+        setCanRetry(result.canRetry || false);
+      }
+    } catch (err) {
+      setError('Failed to retry checkout');
+      setCanRetry(true);
+      console.error('Checkout retry error:', err);
+    } finally {
+      setRetrying(false);
     }
   };
 
@@ -139,12 +224,23 @@ const OrganizationCheckoutModal: React.FC<OrganizationCheckoutModalProps> = ({
   };
 
   const handlePlaceOrder = async () => {
+    if (!sessionId) {
+      setError('No active checkout session');
+      return;
+    }
+
     setLoading(true);
     setError(null);
-    
+    setCanRetry(false);
+
     try {
+      await bulletproofCheckoutService.updateSession(sessionId, {
+        shipping_address: shippingAddress,
+        payment_method: paymentMethod,
+        status: 'processing',
+      });
+
       if (paymentMethod === 'online') {
-        // Create order in BigCommerce with payment processing
         const result = await bigCommerceCustomerService.createOrderForOrganization(
           organization,
           items.map(item => ({
@@ -154,12 +250,18 @@ const OrganizationCheckoutModal: React.FC<OrganizationCheckoutModalProps> = ({
         );
 
         if (result.success && result.orderId) {
+          await bulletproofCheckoutService.completeCheckout(sessionId, result.orderId);
           onOrderComplete(result.orderId, 'online');
+          onClose();
         } else {
           setError(result.error || 'Failed to place order');
+          setCanRetry(true);
+          await bulletproofCheckoutService.updateSession(sessionId, {
+            status: 'failed',
+            last_error: result.error || 'Failed to place order',
+          });
         }
       } else {
-        // Create order with offline payment status
         const result = await bigCommerceCustomerService.createOrderForOrganization(
           organization,
           items.map(item => ({
@@ -170,13 +272,30 @@ const OrganizationCheckoutModal: React.FC<OrganizationCheckoutModalProps> = ({
         );
 
         if (result.success && result.orderId) {
+          await bulletproofCheckoutService.completeCheckout(sessionId, result.orderId);
           onOrderComplete(result.orderId, 'offline');
+          onClose();
         } else {
           setError(result.error || 'Failed to create order');
+          setCanRetry(true);
+          await bulletproofCheckoutService.updateSession(sessionId, {
+            status: 'failed',
+            last_error: result.error || 'Failed to create order',
+          });
         }
       }
     } catch (err) {
-      setError('Failed to place order. Please try again.');
+      const errorMsg = 'Failed to place order. Please try again.';
+      setError(errorMsg);
+      setCanRetry(true);
+      console.error('Order placement error:', err);
+
+      if (sessionId) {
+        await bulletproofCheckoutService.updateSession(sessionId, {
+          status: 'failed',
+          last_error: errorMsg,
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -571,9 +690,40 @@ const OrganizationCheckoutModal: React.FC<OrganizationCheckoutModalProps> = ({
             {renderStepIndicator()}
             
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-center space-x-2">
-                <AlertCircle className="h-4 w-4" />
-                <span>{error}</span>
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                <div className="flex items-center space-x-2 mb-2">
+                  <AlertCircle className="h-4 w-4" />
+                  <span className="font-medium">Error</span>
+                </div>
+                <p className="mb-2">{error}</p>
+
+                {session && session.retry_count > 0 && (
+                  <div className="bg-red-100 border border-red-300 rounded p-2 mb-2">
+                    <p className="text-xs text-red-800">
+                      Retry attempt {session.retry_count} of 3
+                    </p>
+                  </div>
+                )}
+
+                {canRetry && (
+                  <button
+                    onClick={handleRetry}
+                    disabled={retrying}
+                    className="flex items-center space-x-2 px-3 py-1.5 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition-colors disabled:opacity-50"
+                  >
+                    {retrying ? (
+                      <>
+                        <Loader className="h-3 w-3 animate-spin" />
+                        <span>Retrying...</span>
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="h-3 w-3" />
+                        <span>Retry Now</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             )}
 

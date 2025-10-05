@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, CreditCard, Truck, MapPin, User, Lock, ArrowLeft, ArrowRight, Loader } from 'lucide-react';
+import { X, CreditCard, Truck, MapPin, User, Lock, ArrowLeft, ArrowRight, Loader, AlertCircle, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import PriceDisplay from '../PriceDisplay';
-import { checkoutService } from '@/services/checkout';
+import { bulletproofCheckoutService, CheckoutSession } from '@/services/bulletproofCheckout';
 
 interface CartItem {
   id: number;
@@ -49,7 +49,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkoutUrl, setCheckoutUrl] = useState<string | null>(null);
-  const [cartId, setCartId] = useState<string | null>(null);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [session, setSession] = useState<CheckoutSession | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   
   // Form data
@@ -96,10 +99,23 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const total = subtotal + shippingCost + tax;
 
   useEffect(() => {
-    if (isOpen && items.length > 0 && !checkoutUrl) {
+    if (isOpen && items.length > 0 && !sessionId) {
       initializeCheckout();
     }
   }, [isOpen, items]);
+
+  useEffect(() => {
+    if (sessionId) {
+      const interval = setInterval(async () => {
+        const updatedSession = await bulletproofCheckoutService.getSession(sessionId);
+        if (updatedSession) {
+          setSession(updatedSession);
+        }
+      }, 5000);
+
+      return () => clearInterval(interval);
+    }
+  }, [sessionId]);
 
   useEffect(() => {
     if (sameAsShipping) {
@@ -111,29 +127,89 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   }, [sameAsShipping, shippingAddress, user?.email]);
 
   const initializeCheckout = async () => {
+    if (!user?.id) {
+      setError('User not authenticated');
+      return;
+    }
+
     setLoading(true);
     setError(null);
+    setCanRetry(false);
 
     try {
+      const cartItems = items.map(item => ({
+        productId: item.id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        image: item.image
+      }));
+
+      const sessionResult = await bulletproofCheckoutService.createSession(
+        user.id,
+        cartItems
+      );
+
+      if (!sessionResult.success || !sessionResult.sessionId) {
+        setError(sessionResult.error || 'Failed to create checkout session');
+        setCanRetry(sessionResult.canRetry || false);
+        return;
+      }
+
+      setSessionId(sessionResult.sessionId);
+
       const lineItems = items.map(item => ({
         productId: item.id,
         quantity: item.quantity
       }));
 
-      const result = await checkoutService.processCheckout(lineItems);
+      const checkoutResult = await bulletproofCheckoutService.processEmbeddedCheckout(
+        sessionResult.sessionId,
+        lineItems
+      );
 
-      if (result.success && result.checkoutUrl && result.cartId) {
-        setCheckoutUrl(result.checkoutUrl);
-        setCartId(result.cartId);
+      if (checkoutResult.success && checkoutResult.checkoutUrl) {
+        setCheckoutUrl(checkoutResult.checkoutUrl);
         setCurrentStep('embedded-checkout');
       } else {
-        setError(result.error || 'Failed to initialize checkout');
+        setError(checkoutResult.error || 'Failed to initialize checkout');
+        setCanRetry(checkoutResult.canRetry || false);
       }
     } catch (err) {
       setError('Failed to initialize checkout. Please try again.');
+      setCanRetry(true);
       console.error('Checkout initialization error:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    if (!sessionId) {
+      initializeCheckout();
+      return;
+    }
+
+    setRetrying(true);
+    setError(null);
+
+    try {
+      const result = await bulletproofCheckoutService.recoverSession(sessionId);
+
+      if (result.success && result.checkoutUrl) {
+        setCheckoutUrl(result.checkoutUrl);
+        setCurrentStep('embedded-checkout');
+        setError(null);
+      } else {
+        setError(result.error || 'Failed to recover checkout session');
+        setCanRetry(result.canRetry || false);
+      }
+    } catch (err) {
+      setError('Failed to retry checkout. Please try again.');
+      setCanRetry(true);
+      console.error('Checkout retry error:', err);
+    } finally {
+      setRetrying(false);
     }
   };
 
@@ -479,14 +555,53 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return (
         <div className="flex flex-col items-center justify-center h-[600px] space-y-4">
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 max-w-md">
-            <h3 className="text-lg font-semibold text-red-900 mb-2">Checkout Error</h3>
+            <div className="flex items-center space-x-2 mb-3">
+              <AlertCircle className="h-6 w-6 text-red-600" />
+              <h3 className="text-lg font-semibold text-red-900">Checkout Error</h3>
+            </div>
             <p className="text-red-700 mb-4">{error}</p>
-            <button
-              onClick={initializeCheckout}
-              className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Try Again
-            </button>
+
+            {session && session.retry_count > 0 && (
+              <div className="bg-red-100 border border-red-300 rounded p-3 mb-4">
+                <p className="text-xs text-red-800">
+                  Retry attempt {session.retry_count} of 3
+                </p>
+              </div>
+            )}
+
+            {canRetry ? (
+              <button
+                onClick={handleRetry}
+                disabled={retrying}
+                className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
+              >
+                {retrying ? (
+                  <>
+                    <Loader className="h-4 w-4 animate-spin" />
+                    <span>Retrying...</span>
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="h-4 w-4" />
+                    <span>Try Again</span>
+                  </>
+                )}
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-red-600 mb-2">Unable to retry automatically. Please:</p>
+                <button
+                  onClick={() => {
+                    setError(null);
+                    setSessionId(null);
+                    initializeCheckout();
+                  }}
+                  className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors"
+                >
+                  Start New Checkout
+                </button>
+              </div>
+            )}
           </div>
         </div>
       );
