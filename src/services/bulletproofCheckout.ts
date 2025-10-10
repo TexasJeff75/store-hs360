@@ -7,6 +7,7 @@ export interface CheckoutSession {
   id: string;
   user_id: string;
   organization_id?: string;
+  location_id?: string;
   cart_id?: string;
   checkout_id?: string;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'abandoned';
@@ -403,6 +404,7 @@ class BulletproofCheckoutService {
         billingAddress: session.billing_address,
         customerEmail: session.billing_address?.email || '',
         organizationId: session.organization_id,
+        locationId: session.location_id,
       };
 
       const { order, error } = await orderService.createOrder(orderData);

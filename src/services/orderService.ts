@@ -33,6 +33,7 @@ export interface CreateOrderData {
   billingAddress?: Address;
   customerEmail: string;
   organizationId?: string;
+  locationId?: string;
   notes?: string;
 }
 
@@ -53,6 +54,7 @@ export interface Order {
   billing_address?: Address;
   customer_email: string;
   organization_id?: string;
+  location_id?: string;
   notes?: string;
   created_at: string;
   updated_at: string;
@@ -77,6 +79,7 @@ class OrderService {
           billing_address: data.billingAddress,
           customer_email: data.customerEmail,
           organization_id: data.organizationId,
+          location_id: data.locationId,
           notes: data.notes
         })
         .select()

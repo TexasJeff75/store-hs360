@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus } from 'lucide-react';
+import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2 } from 'lucide-react';
 
 interface OrderItem {
   productId: number;
@@ -37,6 +37,7 @@ interface Order {
   id: string;
   user_id: string;
   organization_id?: string;
+  location_id?: string;
   bigcommerce_order_id?: string;
   bigcommerce_cart_id?: string;
   order_number?: string;
@@ -65,6 +66,7 @@ const OrderManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showAddShipment, setShowAddShipment] = useState(false);
   const [canManageOrders, setCanManageOrders] = useState(false);
+  const [locationNames, setLocationNames] = useState<Record<string, string>>({});
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -116,6 +118,22 @@ const OrderManagement: React.FC = () => {
 
       if (error) throw error;
       setOrders(data || []);
+
+      const locationIds = [...new Set(data?.map(o => o.location_id).filter(Boolean))];
+      if (locationIds.length > 0) {
+        const { data: locations } = await supabase
+          .from('locations')
+          .select('id, name')
+          .in('id', locationIds);
+
+        if (locations) {
+          const names: Record<string, string> = {};
+          locations.forEach(loc => {
+            names[loc.id] = loc.name;
+          });
+          setLocationNames(names);
+        }
+      }
     } catch (error) {
       console.error('Error fetching orders:', error);
     } finally {
@@ -307,6 +325,15 @@ const OrderManagement: React.FC = () => {
                       )}
                     </div>
                   </div>
+                  {order.location_id && (
+                    <div>
+                      <span className="text-gray-600">Shipping Location:</span>
+                      <p className="font-medium flex items-center mt-1">
+                        <Building2 className="h-3 w-3 mr-1 text-blue-600" />
+                        {locationNames[order.location_id] || 'Unknown Location'}
+                      </p>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -641,6 +668,7 @@ const OrderManagement: React.FC = () => {
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order ID</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Items</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
@@ -651,7 +679,7 @@ const OrderManagement: React.FC = () => {
           <tbody className="bg-white divide-y divide-gray-200">
             {filteredOrders.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-6 py-12 text-center text-gray-500">
+                <td colSpan={8} className="px-6 py-12 text-center text-gray-500">
                   <Package className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                   <p>No orders found</p>
                 </td>
@@ -664,6 +692,16 @@ const OrderManagement: React.FC = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {order.customer_email}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {order.location_id ? (
+                      <span className="flex items-center">
+                        <Building2 className="h-3 w-3 mr-1 text-blue-600" />
+                        {locationNames[order.location_id] || 'Unknown'}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">—</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {new Date(order.created_at).toLocaleDateString()}

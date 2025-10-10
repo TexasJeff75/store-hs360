@@ -5,6 +5,7 @@ import { bigCommerceCustomerService } from '@/services/bigCommerceCustomer';
 import { bulletproofCheckoutService, CheckoutSession } from '@/services/bulletproofCheckout';
 import { orderService } from '@/services/orderService';
 import PriceDisplay from '../PriceDisplay';
+import LocationSelector from './LocationSelector';
 import type { Organization } from '@/services/supabase';
 
 interface CartItem {
@@ -57,7 +58,9 @@ const OrganizationCheckoutModal: React.FC<OrganizationCheckoutModalProps> = ({
   const [session, setSession] = useState<CheckoutSession | null>(null);
   const [canRetry, setCanRetry] = useState(false);
   const [retrying, setRetrying] = useState(false);
-  
+  const [selectedLocationId, setSelectedLocationId] = useState<string | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<any>(null);
+
   // Form data - pre-populate with organization data
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
     firstName: organization.name.split(' ')[0] || organization.name,
@@ -193,8 +196,8 @@ const OrganizationCheckoutModal: React.FC<OrganizationCheckoutModalProps> = ({
   const validateStep = (step: CheckoutStep): boolean => {
     switch (step) {
       case 'shipping':
-        return !!(shippingAddress.firstName && shippingAddress.lastName && 
-                 shippingAddress.address1 && shippingAddress.city && 
+        return !!(selectedLocationId && shippingAddress.firstName && shippingAddress.lastName &&
+                 shippingAddress.address1 && shippingAddress.city &&
                  shippingAddress.state && shippingAddress.postalCode);
       default:
         return true;
@@ -238,6 +241,7 @@ const OrganizationCheckoutModal: React.FC<OrganizationCheckoutModalProps> = ({
         shipping_address: shippingAddress,
         payment_method: paymentMethod,
         status: 'processing',
+        location_id: selectedLocationId,
       });
 
       if (paymentMethod === 'online') {
@@ -352,9 +356,33 @@ const OrganizationCheckoutModal: React.FC<OrganizationCheckoutModalProps> = ({
 
       <div className="flex items-center space-x-2 mb-4">
         <Truck className="h-5 w-5 text-pink-600" />
-        <h3 className="text-lg font-semibold">Shipping Address</h3>
+        <h3 className="text-lg font-semibold">Shipping Information</h3>
       </div>
-      
+
+      <div className="mb-6">
+        <LocationSelector
+          organizationId={organization.id}
+          selectedLocationId={selectedLocationId}
+          onLocationSelect={(locationId, location) => {
+            setSelectedLocationId(locationId);
+            setSelectedLocation(location);
+            if (location.address) {
+              setShippingAddress({
+                ...shippingAddress,
+                address1: location.address.address1 || '',
+                address2: location.address.address2 || '',
+                city: location.address.city || '',
+                state: location.address.state || '',
+                postalCode: location.address.postalCode || '',
+                country: location.address.country || 'US',
+                company: location.name,
+              });
+            }
+          }}
+          error={error && !selectedLocationId ? 'Please select a location' : undefined}
+        />
+      </div>
+
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
