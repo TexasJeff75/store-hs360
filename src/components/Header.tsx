@@ -29,11 +29,16 @@ const Header: React.FC<HeaderProps> = ({
           <div className="flex items-center">
             <div className="flex-shrink-0 transition-transform hover:scale-105 active:scale-95">
               <a href="#" className="flex items-center space-x-3">
+                <img
+                  src="/Logo_web.webp"
+                  alt="HealthSpan360 Logo"
+                  className="w-12 h-12 object-contain"
+                />
                 <div>
-                  <span className="text-2xl font-poppins font-bold bg-gradient-primary bg-clip-text text-transparent block transition-all hover:drop-shadow-lg">
+                  <span className="text-2xl font-poppins font-bold bg-gradient-to-r from-pink-500 to-orange-500 bg-clip-text text-transparent block transition-all hover:drop-shadow-lg">
                     HealthSpan360
                   </span>
-                  <span className="text-xs font-poppins text-cool-gray -mt-1 block">
+                  <span className="text-xs font-poppins text-gray-600 -mt-1 block">
                     Turning Insight Into Impact
                   </span>
                 </div>
