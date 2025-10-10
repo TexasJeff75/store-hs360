@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ShoppingCart, Star, Tag, Plus, Minus, Heart, Share2 } from 'lucide-react';
 import { Product } from '../services/bigcommerce';
 import PriceDisplay from './PriceDisplay';
+import { contractPricingService, ContractPrice } from '../services/contractPricing';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ProductModalProps {
   product: Product | null;
   isOpen: boolean;
   onClose: () => void;
   onAddToCart: (productId: number, quantity: number) => void;
-  onBuyNow?: (productId: number, quantity: number) => void;
   organizationId?: string;
 }
 
@@ -17,11 +18,52 @@ const ProductModal: React.FC<ProductModalProps> = ({
   isOpen,
   onClose,
   onAddToCart,
-  onBuyNow,
   organizationId
 }) => {
   const [quantity, setQuantity] = useState(1);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [contractPrices, setContractPrices] = useState<ContractPrice[]>([]);
+  const [loadingPrices, setLoadingPrices] = useState(false);
+  const { user, profile } = useAuth();
+
+  useEffect(() => {
+    const fetchContractPrices = async () => {
+      if (!product || !user) {
+        setContractPrices([]);
+        return;
+      }
+
+      setLoadingPrices(true);
+      try {
+        let prices: ContractPrice[] = [];
+
+        if (organizationId) {
+          prices = await contractPricingService.getOrganizationPricing(organizationId);
+          prices = prices.filter(p => p.product_id === product.id);
+        } else if (user.id) {
+          const userPrices = await contractPricingService.getEntityContractPrices(user.id, 'individual');
+          const orgPrice = await contractPricingService.getOrganizationPrice(user.id, product.id);
+          const locPrice = await contractPricingService.getLocationPrice(user.id, product.id);
+
+          prices = [
+            ...userPrices.filter(p => p.product_id === product.id),
+            ...(orgPrice ? [orgPrice] : []),
+            ...(locPrice ? [locPrice] : [])
+          ];
+        }
+
+        prices.sort((a, b) => a.contract_price - b.contract_price);
+        setContractPrices(prices);
+      } catch (error) {
+        console.error('Error fetching contract prices:', error);
+        setContractPrices([]);
+      } finally {
+        setLoadingPrices(false);
+      }
+    };
+
+    fetchContractPrices();
+  }, [product, user, organizationId]);
 
   if (!isOpen || !product) return null;
 
@@ -167,6 +209,65 @@ const ProductModal: React.FC<ProductModalProps> = ({
                   />
                 </div>
 
+                {/* Contract Pricing Options */}
+                {contractPrices.length > 0 && (
+                  <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
+                    <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center">
+                      <Tag className="h-4 w-4 mr-2" />
+                      Available Contract Pricing
+                    </h3>
+                    <div className="space-y-2">
+                      {contractPrices.map((price, index) => {
+                        const quantityValid = quantity >= (price.min_quantity || 1) &&
+                                             (!price.max_quantity || quantity <= price.max_quantity);
+                        return (
+                          <div
+                            key={index}
+                            className={`text-sm p-2 rounded ${
+                              quantityValid
+                                ? 'bg-green-100 border border-green-300'
+                                : 'bg-white border border-blue-200 opacity-60'
+                            }`}
+                          >
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <div className="font-medium text-gray-900">
+                                  ${price.contract_price.toFixed(2)}
+                                  {quantityValid && (
+                                    <span className="ml-2 text-xs text-green-700 font-semibold">
+                                      ✓ Active
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-gray-600">
+                                  {price.pricing_type === 'individual' && 'Individual Pricing'}
+                                  {price.pricing_type === 'organization' && 'Organization Pricing'}
+                                  {price.pricing_type === 'location' && 'Location Pricing'}
+                                </div>
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                Qty: {price.min_quantity || 1}
+                                {price.max_quantity ? `-${price.max_quantity}` : '+'}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {contractPrices.length > 1 && (
+                      <p className="text-xs text-blue-700 mt-2">
+                        Change quantity to see different pricing tiers
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {loadingPrices && (
+                  <div className="text-sm text-gray-600 text-center">
+                    Loading pricing options...
+                  </div>
+                )}
+
                 {/* Benefits */}
                 {product.benefits.length > 0 && (
                   <div>
@@ -223,23 +324,13 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     </div>
                   </div>
 
-                  <button 
+                  <button
                     onClick={handleAddToCart}
                     className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-3 px-6 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center space-x-2 text-lg font-semibold"
                   >
                     <ShoppingCart className="h-5 w-5" />
                     <span>Add {quantity} to Cart</span>
                   </button>
-                  
-                  {/* Buy Now Button */}
-                  {onBuyNow && (
-                    <button 
-                      onClick={() => onBuyNow(product.id, quantity)}
-                      className="w-full bg-green-600 text-white py-3 px-6 rounded-lg hover:bg-green-700 transition-colors flex items-center justify-center space-x-2 text-lg font-semibold"
-                    >
-                      <span>Buy Now</span>
-                    </button>
-                  )}
                 </div>
 
                 {/* Additional Product Info */}

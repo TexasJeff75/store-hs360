@@ -235,37 +235,6 @@ function AppContent() {
     setSelectedProduct(null);
   };
 
-  const handleBuyNow = async (productId: number, quantity: number) => {
-    try {
-      setIsCheckingOut(true);
-      
-      // Process immediate checkout for single item
-      const result = await checkoutService.checkoutSingleItem(productId, quantity);
-
-      if (result.success && result.checkoutUrl) {
-        console.log('Redirecting to buy now checkout:', result.checkoutUrl);
-        
-        // Try to open in new tab first, fallback to same window
-        try {
-          const newWindow = window.open(result.checkoutUrl, '_blank');
-          if (!newWindow || newWindow.closed || typeof newWindow.closed == 'undefined') {
-            // Popup blocked, redirect in same window
-            window.location.href = result.checkoutUrl;
-          }
-        } catch (error) {
-          // Fallback to same window redirect
-          window.location.href = result.checkoutUrl;
-        }
-      } else {
-        // Show error message
-        logError(new Error(result.error || 'Buy now failed'), 'buyNow');
-      }
-    } catch (error) {
-      logError(error, 'buyNow');
-    } finally {
-      setIsCheckingOut(false);
-    }
-  };
 
   const updateCartQuantity = (id: number, quantity: number) => {
     if (quantity === 0) {
@@ -615,7 +584,6 @@ function AppContent() {
           isOpen={isProductModalOpen}
           onClose={handleCloseProductModal}
           onAddToCart={addToCart}
-          onBuyNow={handleBuyNow}
           organizationId={selectedOrganization?.id}
         />
         <UserProfile
