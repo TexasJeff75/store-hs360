@@ -265,6 +265,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const validateStep = (step: CheckoutStep): boolean => {
     switch (step) {
+      case 'customer':
+        if (!selectedCustomerId) {
+          setError('Please select a customer');
+          return false;
+        }
+        return true;
       case 'shipping':
         const shippingValid = !!(shippingAddress.firstName && shippingAddress.lastName &&
                  shippingAddress.address1 && shippingAddress.city &&

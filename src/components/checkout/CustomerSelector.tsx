@@ -142,7 +142,15 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
   };
 
   const handleOrganizationOrder = () => {
-    if (!selectedOrg) return;
+    if (!selectedOrg) {
+      alert('Please select an organization');
+      return;
+    }
+
+    if (!selectedLocation && locations.length > 0) {
+      alert('Please select a shipping location');
+      return;
+    }
 
     const org = organizations.find(o => o.id === selectedOrg);
     if (!org) return;
@@ -176,10 +184,13 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold mb-4 flex items-center space-x-2">
+        <h3 className="text-lg font-semibold mb-2 flex items-center space-x-2">
           <User className="h-5 w-5 text-blue-600" />
           <span>Who are you ordering for?</span>
         </h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Select whether you're ordering for yourself or on behalf of an organization
+        </p>
 
         <div className="space-y-3">
           <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-blue-500 transition-colors">
@@ -238,7 +249,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center space-x-2">
               <Building2 className="h-4 w-4" />
-              <span>Select Organization</span>
+              <span>Select Organization *</span>
             </label>
             <select
               value={selectedOrg}
@@ -247,6 +258,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
                 setSelectedLocation('');
               }}
               className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              required
             >
               <option value="">Choose an organization...</option>
               {organizations.map(org => (
@@ -255,6 +267,9 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
                 </option>
               ))}
             </select>
+            <p className="text-xs text-gray-600 mt-1">
+              Required for organizational orders
+            </p>
           </div>
 
           {selectedOrg && locations.length > 0 && (
@@ -281,14 +296,13 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
             </div>
           )}
 
-          {selectedOrg && (
-            <button
-              onClick={handleOrganizationOrder}
-              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-            >
-              Continue with Organization Order
-            </button>
-          )}
+          <button
+            onClick={handleOrganizationOrder}
+            disabled={!selectedOrg || (locations.length > 0 && !selectedLocation)}
+            className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+          >
+            Continue with Organization Order
+          </button>
         </div>
       )}
 

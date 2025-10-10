@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, Plus, Minus, ShoppingBag } from 'lucide-react';
+import { X, Plus, Minus, ShoppingBag, AlertCircle } from 'lucide-react';
 import CheckoutModal from './checkout/CheckoutModal';
 
 interface CartItem {
@@ -28,8 +28,17 @@ const Cart: React.FC<CartProps> = ({
   organizationId,
 }) => {
   const [isCheckoutOpen, setIsCheckoutOpen] = React.useState(false);
-  
+  const [showOrgWarning, setShowOrgWarning] = React.useState(false);
+
   const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  const handleCheckoutClick = () => {
+    if (!organizationId) {
+      setShowOrgWarning(true);
+      setTimeout(() => setShowOrgWarning(false), 5000);
+    }
+    setIsCheckoutOpen(true);
+  };
 
   const handleOrderComplete = (orderId: string) => {
     console.log('Order completed:', orderId);
@@ -115,13 +124,23 @@ const Cart: React.FC<CartProps> = ({
               </div>
               
               <div className="space-y-3">
-                <button 
-                  onClick={() => setIsCheckoutOpen(true)}
+                {showOrgWarning && !organizationId && (
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div className="flex items-start space-x-2">
+                      <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5 flex-shrink-0" />
+                      <p className="text-xs text-yellow-800">
+                        You will need to select an organization during checkout
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <button
+                  onClick={handleCheckoutClick}
                   className="w-full bg-blue-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
                 >
                   Checkout
                 </button>
-                <button 
+                <button
                   onClick={onClose}
                   className="w-full border border-gray-300 text-gray-700 py-3 px-6 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
                 >
