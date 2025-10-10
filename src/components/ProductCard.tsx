@@ -12,6 +12,8 @@ interface ProductCardProps {
   reviews: number;
   category: string;
   benefits: string[];
+  description?: string;
+  plainTextDescription?: string;
   onAddToCart: (id: number) => void;
 }
 
@@ -25,20 +27,46 @@ const ProductCard: React.FC<ProductCardProps> = ({
   reviews,
   category,
   benefits,
+  description,
+  plainTextDescription,
   onAddToCart
 }) => {
+  const getDescriptionText = () => {
+    if (plainTextDescription) {
+      return plainTextDescription.slice(0, 200) + (plainTextDescription.length > 200 ? '...' : '');
+    }
+    if (description) {
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = description;
+      const text = tempDiv.textContent || tempDiv.innerText || '';
+      return text.slice(0, 200) + (text.length > 200 ? '...' : '');
+    }
+    return '';
+  };
+
+  const descriptionText = getDescriptionText();
+
   return (
     <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 group">
       <div className="relative overflow-hidden rounded-t-lg">
-        <img 
-          src={image} 
+        <img
+          src={image}
           alt={name}
           className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
         />
-        <button className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors opacity-0 group-hover:opacity-100">
+
+        {descriptionText && (
+          <div className="absolute inset-0 bg-black bg-opacity-90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex items-center justify-center">
+            <p className="text-white text-sm leading-relaxed overflow-y-auto max-h-full">
+              {descriptionText}
+            </p>
+          </div>
+        )}
+
+        <button className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors opacity-0 group-hover:opacity-100 z-10">
           <Heart className="h-5 w-5 text-gray-600" />
         </button>
-        <div className="absolute top-3 left-3">
+        <div className="absolute top-3 left-3 z-10">
           <span className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-2 py-1 rounded text-xs font-medium">
             {category}
           </span>
