@@ -185,21 +185,18 @@ const ProductModal: React.FC<ProductModalProps> = ({
                 )}
 
                 {/* Product Description */}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
-                  <div className="prose prose-sm text-gray-600">
-                    <p>
-                      This premium health product is formulated with the highest quality ingredients 
-                      to support your wellness journey. Our science-backed approach ensures maximum 
-                      efficacy and safety.
-                    </p>
-                    <p>
-                      Each serving is carefully crafted to deliver optimal results while maintaining 
-                      the highest standards of purity and potency. Perfect for those seeking to 
-                      enhance their health and vitality naturally.
-                    </p>
+                {(product.description || product.plainTextDescription) && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
+                    <div className="prose prose-sm text-gray-600">
+                      {product.description ? (
+                        <div dangerouslySetInnerHTML={{ __html: product.description }} />
+                      ) : (
+                        <p>{product.plainTextDescription}</p>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Quantity and Add to Cart */}
                 <div className="space-y-4">

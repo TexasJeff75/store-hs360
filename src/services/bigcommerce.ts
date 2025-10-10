@@ -63,6 +63,8 @@ const PRODUCTS_Q = /* GraphQL */ `
             entityId
             name
             path
+            description
+            plainTextDescription
             defaultImage { url(width: 640) }
             prices {
               price {
@@ -136,6 +138,8 @@ export interface Product {
   reviews: number;
   category: string;
   benefits: string[];
+  description?: string;
+  plainTextDescription?: string;
 }
 
 // Data transformation helpers
@@ -152,7 +156,9 @@ function transformBigCommerceProduct(bc: any): Product {
     rating: bc.reviewSummary?.averageRating || 0,
     reviews: bc.reviewSummary?.numberOfReviews || 0,
     category: bc.categories?.edges?.[0]?.node?.name || "General",
-    benefits: (bc.customFields?.edges ?? []).map((e: any) => e?.node?.value).filter(Boolean)
+    benefits: (bc.customFields?.edges ?? []).map((e: any) => e?.node?.value).filter(Boolean),
+    description: bc.description || '',
+    plainTextDescription: bc.plainTextDescription || ''
   };
 }
 
