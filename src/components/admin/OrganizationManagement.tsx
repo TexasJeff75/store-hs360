@@ -482,119 +482,141 @@ const OrganizationManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Organizations Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredOrganizations.map((org) => (
-          <div key={org.id} className={`bg-white rounded-lg shadow-sm border p-6 ${
-            org.is_active ? 'border-gray-200' : 'border-gray-300 bg-gray-50'
-          }`}>
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <div className={`p-2 rounded-lg ${
-                  org.is_active ? 'bg-purple-100' : 'bg-gray-200'
-                }`}>
-                  <Building2 className={`h-6 w-6 ${
-                    org.is_active ? 'text-purple-600' : 'text-gray-500'
-                  }`} />
-                </div>
-                <div>
-                  <h3 className={`text-lg font-semibold ${
-                    org.is_active ? 'text-gray-900' : 'text-gray-600'
-                  }`}>{org.name}</h3>
-                  <p className="text-sm text-gray-500">Code: {org.code}</p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-1">
-                <button
-                  onClick={() => handleViewOrganization(org)}
-                  className="p-1 text-gray-400 hover:text-blue-600 rounded"
-                  title="View Details"
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => handleEditOrganization(org)}
-                  className="p-1 text-gray-400 hover:text-purple-600 rounded"
-                  title="Edit Organization"
-                >
-                  <Edit className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => setSelectedOrgForSubManagement(org)}
-                  className="p-1 text-gray-400 hover:text-purple-600 rounded"
-                  title="Manage Locations & Pricing"
-                >
-                  <Settings className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => handleArchiveOrganization(org.id, org.is_active)}
-                  className={`p-1 text-gray-400 rounded ${
-                    org.is_active ? 'hover:text-orange-600' : 'hover:text-green-600'
-                  }`}
-                  title={org.is_active ? 'Archive Organization' : 'Restore Organization'}
-                >
-                  <Archive className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            {org.description && (
-              <p className="text-gray-600 text-sm mb-4">{org.description}</p>
-            )}
-
-            <div className="space-y-2">
-              {org.contact_email && (
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <Mail className="h-4 w-4" />
-                  <span>{org.contact_email}</span>
-                </div>
-              )}
-              {org.contact_phone && (
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
-                  <Phone className="h-4 w-4" />
-                  <span>{org.contact_phone}</span>
-                </div>
-              )}
-            </div>
-
-            {/* Organization Stats */}
-            <div className="mb-4 grid grid-cols-2 gap-4">
-              <div className="text-center p-2 bg-gray-50 rounded">
-                <div className="flex items-center justify-center space-x-1">
-                  <MapPin className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-900">
-                    {orgStats[org.id]?.locations || 0}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500">Locations</p>
-              </div>
-              <div className="text-center p-2 bg-gray-50 rounded">
-                <div className="flex items-center justify-center space-x-1">
-                  <Users className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm font-medium text-gray-900">
-                    {orgStats[org.id]?.users || 0}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500">Users</p>
-              </div>
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-gray-200">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-500">
-                  Created: {new Date(org.created_at).toLocaleDateString()}
-                </span>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                  org.is_active 
-                    ? 'bg-green-100 text-green-800' 
-                    : 'bg-red-100 text-red-800'
-                }`}>
-                  {org.is_active ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-            </div>
-          </div>
-        ))}
+      {/* Organizations List */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Organization
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Contact
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Stats
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredOrganizations.map((org) => (
+                <tr key={org.id} className={org.is_active ? 'hover:bg-gray-50' : 'bg-gray-50'}>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleViewOrganization(org)}
+                        className="p-2 text-gray-400 hover:text-blue-600 rounded transition-colors"
+                        title="View Details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleEditOrganization(org)}
+                        className="p-2 text-gray-400 hover:text-purple-600 rounded transition-colors"
+                        title="Edit Organization"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => setSelectedOrgForSubManagement(org)}
+                        className="p-2 text-gray-400 hover:text-purple-600 rounded transition-colors"
+                        title="Manage Locations & Pricing"
+                      >
+                        <Settings className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleArchiveOrganization(org.id, org.is_active)}
+                        className={`p-2 text-gray-400 rounded transition-colors ${
+                          org.is_active ? 'hover:text-orange-600' : 'hover:text-green-600'
+                        }`}
+                        title={org.is_active ? 'Archive Organization' : 'Restore Organization'}
+                      >
+                        <Archive className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center">
+                      <div className={`p-2 rounded-lg ${
+                        org.is_active ? 'bg-purple-100' : 'bg-gray-200'
+                      }`}>
+                        <Building2 className={`h-5 w-5 ${
+                          org.is_active ? 'text-purple-600' : 'text-gray-500'
+                        }`} />
+                      </div>
+                      <div className="ml-3">
+                        <div className={`text-sm font-semibold ${
+                          org.is_active ? 'text-gray-900' : 'text-gray-600'
+                        }`}>
+                          {org.name}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          Code: {org.code}
+                        </div>
+                        {org.description && (
+                          <div className="text-xs text-gray-500 mt-1 max-w-xs truncate">
+                            {org.description}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="space-y-1">
+                      {org.contact_email && (
+                        <div className="flex items-center space-x-2 text-sm text-gray-600">
+                          <Mail className="h-3 w-3 text-gray-400" />
+                          <span className="truncate max-w-xs">{org.contact_email}</span>
+                        </div>
+                      )}
+                      {org.contact_phone && (
+                        <div className="flex items-center space-x-2 text-sm text-gray-600">
+                          <Phone className="h-3 w-3 text-gray-400" />
+                          <span>{org.contact_phone}</span>
+                        </div>
+                      )}
+                      {!org.contact_email && !org.contact_phone && (
+                        <span className="text-sm text-gray-400">No contact info</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-1">
+                        <MapPin className="h-4 w-4 text-blue-600" />
+                        <span className="text-sm font-medium text-gray-900">
+                          {orgStats[org.id]?.locations || 0}
+                        </span>
+                      </div>
+                      <div className="flex items-center space-x-1">
+                        <Users className="h-4 w-4 text-green-600" />
+                        <span className="text-sm font-medium text-gray-900">
+                          {orgStats[org.id]?.users || 0}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                      org.is_active
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {org.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {filteredOrganizations.length === 0 && (
