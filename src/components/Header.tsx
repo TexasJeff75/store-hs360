@@ -1,5 +1,6 @@
 import React from 'react';
 import { ShoppingCart, User, Settings, Users, Home } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useAuth } from '../contexts/AuthContext';
 
 interface HeaderProps {
@@ -27,14 +28,27 @@ const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <h1 className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-orange-600 bg-clip-text text-transparent">
-                HealthSpan360
-              </h1>
-              {loading && (
-              <span className="text-sm text-gray-600 hidden sm:inline">Loading...</span>
-              )}
-            </div>
+            <motion.div
+              className="flex-shrink-0"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <a href="#" className="flex items-center space-x-3">
+                <div>
+                  <motion.span
+                    className="text-2xl font-poppins font-bold bg-gradient-primary bg-clip-text text-transparent block"
+                    whileHover={{
+                      textShadow: "0 0 8px rgba(214, 0, 164, 0.5)"
+                    }}
+                  >
+                    HealthSpan360
+                  </motion.span>
+                  <span className="text-xs font-poppins text-cool-gray -mt-1 block">
+                    Turning Insight Into Impact
+                  </span>
+                </div>
+              </a>
+            </motion.div>
           </div>
 
           {/* Center Navigation */}

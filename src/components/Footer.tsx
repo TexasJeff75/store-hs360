@@ -8,9 +8,18 @@ const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Company Info */}
           <div>
-            <h3 className="text-2xl font-bold bg-gradient-to-r from-pink-400 to-orange-400 bg-clip-text text-transparent mb-4">HealthSpan360</h3>
+            <a href="#" className="flex items-center space-x-3 mb-4">
+              <div>
+                <span className="text-xl font-poppins font-bold bg-gradient-primary bg-clip-text text-transparent block">
+                  HealthSpan360
+                </span>
+                <span className="text-xs font-poppins text-cool-gray block">
+                  Turning Insight Into Impact
+                </span>
+              </div>
+            </a>
             <p className="text-gray-300 mb-4 leading-relaxed">
-              Turning insight into impact through advanced peptide science, genetic testing, and personalized healthcare solutions.
+              Advanced peptide science, genetic testing, and personalized healthcare solutions.
             </p>
             <div className="flex space-x-4">
               <Facebook className="h-6 w-6 text-gray-400 hover:text-pink-400 cursor-pointer transition-colors" />
