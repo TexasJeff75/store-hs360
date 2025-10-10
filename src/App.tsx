@@ -4,7 +4,6 @@ import Header from '@/components/Header';
 import AuthModal from '@/components/AuthModal';
 import UserProfile from '@/components/UserProfile';
 import AdminDashboard from '@/components/admin/AdminDashboard';
-import Hero from '@/components/Hero';
 import ProductGrid from '@/components/ProductGrid';
 import ProductFilter from '@/components/ProductFilter';
 import ProductModal from '@/components/ProductModal';
@@ -373,16 +372,14 @@ function AppContent() {
 
   return (
       <div className="min-h-screen bg-gray-50">
-        <Header 
-          cartCount={cartCount} 
+        <Header
+          cartCount={cartCount}
           onCartClick={() => setIsCartOpen(true)}
           onAuthClick={() => setIsAuthModalOpen(true)}
           onProfileClick={() => setIsProfileOpen(true)}
           onAdminClick={() => setIsAdminOpen(true)}
           onSalesRepClick={() => setIsOrgSelectorOpen(true)}
         />
-        
-        <Hero />
 
         {/* Products Section */}
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
