@@ -299,14 +299,16 @@ function AppContent() {
   console.log('🏷️ Available categories:', Object.keys(productsByCategory));
 
   // Filter products based on search and filters
-  const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         product.benefits.some(benefit => benefit.toLowerCase().includes(searchTerm.toLowerCase()));
-    const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
-    const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
-    const matchesContractPricing = !showOnlyContractPricing || productsWithContractPricing.includes(product.id);
-    return matchesSearch && matchesCategory && matchesPrice && matchesContractPricing;
-  });
+  const filteredProducts = products
+    .filter(product => {
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                           product.benefits.some(benefit => benefit.toLowerCase().includes(searchTerm.toLowerCase()));
+      const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
+      const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
+      const matchesContractPricing = !showOnlyContractPricing || productsWithContractPricing.includes(product.id);
+      return matchesSearch && matchesCategory && matchesPrice && matchesContractPricing;
+    })
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
   // Show loading or auth gate
   if (authLoading) {
