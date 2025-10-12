@@ -136,12 +136,14 @@ class ContractPricingService {
     maxQuantity?: number,
     effectiveDate?: string,
     expiryDate?: string,
-    markupPrice?: number
+    markupPrice?: number,
+    id?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const { data, error } = await supabase
         .from('contract_pricing')
         .upsert({
+          ...(id && { id }), // Include ID if editing existing record
           pricing_type: pricingType,
           entity_id: entityId,
           // Keep user_id for backward compatibility with individual pricing
