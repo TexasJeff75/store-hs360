@@ -256,6 +256,14 @@ class BigCommerceRestAPIService {
 
     return response.data;
   }
+
+  async getProductCosts(productIds: number[]) {
+    console.log('[BC REST API] Fetching product costs for:', productIds);
+
+    const response = await callServerlessFunction('getProductCosts', { productIds });
+
+    return response;
+  }
 }
 
 export const bcRestAPI = new BigCommerceRestAPIService();

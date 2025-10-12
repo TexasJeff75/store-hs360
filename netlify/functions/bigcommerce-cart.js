@@ -122,6 +122,40 @@ exports.handler = async (event, context) => {
         };
       }
 
+      case 'getProductCosts': {
+        const { productIds } = data;
+        console.log('[BigCommerce Cart Function] Fetching costs for products:', productIds);
+
+        const productCosts = {};
+
+        for (const productId of productIds) {
+          const response = await fetch(
+            `https://api.bigcommerce.com/stores/${BC_STORE_HASH}/v3/catalog/products/${productId}`,
+            {
+              method: 'GET',
+              headers,
+            }
+          );
+
+          if (response.ok) {
+            const result = await response.json();
+            const product = result.data;
+            productCosts[productId] = {
+              id: product.id,
+              name: product.name,
+              cost_price: product.cost_price || 0,
+              price: product.price || 0,
+            };
+          }
+        }
+
+        return {
+          statusCode: 200,
+          headers: corsHeaders,
+          body: JSON.stringify(productCosts),
+        };
+      }
+
       case 'createCheckout':
       case 'updateCheckout':
       case 'getCheckout':

@@ -1,5 +1,6 @@
 import { cacheService, CacheKeys, CacheTTL } from './cache';
 import { ENV } from '../config/env';
+import { bcRestAPI } from './bigcommerceRestAPI';
 
 const BC_STORE_HASH = ENV.BC_STORE_HASH;
 const BC_STOREFRONT_TOKEN = ENV.BC_STOREFRONT_TOKEN;
@@ -271,21 +272,38 @@ class BigCommerceService {
       }
       
       console.log(`Final product count: ${allProducts.length}`);
-      
+
       if (allProducts.length === 0) {
         console.warn('No products found from BigCommerce API');
-        return { 
-          products: [], 
+        return {
+          products: [],
           errorMessage: 'No products found in BigCommerce store'
         };
       }
-      
+
+      try {
+        console.log('Fetching product costs from REST API...');
+        const productIds = allProducts.map(p => p.id);
+        const costsData = await bcRestAPI.getProductCosts(productIds);
+
+        allProducts = allProducts.map(product => {
+          const costInfo = costsData[product.id];
+          if (costInfo && costInfo.cost_price) {
+            return { ...product, cost: costInfo.cost_price };
+          }
+          return product;
+        });
+
+        console.log('✅ Product costs merged');
+      } catch (costError) {
+        console.warn('Failed to fetch product costs, continuing with data from GraphQL:', costError);
+      }
+
       const result = { products: allProducts };
-      
-      // Cache successful results
+
       cacheService.set(cacheKey, result, CacheTTL.products);
       console.log('💾 Products cached for', CacheTTL.products / 1000 / 60, 'minutes');
-      
+
       return result;
     } catch (error) {
       console.error('BigCommerce API Error:', error);
