@@ -27,11 +27,59 @@ const ProductsManagement: React.FC = () => {
   const [contractPricingCounts, setContractPricingCounts] = useState<Record<number, number>>({});
   const [contractPricingDetails, setContractPricingDetails] = useState<ContractPricingInfo[]>([]);
   const [loadingPricingDetails, setLoadingPricingDetails] = useState(false);
+  const [productSettings, setProductSettings] = useState<Map<number, { allowMarkup: boolean }>>(new Map());
+  const [savingMarkupSetting, setSavingMarkupSetting] = useState(false);
 
   useEffect(() => {
     fetchProducts();
     fetchContractPricingCounts();
+    fetchProductSettings();
   }, []);
+
+  const fetchProductSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('product_settings')
+        .select('product_id, allow_markup');
+
+      if (error) throw error;
+
+      const settingsMap = new Map();
+      data?.forEach((setting: any) => {
+        settingsMap.set(setting.product_id, { allowMarkup: setting.allow_markup });
+      });
+      setProductSettings(settingsMap);
+    } catch (err) {
+      console.error('Error fetching product settings:', err);
+    }
+  };
+
+  const handleToggleMarkupAllowance = async (productId: number, currentValue: boolean) => {
+    try {
+      setSavingMarkupSetting(true);
+
+      const { error } = await supabase
+        .from('product_settings')
+        .upsert({
+          product_id: productId,
+          allow_markup: !currentValue,
+          product_name: selectedProduct?.name
+        });
+
+      if (error) throw error;
+
+      // Update local state
+      const newSettings = new Map(productSettings);
+      newSettings.set(productId, { allowMarkup: !currentValue });
+      setProductSettings(newSettings);
+
+    } catch (err) {
+      console.error('Error updating markup setting:', err);
+      alert('Failed to update markup setting');
+    } finally {
+      setSavingMarkupSetting(false);
+    }
+  };
 
   const fetchProducts = async () => {
     try {
@@ -688,6 +736,45 @@ const ProductsManagement: React.FC = () => {
                             )}
                           </div>
                         </div>
+
+                        {/* Markup Settings (Admin Only) */}
+                        {profile?.role === 'admin' && (
+                          <div className="border-t pt-4">
+                            <h5 className="text-sm font-medium text-gray-700 mb-3">Markup Pricing Settings</h5>
+                            <div className="bg-gray-50 rounded-lg p-4">
+                              <div className="flex items-start justify-between">
+                                <div className="flex-1">
+                                  <label className="flex items-center cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={productSettings.get(selectedProduct.id)?.allowMarkup || false}
+                                      onChange={() => handleToggleMarkupAllowance(
+                                        selectedProduct.id,
+                                        productSettings.get(selectedProduct.id)?.allowMarkup || false
+                                      )}
+                                      disabled={savingMarkupSetting}
+                                      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+                                    />
+                                    <span className="ml-2 text-sm font-medium text-gray-900">
+                                      Allow Markup Above Retail
+                                    </span>
+                                  </label>
+                                  <p className="mt-2 text-xs text-gray-600">
+                                    {productSettings.get(selectedProduct.id)?.allowMarkup
+                                      ? 'This product CAN be marked up above retail price (e.g., genetic testing, micronutrient testing).'
+                                      : 'This product can ONLY be discounted below retail price (standard contract pricing).'
+                                    }
+                                  </p>
+                                </div>
+                                {savingMarkupSetting && (
+                                  <div className="ml-4">
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-600"></div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Rating & Reviews */}
                         <div>

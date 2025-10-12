@@ -3,6 +3,7 @@ import { DollarSign, Plus, Edit, Trash2, Search, User, Building2, MapPin } from 
 import { contractPricingService, type PricingType } from '@/services/contractPricing';
 import { multiTenantService } from '@/services/multiTenant';
 import { bigCommerceService } from '@/services/bigcommerce';
+import { supabase } from '@/services/supabase';
 import type { Organization, Location, Profile } from '@/services/supabase';
 
 interface PricingEntry {
@@ -13,6 +14,7 @@ interface PricingEntry {
   productId: number;
   productName: string;
   contractPrice: number;
+  markupPrice?: number;
   regularPrice: number;
   savings: number;
   minQuantity: number;
@@ -45,11 +47,13 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     entityId: '',
     productId: 0,
     contractPrice: 0,
+    markupPrice: undefined as number | undefined,
     minQuantity: 1,
     maxQuantity: undefined as number | undefined,
     effectiveDate: new Date().toISOString().split('T')[0],
     expiryDate: undefined as string | undefined
   });
+  const [productSettings, setProductSettings] = useState<Map<number, { allowMarkup: boolean }>>(new Map());
 
   useEffect(() => {
     fetchData();
@@ -121,14 +125,24 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
   const fetchData = async () => {
     try {
       setLoading(true);
-      
+
       // Fetch all required data
-      const [productsData, orgsData] = await Promise.all([
+      const [productsData, orgsData, settingsData] = await Promise.all([
         bigCommerceService.getProducts(),
-        multiTenantService.getOrganizations()
+        multiTenantService.getOrganizations(),
+        supabase.from('product_settings').select('product_id, allow_markup')
       ]);
 
       setProducts(productsData.products);
+
+      // Build product settings map
+      const settingsMap = new Map();
+      if (settingsData.data) {
+        settingsData.data.forEach((setting: any) => {
+          settingsMap.set(setting.product_id, { allowMarkup: setting.allow_markup });
+        });
+      }
+      setProductSettings(settingsMap);
       
       if (organizationId) {
         // Filter organizations to only the selected one
@@ -259,7 +273,8 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
         newEntryData.minQuantity,
         newEntryData.maxQuantity,
         newEntryData.effectiveDate,
-        newEntryData.expiryDate
+        newEntryData.expiryDate,
+        selectedEntry.markupPrice
       );
 
       if (result.success) {
@@ -709,10 +724,10 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Markup Price * (Optional)
+                          Contract Price (Discounted) *
                         </label>
                         <p className="text-xs text-gray-500 mb-2">
-                          Set a higher price than the retail price. Sales rep gets 100% of the markup.
+                          Set a price BELOW retail. This is the standard discounted price.
                         </p>
                         <input
                           type="number"
@@ -730,23 +745,54 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                               contractPrice
                             });
                           }}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          placeholder="Leave empty for normal retail price"
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          required
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Markup Amount (Rep keeps 100%)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={selectedEntry.savings}
-                          readOnly
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
-                        />
-                      </div>
+                      {productSettings.get(selectedEntry.productId || 0)?.allowMarkup && (
+                        <>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Markup Price (Optional)
+                            </label>
+                            <p className="text-xs text-gray-500 mb-2">
+                              Set a price ABOVE retail. Sales rep gets 100% of the markup.
+                            </p>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={selectedEntry.markupPrice || ''}
+                              onChange={(e) => {
+                                const markupPrice = e.target.value ? parseFloat(e.target.value) : undefined;
+                                setSelectedEntry({
+                                  ...selectedEntry,
+                                  markupPrice
+                                });
+                                setNewEntryData({
+                                  ...newEntryData,
+                                  markupPrice
+                                });
+                              }}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                              placeholder="Leave empty for normal retail price"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Markup Amount (Rep keeps 100%)
+                            </label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={selectedEntry.markupPrice ? (selectedEntry.markupPrice - (selectedEntry.regularPrice || 0)).toFixed(2) : '0.00'}
+                              readOnly
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50"
+                            />
+                          </div>
+                        </>
+                      )}
                       
                       <div className="grid grid-cols-2 gap-4">
                         <div>

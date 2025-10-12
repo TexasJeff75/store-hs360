@@ -129,13 +129,14 @@ class ContractPricingService {
    */
   async setContractPrice(
     entityId: string,
-    productId: number, 
+    productId: number,
     contractPrice: number,
     pricingType: PricingType = 'individual',
     minQuantity: number = 1,
     maxQuantity?: number,
     effectiveDate?: string,
-    expiryDate?: string
+    expiryDate?: string,
+    markupPrice?: number
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const { data, error } = await supabase
@@ -147,6 +148,7 @@ class ContractPricingService {
           ...(pricingType === 'individual' && { user_id: entityId }),
           product_id: productId,
           contract_price: contractPrice,
+          markup_price: markupPrice,
           min_quantity: minQuantity,
           max_quantity: maxQuantity,
           effective_date: effectiveDate || new Date().toISOString(),
