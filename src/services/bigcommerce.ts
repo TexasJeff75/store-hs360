@@ -75,6 +75,10 @@ const PRODUCTS_Q = /* GraphQL */ `
                 value
                 currencyCode
               }
+              costPrice {
+                value
+                currencyCode
+              }
             }
             categories {
               edges {
@@ -133,6 +137,7 @@ export interface Product {
   name: string;
   price: number;
   originalPrice?: number;
+  cost?: number;
   image: string;
   rating: number;
   reviews: number;
@@ -146,12 +151,14 @@ export interface Product {
 function transformBigCommerceProduct(bc: any): Product {
   const base = bc?.prices?.price?.value ?? 0;
   const sale = bc?.prices?.salePrice?.value;
+  const cost = bc?.prices?.costPrice?.value;
 
   return {
     id: bc.entityId,
     name: bc.name,
     price: (typeof sale === "number" ? sale : base),
     originalPrice: (typeof sale === "number" ? base : undefined),
+    cost: cost,
     image: bc.defaultImage?.url || "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640",
     rating: bc.reviewSummary?.averageRating || 0,
     reviews: bc.reviewSummary?.numberOfReviews || 0,

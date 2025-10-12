@@ -38,6 +38,7 @@ export interface CartItem {
   name: string;
   quantity: number;
   price: number;
+  cost?: number;
   image?: string;
 }
 
@@ -394,6 +395,7 @@ class BulletproofCheckoutService {
           name: item.name,
           quantity: item.quantity,
           price: item.price,
+          cost: item.cost,
           image: item.image,
         })),
         subtotal: session.subtotal,

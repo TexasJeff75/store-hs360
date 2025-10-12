@@ -23,6 +23,7 @@ interface CartItem {
   id: number;
   name: string;
   price: number;
+  cost?: number;
   quantity: number;
   image: string;
 }
@@ -218,6 +219,7 @@ function AppContent() {
           id: product.id,
           name: product.name,
           price: effectivePrice,
+          cost: product.cost,
           quantity: quantity,
           image: product.image
         }];

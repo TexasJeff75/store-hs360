@@ -13,6 +13,7 @@ interface CartItem {
   id: number;
   name: string;
   price: number;
+  cost?: number;
   quantity: number;
   image: string;
 }
@@ -239,6 +240,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         name: item.name,
         quantity: item.quantity,
         price: item.price,
+        cost: item.cost,
         image: item.image
       }));
 
