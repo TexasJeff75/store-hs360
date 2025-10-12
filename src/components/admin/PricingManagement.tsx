@@ -660,8 +660,11 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Contract Price *
+                          Markup Price * (Optional)
                         </label>
+                        <p className="text-xs text-gray-500 mb-2">
+                          Set a higher price than the retail price. Sales rep gets 100% of the markup.
+                        </p>
                         <input
                           type="number"
                           step="0.01"
@@ -669,7 +672,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                           onChange={(e) => {
                             const contractPrice = parseFloat(e.target.value);
                             setSelectedEntry({
-                              ...selectedEntry, 
+                              ...selectedEntry,
                               contractPrice,
                               savings: (selectedEntry.regularPrice || 0) - contractPrice
                             });
@@ -679,13 +682,13 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                             });
                           }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          placeholder="0.00"
+                          placeholder="Leave empty for normal retail price"
                         />
                       </div>
-                      
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Savings
+                          Markup Amount (Rep keeps 100%)
                         </label>
                         <input
                           type="number"
