@@ -480,6 +480,24 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                 return (
                   <tr key={entry.id} className={hasConflict ? "bg-red-50 hover:bg-red-100" : "hover:bg-gray-50"}>
                     <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleEditPricing(entry)}
+                          className="p-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                          title="Edit Pricing"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeletePricing(entry)}
+                          className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                          title="Delete Pricing"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <TypeIcon className="h-4 w-4 mr-2 text-gray-500" />
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getTypeColor(entry.type)}`}>
@@ -540,22 +558,6 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                             Expires: {new Date(entry.expiryDate).toLocaleDateString()}
                           </div>
                         )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
-                        <button
-                          onClick={() => handleEditPricing(entry)}
-                          className="text-purple-600 hover:text-purple-900 p-1 rounded"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeletePricing(entry)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
                       </div>
                     </td>
                   </tr>

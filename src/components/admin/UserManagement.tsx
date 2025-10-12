@@ -433,6 +433,9 @@ const UserManagement: React.FC = () => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   User
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -444,9 +447,6 @@ const UserManagement: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Created
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -454,6 +454,27 @@ const UserManagement: React.FC = () => {
                 const RoleIcon = getRoleIcon(user.role);
                 return (
                   <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => {
+                            setSelectedUser(user);
+                            setIsEditModalOpen(true);
+                          }}
+                          className="p-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                          title="Edit User"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => deleteUser(user.id)}
+                          className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                          title="Delete User"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="flex-shrink-0 h-10 w-10">
@@ -488,25 +509,6 @@ const UserManagement: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(user.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
-                        <button
-                          onClick={() => {
-                            setSelectedUser(user);
-                            setIsEditModalOpen(true);
-                          }}
-                          className="text-purple-600 hover:text-purple-900 p-1 rounded"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => deleteUser(user.id)}
-                          className="text-red-600 hover:text-red-900 p-1 rounded"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
                     </td>
                   </tr>
                 );

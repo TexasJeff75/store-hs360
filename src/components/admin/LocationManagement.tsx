@@ -184,16 +184,18 @@ const LocationManagement: React.FC<LocationManagementProps> = ({ organizationId 
                   <p className="text-sm text-gray-500">Code: {location.code}</p>
                 </div>
               </div>
-              <div className="flex items-center space-x-1">
+              <div className="flex items-center space-x-2">
                 <button
                   onClick={() => handleEditLocation(location)}
-                  className="p-1 text-gray-400 hover:text-purple-600 rounded"
+                  className="p-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                  title="Edit Location"
                 >
                   <Edit className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => handleDeleteLocation(location.id)}
-                  className="p-1 text-gray-400 hover:text-red-600 rounded"
+                  className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                  title="Delete Location"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
