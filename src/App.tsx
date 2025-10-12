@@ -49,6 +49,7 @@ function AppContent() {
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isOrgSelectorOpen, setIsOrgSelectorOpen] = useState(false);
   const [selectedOrganization, setSelectedOrganization] = useState<any>(null);
+  const [userHasMultipleOrgs, setUserHasMultipleOrgs] = useState(false);
   const [showOnlyContractPricing, setShowOnlyContractPricing] = useState(false);
   const [productsWithContractPricing, setProductsWithContractPricing] = useState<number[]>([]);
 
@@ -119,14 +120,18 @@ function AppContent() {
           .from('user_organization_roles')
           .select(`
             organization_id,
-            organizations!inner(id, name, code)
+            organizations!inner(id, name, code, is_active)
           `)
           .eq('user_id', user.id)
-          .limit(1)
-          .maybeSingle();
+          .eq('organizations.is_active', true);
 
-        if (!error && data) {
-          setSelectedOrganization(data.organizations);
+        if (!error && data && data.length > 0) {
+          setUserHasMultipleOrgs(data.length > 1);
+
+          // Auto-select if only one organization
+          if (data.length === 1) {
+            setSelectedOrganization(data[0].organizations);
+          }
         }
       } catch (error) {
         console.error('Error loading user organization:', error);
@@ -362,20 +367,32 @@ function AppContent() {
               Discover our comprehensive range of health and wellness solutions
             </p>
 
-            {/* Organization Selector Button */}
-            <div className="flex justify-center">
-              <button
-                onClick={() => setIsOrgSelectorOpen(true)}
-                className="inline-flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all duration-200 shadow-md hover:shadow-lg"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                </svg>
-                <span className="font-medium">
-                  {selectedOrganization ? `Change Organization (${selectedOrganization.name})` : 'Select Organization for Contract Pricing'}
-                </span>
-              </button>
-            </div>
+            {/* Organization Selector Button - Only show if user has multiple organizations */}
+            {userHasMultipleOrgs && (
+              <div className="flex justify-center">
+                <button
+                  onClick={() => setIsOrgSelectorOpen(true)}
+                  className="inline-flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all duration-200 shadow-md hover:shadow-lg"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  <span className="font-medium">
+                    Change Organization ({selectedOrganization?.name})
+                  </span>
+                </button>
+              </div>
+            )}
+            {selectedOrganization && !userHasMultipleOrgs && (
+              <div className="flex justify-center">
+                <div className="inline-flex items-center space-x-2 bg-blue-50 text-blue-700 px-6 py-3 rounded-lg">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                  <span className="font-medium">Ordering for: {selectedOrganization.name}</span>
+                </div>
+              </div>
+            )}
           </div>
           
           {loading ? (
