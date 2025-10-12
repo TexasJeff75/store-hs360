@@ -260,9 +260,15 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
           const price = c.contractPrice ? `$${c.contractPrice.toFixed(2)}` : c.markupPrice ? `$${c.markupPrice.toFixed(2)} (markup)` : 'N/A';
           return `${price} (qty ${c.minQuantity}${c.maxQuantity ? `-${c.maxQuantity}` : '+'})`;
         }).join(', ');
+
+        const hasUnboundedConflict = conflicts.some(c => !c.maxQuantity);
+        const suggestionText = hasUnboundedConflict
+          ? ' The existing tier has no max quantity (unlimited). You need to either: 1) Set a max quantity on the existing tier, or 2) Delete the existing tier first.'
+          : ' Please adjust min/max quantities to avoid overlap.';
+
         setModalMessage({
           type: 'error',
-          text: `Quantity range conflict! This range overlaps with existing tiers: ${conflictDetails}. Please adjust min/max quantities.`
+          text: `Quantity range conflict! This range (${newEntryData.minQuantity}${newEntryData.maxQuantity ? `-${newEntryData.maxQuantity}` : '+'}) overlaps with existing tiers: ${conflictDetails}.${suggestionText}`
         });
         return;
       }
