@@ -234,50 +234,24 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     const newMin = newEntryData.minQuantity;
     const newMax = newEntryData.maxQuantity || 999999999;
 
-    console.log('=== CONFLICT CHECK DEBUG ===');
-    console.log('isEditing:', isEditing);
-    console.log('selectedEntry:', selectedEntry);
-    console.log('selectedEntry.id:', selectedEntry.id, typeof selectedEntry.id);
-    console.log('newMin:', newMin, 'newMax:', newMax);
-    console.log('Checking against', pricingEntries.length, 'entries');
+    // When editing, exclude the current entry from the list we're checking against
+    const entriesToCheck = isEditing
+      ? pricingEntries.filter(entry => String(entry.id) !== String(selectedEntry.id))
+      : pricingEntries;
 
-    const conflicts = pricingEntries.filter(entry => {
-      console.log('\n--- Checking entry ---');
-      console.log('entry.id:', entry.id, typeof entry.id);
-      console.log('entry.id === selectedEntry.id:', entry.id === selectedEntry.id);
-      console.log('isEditing && match:', isEditing && entry.id === selectedEntry.id);
-
-      // Skip the current entry when editing
-      if (isEditing && entry.id === selectedEntry.id) {
-        console.log('SKIPPING - same entry being edited');
-        return false;
-      }
-
+    const conflicts = entriesToCheck.filter(entry => {
       // Only check conflicts for same product, entity, and type
-      if (entry.productId !== selectedEntry.productId) {
-        console.log('SKIPPING - different product');
-        return false;
-      }
-      if (entry.entityId !== selectedEntry.entityId) {
-        console.log('SKIPPING - different entity');
-        return false;
-      }
-      if (entry.type !== selectedEntry.type) {
-        console.log('SKIPPING - different type');
-        return false;
-      }
+      if (entry.productId !== selectedEntry.productId) return false;
+      if (entry.entityId !== selectedEntry.entityId) return false;
+      if (entry.type !== selectedEntry.type) return false;
 
       const existingMin = entry.minQuantity;
       const existingMax = entry.maxQuantity || 999999999;
 
       // Check if ranges overlap
-      const overlaps = newMin <= existingMax && newMax >= existingMin;
-      console.log(`Range check: new(${newMin}-${newMax}) vs existing(${existingMin}-${existingMax}) = ${overlaps}`);
-      return overlaps;
+      return newMin <= existingMax && newMax >= existingMin;
     });
 
-    console.log('Total conflicts found:', conflicts.length);
-    console.log('=== END DEBUG ===\n');
     return conflicts.length > 0 ? conflicts : null;
   };
 
