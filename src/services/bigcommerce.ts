@@ -152,12 +152,18 @@ function transformBigCommerceProduct(bc: any): Product {
   // Use salePrice if available for promotional pricing, otherwise use base price
   const retailPrice = typeof sale === "number" ? sale : base;
 
+  // Extract cost from custom fields
+  const costField = (bc.customFields?.edges ?? []).find((e: any) =>
+    e?.node?.name?.toLowerCase() === 'cost'
+  );
+  const cost = costField?.node?.value ? parseFloat(costField.node.value) : 0;
+
   return {
     id: bc.entityId,
     name: bc.name,
     price: retailPrice, // This is the normal retail price
     originalPrice: undefined, // Not used currently
-    cost: retailPrice, // TODO: Extract from custom field "cost" in BigCommerce
+    cost: cost, // Extract from custom field "cost" in BigCommerce
     image: bc.defaultImage?.url || "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640",
     rating: bc.reviewSummary?.averageRating || 0,
     reviews: bc.reviewSummary?.numberOfReviews || 0,
