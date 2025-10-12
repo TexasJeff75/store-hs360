@@ -263,6 +263,10 @@ function AppContent() {
     setCartItems(prev => prev.filter(item => item.id !== id));
   };
 
+  const clearCart = () => {
+    setCartItems([]);
+  };
+
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   // Group products by their actual BigCommerce categories
@@ -594,6 +598,7 @@ function AppContent() {
           items={cartItems}
           onUpdateQuantity={updateCartQuantity}
           onRemoveItem={removeFromCart}
+          onClearCart={clearCart}
           organizationId={selectedOrganization?.id}
         />
 

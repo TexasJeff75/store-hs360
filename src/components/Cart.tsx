@@ -19,6 +19,7 @@ interface CartProps {
   items: CartItem[];
   onUpdateQuantity: (id: number, quantity: number) => void;
   onRemoveItem: (id: number) => void;
+  onClearCart: () => void;
   organizationId?: string;
 }
 
@@ -140,6 +141,7 @@ const Cart: React.FC<CartProps> = ({
   items,
   onUpdateQuantity,
   onRemoveItem,
+  onClearCart,
   organizationId,
 }) => {
   const [isCheckoutOpen, setIsCheckoutOpen] = React.useState(false);
@@ -155,7 +157,11 @@ const Cart: React.FC<CartProps> = ({
 
   const handleOrderComplete = (orderId: string) => {
     console.log('Order completed:', orderId);
-    // Clear cart, show success message, etc.
+    // Clear the cart
+    onClearCart();
+    // Close checkout modal
+    setIsCheckoutOpen(false);
+    // Close cart
     onClose();
   };
 
