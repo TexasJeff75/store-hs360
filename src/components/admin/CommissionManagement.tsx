@@ -163,8 +163,15 @@ const CommissionManagement: React.FC = () => {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Commission Management</h2>
-        <p className="text-gray-600">Track and manage sales commissions</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          {profile?.role === 'sales_rep' ? 'My Commissions' : 'Commission Management'}
+        </h2>
+        <p className="text-gray-600">
+          {profile?.role === 'sales_rep'
+            ? 'View your earnings from completed orders'
+            : 'Track and manage sales commissions'
+          }
+        </p>
       </div>
 
       {error && (
@@ -175,17 +182,37 @@ const CommissionManagement: React.FC = () => {
 
       {!loading && commissions.length === 0 && !error && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-          <h3 className="font-semibold text-blue-900 mb-3">How to Set Up Commissions</h3>
-          <ol className="text-blue-800 text-sm space-y-2 list-decimal list-inside">
-            <li>Assign a sales rep to an organization (with commission rate)</li>
-            <li>Sales rep creates an order for that organization</li>
-            <li>When the order is marked as "completed", a commission is automatically calculated</li>
-            <li>Review and approve commissions here</li>
-            <li>Mark approved commissions as paid</li>
-          </ol>
-          <p className="text-blue-700 text-sm mt-4 italic">
-            <strong>Get Started:</strong> Go to the "Sales Reps" tab to assign sales reps to organizations with commission rates.
-          </p>
+          {profile?.role === 'sales_rep' ? (
+            <>
+              <h3 className="font-semibold text-blue-900 mb-3">No Commissions Yet</h3>
+              <div className="text-blue-800 text-sm space-y-2">
+                <p>You don't have any commissions yet. Here's how commissions work:</p>
+                <ul className="list-disc list-inside space-y-1 ml-4">
+                  <li>When you complete an order for your assigned organizations</li>
+                  <li>The system automatically calculates your commission based on the profit margin</li>
+                  <li>Your commissions appear here for tracking</li>
+                  <li>Once approved, they'll be processed for payment</li>
+                </ul>
+                <p className="mt-3 font-medium">
+                  Start by creating orders for your organizations to earn commissions!
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <h3 className="font-semibold text-blue-900 mb-3">How Commissions Work</h3>
+              <ol className="text-blue-800 text-sm space-y-2 list-decimal list-inside">
+                <li>Assign a sales rep to an organization (with commission rate)</li>
+                <li>Sales rep creates an order for that organization</li>
+                <li>When the order is marked as "completed", a commission is automatically calculated</li>
+                <li>Review and approve commissions here</li>
+                <li>Mark approved commissions as paid</li>
+              </ol>
+              <p className="text-blue-700 text-sm mt-4 italic">
+                <strong>Get Started:</strong> Go to the "Sales Reps" tab to assign sales reps to organizations with commission rates.
+              </p>
+            </>
+          )}
         </div>
       )}
 
@@ -193,7 +220,9 @@ const CommissionManagement: React.FC = () => {
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600">Total Commissions</p>
+              <p className="text-sm text-gray-600">
+                {profile?.role === 'sales_rep' ? 'Total Earned' : 'Total Commissions'}
+              </p>
               <p className="text-2xl font-bold text-gray-900">${summary.total.toFixed(2)}</p>
             </div>
             <TrendingUp className="h-8 w-8 text-blue-600" />
@@ -203,8 +232,13 @@ const CommissionManagement: React.FC = () => {
         <div className="bg-yellow-50 rounded-lg shadow p-6 border border-yellow-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-yellow-700">Pending</p>
+              <p className="text-sm text-yellow-700">
+                {profile?.role === 'sales_rep' ? 'Under Review' : 'Pending'}
+              </p>
               <p className="text-2xl font-bold text-yellow-900">${summary.pending.toFixed(2)}</p>
+              {profile?.role === 'sales_rep' && (
+                <p className="text-xs text-yellow-600 mt-1">Awaiting approval</p>
+              )}
             </div>
             <Clock className="h-8 w-8 text-yellow-600" />
           </div>
@@ -213,8 +247,13 @@ const CommissionManagement: React.FC = () => {
         <div className="bg-blue-50 rounded-lg shadow p-6 border border-blue-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-blue-700">Approved</p>
+              <p className="text-sm text-blue-700">
+                {profile?.role === 'sales_rep' ? 'Ready to Pay' : 'Approved'}
+              </p>
               <p className="text-2xl font-bold text-blue-900">${summary.approved.toFixed(2)}</p>
+              {profile?.role === 'sales_rep' && (
+                <p className="text-xs text-blue-600 mt-1">Payment pending</p>
+              )}
             </div>
             <CheckCircle className="h-8 w-8 text-blue-600" />
           </div>
@@ -223,8 +262,13 @@ const CommissionManagement: React.FC = () => {
         <div className="bg-green-50 rounded-lg shadow p-6 border border-green-200">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-green-700">Paid</p>
+              <p className="text-sm text-green-700">
+                {profile?.role === 'sales_rep' ? 'Already Paid' : 'Paid'}
+              </p>
               <p className="text-2xl font-bold text-green-900">${summary.paid.toFixed(2)}</p>
+              {profile?.role === 'sales_rep' && (
+                <p className="text-xs text-green-600 mt-1">Received</p>
+              )}
             </div>
             <DollarSign className="h-8 w-8 text-green-600" />
           </div>

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
 import LocationManagement from './LocationManagement';
@@ -17,19 +18,27 @@ interface AdminDashboardProps {
 type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'analytics';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<AdminTab>('organizations');
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === 'admin';
+  const isSalesRep = profile?.role === 'sales_rep';
+
+  const [activeTab, setActiveTab] = useState<AdminTab>(isSalesRep ? 'commissions' : 'organizations');
 
   if (!isOpen) return null;
 
-  const tabs = [
-    { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2 },
-    { id: 'users' as AdminTab, label: 'Users', icon: Users },
-    { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart },
-    { id: 'salesreps' as AdminTab, label: 'Sales Reps', icon: UserCheck },
-    { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp },
-    { id: 'products' as AdminTab, label: 'Products', icon: Package },
-    { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3 },
+  const adminTabs = [
+    { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2, roles: ['admin'] },
+    { id: 'users' as AdminTab, label: 'Users', icon: Users, roles: ['admin'] },
+    { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep'] },
+    { id: 'salesreps' as AdminTab, label: 'Sales Reps', icon: UserCheck, roles: ['admin'] },
+    { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep'] },
+    { id: 'products' as AdminTab, label: 'Products', icon: Package, roles: ['admin'] },
+    { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3, roles: ['admin'] },
   ];
+
+  const tabs = adminTabs.filter(tab =>
+    isAdmin || (isSalesRep && tab.roles.includes('sales_rep'))
+  );
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -63,8 +72,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
           <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold">Admin Dashboard</h1>
-                <p className="text-purple-100">Manage users, organizations, and pricing</p>
+                <h1 className="text-2xl font-bold">
+                  {isSalesRep ? 'Sales Dashboard' : 'Admin Dashboard'}
+                </h1>
+                <p className="text-purple-100">
+                  {isSalesRep
+                    ? 'View your orders and commissions'
+                    : 'Manage users, organizations, and pricing'
+                  }
+                </p>
               </div>
               <button
                 onClick={onClose}

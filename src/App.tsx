@@ -619,7 +619,7 @@ function AppContent() {
           onClose={() => setIsProfileOpen(false)}
         />
 
-        {profile?.role === 'admin' && (
+        {(profile?.role === 'admin' || profile?.role === 'sales_rep') && (
           <AdminDashboard
             isOpen={isAdminOpen}
             onClose={() => setIsAdminOpen(false)}
