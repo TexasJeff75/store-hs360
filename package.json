@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "netlify dev",
+    "dev": "concurrently \"npm run dev:vite\" \"node server/gql.cjs\"",
     "dev:vite": "node -r dotenv/config node_modules/.bin/vite",
     "build": "npm run build:netlify",
     "build:netlify": "vite build",

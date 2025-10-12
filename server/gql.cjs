@@ -140,6 +140,45 @@ app.post("/api/bigcommerce-cart", async (req, res) => {
         return res.status(200).json(result.data);
       }
 
+      case 'getProductCosts': {
+        const { productIds } = data;
+        console.log('[Cart Function] Fetching costs for products:', productIds);
+
+        const productCosts = {};
+
+        for (const productId of productIds) {
+          const response = await fetch(
+            `https://api.bigcommerce.com/stores/${BC_STORE_HASH}/v3/catalog/products/${productId}?include=variants`,
+            {
+              method: 'GET',
+              headers,
+            }
+          );
+
+          if (response.ok) {
+            const result = await response.json();
+            const product = result.data;
+
+            let costPrice = product.cost_price;
+            if (product.variants && product.variants.length > 0) {
+              const variant = product.variants[0];
+              if (variant.cost_price !== undefined && variant.cost_price !== null) {
+                costPrice = variant.cost_price;
+              }
+            }
+
+            productCosts[productId] = {
+              id: product.id,
+              name: product.name,
+              cost_price: costPrice !== undefined && costPrice !== null ? costPrice : 0,
+              price: product.price || 0,
+            };
+          }
+        }
+
+        return res.status(200).json(productCosts);
+      }
+
       case 'createCheckout':
       case 'updateCheckout':
       case 'getCheckout':
