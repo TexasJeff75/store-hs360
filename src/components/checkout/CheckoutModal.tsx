@@ -155,6 +155,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
       if (locations && locations.length > 0) {
         setSelectedLocationId(locations[0].id);
+        await fetchLocationAddress(locations[0].id);
       }
     }
 
