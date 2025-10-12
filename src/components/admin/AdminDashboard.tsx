@@ -16,17 +16,31 @@ interface AdminDashboardProps {
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'analytics' | 'my-orgs';
+type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'analytics' | 'my-orgs' | 'payments';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
-  const { profile } = useAuth();
+  const { profile, user } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const isSalesRep = profile?.role === 'sales_rep';
   const isCustomer = profile?.role === 'customer';
+  const [userOrgId, setUserOrgId] = React.useState<string | undefined>();
 
   const [activeTab, setActiveTab] = useState<AdminTab>(
     isCustomer ? 'orders' : isSalesRep ? 'my-orgs' : 'organizations'
   );
+
+  React.useEffect(() => {
+    if (isCustomer && user?.id) {
+      const fetchUserOrg = async () => {
+        const { multiTenantService } = await import('@/services/multiTenant');
+        const roles = await multiTenantService.getUserOrganizationRoles(user.id);
+        if (roles.length > 0) {
+          setUserOrgId(roles[0].organization_id);
+        }
+      };
+      fetchUserOrg();
+    }
+  }, [isCustomer, user?.id]);
 
   if (!isOpen) return null;
 
@@ -35,6 +49,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2, roles: ['admin'] },
     { id: 'users' as AdminTab, label: 'Users', icon: Users, roles: ['admin'] },
     { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep', 'customer'] },
+    { id: 'locations' as AdminTab, label: 'Locations', icon: MapPin, roles: ['admin', 'customer'] },
+    { id: 'payments' as AdminTab, label: 'Payment Methods', icon: CreditCard, roles: ['admin', 'customer'] },
     { id: 'salesreps' as AdminTab, label: 'Sales Reps', icon: UserCheck, roles: ['admin'] },
     { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep'] },
     { id: 'products' as AdminTab, label: 'Products', icon: Package, roles: ['admin'] },
@@ -63,6 +79,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
         return <CommissionManagement />;
       case 'products':
         return <ProductsManagement />;
+      case 'locations':
+        return <LocationManagement organizationId={isCustomer ? userOrgId : undefined} />;
+      case 'payments':
+        return (
+          <div className="p-6">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Methods</h2>
+              <p className="text-gray-600">Manage payment methods for your organization</p>
+            </div>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-blue-800">Payment methods management coming soon. This will allow you to securely store and manage payment methods for your organization.</p>
+            </div>
+          </div>
+        );
       case 'analytics':
         return (
           <div className="p-6 text-center text-gray-500">
@@ -82,11 +112,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold">
-                  {isCustomer ? 'My Orders' : isSalesRep ? 'Sales Dashboard' : 'Admin Dashboard'}
+                  {isCustomer ? 'My Account' : isSalesRep ? 'Sales Dashboard' : 'Admin Dashboard'}
                 </h1>
                 <p className="text-purple-100">
                   {isCustomer
-                    ? 'View your order history and tracking information'
+                    ? 'Manage your orders, locations, and payment methods'
                     : isSalesRep
                     ? 'View your orders and commissions'
                     : 'Manage users, organizations, and pricing'
