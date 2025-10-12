@@ -286,12 +286,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     }
 
     try {
-      const result = await contractPricingService.removeContractPrice(
-        entry.entityId, 
-        entry.productId, 
-        entry.type,
-        entry.effectiveDate
-      );
+      const result = await contractPricingService.removeContractPriceById(entry.id);
 
       if (result.success) {
         // Refresh pricing data after a short delay

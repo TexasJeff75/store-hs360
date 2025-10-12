@@ -172,7 +172,32 @@ class ContractPricingService {
   }
 
   /**
+   * Remove contract price by ID (Admin only)
+   */
+  async removeContractPriceById(
+    id: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('contract_pricing')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error removing contract price:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      };
+    }
+  }
+
+  /**
    * Remove contract price for an entity and product (Admin only)
+   * @deprecated Use removeContractPriceById instead to avoid deleting multiple records
    */
   async removeContractPrice(
     entityId: string,
@@ -203,9 +228,9 @@ class ContractPricingService {
       return { success: true };
     } catch (error) {
       console.error('Error removing contract price:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }
