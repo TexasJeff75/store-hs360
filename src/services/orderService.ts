@@ -76,6 +76,19 @@ class OrderService {
 
         if (!orgError && orgData && !orgData.is_house_account) {
           salesRepId = orgData.default_sales_rep_id;
+
+          if (!salesRepId) {
+            const { data: salesRepData } = await supabase
+              .from('organization_sales_reps')
+              .select('sales_rep_id')
+              .eq('organization_id', data.organizationId)
+              .eq('is_active', true)
+              .maybeSingle();
+
+            if (salesRepData) {
+              salesRepId = salesRepData.sales_rep_id;
+            }
+          }
         }
       }
 
