@@ -10,6 +10,7 @@ const CommissionManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedCommission, setSelectedCommission] = useState<any | null>(null);
+  const [groupByMonth, setGroupByMonth] = useState(true);
   const [summary, setSummary] = useState({
     total: 0,
     pending: 0,
@@ -121,6 +122,38 @@ const CommissionManagement: React.FC = () => {
 
     return matchesSearch;
   });
+
+  const groupedCommissions = () => {
+    if (!groupByMonth) {
+      return [{ key: 'all', commissions: filteredCommissions }];
+    }
+
+    const groups: Record<string, any[]> = {};
+
+    filteredCommissions.forEach(commission => {
+      const date = new Date(commission.created_at);
+      const salesRepId = commission.sales_rep_id || 'unknown';
+      const salesRepName = commission.sales_rep?.email || 'Unknown';
+      const monthYear = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
+
+      const key = profile?.role === 'admin'
+        ? `${salesRepName}|${monthYear}`
+        : monthYear;
+
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(commission);
+    });
+
+    return Object.entries(groups)
+      .sort((a, b) => {
+        const dateA = new Date(a[1][0].created_at);
+        const dateB = new Date(b[1][0].created_at);
+        return dateB.getTime() - dateA.getTime();
+      })
+      .map(([key, commissions]) => ({ key, commissions }));
+  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -300,6 +333,17 @@ const CommissionManagement: React.FC = () => {
               <option value="paid">Paid</option>
               <option value="cancelled">Cancelled</option>
             </select>
+
+            <button
+              onClick={() => setGroupByMonth(!groupByMonth)}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                groupByMonth
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {groupByMonth ? 'Group by Month' : 'Show All'}
+            </button>
           </div>
         </div>
 
@@ -321,7 +365,7 @@ const CommissionManagement: React.FC = () => {
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-white">
               {filteredCommissions.length === 0 ? (
                 <tr>
                   <td colSpan={profile?.role === 'admin' ? 10 : 9} className="px-6 py-12 text-center text-gray-500">
@@ -330,73 +374,99 @@ const CommissionManagement: React.FC = () => {
                   </td>
                 </tr>
               ) : (
-                filteredCommissions.map((commission) => (
-                  <tr key={commission.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                      {commission.order_id.slice(0, 8)}...
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {commission.sales_rep?.email || 'N/A'}
-                    </td>
-                    {profile?.role === 'admin' && (
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {commission.organization?.name || 'N/A'}
-                      </td>
+                groupedCommissions().map((group, groupIndex) => (
+                  <React.Fragment key={group.key}>
+                    {groupByMonth && (
+                      <tr className="bg-gray-100 border-y-2 border-gray-300">
+                        <td colSpan={profile?.role === 'admin' ? 10 : 9} className="px-6 py-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <span className="font-bold text-gray-900 text-sm">
+                                {profile?.role === 'admin'
+                                  ? group.key.split('|')[0] + ' - ' + group.key.split('|')[1]
+                                  : group.key
+                                }
+                              </span>
+                              <span className="text-xs text-gray-600">
+                                ({group.commissions.length} {group.commissions.length === 1 ? 'order' : 'orders'})
+                              </span>
+                            </div>
+                            <div className="text-sm font-bold text-green-600">
+                              Total: ${group.commissions.reduce((sum, c) => sum + Number(c.commission_amount), 0).toFixed(2)}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${Number(commission.order_total).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {commission.product_margin ? (
-                        <span className="font-semibold text-blue-600">
-                          ${Number(commission.product_margin).toFixed(2)}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400 text-xs">No cost data</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {Number(commission.commission_rate).toFixed(2)}%
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                      ${Number(commission.commission_amount).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-3 py-1 inline-flex items-center space-x-1 text-xs leading-5 font-semibold rounded-full border ${getStatusColor(commission.status)}`}>
-                        {getStatusIcon(commission.status)}
-                        <span>{commission.status}</span>
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {new Date(commission.created_at).toLocaleDateString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex items-center justify-end space-x-2">
-                        <button
-                          onClick={() => setSelectedCommission(commission)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          <Eye className="h-4 w-4" />
-                        </button>
-                        {profile?.role === 'admin' && commission.status === 'pending' && (
-                          <button
-                            onClick={() => handleApproveCommission(commission.id)}
-                            className="text-green-600 hover:text-green-900"
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                          </button>
+                    {group.commissions.map((commission) => (
+                      <tr key={commission.id} className="hover:bg-gray-50 border-b border-gray-200">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
+                          {commission.order_id.slice(0, 8)}...
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {commission.sales_rep?.email || 'N/A'}
+                        </td>
+                        {profile?.role === 'admin' && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {commission.organization?.name || 'N/A'}
+                          </td>
                         )}
-                        {profile?.role === 'admin' && commission.status === 'approved' && (
-                          <button
-                            onClick={() => handleMarkPaid(commission.id)}
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            <DollarSign className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          ${Number(commission.order_total).toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {commission.product_margin ? (
+                            <span className="font-semibold text-blue-600">
+                              ${Number(commission.product_margin).toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 text-xs">No cost data</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {Number(commission.commission_rate).toFixed(2)}%
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                          ${Number(commission.commission_amount).toFixed(2)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-3 py-1 inline-flex items-center space-x-1 text-xs leading-5 font-semibold rounded-full border ${getStatusColor(commission.status)}`}>
+                            {getStatusIcon(commission.status)}
+                            <span>{commission.status}</span>
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {new Date(commission.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex items-center justify-end space-x-2">
+                            <button
+                              onClick={() => setSelectedCommission(commission)}
+                              className="text-blue-600 hover:text-blue-900"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            {profile?.role === 'admin' && commission.status === 'pending' && (
+                              <button
+                                onClick={() => handleApproveCommission(commission.id)}
+                                className="text-green-600 hover:text-green-900"
+                              >
+                                <CheckCircle className="h-4 w-4" />
+                              </button>
+                            )}
+                            {profile?.role === 'admin' && commission.status === 'approved' && (
+                              <button
+                                onClick={() => handleMarkPaid(commission.id)}
+                                className="text-blue-600 hover:text-blue-900"
+                              >
+                                <DollarSign className="h-4 w-4" />
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </React.Fragment>
                 ))
               )}
             </tbody>
