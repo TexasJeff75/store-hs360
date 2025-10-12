@@ -17,6 +17,15 @@ export interface Commission {
   sales_rep_id: string;
   organization_id?: string;
   order_total: number;
+  product_margin?: number;
+  margin_details?: Array<{
+    productId: string;
+    name: string;
+    price: number;
+    cost: number;
+    quantity: number;
+    margin: number;
+  }>;
   commission_rate: number;
   commission_amount: number;
   status: 'pending' | 'approved' | 'paid' | 'cancelled';

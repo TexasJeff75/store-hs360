@@ -269,6 +269,7 @@ const CommissionManagement: React.FC = () => {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
                 )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Total</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product Margin</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rate</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -279,7 +280,7 @@ const CommissionManagement: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredCommissions.length === 0 ? (
                 <tr>
-                  <td colSpan={profile?.role === 'admin' ? 9 : 8} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={profile?.role === 'admin' ? 10 : 9} className="px-6 py-12 text-center text-gray-500">
                     <DollarSign className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                     <p>No commissions found</p>
                   </td>
@@ -300,6 +301,15 @@ const CommissionManagement: React.FC = () => {
                     )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       ${Number(commission.order_total).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {commission.product_margin ? (
+                        <span className="font-semibold text-blue-600">
+                          ${Number(commission.product_margin).toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-gray-400 text-xs">No cost data</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {Number(commission.commission_rate).toFixed(2)}%
@@ -384,6 +394,14 @@ const CommissionManagement: React.FC = () => {
                     <p className="font-medium">${Number(selectedCommission.order_total).toFixed(2)}</p>
                   </div>
                   <div>
+                    <label className="text-sm text-gray-600">Product Margin</label>
+                    <p className="font-medium text-blue-600">
+                      {selectedCommission.product_margin
+                        ? `$${Number(selectedCommission.product_margin).toFixed(2)}`
+                        : 'No cost data'}
+                    </p>
+                  </div>
+                  <div>
                     <label className="text-sm text-gray-600">Commission Rate</label>
                     <p className="font-medium">{Number(selectedCommission.commission_rate).toFixed(2)}%</p>
                   </div>
@@ -396,6 +414,29 @@ const CommissionManagement: React.FC = () => {
                     <p className="font-medium">{new Date(selectedCommission.created_at).toLocaleString()}</p>
                   </div>
                 </div>
+
+                {selectedCommission.margin_details && selectedCommission.margin_details.length > 0 && (
+                  <div className="mt-4">
+                    <label className="text-sm font-semibold text-gray-700 mb-2 block">Margin Breakdown</label>
+                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                      {selectedCommission.margin_details.map((item: any, index: number) => (
+                        <div key={index} className="flex justify-between items-center text-sm">
+                          <div className="flex-1">
+                            <p className="font-medium">{item.name}</p>
+                            <p className="text-xs text-gray-500">
+                              ${Number(item.price).toFixed(2)} - ${Number(item.cost).toFixed(2)} = ${(Number(item.price) - Number(item.cost)).toFixed(2)} × {item.quantity}
+                            </p>
+                          </div>
+                          <p className="font-semibold text-blue-600">${Number(item.margin).toFixed(2)}</p>
+                        </div>
+                      ))}
+                      <div className="border-t pt-2 mt-2 flex justify-between font-semibold">
+                        <span>Total Product Margin:</span>
+                        <span className="text-blue-600">${Number(selectedCommission.product_margin).toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
                 {selectedCommission.notes && (
                   <div>
