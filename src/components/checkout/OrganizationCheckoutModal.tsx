@@ -85,10 +85,10 @@ const OrganizationCheckoutModal: React.FC<OrganizationCheckoutModalProps> = ({
     { id: 'overnight', name: 'Overnight Shipping', price: 39.99, days: '1 business day' }
   ];
 
-  const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-  const shippingCost = shippingMethods.find(m => m.id === selectedShippingMethod)?.price || 0;
-  const tax = subtotal * 0.08; // Mock 8% tax
-  const total = subtotal + shippingCost + tax;
+  const subtotal = session?.subtotal || items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  const shippingCost = session?.shipping || (shippingMethods.find(m => m.id === selectedShippingMethod)?.price || 0);
+  const tax = session?.tax || 0;
+  const total = session?.total || (subtotal + shippingCost + tax);
 
   useEffect(() => {
     if (isOpen && organization && user?.id && !sessionId) {
@@ -206,17 +206,50 @@ const OrganizationCheckoutModal: React.FC<OrganizationCheckoutModalProps> = ({
     }
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!validateStep(currentStep)) {
       setError('Please fill in all required fields');
       return;
     }
-    
+
     setError(null);
-    const steps: CheckoutStep[] = ['shipping', 'payment', 'review'];
-    const currentIndex = steps.indexOf(currentStep);
-    if (currentIndex < steps.length - 1) {
-      setCurrentStep(steps[currentIndex + 1]);
+    setLoading(true);
+
+    try {
+      if (currentStep === 'shipping') {
+        const taxData = await bigCommerceCustomerService.getTaxForOrganization(
+          organization,
+          items.map(item => ({
+            productId: item.id,
+            quantity: item.quantity
+          }))
+        );
+
+        if (taxData && sessionId) {
+          await bulletproofCheckoutService.updateSession(sessionId, {
+            subtotal: taxData.subtotal,
+            tax: taxData.tax,
+            shipping: taxData.shipping,
+            total: taxData.total,
+          });
+
+          const updatedSession = await bulletproofCheckoutService.getSession(sessionId);
+          if (updatedSession) {
+            setSession(updatedSession);
+          }
+        }
+      }
+
+      const steps: CheckoutStep[] = ['shipping', 'payment', 'review'];
+      const currentIndex = steps.indexOf(currentStep);
+      if (currentIndex < steps.length - 1) {
+        setCurrentStep(steps[currentIndex + 1]);
+      }
+    } catch (err) {
+      console.error('Error fetching tax:', err);
+      setError('Failed to calculate tax. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 

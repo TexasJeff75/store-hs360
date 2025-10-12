@@ -34,8 +34,8 @@ class RestCheckoutService {
   async createCheckoutSession(userId: string, items: any[]): Promise<CheckoutFlowResult> {
     try {
       const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      const tax = subtotal * 0.08;
-      const shipping = 9.99;
+      const tax = 0; // Tax will be fetched from BigCommerce after address is added
+      const shipping = 0;
       const total = subtotal + tax + shipping;
 
       const { data: session, error } = await supabase

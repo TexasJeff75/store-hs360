@@ -116,7 +116,7 @@ class BulletproofCheckoutService {
 
       const idempotencyKey = uuidv4();
       const subtotal = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-      const tax = subtotal * 0.08;
+      const tax = 0; // Tax will be fetched from BigCommerce after address is added
       const shipping = 0;
       const total = subtotal + tax + shipping;
 
@@ -452,6 +452,59 @@ class BulletproofCheckoutService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to complete checkout',
+        canRetry: true,
+      };
+    }
+  }
+
+  async updateTaxFromCheckout(sessionId: string, checkoutId: string): Promise<CheckoutResult> {
+    console.log('[Bulletproof Checkout] Updating tax from BigCommerce checkout:', checkoutId);
+
+    const session = await this.getSession(sessionId);
+    if (!session) {
+      return {
+        success: false,
+        error: 'Session not found',
+        canRetry: false,
+      };
+    }
+
+    try {
+      const checkoutData = await bcRestAPI.getCheckout(checkoutId);
+
+      if (!checkoutData) {
+        return {
+          success: false,
+          error: 'Failed to fetch checkout data',
+          canRetry: true,
+        };
+      }
+
+      const tax = checkoutData.tax_total || 0;
+      const shipping = checkoutData.shipping_cost_total_inc_tax || 0;
+      const subtotal = checkoutData.subtotal_ex_tax || session.subtotal;
+      const total = checkoutData.grand_total || (subtotal + tax + shipping);
+
+      console.log('[Bulletproof Checkout] Tax from BigCommerce:', tax);
+      console.log('[Bulletproof Checkout] Shipping from BigCommerce:', shipping);
+      console.log('[Bulletproof Checkout] Grand Total from BigCommerce:', total);
+
+      await this.updateSession(sessionId, {
+        subtotal,
+        tax,
+        shipping,
+        total,
+      });
+
+      return {
+        success: true,
+        sessionId,
+      };
+    } catch (error) {
+      console.error('[Bulletproof Checkout] Error updating tax:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update tax',
         canRetry: true,
       };
     }

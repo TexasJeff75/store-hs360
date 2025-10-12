@@ -283,6 +283,59 @@ class BigCommerceCustomerService {
   }
 
   /**
+   * Get tax calculation for organization checkout
+   */
+  async getTaxForOrganization(
+    organization: Organization,
+    lineItems: OrderLineItem[]
+  ): Promise<{ tax: number; shipping: number; subtotal: number; total: number } | null> {
+    try {
+      const restCartItems = lineItems.map(item => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        ...(item.variantId && { variantId: item.variantId })
+      }));
+
+      const { cartId } = await bcRestAPI.createCart(restCartItems);
+      if (!cartId) {
+        console.error('Failed to create cart for tax calculation');
+        return null;
+      }
+
+      const billingAddress = {
+        first_name: organization.name.split(' ')[0] || organization.name,
+        last_name: organization.name.split(' ').slice(1).join(' ') || 'Organization',
+        company: organization.name,
+        email: organization.contact_email || `${organization.code}@example.com`,
+        phone: organization.contact_phone || '',
+        address1: organization.billing_address?.address1 || '123 Business St',
+        address2: organization.billing_address?.address2 || '',
+        city: organization.billing_address?.city || 'Business City',
+        state_or_province: organization.billing_address?.state || 'CA',
+        state_or_province_code: organization.billing_address?.state || 'CA',
+        postal_code: organization.billing_address?.postalCode || '90210',
+        country_code: organization.billing_address?.country || 'US'
+      };
+
+      const checkoutData = await bcRestAPI.addBillingAddress(cartId, billingAddress);
+
+      if (checkoutData) {
+        return {
+          tax: checkoutData.tax_total || 0,
+          shipping: checkoutData.shipping_cost_total_inc_tax || 0,
+          subtotal: checkoutData.subtotal_ex_tax || 0,
+          total: checkoutData.grand_total || 0
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Error getting tax for organization:', error);
+      return null;
+    }
+  }
+
+  /**
    * Create order for organization in BigCommerce
    */
   async createOrderForOrganization(

@@ -114,7 +114,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shippingCost = shippingMethods.find(m => m.id === selectedShippingMethod)?.price || 0;
-  const tax = subtotal * 0.08;
+  const tax = 0; // Tax will be calculated by BigCommerce
   const total = subtotal + shippingCost + tax;
 
   useEffect(() => {
