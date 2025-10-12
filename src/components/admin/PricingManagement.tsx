@@ -268,7 +268,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       const result = await contractPricingService.setContractPrice(
         selectedEntry.entityId!,
         selectedEntry.productId!,
-        selectedEntry.contractPrice!,
+        selectedEntry.contractPrice,
         selectedEntry.type as PricingType,
         newEntryData.minQuantity,
         newEntryData.maxQuantity,
@@ -724,29 +724,32 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Contract Price (Discounted) *
+                          Contract Price (Discounted) {!productSettings.get(selectedEntry.productId || 0)?.allowMarkup && '*'}
                         </label>
                         <p className="text-xs text-gray-500 mb-2">
-                          Set a price BELOW retail. This is the standard discounted price.
+                          {productSettings.get(selectedEntry.productId || 0)?.allowMarkup
+                            ? 'Optional when markup price is set. Set a price BELOW retail for standard discounted pricing.'
+                            : 'Required. Set a price BELOW retail. This is the standard discounted price.'
+                          }
                         </p>
                         <input
                           type="number"
                           step="0.01"
-                          value={selectedEntry.contractPrice}
+                          value={selectedEntry.contractPrice || ''}
                           onChange={(e) => {
-                            const contractPrice = parseFloat(e.target.value);
+                            const contractPrice = e.target.value ? parseFloat(e.target.value) : undefined;
                             setSelectedEntry({
                               ...selectedEntry,
                               contractPrice,
-                              savings: (selectedEntry.regularPrice || 0) - contractPrice
+                              savings: contractPrice ? (selectedEntry.regularPrice || 0) - contractPrice : 0
                             });
                             setNewEntryData({
                               ...newEntryData,
-                              contractPrice
+                              contractPrice: contractPrice || 0
                             });
                           }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          required
+                          placeholder={productSettings.get(selectedEntry.productId || 0)?.allowMarkup ? 'Optional if markup is set' : 'Required'}
                         />
                       </div>
 
@@ -887,7 +890,13 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                 <button
                   type="button"
                   onClick={handleSavePricing}
-                  disabled={!selectedEntry.contractPrice || !selectedEntry.productId || !selectedEntry.entityId || !newEntryData.minQuantity || !newEntryData.effectiveDate}
+                  disabled={
+                    (!selectedEntry.contractPrice && !selectedEntry.markupPrice) ||
+                    !selectedEntry.productId ||
+                    !selectedEntry.entityId ||
+                    !newEntryData.minQuantity ||
+                    !newEntryData.effectiveDate
+                  }
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isEditing ? 'Update' : 'Create'} Pricing

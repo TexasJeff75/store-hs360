@@ -130,7 +130,7 @@ class ContractPricingService {
   async setContractPrice(
     entityId: string,
     productId: number,
-    contractPrice: number,
+    contractPrice: number | undefined,
     pricingType: PricingType = 'individual',
     minQuantity: number = 1,
     maxQuantity?: number,
@@ -147,8 +147,8 @@ class ContractPricingService {
           // Keep user_id for backward compatibility with individual pricing
           ...(pricingType === 'individual' && { user_id: entityId }),
           product_id: productId,
-          contract_price: contractPrice,
-          markup_price: markupPrice,
+          contract_price: contractPrice || null,
+          markup_price: markupPrice || null,
           min_quantity: minQuantity,
           max_quantity: maxQuantity,
           effective_date: effectiveDate || new Date().toISOString(),
