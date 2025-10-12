@@ -16,6 +16,13 @@ const UserManagement: React.FC = () => {
   const [newUserPassword, setNewUserPassword] = useState('');
   const [newUserRole, setNewUserRole] = useState<'admin' | 'sales_rep' | 'customer'>('customer');
   const [newUserApproved, setNewUserApproved] = useState(true);
+  const [newUserOrganizationId, setNewUserOrganizationId] = useState<string>('');
+  const [newUserOrganizationRole, setNewUserOrganizationRole] = useState<string>('member');
+  const [createNewOrganization, setCreateNewOrganization] = useState(false);
+  const [newOrgName, setNewOrgName] = useState('');
+  const [newOrgCode, setNewOrgCode] = useState('');
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [loadingOrgs, setLoadingOrgs] = useState(false);
   const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [sendingPasswordReset, setSendingPasswordReset] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<{ [key: string]: Partial<Profile> }>({});
@@ -25,7 +32,26 @@ const UserManagement: React.FC = () => {
 
   useEffect(() => {
     fetchUsers();
+    fetchOrganizations();
   }, []);
+
+  const fetchOrganizations = async () => {
+    try {
+      setLoadingOrgs(true);
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('id, name, code')
+        .eq('is_active', true)
+        .order('name');
+
+      if (error) throw error;
+      setOrganizations(data || []);
+    } catch (err) {
+      console.error('Failed to fetch organizations:', err);
+    } finally {
+      setLoadingOrgs(false);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -236,6 +262,11 @@ const UserManagement: React.FC = () => {
             password: newUserPassword,
             role: newUserRole,
             is_approved: newUserApproved,
+            organizationId: newUserOrganizationId || undefined,
+            organizationRole: newUserOrganizationRole,
+            createOrganization: createNewOrganization,
+            newOrgName: createNewOrganization ? newOrgName : undefined,
+            newOrgCode: createNewOrganization ? newOrgCode : undefined,
           }),
         }
       );
@@ -264,7 +295,13 @@ const UserManagement: React.FC = () => {
         setNewUserPassword('');
         setNewUserRole('customer');
         setNewUserApproved(true);
+        setNewUserOrganizationId('');
+        setNewUserOrganizationRole('member');
+        setCreateNewOrganization(false);
+        setNewOrgName('');
+        setNewOrgCode('');
         setModalMessage(null);
+        fetchOrganizations();
       }, 2000);
 
     } catch (err) {
@@ -754,6 +791,99 @@ const UserManagement: React.FC = () => {
                           <span className="ml-2 text-sm text-gray-700">Account Approved</span>
                         </label>
                       </div>
+
+                      {(newUserRole === 'customer' || newUserRole === 'sales_rep') && (
+                        <>
+                          <div className="pt-4 border-t border-gray-200">
+                            <h4 className="text-sm font-medium text-gray-900 mb-3">Organization Assignment</h4>
+
+                            <div className="mb-4">
+                              <label className="flex items-center mb-2">
+                                <input
+                                  type="checkbox"
+                                  checked={createNewOrganization}
+                                  onChange={(e) => {
+                                    setCreateNewOrganization(e.target.checked);
+                                    if (e.target.checked) {
+                                      setNewUserOrganizationId('');
+                                    }
+                                  }}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="ml-2 text-sm text-gray-700">Create New Organization</span>
+                              </label>
+                            </div>
+
+                            {createNewOrganization ? (
+                              <>
+                                <div className="mb-3">
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Organization Name *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={newOrgName}
+                                    onChange={(e) => setNewOrgName(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="e.g., Acme Corporation"
+                                  />
+                                </div>
+                                <div className="mb-3">
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Organization Code *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={newOrgCode}
+                                    onChange={(e) => setNewOrgCode(e.target.value.toUpperCase())}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="e.g., ACME"
+                                    maxLength={10}
+                                  />
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Short unique identifier for the organization
+                                  </p>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="mb-3">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Select Organization
+                                </label>
+                                <select
+                                  value={newUserOrganizationId}
+                                  onChange={(e) => setNewUserOrganizationId(e.target.value)}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  disabled={loadingOrgs}
+                                >
+                                  <option value="">-- Optional --</option>
+                                  {organizations.map(org => (
+                                    <option key={org.id} value={org.id}>
+                                      {org.name} ({org.code})
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                            )}
+
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Organization Role
+                              </label>
+                              <select
+                                value={newUserOrganizationRole}
+                                onChange={(e) => setNewUserOrganizationRole(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              >
+                                <option value="viewer">Viewer</option>
+                                <option value="member">Member</option>
+                                <option value="manager">Manager</option>
+                                <option value="admin">Admin</option>
+                              </select>
+                            </div>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -782,6 +912,11 @@ const UserManagement: React.FC = () => {
                     setNewUserPassword('');
                     setNewUserRole('customer');
                     setNewUserApproved(true);
+                    setNewUserOrganizationId('');
+                    setNewUserOrganizationRole('member');
+                    setCreateNewOrganization(false);
+                    setNewOrgName('');
+                    setNewOrgCode('');
                     setModalMessage(null);
                   }}
                   disabled={isCreatingUser}

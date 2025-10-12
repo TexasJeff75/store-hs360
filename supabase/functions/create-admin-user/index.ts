@@ -15,6 +15,9 @@ interface CreateUserRequest {
   lastName?: string;
   organizationId?: string;
   organizationRole?: string;
+  createOrganization?: boolean;
+  newOrgName?: string;
+  newOrgCode?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -68,10 +71,36 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: CreateUserRequest = await req.json();
-    const { email, password, role, is_approved, firstName, lastName, organizationId, organizationRole } = body;
+    const {
+      email,
+      password,
+      role,
+      is_approved,
+      firstName,
+      lastName,
+      organizationId,
+      organizationRole,
+      createOrganization,
+      newOrgName,
+      newOrgCode
+    } = body;
 
     if (!email || !password) {
       return new Response(JSON.stringify({ error: 'Email and password are required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if ((role === 'customer' || role === 'sales_rep') && !organizationId && !createOrganization) {
+      return new Response(JSON.stringify({ error: 'Customer and Sales Rep users require an organization assignment' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    if (createOrganization && (!newOrgName || !newOrgCode)) {
+      return new Response(JSON.stringify({ error: 'Organization name and code are required when creating a new organization' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -117,18 +146,59 @@ Deno.serve(async (req: Request) => {
       console.error('Profile update error:', profileError);
     }
 
-    if (organizationId && organizationRole) {
+    let finalOrganizationId = organizationId;
+
+    if (createOrganization && newOrgName && newOrgCode) {
+      const { data: existingOrg } = await supabaseAdmin
+        .from('organizations')
+        .select('id')
+        .eq('code', newOrgCode)
+        .maybeSingle();
+
+      if (existingOrg) {
+        return new Response(JSON.stringify({ error: `Organization with code ${newOrgCode} already exists` }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const { data: newOrg, error: orgCreateError } = await supabaseAdmin
+        .from('organizations')
+        .insert({
+          name: newOrgName,
+          code: newOrgCode,
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (orgCreateError || !newOrg) {
+        console.error('Organization creation error:', orgCreateError);
+        return new Response(JSON.stringify({ error: 'Failed to create organization' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      finalOrganizationId = newOrg.id;
+    }
+
+    if (finalOrganizationId && organizationRole) {
       const { error: orgError } = await supabaseAdmin
         .from('user_organization_roles')
         .insert({
           user_id: authData.user.id,
-          organization_id: organizationId,
+          organization_id: finalOrganizationId,
           role: organizationRole,
           is_primary: true,
         });
 
       if (orgError) {
         console.error('Organization assignment error:', orgError);
+        return new Response(JSON.stringify({ error: 'Failed to assign user to organization' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
     }
 
