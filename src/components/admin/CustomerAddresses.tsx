@@ -28,6 +28,8 @@ const CustomerAddresses: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [locationId, setLocationId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Partial<Address>>({
     address_type: 'shipping',
     label: '',
@@ -47,18 +49,59 @@ const CustomerAddresses: React.FC = () => {
   });
 
   useEffect(() => {
-    fetchAddresses();
+    fetchUserOrganization();
   }, [user]);
 
+  useEffect(() => {
+    if (organizationId && locationId) {
+      fetchAddresses();
+    }
+  }, [organizationId, locationId]);
+
+  const fetchUserOrganization = async () => {
+    if (!user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('user_organization_roles')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data?.organization_id) {
+        setOrganizationId(data.organization_id);
+
+        // Get the first location for this organization
+        const { data: locationData } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('organization_id', data.organization_id)
+          .eq('is_active', true)
+          .limit(1)
+          .maybeSingle();
+
+        if (locationData?.id) {
+          setLocationId(locationData.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching organization:', error);
+    }
+  };
+
   const fetchAddresses = async () => {
+    if (!organizationId || !locationId) return;
+
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('customer_addresses')
         .select('*')
-        .eq('user_id', user?.id)
-        .is('organization_id', null)
-        .is('location_id', null)
+        .eq('organization_id', organizationId)
+        .eq('location_id', locationId)
         .eq('is_active', true)
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: false });
@@ -76,7 +119,7 @@ const CustomerAddresses: React.FC = () => {
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!user || !organizationId || !locationId) return;
 
     if (!formData.label || !formData.first_name || !formData.last_name ||
         !formData.address1 || !formData.city || !formData.state_or_province ||
@@ -89,8 +132,8 @@ const CustomerAddresses: React.FC = () => {
       const addressData = {
         ...formData,
         user_id: user.id,
-        organization_id: null,
-        location_id: null,
+        organization_id: organizationId,
+        location_id: locationId,
       };
 
       if (editingId) {
@@ -164,11 +207,14 @@ const CustomerAddresses: React.FC = () => {
   };
 
   const handleSetDefault = async (id: string, addressType: 'shipping' | 'billing') => {
+    if (!organizationId || !locationId) return;
+
     try {
       await supabase
         .from('customer_addresses')
         .update({ is_default: false })
-        .eq('user_id', user?.id)
+        .eq('organization_id', organizationId)
+        .eq('location_id', locationId)
         .eq('address_type', addressType);
 
       const { error } = await supabase
@@ -195,10 +241,20 @@ const CustomerAddresses: React.FC = () => {
   const shippingAddresses = addresses.filter(a => a.address_type === 'shipping');
   const billingAddresses = addresses.filter(a => a.address_type === 'billing');
 
+  if (!organizationId || !locationId) {
+    return (
+      <div className="p-6">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <p className="text-yellow-800">No organization found. Please contact your administrator.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">My Addresses</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Organization Addresses</h2>
         <button
           onClick={() => {
             setIsAdding(true);
