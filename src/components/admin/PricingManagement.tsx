@@ -212,12 +212,45 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     setIsModalOpen(true);
   };
 
+  const checkForConflicts = () => {
+    if (!selectedEntry) return null;
+
+    const newMin = newEntryData.minQuantity;
+    const newMax = newEntryData.maxQuantity || 999999999;
+
+    const conflicts = pricingEntries.filter(entry => {
+      if (entry.id === selectedEntry.id) return false;
+      if (entry.productId !== selectedEntry.productId) return false;
+      if (entry.entityId !== selectedEntry.entityId) return false;
+      if (entry.type !== selectedEntry.type) return false;
+
+      const existingMin = entry.minQuantity;
+      const existingMax = entry.maxQuantity || 999999999;
+
+      return newMin <= existingMax && newMax >= existingMin;
+    });
+
+    return conflicts.length > 0 ? conflicts : null;
+  };
+
   const handleSavePricing = async () => {
     if (!selectedEntry) return;
 
     try {
       setModalMessage(null);
-      
+
+      const conflicts = checkForConflicts();
+      if (conflicts) {
+        const conflictDetails = conflicts.map(c =>
+          `${c.contractPrice.toFixed(2)} (qty ${c.minQuantity}${c.maxQuantity ? `-${c.maxQuantity}` : '+'})`
+        ).join(', ');
+        setModalMessage({
+          type: 'error',
+          text: `Quantity range conflict! This range overlaps with existing tiers: ${conflictDetails}. Please adjust min/max quantities.`
+        });
+        return;
+      }
+
       const result = await contractPricingService.setContractPrice(
         selectedEntry.entityId!,
         selectedEntry.productId!,
@@ -233,8 +266,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
         setModalMessage({ type: 'success', text: 'Pricing saved successfully!' });
         setIsModalOpen(false);
         setSelectedEntry(null);
-        
-        // Refresh pricing data after a short delay to ensure database is updated
+
         setTimeout(async () => {
           await fetchPricingEntries();
         }, 500);
@@ -401,8 +433,23 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredEntries.map((entry) => {
                 const TypeIcon = getTypeIcon(entry.type);
+
+                const hasConflict = pricingEntries.some(other => {
+                  if (other.id === entry.id) return false;
+                  if (other.productId !== entry.productId) return false;
+                  if (other.entityId !== entry.entityId) return false;
+                  if (other.type !== entry.type) return false;
+
+                  const entryMin = entry.minQuantity;
+                  const entryMax = entry.maxQuantity || 999999999;
+                  const otherMin = other.minQuantity;
+                  const otherMax = other.maxQuantity || 999999999;
+
+                  return entryMin <= otherMax && entryMax >= otherMin;
+                });
+
                 return (
-                  <tr key={entry.id} className="hover:bg-gray-50">
+                  <tr key={entry.id} className={hasConflict ? "bg-red-50 hover:bg-red-100" : "hover:bg-gray-50"}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <TypeIcon className="h-4 w-4 mr-2 text-gray-500" />
@@ -427,9 +474,16 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                       <div className="text-sm text-green-600">${entry.savings.toFixed(2)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {entry.minQuantity}
-                        {entry.maxQuantity ? ` - ${entry.maxQuantity}` : '+'}
+                      <div className="flex items-center space-x-2">
+                        <div className="text-sm text-gray-900">
+                          {entry.minQuantity}
+                          {entry.maxQuantity ? ` - ${entry.maxQuantity}` : '+'}
+                        </div>
+                        {hasConflict && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                            Conflict
+                          </span>
+                        )}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
