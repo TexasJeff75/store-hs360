@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart, User, Settings, Users, Home } from 'lucide-react';
+import { ShoppingCart, User, Settings, Users, Home, Package } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface HeaderProps {
@@ -9,6 +9,7 @@ interface HeaderProps {
   onProfileClick: () => void;
   onAdminClick: () => void;
   onSalesRepClick: () => void;
+  onOrderHistoryClick: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -17,7 +18,8 @@ const Header: React.FC<HeaderProps> = ({
   onAuthClick,
   onProfileClick,
   onAdminClick,
-  onSalesRepClick
+  onSalesRepClick,
+  onOrderHistoryClick
 }) => {
   const { user, profile, loading } = useAuth();
 
@@ -81,6 +83,15 @@ const Header: React.FC<HeaderProps> = ({
                     <span className="hidden sm:inline">Admin</span>
                   </button>
                 )}
+
+                <button
+                  onClick={onOrderHistoryClick}
+                  className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
+                  title="Order History"
+                >
+                  <Package className="w-5 h-5" />
+                  <span className="hidden sm:inline">Orders</span>
+                </button>
 
                 <button
                   onClick={onProfileClick}
