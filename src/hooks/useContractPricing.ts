@@ -67,13 +67,30 @@ export function useContractPricing(productId: number, regularPrice: number, quan
         if (organizationId) {
           // Sales rep mode - get organization pricing directly
           const orgPricing = await contractPricingService.getOrganizationPricing(organizationId);
-          const productPricing = orgPricing.find(p => p.product_id === productId);
 
-          if (productPricing &&
-              (!quantity || (quantity >= (productPricing.min_quantity || 1) &&
-               (!productPricing.max_quantity || quantity <= productPricing.max_quantity)))) {
+          // Filter pricing entries for this product
+          const productPricingTiers = orgPricing.filter(p => p.product_id === productId);
+
+          // Find the best matching tier for the quantity
+          let bestTier = null;
+          const currentQuantity = quantity || 1;
+
+          for (const tier of productPricingTiers) {
+            const minQty = tier.min_quantity || 1;
+            const maxQty = tier.max_quantity || Infinity;
+
+            if (currentQuantity >= minQty && currentQuantity <= maxQty) {
+              // This tier matches the quantity range
+              if (!bestTier || minQty > (bestTier.min_quantity || 1)) {
+                // Use the tier with the highest min_quantity that still matches
+                bestTier = tier;
+              }
+            }
+          }
+
+          if (bestTier) {
             // Use markup_price if available, otherwise contract_price, otherwise null
-            const finalPrice = productPricing.markup_price || productPricing.contract_price;
+            const finalPrice = bestTier.markup_price || bestTier.contract_price;
 
             if (finalPrice !== null && finalPrice !== undefined) {
               effectivePrice = {

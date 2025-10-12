@@ -101,6 +101,7 @@ class ContractPricingService {
 
   /**
    * Get organization-specific pricing for sales rep orders
+   * Returns all tiers, caller should filter by quantity
    */
   async getOrganizationPricing(organizationId: string): Promise<ContractPrice[]> {
     try {
@@ -111,7 +112,7 @@ class ContractPricingService {
         .eq('entity_id', organizationId)
         .lte('effective_date', new Date().toISOString())
         .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString())
-        .order('effective_date', { ascending: false });
+        .order('min_quantity', { ascending: true }); // Order by quantity tiers
 
       if (error) {
         throw error;
@@ -315,35 +316,44 @@ class ContractPricingService {
       // Check for location-specific pricing first (highest priority)
       const locationPrice = await this.getLocationPrice(userId, productId, quantity);
       if (locationPrice) {
-        const result = { 
-          price: locationPrice.contract_price, 
-          source: 'location' as const
-        };
-        cacheService.set(cacheKey, result, CacheTTL.effectivePrice);
-        return result;
+        const finalPrice = locationPrice.markup_price || locationPrice.contract_price;
+        if (finalPrice !== null && finalPrice !== undefined) {
+          const result = {
+            price: finalPrice,
+            source: 'location' as const
+          };
+          cacheService.set(cacheKey, result, CacheTTL.effectivePrice);
+          return result;
+        }
       }
 
       // Check for organization-level pricing
       const organizationPrice = await this.getOrganizationPrice(userId, productId, quantity);
       if (organizationPrice) {
-        const result = { 
-          price: organizationPrice.contract_price, 
-          source: 'organization' as const
-        };
-        cacheService.set(cacheKey, result, CacheTTL.effectivePrice);
-        return result;
+        const finalPrice = organizationPrice.markup_price || organizationPrice.contract_price;
+        if (finalPrice !== null && finalPrice !== undefined) {
+          const result = {
+            price: finalPrice,
+            source: 'organization' as const
+          };
+          cacheService.set(cacheKey, result, CacheTTL.effectivePrice);
+          return result;
+        }
       }
 
       // Check for individual contract pricing (lowest priority)
       const contractPrice = await this.getContractPrice(userId, productId, 'individual');
-      
+
       if (contractPrice) {
-        const result = { 
-          price: contractPrice.contract_price, 
-          source: 'individual' as const
-        };
-        cacheService.set(cacheKey, result, CacheTTL.effectivePrice);
-        return result;
+        const finalPrice = contractPrice.markup_price || contractPrice.contract_price;
+        if (finalPrice !== null && finalPrice !== undefined) {
+          const result = {
+            price: finalPrice,
+            source: 'individual' as const
+          };
+          cacheService.set(cacheKey, result, CacheTTL.effectivePrice);
+          return result;
+        }
       }
 
       // Cache null result too
