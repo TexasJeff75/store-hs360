@@ -68,14 +68,19 @@ export function useContractPricing(productId: number, regularPrice: number, quan
           // Sales rep mode - get organization pricing directly
           const orgPricing = await contractPricingService.getOrganizationPricing(organizationId);
           const productPricing = orgPricing.find(p => p.product_id === productId);
-          
-          if (productPricing && 
-              (!quantity || (quantity >= (productPricing.min_quantity || 1) && 
+
+          if (productPricing &&
+              (!quantity || (quantity >= (productPricing.min_quantity || 1) &&
                (!productPricing.max_quantity || quantity <= productPricing.max_quantity)))) {
-            effectivePrice = {
-              price: productPricing.contract_price,
-              source: 'organization' as const
-            };
+            // Use markup_price if available, otherwise contract_price, otherwise null
+            const finalPrice = productPricing.markup_price || productPricing.contract_price;
+
+            if (finalPrice !== null && finalPrice !== undefined) {
+              effectivePrice = {
+                price: finalPrice,
+                source: 'organization' as const
+              };
+            }
           }
         } else {
           // Regular user mode

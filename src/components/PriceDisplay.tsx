@@ -51,10 +51,13 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
     }
   };
 
+  // Safety check for null price
+  const displayPrice = price ?? regularPrice ?? 0;
+
   return (
     <div className={`flex flex-col space-y-1 ${className}`}>
       <div className="flex items-center space-x-2 flex-wrap">
-        <span className="text-lg font-bold text-gray-900">${price.toFixed(2)}</span>
+        <span className="text-lg font-bold text-gray-900">${displayPrice.toFixed(2)}</span>
         
         {/* Contract Price Badge */}
         {isContractPrice && (
