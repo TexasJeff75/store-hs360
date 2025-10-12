@@ -618,8 +618,10 @@ const ProductsManagement: React.FC = () => {
                     <span className="font-medium">${product.price.toFixed(2)}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {product.cost ? (
-                      <span className="font-medium text-gray-700">${product.cost.toFixed(2)}</span>
+                    {product.cost !== undefined && product.cost !== null ? (
+                      <span className={`font-medium ${product.cost === 0 ? 'text-orange-600' : 'text-gray-700'}`}>
+                        ${product.cost.toFixed(2)}
+                      </span>
                     ) : (
                       <span className="text-gray-400">-</span>
                     )}

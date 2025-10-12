@@ -288,7 +288,7 @@ class BigCommerceService {
 
         allProducts = allProducts.map(product => {
           const costInfo = costsData[product.id];
-          if (costInfo && costInfo.cost_price) {
+          if (costInfo && costInfo.cost_price !== undefined) {
             return { ...product, cost: costInfo.cost_price };
           }
           return product;
