@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp } from 'lucide-react';
+import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck } from 'lucide-react';
 import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
 import LocationManagement from './LocationManagement';
@@ -7,13 +7,14 @@ import PricingManagement from './PricingManagement';
 import ProductsManagement from './ProductsManagement';
 import OrderManagement from './OrderManagement';
 import CommissionManagement from './CommissionManagement';
+import SalesRepAssignment from './SalesRepAssignment';
 
 interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'analytics';
+type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'analytics';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('organizations');
@@ -24,6 +25,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2 },
     { id: 'users' as AdminTab, label: 'Users', icon: Users },
     { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart },
+    { id: 'salesreps' as AdminTab, label: 'Sales Reps', icon: UserCheck },
     { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp },
     { id: 'products' as AdminTab, label: 'Products', icon: Package },
     { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3 },
@@ -37,6 +39,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
         return <UserManagement />;
       case 'orders':
         return <OrderManagement />;
+      case 'salesreps':
+        return <SalesRepAssignment />;
       case 'commissions':
         return <CommissionManagement />;
       case 'products':

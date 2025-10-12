@@ -16,6 +16,7 @@ const CommissionManagement: React.FC = () => {
     approved: 0,
     paid: 0
   });
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCommissions();
@@ -26,6 +27,8 @@ const CommissionManagement: React.FC = () => {
 
     try {
       setLoading(true);
+      setError(null);
+      console.log('Fetching commissions for user:', user.id, 'role:', profile?.role);
 
       if (profile?.role === 'sales_rep') {
         const { commissions: data } = await commissionService.getSalesRepCommissions(
@@ -44,9 +47,17 @@ const CommissionManagement: React.FC = () => {
           });
         }
       } else if (profile?.role === 'admin') {
-        const { commissions: data } = await commissionService.getAllCommissions({
+        const { commissions: data, error: fetchError } = await commissionService.getAllCommissions({
           status: statusFilter !== 'all' ? statusFilter : undefined
         });
+
+        if (fetchError) {
+          console.error('Error from service:', fetchError);
+          setError(fetchError);
+          return;
+        }
+
+        console.log('Fetched commissions:', data);
         setCommissions(data);
 
         const totalSum = data.reduce((acc, c) => acc + Number(c.commission_amount), 0);
@@ -60,9 +71,13 @@ const CommissionManagement: React.FC = () => {
           approved: approvedSum,
           paid: paidSum
         });
+      } else {
+        console.log('User role not admin or sales_rep:', profile?.role);
+        setError('You do not have permission to view commissions');
       }
     } catch (error) {
       console.error('Error fetching commissions:', error);
+      setError(error instanceof Error ? error.message : 'Failed to fetch commissions');
     } finally {
       setLoading(false);
     }
@@ -151,6 +166,28 @@ const CommissionManagement: React.FC = () => {
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Commission Management</h2>
         <p className="text-gray-600">Track and manage sales commissions</p>
       </div>
+
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800 text-sm">{error}</p>
+        </div>
+      )}
+
+      {!loading && commissions.length === 0 && !error && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+          <h3 className="font-semibold text-blue-900 mb-3">How to Set Up Commissions</h3>
+          <ol className="text-blue-800 text-sm space-y-2 list-decimal list-inside">
+            <li>Assign a sales rep to an organization (with commission rate)</li>
+            <li>Sales rep creates an order for that organization</li>
+            <li>When the order is marked as "completed", a commission is automatically calculated</li>
+            <li>Review and approve commissions here</li>
+            <li>Mark approved commissions as paid</li>
+          </ol>
+          <p className="text-blue-700 text-sm mt-4 italic">
+            <strong>Get Started:</strong> Go to the "Sales Reps" tab to assign sales reps to organizations with commission rates.
+          </p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-white rounded-lg shadow p-6">
