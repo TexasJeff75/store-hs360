@@ -512,29 +512,31 @@ const OrganizationManagement: React.FC = () => {
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={() => handleViewOrganization(org)}
-                        className="p-2 text-gray-400 hover:text-blue-600 rounded transition-colors"
+                        className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                         title="View Details"
                       >
                         <Eye className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleEditOrganization(org)}
-                        className="p-2 text-gray-400 hover:text-purple-600 rounded transition-colors"
+                        className="p-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
                         title="Edit Organization"
                       >
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => setSelectedOrgForSubManagement(org)}
-                        className="p-2 text-gray-400 hover:text-purple-600 rounded transition-colors"
+                        className="p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
                         title="Manage Locations & Pricing"
                       >
                         <Settings className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleArchiveOrganization(org.id, org.is_active)}
-                        className={`p-2 text-gray-400 rounded transition-colors ${
-                          org.is_active ? 'hover:text-orange-600' : 'hover:text-green-600'
+                        className={`p-2 rounded-lg transition-colors ${
+                          org.is_active
+                            ? 'text-orange-600 bg-orange-50 hover:bg-orange-100'
+                            : 'text-green-600 bg-green-50 hover:bg-green-100'
                         }`}
                         title={org.is_active ? 'Archive Organization' : 'Restore Organization'}
                       >
