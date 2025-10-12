@@ -187,10 +187,14 @@ function AppContent() {
           if (productPricing &&
               quantity >= (productPricing.min_quantity || 1) &&
               (!productPricing.max_quantity || quantity <= productPricing.max_quantity)) {
-            priceResult = {
-              price: productPricing.contract_price,
-              source: 'organization' as const
-            };
+            // Use markup_price if available, otherwise contract_price
+            const finalPrice = productPricing.markup_price || productPricing.contract_price;
+            if (finalPrice !== null && finalPrice !== undefined) {
+              priceResult = {
+                price: finalPrice,
+                source: 'organization' as const
+              };
+            }
           }
         } else if (profile) {
           // Regular user mode

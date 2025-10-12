@@ -1,6 +1,8 @@
 import React from 'react';
-import { X, Plus, Minus, ShoppingBag, AlertCircle } from 'lucide-react';
+import { X, Plus, Minus, ShoppingBag, AlertCircle, Tag } from 'lucide-react';
 import CheckoutModal from './checkout/CheckoutModal';
+import PriceDisplay from './PriceDisplay';
+import { useContractPricing } from '../hooks/useContractPricing';
 
 interface CartItem {
   id: number;
@@ -20,6 +22,118 @@ interface CartProps {
   organizationId?: string;
 }
 
+const CartItemRow: React.FC<{
+  item: CartItem;
+  onUpdateQuantity: (id: number, quantity: number) => void;
+  onRemoveItem: (id: number) => void;
+  organizationId?: string;
+}> = ({ item, onUpdateQuantity, onRemoveItem, organizationId }) => {
+  const { price } = useContractPricing(item.id, item.price, item.quantity, organizationId);
+  const itemTotal = price * item.quantity;
+
+  return (
+    <div className="flex items-center space-x-4 bg-gray-50 rounded-lg p-4">
+      <img
+        src={item.image}
+        alt={item.name}
+        className="w-16 h-16 object-cover rounded-lg"
+      />
+      <div className="flex-1">
+        <h3 className="font-medium text-gray-900 text-sm">{item.name}</h3>
+        <PriceDisplay
+          productId={item.id}
+          regularPrice={item.price}
+          quantity={item.quantity}
+          organizationId={organizationId}
+          showSavings={false}
+          className="mt-1"
+        />
+        <div className="text-xs text-gray-500 mt-1">
+          Item total: ${itemTotal.toFixed(2)}
+        </div>
+
+        {/* Quantity Controls */}
+        <div className="flex items-center space-x-2 mt-2">
+          <button
+            onClick={() => onUpdateQuantity(item.id, Math.max(0, item.quantity - 1))}
+            className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+          <button
+            onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+            className="p-1 hover:bg-gray-200 rounded-full transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+          <button
+            onClick={() => onRemoveItem(item.id)}
+            className="ml-auto text-red-500 hover:text-red-700 transition-colors text-sm"
+          >
+            Remove
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CartItemPrice: React.FC<{
+  item: CartItem;
+  organizationId?: string;
+  onPriceCalculated: (itemId: number, price: number, isContract: boolean) => void;
+}> = ({ item, organizationId, onPriceCalculated }) => {
+  const { price, source } = useContractPricing(item.id, item.price, item.quantity, organizationId);
+
+  React.useEffect(() => {
+    const isContract = source !== 'regular';
+    onPriceCalculated(item.id, price * item.quantity, isContract);
+  }, [item.id, price, item.quantity, source, onPriceCalculated]);
+
+  return null;
+};
+
+const CartTotal: React.FC<{
+  items: CartItem[];
+  organizationId?: string;
+}> = ({ items, organizationId }) => {
+  const [itemPrices, setItemPrices] = React.useState<Record<number, { total: number; isContract: boolean }>>({});
+
+  const handlePriceCalculated = React.useCallback((itemId: number, price: number, isContract: boolean) => {
+    setItemPrices(prev => ({
+      ...prev,
+      [itemId]: { total: price, isContract }
+    }));
+  }, []);
+
+  const total = Object.values(itemPrices).reduce((sum, item) => sum + item.total, 0);
+  const hasContractPricing = Object.values(itemPrices).some(item => item.isContract);
+
+  return (
+    <div>
+      {items.map(item => (
+        <CartItemPrice
+          key={item.id}
+          item={item}
+          organizationId={organizationId}
+          onPriceCalculated={handlePriceCalculated}
+        />
+      ))}
+      <div className="flex items-center justify-between mb-4">
+        <span className="text-lg font-semibold text-gray-900">Total:</span>
+        <span className="text-2xl font-bold text-blue-600">${total.toFixed(2)}</span>
+      </div>
+      {hasContractPricing && (
+        <div className="flex items-center space-x-1 text-xs text-green-600 mb-3">
+          <Tag className="h-3 w-3" />
+          <span>Special pricing applied</span>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const Cart: React.FC<CartProps> = ({
   isOpen,
   onClose,
@@ -30,8 +144,6 @@ const Cart: React.FC<CartProps> = ({
 }) => {
   const [isCheckoutOpen, setIsCheckoutOpen] = React.useState(false);
   const [showOrgWarning, setShowOrgWarning] = React.useState(false);
-
-  const total = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   const handleCheckoutClick = () => {
     if (!organizationId) {
@@ -77,40 +189,13 @@ const Cart: React.FC<CartProps> = ({
             ) : (
               <div className="space-y-4">
                 {items.map(item => (
-                  <div key={item.id} className="flex items-center space-x-4 bg-gray-50 rounded-lg p-4">
-                    <img 
-                      src={item.image} 
-                      alt={item.name}
-                      className="w-16 h-16 object-cover rounded-lg"
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-medium text-gray-900 text-sm">{item.name}</h3>
-                      <p className="text-blue-600 font-semibold">${item.price}</p>
-                      
-                      {/* Quantity Controls */}
-                      <div className="flex items-center space-x-2 mt-2">
-                        <button
-                          onClick={() => onUpdateQuantity(item.id, Math.max(0, item.quantity - 1))}
-                          className="p-1 hover:bg-gray-200 rounded-full transition-colors"
-                        >
-                          <Minus className="h-4 w-4" />
-                        </button>
-                        <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
-                        <button
-                          onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                          className="p-1 hover:bg-gray-200 rounded-full transition-colors"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => onRemoveItem(item.id)}
-                          className="ml-auto text-red-500 hover:text-red-700 transition-colors text-sm"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    </div>
-                  </div>
+                  <CartItemRow
+                    key={item.id}
+                    item={item}
+                    onUpdateQuantity={onUpdateQuantity}
+                    onRemoveItem={onRemoveItem}
+                    organizationId={organizationId}
+                  />
                 ))}
               </div>
             )}
@@ -119,11 +204,8 @@ const Cart: React.FC<CartProps> = ({
           {/* Footer */}
           {items.length > 0 && (
             <div className="border-t border-gray-200 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-lg font-semibold text-gray-900">Total:</span>
-                <span className="text-2xl font-bold text-blue-600">${total.toFixed(2)}</span>
-              </div>
-              
+              <CartTotal items={items} organizationId={organizationId} />
+
               <div className="space-y-3">
                 {showOrgWarning && !organizationId && (
                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
