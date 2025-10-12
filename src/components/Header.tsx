@@ -74,7 +74,7 @@ const Header: React.FC<HeaderProps> = ({
                   </button>
                 )}
 
-                {profile?.role === 'admin' && (
+                {(profile?.role === 'admin' || profile?.role === 'sales_rep') && (
                   <button
                     onClick={onAdminClick}
                     className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
@@ -84,14 +84,16 @@ const Header: React.FC<HeaderProps> = ({
                   </button>
                 )}
 
-                <button
-                  onClick={onOrderHistoryClick}
-                  className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
-                  title="Order History"
-                >
-                  <Package className="w-5 h-5" />
-                  <span className="hidden sm:inline">Orders</span>
-                </button>
+                {profile?.role === 'customer' && (
+                  <button
+                    onClick={onOrderHistoryClick}
+                    className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
+                    title="Order History"
+                  >
+                    <Package className="w-5 h-5" />
+                    <span className="hidden sm:inline">Orders</span>
+                  </button>
+                )}
 
                 <button
                   onClick={onProfileClick}
