@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Search, Eye, DollarSign, Tag, Hash, ChevronUp, ChevronDown, Building2, CheckCircle2, XCircle, Truck } from 'lucide-react';
+import { Package, Search, Eye, DollarSign, Tag, Hash, ChevronUp, ChevronDown, Building2, CheckCircle2, XCircle, Truck, RefreshCw } from 'lucide-react';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { cacheService } from '@/services/cache';
 
 interface ContractPricingInfo {
   organization_name: string;
@@ -81,11 +82,18 @@ const ProductsManagement: React.FC = () => {
     }
   };
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (forceRefresh = false) => {
     try {
       setLoading(true);
+
+      if (forceRefresh) {
+        // Clear the products cache
+        cacheService.delete('products_all');
+        console.log('🗑️ Product cache cleared');
+      }
+
       const { products, errorMessage } = await bigCommerceService.getProducts();
-      
+
       if (errorMessage) {
         setError(errorMessage);
       } else {
@@ -96,6 +104,10 @@ const ProductsManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefreshProducts = async () => {
+    await fetchProducts(true);
   };
 
   const handleViewProduct = async (product: Product) => {
@@ -492,6 +504,14 @@ const ProductsManagement: React.FC = () => {
             <option key={category} value={category}>{category}</option>
           ))}
         </select>
+        <button
+          onClick={handleRefreshProducts}
+          disabled={loading}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        >
+          <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
       {/* Products Table */}
