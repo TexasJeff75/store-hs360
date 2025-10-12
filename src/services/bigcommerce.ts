@@ -148,16 +148,16 @@ function transformBigCommerceProduct(bc: any): Product {
   const base = bc?.prices?.price?.value ?? 0;
   const sale = bc?.prices?.salePrice?.value;
 
-  // BigCommerce price is the wholesale/cost price (what sales rep pays)
-  // Use salePrice if available, otherwise use base price as the cost
-  const wholesalePrice = typeof sale === "number" ? sale : base;
+  // BigCommerce price is the normal retail price (what customer pays)
+  // Use salePrice if available for promotional pricing, otherwise use base price
+  const retailPrice = typeof sale === "number" ? sale : base;
 
   return {
     id: bc.entityId,
     name: bc.name,
-    price: wholesalePrice, // This is the wholesale/cost price
-    originalPrice: undefined, // Not used in wholesale model
-    cost: wholesalePrice, // Same as price - this is what sales rep pays
+    price: retailPrice, // This is the normal retail price
+    originalPrice: undefined, // Not used currently
+    cost: retailPrice, // TODO: Extract from custom field "cost" in BigCommerce
     image: bc.defaultImage?.url || "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640",
     rating: bc.reviewSummary?.averageRating || 0,
     reviews: bc.reviewSummary?.numberOfReviews || 0,

@@ -16,8 +16,8 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export function useContractPricing(productId: number, regularPrice: number, quantity?: number, organizationId?: string): ContractPricingResult {
   const { user, profile } = useAuth();
-  // Default markup: If no contract price is set, show 50% markup over wholesale
-  const defaultRetailPrice = regularPrice * 1.5;
+  // regularPrice from BigCommerce is already the retail price, no markup needed
+  const defaultRetailPrice = regularPrice;
   const [price, setPrice] = useState(defaultRetailPrice);
   const [source, setSource] = useState<'regular' | 'individual' | 'organization' | 'location'>('regular');
   const [loading, setLoading] = useState(true);
