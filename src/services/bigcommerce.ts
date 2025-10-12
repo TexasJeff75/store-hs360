@@ -62,9 +62,21 @@ const PRODUCTS_Q = /* GraphQL */ `
           node {
             entityId
             name
+            sku
             path
             description
             plainTextDescription
+            brand {
+              name
+            }
+            condition
+            weight {
+              value
+              unit
+            }
+            inventory {
+              isInStock
+            }
             defaultImage { url(width: 640) }
             prices {
               price {
@@ -91,10 +103,6 @@ const PRODUCTS_Q = /* GraphQL */ `
                   value
                 }
               }
-            }
-            reviewSummary {
-              averageRating
-              numberOfReviews
             }
           }
         }
@@ -131,13 +139,19 @@ const CATEGORIES_Q = /* GraphQL */ `
 export interface Product {
   id: number;
   name: string;
+  sku?: string;
   price: number;
   originalPrice?: number;
   cost?: number;
   image: string;
-  rating: number;
-  reviews: number;
+  hasImage: boolean;
+  hasDescription: boolean;
   category: string;
+  brand?: string;
+  condition?: string;
+  weight?: number;
+  weightUnit?: string;
+  isInStock?: boolean;
   benefits: string[];
   description?: string;
   plainTextDescription?: string;
@@ -158,16 +172,25 @@ function transformBigCommerceProduct(bc: any): Product {
   );
   const cost = costField?.node?.value ? parseFloat(costField.node.value) : 0;
 
+  const hasImage = !!bc.defaultImage?.url;
+  const hasDescription = !!(bc.description || bc.plainTextDescription);
+
   return {
     id: bc.entityId,
     name: bc.name,
-    price: retailPrice, // This is the normal retail price
-    originalPrice: undefined, // Not used currently
-    cost: cost, // Extract from custom field "cost" in BigCommerce
+    sku: bc.sku || undefined,
+    price: retailPrice,
+    originalPrice: undefined,
+    cost: cost,
     image: bc.defaultImage?.url || "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640",
-    rating: bc.reviewSummary?.averageRating || 0,
-    reviews: bc.reviewSummary?.numberOfReviews || 0,
+    hasImage,
+    hasDescription,
     category: bc.categories?.edges?.[0]?.node?.name || "General",
+    brand: bc.brand?.name || undefined,
+    condition: bc.condition || undefined,
+    weight: bc.weight?.value || undefined,
+    weightUnit: bc.weight?.unit || undefined,
+    isInStock: bc.inventory?.isInStock ?? true,
     benefits: (bc.customFields?.edges ?? []).map((e: any) => e?.node?.value).filter(Boolean),
     description: bc.description || '',
     plainTextDescription: bc.plainTextDescription || ''

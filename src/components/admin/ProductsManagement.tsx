@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Search, Eye, ExternalLink, DollarSign, Star, Tag, Image, Calendar, Hash, BarChart3, ChevronUp, ChevronDown, Building2 } from 'lucide-react';
+import { Package, Search, Eye, DollarSign, Tag, Hash, ChevronUp, ChevronDown, Building2, CheckCircle2, XCircle, Truck } from 'lucide-react';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -448,22 +448,22 @@ const ProductsManagement: React.FC = () => {
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center">
-            <DollarSign className="h-8 w-8 text-purple-600" />
+            <CheckCircle2 className="h-8 w-8 text-green-600" />
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Avg Price</p>
+              <p className="text-sm font-medium text-gray-500">With Images</p>
               <p className="text-2xl font-semibold text-gray-900">
-                ${products.length > 0 ? (products.reduce((sum, p) => sum + p.price, 0) / products.length).toFixed(2) : '0.00'}
+                {products.filter(p => p.hasImage).length}
               </p>
             </div>
           </div>
         </div>
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center">
-            <Star className="h-8 w-8 text-yellow-600" />
+            <CheckCircle2 className="h-8 w-8 text-blue-600" />
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Avg Rating</p>
+              <p className="text-sm font-medium text-gray-500">With Descriptions</p>
               <p className="text-2xl font-semibold text-gray-900">
-                {products.length > 0 ? (products.reduce((sum, p) => sum + p.rating, 0) / products.length).toFixed(1) : '0.0'}
+                {products.filter(p => p.hasDescription).length}
               </p>
             </div>
           </div>
@@ -511,11 +511,11 @@ const ProductsManagement: React.FC = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <button
-                    onClick={() => handleSort('id')}
+                    onClick={() => handleSort('sku')}
                     className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
                   >
-                    <span>ID</span>
-                    {getSortIcon('id')}
+                    <span>SKU</span>
+                    {getSortIcon('sku')}
                   </button>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -538,21 +538,21 @@ const ProductsManagement: React.FC = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <button
-                    onClick={() => handleSort('rating')}
+                    onClick={() => handleSort('cost')}
                     className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
                   >
-                    <span>Rating</span>
-                    {getSortIcon('rating')}
+                    <span>Cost</span>
+                    {getSortIcon('cost')}
                   </button>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <button
-                    onClick={() => handleSort('reviews')}
-                    className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
-                  >
-                    <span>Reviews</span>
-                    {getSortIcon('reviews')}
-                  </button>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Image
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Description
+                </th>
+                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Stock
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Contract Pricing
@@ -567,32 +567,27 @@ const ProductsManagement: React.FC = () => {
                 <tr key={product.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-12 w-12">
-                        <img 
-                          className="h-12 w-12 rounded-lg object-cover" 
-                          src={product.image} 
+                      <div className="flex-shrink-0 h-10 w-10">
+                        <img
+                          className="h-10 w-10 rounded object-cover"
+                          src={product.image}
                           alt={product.name}
                         />
                       </div>
-                      <div className="ml-4">
+                      <div className="ml-3">
                         <div className="text-sm font-medium text-gray-900 max-w-xs truncate">
                           {product.name}
                         </div>
-                        <div className="text-sm text-gray-500">
-                          {product.benefits.length > 0 && (
-                            <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                              {product.benefits.length} benefit{product.benefits.length !== 1 ? 's' : ''}
-                            </span>
-                          )}
-                        </div>
+                        {product.brand && (
+                          <div className="text-xs text-gray-500">
+                            {product.brand}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <Hash className="h-4 w-4 text-gray-400 mr-1" />
-                      {product.id}
-                    </div>
+                    {product.sku || <span className="text-gray-400">-</span>}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
@@ -600,26 +595,35 @@ const ProductsManagement: React.FC = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex flex-col">
-                      <span className="font-medium">${product.price.toFixed(2)}</span>
-                      {product.originalPrice && product.originalPrice !== product.price && (
-                        <span className="text-xs text-gray-500 line-through">
-                          ${product.originalPrice.toFixed(2)}
-                        </span>
-                      )}
-                    </div>
+                    <span className="font-medium">${product.price.toFixed(2)}</span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <Star className="h-4 w-4 text-yellow-400 mr-1" />
-                      {product.rating.toFixed(1)}
-                    </div>
+                    {product.cost ? (
+                      <span className="font-medium text-gray-700">${product.cost.toFixed(2)}</span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <BarChart3 className="h-4 w-4 text-gray-400 mr-1" />
-                      {product.reviews}
-                    </div>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    {product.hasImage ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-400 mx-auto" />
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    {product.hasDescription ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-400 mx-auto" />
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                    {product.isInStock ? (
+                      <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-400 mx-auto" />
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {contractPricingCounts[product.id] > 0 ? (
@@ -636,7 +640,7 @@ const ProductsManagement: React.FC = () => {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <button
                       onClick={() => handleViewProduct(product)}
-                      className="text-purple-600 hover:text-purple-900 p-1 rounded"
+                      className="text-blue-600 hover:text-blue-900 p-1 rounded"
                       title="View Details"
                     >
                       <Eye className="h-4 w-4" />
@@ -776,20 +780,55 @@ const ProductsManagement: React.FC = () => {
                           </div>
                         )}
 
-                        {/* Rating & Reviews */}
+                        {/* Product Details */}
                         <div>
-                          <h5 className="text-sm font-medium text-gray-500 mb-2">Customer Feedback</h5>
+                          <h5 className="text-sm font-medium text-gray-500 mb-2">Product Information</h5>
                           <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-700">Rating:</span>
-                              <div className="flex items-center">
-                                <Star className="h-4 w-4 text-yellow-400 mr-1" />
-                                <span className="text-sm font-medium">{selectedProduct.rating.toFixed(1)}</span>
+                            {selectedProduct.sku && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-700">SKU:</span>
+                                <span className="text-sm font-medium">{selectedProduct.sku}</span>
                               </div>
-                            </div>
+                            )}
+                            {selectedProduct.cost !== undefined && selectedProduct.cost > 0 && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-700">Cost:</span>
+                                <span className="text-sm font-medium">${selectedProduct.cost.toFixed(2)}</span>
+                              </div>
+                            )}
+                            {selectedProduct.brand && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-700">Brand:</span>
+                                <span className="text-sm font-medium">{selectedProduct.brand}</span>
+                              </div>
+                            )}
+                            {selectedProduct.condition && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-700">Condition:</span>
+                                <span className="text-sm font-medium">{selectedProduct.condition}</span>
+                              </div>
+                            )}
+                            {selectedProduct.weight && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-700">Weight:</span>
+                                <span className="text-sm font-medium">
+                                  {selectedProduct.weight} {selectedProduct.weightUnit}
+                                </span>
+                              </div>
+                            )}
                             <div className="flex items-center justify-between">
-                              <span className="text-sm text-gray-700">Reviews:</span>
-                              <span className="text-sm text-gray-900">{selectedProduct.reviews}</span>
+                              <span className="text-sm text-gray-700">In Stock:</span>
+                              <span className="text-sm font-medium">
+                                {selectedProduct.isInStock ? (
+                                  <span className="text-green-600 flex items-center">
+                                    <CheckCircle2 className="h-4 w-4 mr-1" /> Yes
+                                  </span>
+                                ) : (
+                                  <span className="text-red-600 flex items-center">
+                                    <XCircle className="h-4 w-4 mr-1" /> No
+                                  </span>
+                                )}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -825,13 +864,31 @@ const ProductsManagement: React.FC = () => {
                                 <span className="ml-2 font-medium">{selectedProduct.category}</span>
                               </div>
                               <div>
-                                <span className="text-gray-600">Benefits Count:</span>
-                                <span className="ml-2 font-medium">{selectedProduct.benefits.length}</span>
+                                <span className="text-gray-600">Has Image:</span>
+                                <span className="ml-2 font-medium">
+                                  {selectedProduct.hasImage ? (
+                                    <span className="text-green-600 flex items-center">
+                                      <CheckCircle2 className="h-4 w-4 mr-1" /> Yes
+                                    </span>
+                                  ) : (
+                                    <span className="text-red-600 flex items-center">
+                                      <XCircle className="h-4 w-4 mr-1" /> No
+                                    </span>
+                                  )}
+                                </span>
                               </div>
                               <div>
-                                <span className="text-gray-600">Has Sale Price:</span>
+                                <span className="text-gray-600">Has Description:</span>
                                 <span className="ml-2 font-medium">
-                                  {selectedProduct.originalPrice && selectedProduct.originalPrice !== selectedProduct.price ? 'Yes' : 'No'}
+                                  {selectedProduct.hasDescription ? (
+                                    <span className="text-green-600 flex items-center">
+                                      <CheckCircle2 className="h-4 w-4 mr-1" /> Yes
+                                    </span>
+                                  ) : (
+                                    <span className="text-red-600 flex items-center">
+                                      <XCircle className="h-4 w-4 mr-1" /> No
+                                    </span>
+                                  )}
                                 </span>
                               </div>
                             </div>
