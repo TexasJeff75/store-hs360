@@ -8,9 +8,11 @@ interface CartItem {
   id: number;
   name: string;
   price: number;
+  retailPrice?: number;
   cost?: number;
   quantity: number;
   image: string;
+  hasMarkup?: boolean;
 }
 
 interface CartProps {

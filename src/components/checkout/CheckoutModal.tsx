@@ -13,9 +13,11 @@ interface CartItem {
   id: number;
   name: string;
   price: number;
+  retailPrice?: number;
   cost?: number;
   quantity: number;
   image: string;
+  hasMarkup?: boolean;
 }
 
 interface CheckoutModalProps {
@@ -240,8 +242,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         name: item.name,
         quantity: item.quantity,
         price: item.price,
-        cost: item.cost,
-        image: item.image
+        retailPrice: item.retailPrice || item.price,
+        cost: item.cost || 0,
+        image: item.image,
+        hasMarkup: item.hasMarkup || false
       }));
 
       const sessionResult = await restCheckoutService.createCheckoutSession(

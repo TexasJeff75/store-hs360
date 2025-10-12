@@ -38,8 +38,10 @@ export interface CartItem {
   name: string;
   quantity: number;
   price: number;
+  retailPrice?: number;
   cost?: number;
   image?: string;
+  hasMarkup?: boolean;
 }
 
 export interface ErrorLogEntry {
@@ -395,8 +397,10 @@ class BulletproofCheckoutService {
           name: item.name,
           quantity: item.quantity,
           price: item.price,
-          cost: item.cost,
+          retailPrice: item.retailPrice || item.price,
+          cost: item.cost || 0,
           image: item.image,
+          hasMarkup: item.hasMarkup || false,
         })),
         subtotal: session.subtotal,
         tax: session.tax,

@@ -23,9 +23,11 @@ interface CartItem {
   id: number;
   name: string;
   price: number;
+  retailPrice?: number;
   cost?: number;
   quantity: number;
   image: string;
+  hasMarkup?: boolean;
 }
 
 function AppContent() {
@@ -174,10 +176,13 @@ function AppContent() {
 
     // Fetch the effective price (contract or regular)
     let effectivePrice = product.price;
+    let retailPrice = product.price;
+    let hasMarkup = false;
 
     if (user && (profile || selectedOrganization)) {
       try {
         let priceResult;
+        let productPricingData;
 
         if (selectedOrganization) {
           // Sales rep mode - get organization pricing
@@ -187,14 +192,23 @@ function AppContent() {
           if (productPricing &&
               quantity >= (productPricing.min_quantity || 1) &&
               (!productPricing.max_quantity || quantity <= productPricing.max_quantity)) {
-            // Use markup_price if available, otherwise contract_price
-            const finalPrice = productPricing.markup_price || productPricing.contract_price;
-            if (finalPrice !== null && finalPrice !== undefined) {
-              priceResult = {
-                price: finalPrice,
-                source: 'organization' as const
-              };
+            productPricingData = productPricing;
+
+            // Check if markup_price is being used
+            if (productPricing.markup_price !== null && productPricing.markup_price !== undefined) {
+              effectivePrice = productPricing.markup_price;
+              retailPrice = productPricing.contract_price || product.price;
+              hasMarkup = true;
+            } else if (productPricing.contract_price !== null && productPricing.contract_price !== undefined) {
+              effectivePrice = productPricing.contract_price;
+              retailPrice = effectivePrice;
+              hasMarkup = false;
             }
+
+            priceResult = {
+              price: effectivePrice,
+              source: 'organization' as const
+            };
           }
         } else if (profile) {
           // Regular user mode
@@ -204,10 +218,12 @@ function AppContent() {
             profile.role,
             quantity
           );
-        }
 
-        if (priceResult) {
-          effectivePrice = priceResult.price;
+          if (priceResult) {
+            effectivePrice = priceResult.price;
+            retailPrice = effectivePrice;
+            hasMarkup = false;
+          }
         }
       } catch (error) {
         console.error('Error fetching contract price for cart:', error);
@@ -228,9 +244,11 @@ function AppContent() {
           id: product.id,
           name: product.name,
           price: effectivePrice,
+          retailPrice: retailPrice,
           cost: product.cost,
           quantity: quantity,
-          image: product.image
+          image: product.image,
+          hasMarkup: hasMarkup
         }];
       }
     });
