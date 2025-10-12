@@ -217,34 +217,38 @@ const UserManagement: React.FC = () => {
       setIsCreatingUser(true);
       setModalMessage(null);
 
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newUserEmail,
-        password: newUserPassword,
-        options: {
-          emailRedirectTo: `${window.location.origin}/`,
-          data: {
-            role: newUserRole,
-            is_approved: newUserApproved
-          }
-        }
-      });
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (authError) throw authError;
-
-      if (!authData.user) {
-        throw new Error('User creation failed - no user returned');
+      if (!session) {
+        throw new Error('No active session');
       }
 
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .update({
-          role: newUserRole,
-          is_approved: newUserApproved
-        })
-        .eq('id', authData.user.id);
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: newUserEmail,
+            password: newUserPassword,
+            role: newUserRole,
+            is_approved: newUserApproved,
+          }),
+        }
+      );
 
-      if (profileError) {
-        console.warn('Profile update error:', profileError);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'User creation failed');
       }
 
       setModalMessage({
@@ -265,7 +269,14 @@ const UserManagement: React.FC = () => {
 
     } catch (err) {
       console.error('Error creating user:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to create user';
+      let errorMessage = 'Failed to create user';
+
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      } else if (typeof err === 'object' && err !== null && 'message' in err) {
+        errorMessage = String((err as any).message);
+      }
+
       setModalMessage({ type: 'error', text: errorMessage });
     } finally {
       setIsCreatingUser(false);

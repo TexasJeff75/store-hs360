@@ -91,53 +91,57 @@ const UserOrganizationManagement: React.FC<UserOrganizationManagementProps> = ({
   const handleCreateUser = async () => {
     try {
       setModalMessage(null);
-      
-      // Create user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newUserData.email,
-        password: newUserData.password,
-      });
-      
-      if (authError) throw authError;
-      
-      if (authData.user) {
-        // Create profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: authData.user.id,
-              email: authData.user.email,
-              role: 'approved',
-              is_approved: true,
-            },
-          ]);
-        
-        if (profileError) throw profileError;
-        
-        // Assign user to organization
-        await multiTenantService.assignUserToOrganization({
-          user_id: authData.user.id,
-          organization_id: organizationId,
-          location_id: null,
-          role: newUserData.role as any,
-          is_primary: false
-        });
-        
-        setModalMessage({ type: 'success', text: 'User created and assigned to organization successfully!' });
-        
-        // Reset form
-        setNewUserData({ email: '', password: '', role: 'viewer' });
-        
-        // Refresh data
-        fetchData();
-        
-        // Auto-close modal after success
-        setTimeout(() => {
-          setIsCreateUserModalOpen(false);
-          setModalMessage(null);
-        }, 2000);
+
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error('No active session');
       }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: newUserData.email,
+            password: newUserData.password,
+            role: 'customer',
+            is_approved: true,
+            organizationId: organizationId,
+            organizationRole: newUserData.role,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'User creation failed');
+      }
+
+      setModalMessage({ type: 'success', text: 'User created and assigned to organization successfully!' });
+
+      // Reset form
+      setNewUserData({ email: '', password: '', role: 'viewer' });
+
+      // Refresh data
+      fetchData();
+
+      // Auto-close modal after success
+      setTimeout(() => {
+        setIsCreateUserModalOpen(false);
+        setModalMessage(null);
+      }, 2000);
+
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create user';
       setModalMessage({ type: 'error', text: errorMessage });
