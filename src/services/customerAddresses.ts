@@ -51,6 +51,8 @@ class CustomerAddressService {
         .from('customer_addresses')
         .select('*')
         .eq('user_id', userId)
+        .is('organization_id', null)
+        .is('location_id', null)
         .eq('is_active', true)
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: false });
@@ -61,7 +63,10 @@ class CustomerAddressService {
 
       const { data, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Query error:', error);
+        throw error;
+      }
       return data || [];
     } catch (error) {
       console.error('Error fetching user addresses:', error);

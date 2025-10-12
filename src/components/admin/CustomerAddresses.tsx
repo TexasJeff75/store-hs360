@@ -56,11 +56,17 @@ const CustomerAddresses: React.FC = () => {
       const { data, error } = await supabase
         .from('customer_addresses')
         .select('*')
+        .eq('user_id', user?.id)
+        .is('organization_id', null)
+        .is('location_id', null)
         .eq('is_active', true)
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Fetch error:', error);
+        throw error;
+      }
       setAddresses(data || []);
     } catch (error) {
       console.error('Error fetching addresses:', error);
@@ -72,10 +78,19 @@ const CustomerAddresses: React.FC = () => {
   const handleSave = async () => {
     if (!user) return;
 
+    if (!formData.label || !formData.first_name || !formData.last_name ||
+        !formData.address1 || !formData.city || !formData.state_or_province ||
+        !formData.postal_code) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
     try {
       const addressData = {
         ...formData,
         user_id: user.id,
+        organization_id: null,
+        location_id: null,
       };
 
       if (editingId) {
@@ -84,13 +99,19 @@ const CustomerAddresses: React.FC = () => {
           .update(addressData)
           .eq('id', editingId);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Update error:', error);
+          throw error;
+        }
       } else {
         const { error } = await supabase
           .from('customer_addresses')
           .insert([addressData]);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Insert error:', error);
+          throw error;
+        }
       }
 
       setEditingId(null);
