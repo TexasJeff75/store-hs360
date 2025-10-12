@@ -96,8 +96,9 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
           productId: price.product_id,
           productName: product?.name || `Product ${price.product_id}`,
           contractPrice: price.contract_price,
+          markupPrice: price.markup_price,
           regularPrice: product?.price || 0,
-          savings: (product?.price || 0) - price.contract_price,
+          savings: price.contract_price ? (product?.price || 0) - price.contract_price : 0,
           minQuantity: price.min_quantity || 1,
           maxQuantity: price.max_quantity,
           effectiveDate: price.effective_date || price.created_at,
@@ -255,9 +256,10 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
 
       const conflicts = checkForConflicts();
       if (conflicts) {
-        const conflictDetails = conflicts.map(c =>
-          `${c.contractPrice.toFixed(2)} (qty ${c.minQuantity}${c.maxQuantity ? `-${c.maxQuantity}` : '+'})`
-        ).join(', ');
+        const conflictDetails = conflicts.map(c => {
+          const price = c.contractPrice ? `$${c.contractPrice.toFixed(2)}` : c.markupPrice ? `$${c.markupPrice.toFixed(2)} (markup)` : 'N/A';
+          return `${price} (qty ${c.minQuantity}${c.maxQuantity ? `-${c.maxQuantity}` : '+'})`;
+        }).join(', ');
         setModalMessage({
           type: 'error',
           text: `Quantity range conflict! This range overlaps with existing tiers: ${conflictDetails}. Please adjust min/max quantities.`
@@ -427,7 +429,10 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                   Contract Price
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Savings
+                  Markup Price
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Savings/Markup
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Quantity Range
@@ -478,10 +483,27 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                       <div className="text-sm text-gray-900">${entry.regularPrice.toFixed(2)}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-green-600">${entry.contractPrice.toFixed(2)}</div>
+                      {entry.contractPrice ? (
+                        <div className="text-sm font-medium text-green-600">${entry.contractPrice.toFixed(2)}</div>
+                      ) : (
+                        <div className="text-sm text-gray-400">—</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-green-600">${entry.savings.toFixed(2)}</div>
+                      {entry.markupPrice ? (
+                        <div className="text-sm font-medium text-blue-600">${entry.markupPrice.toFixed(2)}</div>
+                      ) : (
+                        <div className="text-sm text-gray-400">—</div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {entry.contractPrice && entry.savings > 0 ? (
+                        <div className="text-sm text-green-600">-${entry.savings.toFixed(2)}</div>
+                      ) : entry.markupPrice && entry.markupPrice > entry.regularPrice ? (
+                        <div className="text-sm text-blue-600">+${(entry.markupPrice - entry.regularPrice).toFixed(2)}</div>
+                      ) : (
+                        <div className="text-sm text-gray-400">—</div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
