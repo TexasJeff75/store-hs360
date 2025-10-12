@@ -10,11 +10,11 @@ interface UserWithRole extends Profile {
   locationName?: string;
 }
 
-interface UserOrganizationManagementProps {
+interface CustomerUserManagementProps {
   organizationId: string;
 }
 
-const UserOrganizationManagement: React.FC<UserOrganizationManagementProps> = ({ organizationId }) => {
+const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organizationId }) => {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [allUsers, setAllUsers] = useState<Profile[]>([]);
   const [locations, setLocations] = useState<any[]>([]);
@@ -686,4 +686,4 @@ const UserOrganizationManagement: React.FC<UserOrganizationManagementProps> = ({
   );
 };
 
-export default UserOrganizationManagement;
+export default CustomerUserManagement;

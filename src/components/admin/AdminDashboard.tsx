@@ -9,24 +9,26 @@ import ProductsManagement from './ProductsManagement';
 import OrderManagement from './OrderManagement';
 import CommissionManagement from './CommissionManagement';
 import SalesRepAssignment from './SalesRepAssignment';
+import SalesRepDashboard from './SalesRepDashboard';
 
 interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'analytics';
+type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'analytics' | 'my-orgs';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const isSalesRep = profile?.role === 'sales_rep';
 
-  const [activeTab, setActiveTab] = useState<AdminTab>(isSalesRep ? 'commissions' : 'organizations');
+  const [activeTab, setActiveTab] = useState<AdminTab>(isSalesRep ? 'my-orgs' : 'organizations');
 
   if (!isOpen) return null;
 
   const adminTabs = [
+    { id: 'my-orgs' as AdminTab, label: 'My Organizations', icon: Building2, roles: ['sales_rep'] },
     { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2, roles: ['admin'] },
     { id: 'users' as AdminTab, label: 'Users', icon: Users, roles: ['admin'] },
     { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep'] },
@@ -42,6 +44,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
 
   const renderTabContent = () => {
     switch (activeTab) {
+      case 'my-orgs':
+        return <SalesRepDashboard />;
       case 'organizations':
         return <OrganizationManagement />;
       case 'users':

@@ -4,7 +4,7 @@ import { multiTenantService } from '@/services/multiTenant';
 import { supabase } from '@/services/supabase';
 import LocationManagement from './LocationManagement';
 import PricingManagement from './PricingManagement';
-import UserOrganizationManagement from './UserOrganizationManagement';
+import CustomerUserManagement from './CustomerUserManagement';
 import type { Organization } from '@/services/supabase';
 
 type SubManagementTab = 'locations' | 'pricing' | 'users';
@@ -338,7 +338,7 @@ const OrganizationManagement: React.FC = () => {
             <PricingManagement organizationId={selectedOrgForSubManagement.id} />
           )}
           {activeSubTab === 'users' && (
-            <UserOrganizationManagement organizationId={selectedOrgForSubManagement.id} />
+            <CustomerUserManagement organizationId={selectedOrgForSubManagement.id} />
           )}
         </div>
       </div>
