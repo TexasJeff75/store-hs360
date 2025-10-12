@@ -59,7 +59,7 @@ export const multiTenantService = {
     const { data, error } = await supabase
       .from('locations')
       .insert(location)
-      .select()
+      .select('*, organizations(name)')
       .single();
 
     if (error) {
@@ -74,9 +74,9 @@ export const multiTenantService = {
       .from('locations')
       .update(updates)
       .eq('id', id)
-      .select()
+      .select('*, organizations(name)')
       .single();
-    
+
     if (error) throw error;
     return data;
   },
