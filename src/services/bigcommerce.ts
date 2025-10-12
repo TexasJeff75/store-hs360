@@ -75,10 +75,6 @@ const PRODUCTS_Q = /* GraphQL */ `
                 value
                 currencyCode
               }
-              costPrice {
-                value
-                currencyCode
-              }
             }
             categories {
               edges {
@@ -151,7 +147,19 @@ export interface Product {
 function transformBigCommerceProduct(bc: any): Product {
   const base = bc?.prices?.price?.value ?? 0;
   const sale = bc?.prices?.salePrice?.value;
-  const cost = bc?.prices?.costPrice?.value;
+
+  // Try to get cost from custom fields (look for 'cost' or 'Cost' field)
+  let cost: number | undefined;
+  const customFields = bc.customFields?.edges ?? [];
+  const costField = customFields.find((e: any) =>
+    e?.node?.name?.toLowerCase() === 'cost'
+  );
+  if (costField?.node?.value) {
+    const parsedCost = parseFloat(costField.node.value);
+    if (!isNaN(parsedCost)) {
+      cost = parsedCost;
+    }
+  }
 
   return {
     id: bc.entityId,
