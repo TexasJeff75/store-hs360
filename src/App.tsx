@@ -11,7 +11,6 @@ import Cart from '@/components/Cart';
 import Footer from '@/components/Footer';
 import OrganizationSelector from '@/components/OrganizationSelector';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
-import OrderHistory from '@/components/OrderHistory';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
 import { checkoutService, CartLineItem } from '@/services/checkout';
 import { useErrorLogger } from '@/hooks/useErrorLogger';
@@ -41,7 +40,6 @@ function AppContent() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [isOrderHistoryOpen, setIsOrderHistoryOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -337,7 +335,7 @@ function AppContent() {
           onProfileClick={() => {}}
           onAdminClick={() => {}}
           onSalesRepClick={() => {}}
-          onOrderHistoryClick={() => {}}
+          onOrderHistoryClick={() => setIsAdminOpen(true)}
         />
         
         <div className="min-h-screen flex items-center justify-center px-4">
@@ -386,7 +384,7 @@ function AppContent() {
           onProfileClick={() => setIsProfileOpen(true)}
           onAdminClick={() => setIsAdminOpen(true)}
           onSalesRepClick={() => setIsOrgSelectorOpen(true)}
-          onOrderHistoryClick={() => setIsOrderHistoryOpen(true)}
+          onOrderHistoryClick={() => setIsAdminOpen(true)}
         />
 
         {/* Products Section */}
@@ -654,23 +652,6 @@ function AppContent() {
           onSelectOrganization={setSelectedOrganization}
           selectedOrganization={selectedOrganization}
         />
-
-        {isOrderHistoryOpen && (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-white">
-            <div className="flex items-start justify-between p-4 border-b border-gray-200">
-              <h2 className="text-2xl font-bold text-gray-900">Order History</h2>
-              <button
-                onClick={() => setIsOrderHistoryOpen(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <OrderHistory />
-          </div>
-        )}
 
         <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
       </div>

@@ -22,8 +22,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const { profile } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const isSalesRep = profile?.role === 'sales_rep';
+  const isCustomer = profile?.role === 'customer';
 
-  const [activeTab, setActiveTab] = useState<AdminTab>(isSalesRep ? 'my-orgs' : 'organizations');
+  const [activeTab, setActiveTab] = useState<AdminTab>(
+    isCustomer ? 'orders' : isSalesRep ? 'my-orgs' : 'organizations'
+  );
 
   if (!isOpen) return null;
 
@@ -31,7 +34,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     { id: 'my-orgs' as AdminTab, label: 'My Organizations', icon: Building2, roles: ['sales_rep'] },
     { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2, roles: ['admin'] },
     { id: 'users' as AdminTab, label: 'Users', icon: Users, roles: ['admin'] },
-    { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep'] },
+    { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep', 'customer'] },
     { id: 'salesreps' as AdminTab, label: 'Sales Reps', icon: UserCheck, roles: ['admin'] },
     { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep'] },
     { id: 'products' as AdminTab, label: 'Products', icon: Package, roles: ['admin'] },
@@ -39,7 +42,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   ];
 
   const tabs = adminTabs.filter(tab =>
-    isAdmin || (isSalesRep && tab.roles.includes('sales_rep'))
+    isAdmin ||
+    (isSalesRep && tab.roles.includes('sales_rep')) ||
+    (isCustomer && tab.roles.includes('customer'))
   );
 
   const renderTabContent = () => {
@@ -77,10 +82,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold">
-                  {isSalesRep ? 'Sales Dashboard' : 'Admin Dashboard'}
+                  {isCustomer ? 'My Orders' : isSalesRep ? 'Sales Dashboard' : 'Admin Dashboard'}
                 </h1>
                 <p className="text-purple-100">
-                  {isSalesRep
+                  {isCustomer
+                    ? 'View your order history and tracking information'
+                    : isSalesRep
                     ? 'View your orders and commissions'
                     : 'Manage users, organizations, and pricing'
                   }
