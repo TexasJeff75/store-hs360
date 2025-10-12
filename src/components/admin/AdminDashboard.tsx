@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck } from 'lucide-react';
+import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
@@ -10,13 +10,15 @@ import OrderManagement from './OrderManagement';
 import CommissionManagement from './CommissionManagement';
 import SalesRepAssignment from './SalesRepAssignment';
 import SalesRepDashboard from './SalesRepDashboard';
+import CustomerAddresses from './CustomerAddresses';
+import CustomerPaymentMethods from './CustomerPaymentMethods';
 
 interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'analytics' | 'my-orgs';
+type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'analytics' | 'my-orgs' | 'addresses' | 'payments';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const { profile } = useAuth();
@@ -35,6 +37,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2, roles: ['admin'] },
     { id: 'users' as AdminTab, label: 'Users', icon: Users, roles: ['admin'] },
     { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep', 'customer'] },
+    { id: 'addresses' as AdminTab, label: 'Addresses', icon: MapPin, roles: ['customer'] },
+    { id: 'payments' as AdminTab, label: 'Payment Methods', icon: CreditCard, roles: ['customer'] },
     { id: 'salesreps' as AdminTab, label: 'Sales Reps', icon: UserCheck, roles: ['admin'] },
     { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep'] },
     { id: 'products' as AdminTab, label: 'Products', icon: Package, roles: ['admin'] },
@@ -63,6 +67,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
         return <CommissionManagement />;
       case 'products':
         return <ProductsManagement />;
+      case 'addresses':
+        return <CustomerAddresses />;
+      case 'payments':
+        return <CustomerPaymentMethods />;
       case 'analytics':
         return (
           <div className="p-6 text-center text-gray-500">
