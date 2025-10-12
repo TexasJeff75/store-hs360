@@ -145,17 +145,20 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (organizationId) {
       setSelectedOrgId(organizationId);
 
-      // Fetch organization's first location
-      const { data: locations } = await supabase
-        .from('locations')
-        .select('id')
-        .eq('organization_id', organizationId)
-        .eq('is_active', true)
-        .limit(1);
+      // Only auto-fetch location address for admins/managers
+      // Customers should be able to choose from their saved addresses
+      if (isAdmin) {
+        const { data: locations } = await supabase
+          .from('locations')
+          .select('id')
+          .eq('organization_id', organizationId)
+          .eq('is_active', true)
+          .limit(1);
 
-      if (locations && locations.length > 0) {
-        setSelectedLocationId(locations[0].id);
-        await fetchLocationAddress(locations[0].id);
+        if (locations && locations.length > 0) {
+          setSelectedLocationId(locations[0].id);
+          await fetchLocationAddress(locations[0].id);
+        }
       }
     }
 
