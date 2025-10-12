@@ -25,6 +25,9 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   const { user, profile } = useAuth();
   const { price, source, savings, loading } = useContractPricing(productId, regularPrice, quantity, organizationId);
 
+  // regularPrice is the wholesale/cost price from BigCommerce
+  // price is the retail selling price (either contract or default markup)
+
   // Don't show loading state - just show the current price to prevent flickering
   // The price will update when loaded
 
@@ -41,10 +44,10 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
 
   const getSourceLabel = () => {
     switch (source) {
-      case 'location': return 'Location Price';
-      case 'organization': return 'Organization Price';
-      case 'individual': return 'Contract Price';
-      default: return 'Contract Price';
+      case 'location': return 'Location Retail Price';
+      case 'organization': return 'Organization Retail Price';
+      case 'individual': return 'Your Retail Price';
+      default: return 'Retail Price';
     }
   };
 
@@ -65,22 +68,10 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
         )}
       </div>
         
-      {/* Only show savings/original price section if there's something to show */}
-      {((originalPrice && originalPrice !== price) || (isContractPrice && regularPrice !== price && showSavings && savings > 0)) && (
-        <div className="flex items-center space-x-2 flex-wrap">
-        {/* Original/Regular Price Strikethrough */}
-        {(originalPrice && originalPrice !== price) || (isContractPrice && regularPrice !== price) && (
-          <span className="text-sm text-gray-500 line-through">
-            ${(originalPrice || regularPrice).toFixed(2)}
-          </span>
-        )}
-
-        {/* Savings Display */}
-        {showSavings && savings && savings > 0 && (
-          <div className="text-sm text-green-600 font-medium">
-            Save ${savings.toFixed(2)}
-          </div>
-        )}
+      {/* Show special pricing discount */}
+      {isContractPrice && savings > 0 && showSavings && (
+        <div className="text-sm text-green-600 font-medium">
+          ${savings.toFixed(2)} off retail
         </div>
       )}
 

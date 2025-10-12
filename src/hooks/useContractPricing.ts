@@ -16,7 +16,9 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 export function useContractPricing(productId: number, regularPrice: number, quantity?: number, organizationId?: string): ContractPricingResult {
   const { user, profile } = useAuth();
-  const [price, setPrice] = useState(regularPrice);
+  // Default markup: If no contract price is set, show 50% markup over wholesale
+  const defaultRetailPrice = regularPrice * 1.5;
+  const [price, setPrice] = useState(defaultRetailPrice);
   const [source, setSource] = useState<'regular' | 'individual' | 'organization' | 'location'>('regular');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -34,7 +36,7 @@ export function useContractPricing(productId: number, regularPrice: number, quan
       // For sales rep mode, use organization pricing even without user profile
       if (!user || (!profile && !organizationId)) {
         if (isMounted.current) {
-          setPrice(regularPrice);
+          setPrice(defaultRetailPrice);
           setSource('regular');
           setLoading(false);
         }
@@ -98,15 +100,15 @@ export function useContractPricing(productId: number, regularPrice: number, quan
             setSource(effectivePrice.source);
           }
         } else {
-          // Cache the regular price result
+          // Cache the default retail price result
           pricingCache.set(cacheKey, {
-            price: regularPrice,
+            price: defaultRetailPrice,
             source: 'regular',
             timestamp: Date.now()
           });
 
           if (isMounted.current) {
-            setPrice(regularPrice);
+            setPrice(defaultRetailPrice);
             setSource('regular');
           }
         }
@@ -114,7 +116,7 @@ export function useContractPricing(productId: number, regularPrice: number, quan
         console.error('Error fetching effective price:', err);
         if (isMounted.current) {
           setError(err instanceof Error ? err.message : 'Failed to fetch pricing');
-          setPrice(regularPrice);
+          setPrice(defaultRetailPrice);
           setSource('regular');
         }
       } finally {
@@ -125,9 +127,9 @@ export function useContractPricing(productId: number, regularPrice: number, quan
     };
 
     fetchEffectivePrice();
-  }, [user, profile, productId, regularPrice, quantity, organizationId]);
+  }, [user, profile, productId, regularPrice, quantity, organizationId, defaultRetailPrice]);
 
-  const savings = regularPrice - price;
+  const savings = defaultRetailPrice - price;
 
   return {
     price,

@@ -148,25 +148,16 @@ function transformBigCommerceProduct(bc: any): Product {
   const base = bc?.prices?.price?.value ?? 0;
   const sale = bc?.prices?.salePrice?.value;
 
-  // Try to get cost from custom fields (look for 'cost' or 'Cost' field)
-  let cost: number | undefined;
-  const customFields = bc.customFields?.edges ?? [];
-  const costField = customFields.find((e: any) =>
-    e?.node?.name?.toLowerCase() === 'cost'
-  );
-  if (costField?.node?.value) {
-    const parsedCost = parseFloat(costField.node.value);
-    if (!isNaN(parsedCost)) {
-      cost = parsedCost;
-    }
-  }
+  // BigCommerce price is the wholesale/cost price (what sales rep pays)
+  // Use salePrice if available, otherwise use base price as the cost
+  const wholesalePrice = typeof sale === "number" ? sale : base;
 
   return {
     id: bc.entityId,
     name: bc.name,
-    price: (typeof sale === "number" ? sale : base),
-    originalPrice: (typeof sale === "number" ? base : undefined),
-    cost: cost,
+    price: wholesalePrice, // This is the wholesale/cost price
+    originalPrice: undefined, // Not used in wholesale model
+    cost: wholesalePrice, // Same as price - this is what sales rep pays
     image: bc.defaultImage?.url || "https://images.pexels.com/photos/3683074/pexels-photo-3683074.jpeg?auto=compress&cs=tinysrgb&w=640",
     rating: bc.reviewSummary?.averageRating || 0,
     reviews: bc.reviewSummary?.numberOfReviews || 0,
