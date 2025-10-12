@@ -233,8 +233,15 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     const newMin = newEntryData.minQuantity;
     const newMax = newEntryData.maxQuantity || 999999999;
 
+    console.log('Checking conflicts for selectedEntry:', selectedEntry.id, 'isEditing:', isEditing);
+
     const conflicts = pricingEntries.filter(entry => {
-      if (entry.id === selectedEntry.id) return false;
+      console.log('Comparing entry.id:', entry.id, 'with selectedEntry.id:', selectedEntry.id, 'equal?', entry.id === selectedEntry.id);
+
+      if (isEditing && entry.id === selectedEntry.id) {
+        console.log('Skipping self in edit mode');
+        return false;
+      }
       if (entry.productId !== selectedEntry.productId) return false;
       if (entry.entityId !== selectedEntry.entityId) return false;
       if (entry.type !== selectedEntry.type) return false;
@@ -242,9 +249,12 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       const existingMin = entry.minQuantity;
       const existingMax = entry.maxQuantity || 999999999;
 
-      return newMin <= existingMax && newMax >= existingMin;
+      const overlaps = newMin <= existingMax && newMax >= existingMin;
+      console.log(`Range check: new(${newMin}-${newMax}) vs existing(${existingMin}-${existingMax}) = ${overlaps}`);
+      return overlaps;
     });
 
+    console.log('Conflicts found:', conflicts.length);
     return conflicts.length > 0 ? conflicts : null;
   };
 
