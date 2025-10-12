@@ -1,0 +1,410 @@
+import React, { useState, useEffect } from 'react';
+import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter } from 'lucide-react';
+import { commissionService, Commission } from '../../services/commissionService';
+import { useAuth } from '../../contexts/AuthContext';
+
+const CommissionManagement: React.FC = () => {
+  const { user, profile } = useAuth();
+  const [commissions, setCommissions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedCommission, setSelectedCommission] = useState<any | null>(null);
+  const [summary, setSummary] = useState({
+    total: 0,
+    pending: 0,
+    approved: 0,
+    paid: 0
+  });
+
+  useEffect(() => {
+    fetchCommissions();
+  }, [statusFilter, user]);
+
+  const fetchCommissions = async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+
+      if (profile?.role === 'sales_rep') {
+        const { commissions: data } = await commissionService.getSalesRepCommissions(
+          user.id,
+          statusFilter !== 'all' ? statusFilter : undefined
+        );
+        setCommissions(data);
+
+        const { summary: summaryData } = await commissionService.getSalesRepCommissionSummary(user.id);
+        if (summaryData) {
+          setSummary({
+            total: summaryData.total_commissions,
+            pending: summaryData.pending_amount,
+            approved: summaryData.approved_amount,
+            paid: summaryData.paid_amount
+          });
+        }
+      } else if (profile?.role === 'admin') {
+        const { commissions: data } = await commissionService.getAllCommissions({
+          status: statusFilter !== 'all' ? statusFilter : undefined
+        });
+        setCommissions(data);
+
+        const totalSum = data.reduce((acc, c) => acc + Number(c.commission_amount), 0);
+        const pendingSum = data.filter(c => c.status === 'pending').reduce((acc, c) => acc + Number(c.commission_amount), 0);
+        const approvedSum = data.filter(c => c.status === 'approved').reduce((acc, c) => acc + Number(c.commission_amount), 0);
+        const paidSum = data.filter(c => c.status === 'paid').reduce((acc, c) => acc + Number(c.commission_amount), 0);
+
+        setSummary({
+          total: totalSum,
+          pending: pendingSum,
+          approved: approvedSum,
+          paid: paidSum
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching commissions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveCommission = async (commissionId: string) => {
+    if (!user) return;
+
+    const notes = prompt('Add approval notes (optional):');
+    const result = await commissionService.approveCommission(commissionId, user.id, notes || undefined);
+
+    if (result.success) {
+      alert('Commission approved successfully');
+      fetchCommissions();
+      setSelectedCommission(null);
+    } else {
+      alert(`Failed to approve commission: ${result.error}`);
+    }
+  };
+
+  const handleMarkPaid = async (commissionId: string) => {
+    const paymentRef = prompt('Enter payment reference:');
+    if (!paymentRef) return;
+
+    const result = await commissionService.markCommissionPaid(commissionId, paymentRef);
+
+    if (result.success) {
+      alert('Commission marked as paid');
+      fetchCommissions();
+      setSelectedCommission(null);
+    } else {
+      alert(`Failed to mark commission as paid: ${result.error}`);
+    }
+  };
+
+  const filteredCommissions = commissions.filter(commission => {
+    const matchesSearch =
+      commission.sales_rep?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      commission.organization?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      commission.order_id.toLowerCase().includes(searchTerm.toLowerCase());
+
+    return matchesSearch;
+  });
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'approved':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'paid':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return <Clock className="h-4 w-4" />;
+      case 'approved':
+        return <CheckCircle className="h-4 w-4" />;
+      case 'paid':
+        return <DollarSign className="h-4 w-4" />;
+      case 'cancelled':
+        return <XCircle className="h-4 w-4" />;
+      default:
+        return null;
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Commission Management</h2>
+        <p className="text-gray-600">Track and manage sales commissions</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600">Total Commissions</p>
+              <p className="text-2xl font-bold text-gray-900">${summary.total.toFixed(2)}</p>
+            </div>
+            <TrendingUp className="h-8 w-8 text-blue-600" />
+          </div>
+        </div>
+
+        <div className="bg-yellow-50 rounded-lg shadow p-6 border border-yellow-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-yellow-700">Pending</p>
+              <p className="text-2xl font-bold text-yellow-900">${summary.pending.toFixed(2)}</p>
+            </div>
+            <Clock className="h-8 w-8 text-yellow-600" />
+          </div>
+        </div>
+
+        <div className="bg-blue-50 rounded-lg shadow p-6 border border-blue-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-blue-700">Approved</p>
+              <p className="text-2xl font-bold text-blue-900">${summary.approved.toFixed(2)}</p>
+            </div>
+            <CheckCircle className="h-8 w-8 text-blue-600" />
+          </div>
+        </div>
+
+        <div className="bg-green-50 rounded-lg shadow p-6 border border-green-200">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-green-700">Paid</p>
+              <p className="text-2xl font-bold text-green-900">${summary.paid.toFixed(2)}</p>
+            </div>
+            <DollarSign className="h-8 w-8 text-green-600" />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow">
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex gap-4">
+            <div className="flex-1 relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by sales rep, organization, or order..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="approved">Approved</option>
+              <option value="paid">Paid</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sales Rep</th>
+                {profile?.role === 'admin' && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
+                )}
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Total</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rate</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredCommissions.length === 0 ? (
+                <tr>
+                  <td colSpan={profile?.role === 'admin' ? 9 : 8} className="px-6 py-12 text-center text-gray-500">
+                    <DollarSign className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p>No commissions found</p>
+                  </td>
+                </tr>
+              ) : (
+                filteredCommissions.map((commission) => (
+                  <tr key={commission.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
+                      {commission.order_id.slice(0, 8)}...
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {commission.sales_rep?.email || 'N/A'}
+                    </td>
+                    {profile?.role === 'admin' && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {commission.organization?.name || 'N/A'}
+                      </td>
+                    )}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      ${Number(commission.order_total).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {Number(commission.commission_rate).toFixed(2)}%
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
+                      ${Number(commission.commission_amount).toFixed(2)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 inline-flex items-center space-x-1 text-xs leading-5 font-semibold rounded-full border ${getStatusColor(commission.status)}`}>
+                        {getStatusIcon(commission.status)}
+                        <span>{commission.status}</span>
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(commission.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end space-x-2">
+                        <button
+                          onClick={() => setSelectedCommission(commission)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        {profile?.role === 'admin' && commission.status === 'pending' && (
+                          <button
+                            onClick={() => handleApproveCommission(commission.id)}
+                            className="text-green-600 hover:text-green-900"
+                          >
+                            <CheckCircle className="h-4 w-4" />
+                          </button>
+                        )}
+                        {profile?.role === 'admin' && commission.status === 'approved' && (
+                          <button
+                            onClick={() => handleMarkPaid(commission.id)}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
+                            <DollarSign className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {selectedCommission && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20">
+            <div className="fixed inset-0 bg-black bg-opacity-50" onClick={() => setSelectedCommission(null)}></div>
+
+            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Commission Details</h3>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-sm text-gray-600">Order ID</label>
+                    <p className="font-medium">{selectedCommission.order_id}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Sales Rep</label>
+                    <p className="font-medium">{selectedCommission.sales_rep?.email}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Organization</label>
+                    <p className="font-medium">{selectedCommission.organization?.name || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Status</label>
+                    <span className={`px-3 py-1 inline-flex items-center space-x-1 text-xs font-semibold rounded-full border ${getStatusColor(selectedCommission.status)}`}>
+                      {getStatusIcon(selectedCommission.status)}
+                      <span>{selectedCommission.status}</span>
+                    </span>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Order Total</label>
+                    <p className="font-medium">${Number(selectedCommission.order_total).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Commission Rate</label>
+                    <p className="font-medium">{Number(selectedCommission.commission_rate).toFixed(2)}%</p>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Commission Amount</label>
+                    <p className="font-bold text-green-600 text-lg">${Number(selectedCommission.commission_amount).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <label className="text-sm text-gray-600">Created Date</label>
+                    <p className="font-medium">{new Date(selectedCommission.created_at).toLocaleString()}</p>
+                  </div>
+                </div>
+
+                {selectedCommission.notes && (
+                  <div>
+                    <label className="text-sm text-gray-600">Notes</label>
+                    <p className="font-medium">{selectedCommission.notes}</p>
+                  </div>
+                )}
+
+                {selectedCommission.payment_reference && (
+                  <div>
+                    <label className="text-sm text-gray-600">Payment Reference</label>
+                    <p className="font-medium">{selectedCommission.payment_reference}</p>
+                  </div>
+                )}
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    onClick={() => setSelectedCommission(null)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  >
+                    Close
+                  </button>
+                  {profile?.role === 'admin' && selectedCommission.status === 'pending' && (
+                    <button
+                      onClick={() => handleApproveCommission(selectedCommission.id)}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                    >
+                      Approve Commission
+                    </button>
+                  )}
+                  {profile?.role === 'admin' && selectedCommission.status === 'approved' && (
+                    <button
+                      onClick={() => handleMarkPaid(selectedCommission.id)}
+                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                    >
+                      Mark as Paid
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default CommissionManagement;
