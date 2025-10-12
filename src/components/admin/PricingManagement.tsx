@@ -234,10 +234,20 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     const newMin = newEntryData.minQuantity;
     const newMax = newEntryData.maxQuantity || 999999999;
 
+    alert(`Conflict check - isEditing: ${isEditing}, selectedEntry.id: ${selectedEntry.id}, total entries: ${pricingEntries.length}`);
+
     // When editing, exclude the current entry from the list we're checking against
     const entriesToCheck = isEditing
-      ? pricingEntries.filter(entry => String(entry.id) !== String(selectedEntry.id))
+      ? pricingEntries.filter(entry => {
+          const match = String(entry.id) !== String(selectedEntry.id);
+          if (!match) {
+            alert(`Excluding entry with ID: ${entry.id} (matches selectedEntry.id: ${selectedEntry.id})`);
+          }
+          return match;
+        })
       : pricingEntries;
+
+    alert(`Entries to check: ${entriesToCheck.length} (filtered from ${pricingEntries.length})`);
 
     const conflicts = entriesToCheck.filter(entry => {
       // Only check conflicts for same product, entity, and type
@@ -252,6 +262,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       return newMin <= existingMax && newMax >= existingMin;
     });
 
+    alert(`Conflicts found: ${conflicts.length}`);
     return conflicts.length > 0 ? conflicts : null;
   };
 
