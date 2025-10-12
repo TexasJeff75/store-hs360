@@ -709,7 +709,7 @@ const OrderManagement: React.FC = () => {
               <div key={order.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
                 <div className="p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-center justify-between">
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-6 gap-4 items-center">
+                    <div className="flex-1 grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Order ID</p>
                         <p className="text-sm font-mono font-medium text-gray-900">{order.id.slice(0, 8)}...</p>
@@ -732,6 +732,27 @@ const OrderManagement: React.FC = () => {
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Date</p>
                         <p className="text-sm text-gray-900">{new Date(order.created_at).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">Tracking</p>
+                        {order.shipments && order.shipments.length > 0 ? (
+                          <div className="space-y-1">
+                            {order.shipments.slice(0, 2).map((shipment, idx) => (
+                              <div key={idx} className="flex items-center space-x-2">
+                                <Truck className="h-3 w-3 text-blue-600" />
+                                <span className="text-xs font-mono text-gray-900">{shipment.tracking_number}</span>
+                                <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${getShipmentStatusColor(shipment.status)}`}>
+                                  {shipment.status.replace('_', ' ')}
+                                </span>
+                              </div>
+                            ))}
+                            {order.shipments.length > 2 && (
+                              <p className="text-xs text-gray-500">+{order.shipments.length - 2} more</p>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-400">No tracking</p>
+                        )}
                       </div>
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Total</p>
