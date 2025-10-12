@@ -325,14 +325,14 @@ const LocationManagement: React.FC<LocationManagementProps> = ({ organizationId 
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Location Code *
+                          Location Code
                         </label>
                         <input
                           type="text"
-                          value={selectedLocation.code}
+                          value={selectedLocation.code || ''}
                           onChange={(e) => setSelectedLocation({...selectedLocation, code: e.target.value.toUpperCase()})}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          placeholder="LOC001"
+                          placeholder="LOC001 (optional)"
                         />
                       </div>
                       
@@ -546,7 +546,6 @@ const LocationManagement: React.FC<LocationManagementProps> = ({ organizationId 
                   onClick={handleSaveLocation}
                   disabled={
                     !selectedLocation.name ||
-                    !selectedLocation.code ||
                     !selectedLocation.organization_id ||
                     !(selectedLocation.address as any)?.firstName ||
                     !(selectedLocation.address as any)?.lastName ||
