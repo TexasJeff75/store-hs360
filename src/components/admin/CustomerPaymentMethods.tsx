@@ -17,23 +17,33 @@ interface PaymentMethod {
   created_at: string;
 }
 
-const CustomerPaymentMethods: React.FC = () => {
+interface CustomerPaymentMethodsProps {
+  organizationId?: string;
+}
+
+const CustomerPaymentMethods: React.FC<CustomerPaymentMethodsProps> = ({ organizationId }) => {
   const { user } = useAuth();
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchPaymentMethods();
-  }, [user]);
+  }, [user, organizationId]);
 
   const fetchPaymentMethods = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      let query = supabase
         .from('payment_methods')
         .select('*')
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: false });
+
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setPaymentMethods(data || []);

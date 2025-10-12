@@ -10,6 +10,7 @@ import OrderManagement from './OrderManagement';
 import CommissionManagement from './CommissionManagement';
 import SalesRepAssignment from './SalesRepAssignment';
 import SalesRepDashboard from './SalesRepDashboard';
+import CustomerPaymentMethods from './CustomerPaymentMethods';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -82,17 +83,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
       case 'locations':
         return <LocationManagement organizationId={isCustomer ? userOrgId : undefined} />;
       case 'payments':
-        return (
-          <div className="p-6">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Payment Methods</h2>
-              <p className="text-gray-600">Manage payment methods for your organization</p>
-            </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <p className="text-blue-800">Payment methods management coming soon. This will allow you to securely store and manage payment methods for your organization.</p>
-            </div>
-          </div>
-        );
+        return <CustomerPaymentMethods organizationId={isCustomer ? userOrgId : undefined} />;
       case 'analytics':
         return (
           <div className="p-6 text-center text-gray-500">
