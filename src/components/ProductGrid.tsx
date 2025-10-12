@@ -125,6 +125,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
                 showSavings={true}
                 organizationId={organizationId}
               />
+              <p className="text-xs text-gray-500 mt-1">+ tax</p>
             </div>
 
             {/* Add to Cart Button */}

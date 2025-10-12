@@ -109,12 +109,13 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
         {/* Price */}
         <div className="mb-3">
-          <PriceDisplay 
+          <PriceDisplay
             productId={id}
             regularPrice={price}
             originalPrice={originalPrice}
             showSavings={true}
           />
+          <p className="text-xs text-gray-500 mt-1">+ tax</p>
         </div>
 
         {/* Add to Cart Button */}
