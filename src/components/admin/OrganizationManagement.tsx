@@ -1,12 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit, Trash2, Search, MapPin, Users, Mail, Phone, AlertCircle, CheckCircle, Eye, Archive, ArrowLeft, Settings, DollarSign, Save, RotateCcw } from 'lucide-react';
+import { Building2, Plus, Edit, Trash2, Search, MapPin, Users, Mail, Phone, AlertCircle, CheckCircle, Eye, Archive, ArrowLeft, Settings, DollarSign, Save, RotateCcw, UserCheck, Home } from 'lucide-react';
 import { multiTenantService } from '@/services/multiTenant';
+import { supabase } from '@/services/supabase';
 import LocationManagement from './LocationManagement';
 import PricingManagement from './PricingManagement';
 import UserOrganizationManagement from './UserOrganizationManagement';
 import type { Organization } from '@/services/supabase';
 
 type SubManagementTab = 'locations' | 'pricing' | 'users';
+
+interface SalesRep {
+  id: string;
+  email: string;
+  full_name?: string;
+}
 
 const OrganizationManagement: React.FC = () => {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
@@ -25,10 +32,12 @@ const OrganizationManagement: React.FC = () => {
   const [pendingChanges, setPendingChanges] = useState<{ [key: string]: Partial<Organization> }>({});
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
 
   useEffect(() => {
     fetchOrganizations();
     fetchOrgStats();
+    fetchSalesReps();
   }, []);
 
   const fetchOrganizations = async () => {
@@ -51,7 +60,7 @@ const OrganizationManagement: React.FC = () => {
       ]);
 
       const stats: { [key: string]: { locations: number; users: number } } = {};
-      
+
       // Count locations per organization
       locations.forEach(location => {
         if (!stats[location.organization_id]) {
@@ -71,6 +80,21 @@ const OrganizationManagement: React.FC = () => {
       setOrgStats(stats);
     } catch (err) {
       console.error('Failed to fetch organization stats:', err);
+    }
+  };
+
+  const fetchSalesReps = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .eq('role', 'sales_rep')
+        .order('email');
+
+      if (error) throw error;
+      setSalesReps(data || []);
+    } catch (err) {
+      console.error('Failed to fetch sales reps:', err);
     }
   };
 
@@ -606,13 +630,21 @@ const OrganizationManagement: React.FC = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                      org.is_active
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {org.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                    <div className="flex flex-col space-y-1">
+                      <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                        org.is_active
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {org.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                      {(org as any).is_house_account && (
+                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <Home className="h-3 w-3 mr-1" />
+                          House
+                        </span>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -747,8 +779,52 @@ const OrganizationManagement: React.FC = () => {
                           placeholder="+1 (555) 123-4567"
                         />
                       </div>
-                      
+
                       <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          <span className="flex items-center">
+                            <UserCheck className="h-4 w-4 mr-1" />
+                            Default Sales Rep
+                          </span>
+                        </label>
+                        <select
+                          value={(selectedOrg as any).default_sales_rep_id || ''}
+                          onChange={(e) => setSelectedOrg({...selectedOrg, default_sales_rep_id: e.target.value || null} as any)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          disabled={(selectedOrg as any).is_house_account}
+                        >
+                          <option value="">No Default Sales Rep</option>
+                          {salesReps.map(rep => (
+                            <option key={rep.id} value={rep.id}>
+                              {rep.full_name || rep.email}
+                            </option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Sales rep assigned to orders from this organization
+                        </p>
+                      </div>
+
+                      <div className="space-y-3">
+                        <label className="flex items-center">
+                          <input
+                            type="checkbox"
+                            checked={(selectedOrg as any).is_house_account || false}
+                            onChange={(e) => {
+                              const isHouseAccount = e.target.checked;
+                              setSelectedOrg({
+                                ...selectedOrg,
+                                is_house_account: isHouseAccount,
+                                default_sales_rep_id: isHouseAccount ? null : (selectedOrg as any).default_sales_rep_id
+                              } as any);
+                            }}
+                            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                          />
+                          <span className="ml-2 text-sm text-gray-700 flex items-center">
+                            <Home className="h-4 w-4 mr-1" />
+                            House Account (No Commission)
+                          </span>
+                        </label>
                         <label className="flex items-center">
                           <input
                             type="checkbox"

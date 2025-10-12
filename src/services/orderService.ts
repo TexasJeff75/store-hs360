@@ -65,6 +65,20 @@ export interface Order {
 class OrderService {
   async createOrder(data: CreateOrderData): Promise<{ order: Order | null; error?: string }> {
     try {
+      let salesRepId = null;
+
+      if (data.organizationId) {
+        const { data: orgData, error: orgError } = await supabase
+          .from('organizations')
+          .select('default_sales_rep_id, is_house_account')
+          .eq('id', data.organizationId)
+          .maybeSingle();
+
+        if (!orgError && orgData && !orgData.is_house_account) {
+          salesRepId = orgData.default_sales_rep_id;
+        }
+      }
+
       const { data: order, error } = await supabase
         .from('orders')
         .insert({
@@ -81,6 +95,7 @@ class OrderService {
           customer_email: data.customerEmail,
           organization_id: data.organizationId,
           location_id: data.locationId,
+          sales_rep_id: salesRepId,
           notes: data.notes
         })
         .select()
