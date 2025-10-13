@@ -89,26 +89,19 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </span>
         </div>
 
-        <button
+        <div
           onClick={handleFavoriteClick}
-          className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white hover:scale-110 transition-all z-30 opacity-100 cursor-pointer"
-          type="button"
+          className="absolute top-2 right-2 p-3 bg-white rounded-full shadow-lg hover:shadow-xl cursor-pointer z-50"
+          style={{ pointerEvents: 'auto' }}
         >
-          <motion.div
-            animate={{
-              scale: isAnimating ? [1, 1.3, 1] : 1,
-            }}
-            transition={{ duration: 0.3 }}
-          >
-            <Heart
-              className={`h-5 w-5 transition-all duration-300 ${
-                favorited
-                  ? 'text-red-500 fill-red-500'
-                  : 'text-gray-600'
-              }`}
-            />
-          </motion.div>
-        </button>
+          <Heart
+            className={`h-5 w-5 ${
+              favorited
+                ? 'text-red-500 fill-red-500'
+                : 'text-gray-400 hover:text-gray-600'
+            }`}
+          />
+        </div>
 
         {/* Flying heart animation */}
         {showAnimation && (
