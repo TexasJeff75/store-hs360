@@ -60,7 +60,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   ];
 
   const tabs = adminTabs.filter(tab =>
-    isAdmin ||
+    (isAdmin && tab.roles.includes('admin')) ||
     (isSalesRep && tab.roles.includes('sales_rep')) ||
     (isCustomer && tab.roles.includes('customer'))
   );
