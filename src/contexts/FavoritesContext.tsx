@@ -31,10 +31,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
   const [isLoading, setIsLoading] = useState(false);
   const [animatingProductId, setAnimatingProductId] = useState<number | null>(null);
 
-  console.log('🔄 FavoritesProvider rendered, user:', user?.email);
-
   useEffect(() => {
-    console.log('🔄 User changed in FavoritesProvider:', user?.email);
     if (user) {
       loadFavorites();
     } else {
@@ -45,30 +42,22 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
   const loadFavorites = async () => {
     if (!user) return;
 
-    console.log('📥 Loading favorites for user:', user.id);
     setIsLoading(true);
     const userFavorites = await favoritesService.getUserFavorites(user.id);
-    console.log('📥 Loaded favorites:', userFavorites);
     setFavorites(userFavorites);
     setIsLoading(false);
   };
 
   const isFavorite = (productId: number): boolean => {
-    const result = favorites.includes(productId);
-    console.log('🔍 isFavorite check:', { productId, favorites, result });
-    return result;
+    return favorites.includes(productId);
   };
 
   const toggleFavorite = async (productId: number) => {
     if (!user) {
-      console.log('⚠️ No user logged in, cannot favorite');
       return;
     }
 
-    console.log('💜 Toggle favorite clicked:', { productId, userId: user.id });
-
     const currentlyFavorited = isFavorite(productId);
-    console.log('Current favorite status:', currentlyFavorited);
 
     // Trigger animation
     setAnimatingProductId(productId);
@@ -84,7 +73,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
     const success = await favoritesService.toggleFavorite(user.id, productId, currentlyFavorited);
 
     if (!success) {
-      console.log('❌ Failed to toggle favorite, reverting');
       // Revert on failure
       if (currentlyFavorited) {
         setFavorites(prev => [...prev, productId]);
