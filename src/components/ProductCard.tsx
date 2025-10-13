@@ -123,7 +123,8 @@ const ProductCard: React.FC<ProductCardProps> = ({
               duration: 0.8,
               ease: 'easeInOut'
             }}
-            className="pointer-events-none z-50"
+            className="pointer-events-none z-40"
+            style={{ pointerEvents: 'none' }}
           >
             <Heart className="h-8 w-8 text-red-500 fill-red-500" />
           </motion.div>
@@ -137,7 +138,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           />
 
           {descriptionText && (
-            <div className="absolute inset-0 bg-black bg-opacity-90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex items-center justify-center z-10">
+            <div className="absolute inset-0 bg-black bg-opacity-90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex items-center justify-center z-10 pointer-events-none">
               <p className="text-white text-sm leading-relaxed overflow-y-auto max-h-full">
                 {descriptionText}
               </p>
