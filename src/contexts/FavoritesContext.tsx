@@ -53,11 +53,14 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
   };
 
   const toggleFavorite = async (productId: number) => {
+    console.log('🎯 toggleFavorite called:', { productId, user: user?.email });
     if (!user) {
+      console.log('❌ No user, returning');
       return;
     }
 
     const currentlyFavorited = isFavorite(productId);
+    console.log('Current favorite status:', currentlyFavorited, 'Favorites array:', favorites);
 
     // Trigger animation
     setAnimatingProductId(productId);
