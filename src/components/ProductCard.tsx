@@ -48,27 +48,26 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 group">
-      <div className="relative rounded-t-lg">
-        <div className="absolute top-2 left-2 z-10">
-          <span className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-2 py-1 rounded text-xs font-medium shadow-md">
+      <div className="relative rounded-t-lg bg-white p-3">
+        <div className="absolute top-2 left-2 z-20 opacity-90 group-hover:opacity-100">
+          <span className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-2 py-1 rounded text-xs font-medium shadow-lg">
             {category}
           </span>
         </div>
 
-        <button className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors opacity-0 group-hover:opacity-100 z-10">
+        <button className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-all opacity-0 group-hover:opacity-100 z-20">
           <Heart className="h-5 w-5 text-gray-600" />
         </button>
 
-        <div className="relative overflow-hidden rounded-t-lg bg-gray-100 pt-10 pb-4 px-4 flex items-center justify-center" style={{ minHeight: '240px' }}>
+        <div className="relative overflow-hidden rounded-lg bg-white">
           <img
             src={image}
             alt={name}
-            className="max-w-full h-auto object-contain group-hover:scale-105 transition-transform duration-300"
-            style={{ maxHeight: '180px' }}
+            className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-300"
           />
 
           {descriptionText && (
-            <div className="absolute inset-0 bg-black bg-opacity-90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black bg-opacity-90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex items-center justify-center z-10">
               <p className="text-white text-sm leading-relaxed overflow-y-auto max-h-full">
                 {descriptionText}
               </p>
