@@ -70,8 +70,8 @@ function AppContent() {
           bigCommerceService.getCategories((err: unknown, ctx?: string) => logError(err, ctx))
         ]);
         
-        const timeoutPromise = new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 20000)
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Request timeout')), 35000)
         );
         
         const [productsData, categoriesData] = await Promise.race([
