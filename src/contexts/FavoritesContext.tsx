@@ -54,7 +54,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
   };
 
   const isFavorite = (productId: number): boolean => {
-    return favorites.includes(productId);
+    const result = favorites.includes(productId);
+    console.log('🔍 isFavorite check:', { productId, favorites, result });
+    return result;
   };
 
   const toggleFavorite = async (productId: number) => {

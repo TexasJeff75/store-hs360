@@ -9,17 +9,21 @@ export interface Favorite {
 
 export const favoritesService = {
   async getUserFavorites(userId: string): Promise<number[]> {
+    console.log('📥 Fetching favorites for user:', userId);
     const { data, error } = await supabase
       .from('favorites')
       .select('product_id')
       .eq('user_id', userId);
 
     if (error) {
-      console.error('Error fetching favorites:', error);
+      console.error('❌ Error fetching favorites:', error);
       return [];
     }
 
-    return data?.map(f => f.product_id) || [];
+    console.log('📥 Fetched favorites data:', data);
+    const productIds = data?.map(f => f.product_id) || [];
+    console.log('📥 Returning product IDs:', productIds);
+    return productIds;
   },
 
   async addFavorite(userId: string, productId: number): Promise<boolean> {
@@ -38,6 +42,7 @@ export const favoritesService = {
   },
 
   async removeFavorite(userId: string, productId: number): Promise<boolean> {
+    console.log('🗑️ Removing favorite:', { userId, productId });
     const { error } = await supabase
       .from('favorites')
       .delete()
@@ -45,10 +50,11 @@ export const favoritesService = {
       .eq('product_id', productId);
 
     if (error) {
-      console.error('Error removing favorite:', error);
+      console.error('❌ Error removing favorite:', error);
       return false;
     }
 
+    console.log('✅ Favorite removed successfully');
     return true;
   },
 
