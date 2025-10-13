@@ -9,33 +9,38 @@ export interface Favorite {
 
 export const favoritesService = {
   async getUserFavorites(userId: string): Promise<number[]> {
+    console.log('📚 favoritesService.getUserFavorites called for:', userId);
     const { data, error } = await supabase
       .from('favorites')
       .select('product_id')
       .eq('user_id', userId);
 
     if (error) {
-      console.error('Error fetching favorites:', error);
+      console.error('❌ Error fetching favorites:', error);
       return [];
     }
 
+    console.log('✅ Favorites data from DB:', data);
     return data?.map(f => f.product_id) || [];
   },
 
   async addFavorite(userId: string, productId: number): Promise<boolean> {
+    console.log('➕ Adding favorite:', { userId, productId });
     const { error } = await supabase
       .from('favorites')
       .insert({ user_id: userId, product_id: productId });
 
     if (error) {
-      console.error('Error adding favorite:', error);
+      console.error('❌ Error adding favorite:', error);
       return false;
     }
 
+    console.log('✅ Favorite added successfully');
     return true;
   },
 
   async removeFavorite(userId: string, productId: number): Promise<boolean> {
+    console.log('➖ Removing favorite:', { userId, productId });
     const { error } = await supabase
       .from('favorites')
       .delete()
@@ -43,10 +48,11 @@ export const favoritesService = {
       .eq('product_id', productId);
 
     if (error) {
-      console.error('Error removing favorite:', error);
+      console.error('❌ Error removing favorite:', error);
       return false;
     }
 
+    console.log('✅ Favorite removed successfully');
     return true;
   },
 

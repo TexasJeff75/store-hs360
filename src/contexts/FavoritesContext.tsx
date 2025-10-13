@@ -32,6 +32,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
   const [animatingProductId, setAnimatingProductId] = useState<number | null>(null);
 
   useEffect(() => {
+    console.log('🔄 FavoritesProvider useEffect - user changed:', user?.email);
     if (user) {
       loadFavorites();
     } else {
@@ -42,8 +43,10 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
   const loadFavorites = async () => {
     if (!user) return;
 
+    console.log('📥 Loading favorites for user:', user.email);
     setIsLoading(true);
     const userFavorites = await favoritesService.getUserFavorites(user.id);
+    console.log('✅ Loaded favorites:', userFavorites);
     setFavorites(userFavorites);
     setIsLoading(false);
   };
@@ -73,7 +76,9 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
     }
 
     // Make API call
+    console.log('📡 Calling favoritesService.toggleFavorite');
     const success = await favoritesService.toggleFavorite(user.id, productId, currentlyFavorited);
+    console.log('📡 toggleFavorite result:', success);
 
     if (!success) {
       // Revert on failure
