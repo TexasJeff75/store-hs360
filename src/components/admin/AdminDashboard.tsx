@@ -11,7 +11,7 @@ import CommissionManagement from './CommissionManagement';
 import SalesRepAssignment from './SalesRepAssignment';
 import SalesRepDashboard from './SalesRepDashboard';
 import CustomerPaymentMethods from './CustomerPaymentMethods';
-import LoginAuditLog from './LoginAuditLog';
+import Analytics from './Analytics';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -86,7 +86,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
       case 'payments':
         return <CustomerPaymentMethods organizationId={isCustomer ? userOrgId : undefined} />;
       case 'analytics':
-        return <LoginAuditLog />;
+        return <Analytics />;
       default:
         return null;
     }
