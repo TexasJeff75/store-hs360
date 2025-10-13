@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { FavoritesProvider } from '@/contexts/FavoritesContext';
 import Header from '@/components/Header';
 import AuthModal from '@/components/AuthModal';
 import UserProfile from '@/components/UserProfile';
 import AdminDashboard from '@/components/admin/AdminDashboard';
 import ProductGrid from '@/components/ProductGrid';
 import ProductFilter from '@/components/ProductFilter';
+import FavoritesList from '@/components/FavoritesList';
 import ProductModal from '@/components/ProductModal';
 import Cart from '@/components/Cart';
 import Footer from '@/components/Footer';
@@ -465,7 +467,7 @@ function AppContent() {
             <div>
               {/* Filters and Search */}
               <div className="flex flex-col lg:flex-row gap-8 mb-8">
-                <div className="lg:w-64 flex-shrink-0">
+                <div className="lg:w-64 flex-shrink-0 space-y-6">
                   <ProductFilter
                     categories={Object.keys(productsByCategory)}
                     selectedCategory={selectedCategory}
@@ -474,6 +476,18 @@ function AppContent() {
                     onPriceRangeChange={setPriceRange}
                     isOpen={isFilterOpen}
                     onToggle={() => setIsFilterOpen(!isFilterOpen)}
+                  />
+                  <FavoritesList
+                    products={products.map(p => ({
+                      id: p.id,
+                      name: p.name,
+                      image: p.image,
+                      price: p.price
+                    }))}
+                    onProductClick={(productId) => {
+                      const product = products.find(p => p.id === productId);
+                      if (product) handleProductClick(product);
+                    }}
                   />
                 </div>
                 
@@ -659,7 +673,9 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <AppContent />
+      <FavoritesProvider>
+        <AppContent />
+      </FavoritesProvider>
     </AuthProvider>
   );
 }

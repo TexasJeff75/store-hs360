@@ -1,6 +1,9 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Star, Heart, ShoppingCart } from 'lucide-react';
+import { motion } from 'framer-motion';
 import PriceDisplay from './PriceDisplay';
+import { useFavorites } from '../contexts/FavoritesContext';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ProductCardProps {
   id: number;
@@ -31,6 +34,31 @@ const ProductCard: React.FC<ProductCardProps> = ({
   plainTextDescription,
   onAddToCart
 }) => {
+  const { user } = useAuth();
+  const { isFavorite, toggleFavorite, animatingProductId } = useFavorites();
+  const [showAnimation, setShowAnimation] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [animationStart, setAnimationStart] = useState({ x: 0, y: 0 });
+
+  const favorited = user ? isFavorite(id) : false;
+  const isAnimating = animatingProductId === id;
+
+  useEffect(() => {
+    if (isAnimating && !favorited && cardRef.current) {
+      // Get card position for animation start point
+      const rect = cardRef.current.getBoundingClientRect();
+      setAnimationStart({ x: rect.left + rect.width / 2, y: rect.top + 50 });
+      setShowAnimation(true);
+      setTimeout(() => setShowAnimation(false), 1000);
+    }
+  }, [isAnimating, favorited]);
+
+  const handleFavoriteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (user) {
+      toggleFavorite(id);
+    }
+  };
   const getDescriptionText = () => {
     if (plainTextDescription) {
       return plainTextDescription.slice(0, 200) + (plainTextDescription.length > 200 ? '...' : '');
@@ -47,7 +75,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const descriptionText = getDescriptionText();
 
   return (
-    <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 group">
+    <div ref={cardRef} className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 group relative">
       <div className="relative rounded-t-lg bg-white p-3">
         <div className="absolute top-2 left-2 z-20 opacity-90 group-hover:opacity-100">
           <span className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-2 py-1 rounded text-xs font-medium shadow-lg">
@@ -55,9 +83,54 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </span>
         </div>
 
-        <button className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-all opacity-0 group-hover:opacity-100 z-20">
-          <Heart className="h-5 w-5 text-gray-600" />
+        <button
+          onClick={handleFavoriteClick}
+          className={`absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-all z-20 ${
+            user ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+          }`}
+          disabled={!user}
+        >
+          <motion.div
+            animate={{
+              scale: isAnimating ? [1, 1.3, 1] : 1,
+            }}
+            transition={{ duration: 0.3 }}
+          >
+            <Heart
+              className={`h-5 w-5 transition-all duration-300 ${
+                favorited
+                  ? 'text-red-500 fill-red-500'
+                  : 'text-gray-600'
+              }`}
+            />
+          </motion.div>
         </button>
+
+        {/* Flying heart animation */}
+        {showAnimation && (
+          <motion.div
+            initial={{
+              position: 'fixed',
+              left: animationStart.x,
+              top: animationStart.y,
+              opacity: 1,
+              scale: 1
+            }}
+            animate={{
+              left: 100,
+              top: window.innerHeight / 2,
+              opacity: 0,
+              scale: 0.5
+            }}
+            transition={{
+              duration: 0.8,
+              ease: 'easeInOut'
+            }}
+            className="pointer-events-none z-50"
+          >
+            <Heart className="h-8 w-8 text-red-500 fill-red-500" />
+          </motion.div>
+        )}
 
         <div className="relative overflow-hidden rounded-lg bg-white">
           <img
