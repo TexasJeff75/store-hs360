@@ -48,28 +48,32 @@ const ProductCard: React.FC<ProductCardProps> = ({
 
   return (
     <div className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 group">
-      <div className="relative overflow-hidden rounded-t-lg h-48 bg-gray-100 flex items-center justify-center p-4">
-        <img
-          src={image}
-          alt={name}
-          className="max-w-full max-h-full object-contain group-hover:scale-105 transition-transform duration-300"
-        />
-
-        {descriptionText && (
-          <div className="absolute inset-0 bg-black bg-opacity-90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex items-center justify-center">
-            <p className="text-white text-sm leading-relaxed overflow-y-auto max-h-full">
-              {descriptionText}
-            </p>
-          </div>
-        )}
-
-        <button className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors opacity-0 group-hover:opacity-100 z-10">
-          <Heart className="h-5 w-5 text-gray-600" />
-        </button>
-        <div className="absolute top-3 left-3 z-10">
-          <span className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-2 py-1 rounded text-xs font-medium">
+      <div className="relative rounded-t-lg">
+        <div className="absolute top-2 left-2 z-10">
+          <span className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-2 py-1 rounded text-xs font-medium shadow-md">
             {category}
           </span>
+        </div>
+
+        <button className="absolute top-2 right-2 p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors opacity-0 group-hover:opacity-100 z-10">
+          <Heart className="h-5 w-5 text-gray-600" />
+        </button>
+
+        <div className="relative overflow-hidden rounded-t-lg bg-gray-100 pt-10 pb-4 px-4 flex items-center justify-center" style={{ minHeight: '240px' }}>
+          <img
+            src={image}
+            alt={name}
+            className="max-w-full h-auto object-contain group-hover:scale-105 transition-transform duration-300"
+            style={{ maxHeight: '180px' }}
+          />
+
+          {descriptionText && (
+            <div className="absolute inset-0 bg-black bg-opacity-90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex items-center justify-center">
+              <p className="text-white text-sm leading-relaxed overflow-y-auto max-h-full">
+                {descriptionText}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
