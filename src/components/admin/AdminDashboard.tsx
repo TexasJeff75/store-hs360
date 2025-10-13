@@ -11,6 +11,7 @@ import CommissionManagement from './CommissionManagement';
 import SalesRepAssignment from './SalesRepAssignment';
 import SalesRepDashboard from './SalesRepDashboard';
 import CustomerPaymentMethods from './CustomerPaymentMethods';
+import LoginAuditLog from './LoginAuditLog';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -85,12 +86,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
       case 'payments':
         return <CustomerPaymentMethods organizationId={isCustomer ? userOrgId : undefined} />;
       case 'analytics':
-        return (
-          <div className="p-6 text-center text-gray-500">
-            <BarChart3 className="h-16 w-16 mx-auto mb-4" />
-            <p>Analytics dashboard coming soon...</p>
-          </div>
-        );
+        return <LoginAuditLog />;
       default:
         return null;
     }
