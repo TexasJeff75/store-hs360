@@ -13,6 +13,7 @@ import Cart from '@/components/Cart';
 import Footer from '@/components/Footer';
 import OrganizationSelector from '@/components/OrganizationSelector';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
+import FavoritesDebug from '@/components/FavoritesDebug';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
 import { checkoutService, CartLineItem } from '@/services/checkout';
 import { useErrorLogger } from '@/hooks/useErrorLogger';
@@ -666,6 +667,7 @@ function AppContent() {
         />
 
         <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
+        <FavoritesDebug />
       </div>
   );
 }
