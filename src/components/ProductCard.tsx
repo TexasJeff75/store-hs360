@@ -54,9 +54,14 @@ const ProductCard: React.FC<ProductCardProps> = ({
   }, [isAnimating, favorited]);
 
   const handleFavoriteClick = (e: React.MouseEvent) => {
+    console.log('❤️ Heart button clicked!', { id, user: user?.email });
     e.stopPropagation();
+    e.preventDefault();
     if (user) {
+      console.log('✓ User is logged in, toggling favorite');
       toggleFavorite(id);
+    } else {
+      console.log('✗ User not logged in');
     }
   };
   const getDescriptionText = () => {

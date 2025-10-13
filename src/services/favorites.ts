@@ -23,15 +23,17 @@ export const favoritesService = {
   },
 
   async addFavorite(userId: string, productId: number): Promise<boolean> {
+    console.log('🔹 Adding favorite:', { userId, productId });
     const { error } = await supabase
       .from('favorites')
       .insert({ user_id: userId, product_id: productId });
 
     if (error) {
-      console.error('Error adding favorite:', error);
+      console.error('❌ Error adding favorite:', error);
       return false;
     }
 
+    console.log('✅ Favorite added successfully');
     return true;
   },
 
