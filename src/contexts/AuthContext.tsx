@@ -205,26 +205,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('Sign in result:', { error });
 
     if (!error && data.user) {
-      try {
-        const { error: auditError } = await supabase
-          .from('login_audit')
-          .insert([
-            {
-              user_id: data.user.id,
-              email: data.user.email,
-              age_verified: ageVerified,
-              login_timestamp: new Date().toISOString(),
-            },
-          ]);
+      // Log audit record asynchronously without blocking login
+      setTimeout(async () => {
+        try {
+          const { error: auditError } = await supabase
+            .from('login_audit')
+            .insert([
+              {
+                user_id: data.user.id,
+                email: data.user.email,
+                age_verified: ageVerified,
+                login_timestamp: new Date().toISOString(),
+              },
+            ]);
 
-        if (auditError) {
-          console.error('Error logging audit record:', auditError);
-        } else {
-          console.log('Login audit record created successfully');
+          if (auditError) {
+            console.error('Error logging audit record:', auditError);
+          } else {
+            console.log('Login audit record created successfully');
+          }
+        } catch (auditException) {
+          console.error('Failed to create audit log:', auditException);
         }
-      } catch (auditException) {
-        console.error('Failed to create audit log:', auditException);
-      }
+      }, 100);
     }
 
     return { error };
