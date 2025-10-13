@@ -9,7 +9,7 @@ interface AuthContextType {
   profile: Profile | null;
   loading: boolean;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string, ageVerified: boolean) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: any }>;
 }
@@ -195,14 +195,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string, ageVerified: boolean) => {
     console.log('Attempting sign in for:', email);
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     console.log('Sign in result:', { error });
+
+    if (!error && data.user) {
+      try {
+        const { error: auditError } = await supabase
+          .from('login_audit')
+          .insert([
+            {
+              user_id: data.user.id,
+              email: data.user.email,
+              age_verified: ageVerified,
+              login_timestamp: new Date().toISOString(),
+            },
+          ]);
+
+        if (auditError) {
+          console.error('Error logging audit record:', auditError);
+        } else {
+          console.log('Login audit record created successfully');
+        }
+      } catch (auditException) {
+        console.error('Failed to create audit log:', auditException);
+      }
+    }
+
     return { error };
   };
 

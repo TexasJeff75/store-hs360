@@ -13,6 +13,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [ageVerified, setAgeVerified] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -23,6 +24,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
     setEmail('');
     setPassword('');
     setConfirmPassword('');
+    setAgeVerified(false);
     setError(null);
     setSuccess(null);
   };
@@ -39,6 +41,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
     setError(null);
     setSuccess(null);
 
+    if (!ageVerified) {
+      setError('You must verify that you are 21 years or older to continue');
+      setLoading(false);
+      return;
+    }
+
     if (mode === 'signup' && password !== confirmPassword) {
       setError('Passwords do not match');
       setLoading(false);
@@ -54,7 +62,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
     try {
       if (mode === 'signin') {
         console.log('Attempting sign in...');
-        const { error } = await signIn(email, password);
+        const { error } = await signIn(email, password, ageVerified);
         if (error) {
           console.error('Sign in error:', error);
           if (error.message.includes('Invalid login credentials')) {
@@ -202,6 +210,21 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                   </div>
                 </div>
               )}
+
+              {/* Age Verification Checkbox */}
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <label className="flex items-start space-x-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={ageVerified}
+                    onChange={(e) => setAgeVerified(e.target.checked)}
+                    className="mt-1 h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
+                  />
+                  <span className="text-sm text-gray-700">
+                    <strong className="font-semibold text-gray-900">Age Verification Required:</strong> I certify that I am 21 years of age or older and agree to comply with all applicable laws regarding the purchase of health products.
+                  </span>
+                </label>
+              </div>
 
               {/* Submit Button */}
               <button
