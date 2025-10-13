@@ -91,9 +91,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
         <button
           onClick={handleFavoriteClick}
           className={`absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full shadow-md hover:bg-white transition-all z-20 ${
-            user ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            user ? 'opacity-100 cursor-pointer' : 'opacity-0 group-hover:opacity-100 cursor-not-allowed'
           }`}
-          disabled={!user}
+          type="button"
         >
           <motion.div
             animate={{
