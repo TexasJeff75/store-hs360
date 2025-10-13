@@ -134,11 +134,11 @@ const ProductModal: React.FC<ProductModalProps> = ({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Product Images */}
               <div className="space-y-4">
-                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                  <img 
-                    src={productImages[selectedImageIndex]} 
+                <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
+                  <img
+                    src={productImages[selectedImageIndex]}
                     alt={product.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                   />
                 </div>
                 
