@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShoppingCart, Star, Tag, Plus, Minus, Heart } from 'lucide-react';
+import { X, ShoppingCart, Star, Tag, Plus, Minus, Heart, Repeat } from 'lucide-react';
 import { Product } from '../services/bigcommerce';
 import PriceDisplay from './PriceDisplay';
 import { contractPricingService, ContractPrice } from '../services/contractPricing';
 import { useAuth } from '../contexts/AuthContext';
 import { useFavorites } from '../contexts/FavoritesContext';
+import SubscribeModal from './SubscribeModal';
 
 interface ProductModalProps {
   product: Product | null;
@@ -25,6 +26,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [contractPrices, setContractPrices] = useState<ContractPrice[]>([]);
   const [loadingPrices, setLoadingPrices] = useState(false);
+  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
   const { user, profile } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
 
@@ -327,31 +329,40 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     </div>
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="space-y-3">
+                    <div className="flex gap-3">
+                      <button
+                        onClick={handleFavoriteClick}
+                        className="p-3 border-2 rounded-lg transition-all hover:scale-105 active:scale-95 flex items-center justify-center"
+                        style={{
+                          borderColor: favorited ? '#ef4444' : '#e5e7eb',
+                          backgroundColor: favorited ? '#fef2f2' : 'white'
+                        }}
+                        type="button"
+                        aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
+                      >
+                        <Heart
+                          className={`h-6 w-6 transition-colors ${
+                            favorited
+                              ? 'text-red-500 fill-red-500'
+                              : 'text-gray-400 hover:text-red-400'
+                          }`}
+                        />
+                      </button>
+                      <button
+                        onClick={handleAddToCart}
+                        className="flex-1 bg-gradient-to-r from-pink-500 to-orange-500 text-white py-3 px-6 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center space-x-2 text-lg font-semibold"
+                      >
+                        <ShoppingCart className="h-5 w-5" />
+                        <span>Add {quantity} to Cart</span>
+                      </button>
+                    </div>
                     <button
-                      onClick={handleFavoriteClick}
-                      className="p-3 border-2 rounded-lg transition-all hover:scale-105 active:scale-95 flex items-center justify-center"
-                      style={{
-                        borderColor: favorited ? '#ef4444' : '#e5e7eb',
-                        backgroundColor: favorited ? '#fef2f2' : 'white'
-                      }}
-                      type="button"
-                      aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
+                      onClick={() => setShowSubscribeModal(true)}
+                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 flex items-center justify-center space-x-2 text-lg font-semibold border-2 border-transparent"
                     >
-                      <Heart
-                        className={`h-6 w-6 transition-colors ${
-                          favorited
-                            ? 'text-red-500 fill-red-500'
-                            : 'text-gray-400 hover:text-red-400'
-                        }`}
-                      />
-                    </button>
-                    <button
-                      onClick={handleAddToCart}
-                      className="flex-1 bg-gradient-to-r from-pink-500 to-orange-500 text-white py-3 px-6 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center space-x-2 text-lg font-semibold"
-                    >
-                      <ShoppingCart className="h-5 w-5" />
-                      <span>Add {quantity} to Cart</span>
+                      <Repeat className="h-5 w-5" />
+                      <span>Subscribe & Save 10%</span>
                     </button>
                   </div>
                 </div>
@@ -390,6 +401,16 @@ const ProductModal: React.FC<ProductModalProps> = ({
           </div>
         </div>
       </div>
+
+      {product && (
+        <SubscribeModal
+          isOpen={showSubscribeModal}
+          onClose={() => setShowSubscribeModal(false)}
+          productId={product.id}
+          productName={product.name}
+          productPrice={product.price}
+        />
+      )}
     </div>
   );
 };
