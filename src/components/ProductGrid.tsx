@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart, Star, Heart } from 'lucide-react';
+import { ShoppingCart, Star } from 'lucide-react';
 import { Product } from '../services/bigcommerce';
 import PriceDisplay from './PriceDisplay';
 
@@ -58,9 +58,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
               </div>
             )}
 
-            <button className="absolute top-3 right-3 p-2 bg-white rounded-full shadow-sm hover:bg-gray-50 transition-colors opacity-0 group-hover:opacity-100 z-10">
-              <Heart className="h-5 w-5 text-gray-600" />
-            </button>
             <div className="absolute top-3 left-3 z-10">
               <span className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-2 py-1 rounded text-xs font-medium">
                 {product.category}
