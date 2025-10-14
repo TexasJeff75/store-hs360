@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShoppingCart, Star, Tag, Plus, Minus, Heart, Share2 } from 'lucide-react';
+import { X, ShoppingCart, Star, Tag, Plus, Minus, Heart } from 'lucide-react';
 import { Product } from '../services/bigcommerce';
 import PriceDisplay from './PriceDisplay';
 import { contractPricingService, ContractPrice } from '../services/contractPricing';
 import { useAuth } from '../contexts/AuthContext';
+import { useFavorites } from '../contexts/FavoritesContext';
 
 interface ProductModalProps {
   product: Product | null;
@@ -25,6 +26,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
   const [contractPrices, setContractPrices] = useState<ContractPrice[]>([]);
   const [loadingPrices, setLoadingPrices] = useState(false);
   const { user, profile } = useAuth();
+  const { isFavorite, toggleFavorite } = useFavorites();
 
   useEffect(() => {
     const fetchContractPrices = async () => {
@@ -67,9 +69,25 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
   if (!isOpen || !product) return null;
 
+  const favorited = user ? isFavorite(product.id) : false;
+
+  const handleFavoriteClick = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    e.preventDefault();
+
+    if (!user) {
+      return;
+    }
+
+    try {
+      await toggleFavorite(product.id);
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+    }
+  };
+
   const handleAddToCart = () => {
     onAddToCart(product.id, quantity);
-    // Show success feedback or close modal
     setTimeout(() => {
       onClose();
     }, 500);
@@ -105,28 +123,12 @@ const ProductModal: React.FC<ProductModalProps> = ({
             <h2 className="text-xl font-semibold text-gray-900 truncate pr-4">
               {product.name}
             </h2>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => {/* Add to wishlist functionality */}}
-                className="p-2 text-gray-400 hover:text-red-500 rounded-full hover:bg-gray-100 transition-colors"
-                title="Add to wishlist"
-              >
-                <Heart className="h-5 w-5" />
-              </button>
-              <button
-                onClick={() => {/* Share functionality */}}
-                className="p-2 text-gray-400 hover:text-blue-500 rounded-full hover:bg-gray-100 transition-colors"
-                title="Share product"
-              >
-                <Share2 className="h-5 w-5" />
-              </button>
-              <button
-                onClick={onClose}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
+            <button
+              onClick={onClose}
+              className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
           </div>
 
           {/* Content */}
@@ -325,13 +327,33 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleAddToCart}
-                    className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-3 px-6 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center space-x-2 text-lg font-semibold"
-                  >
-                    <ShoppingCart className="h-5 w-5" />
-                    <span>Add {quantity} to Cart</span>
-                  </button>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={handleFavoriteClick}
+                      className="p-3 border-2 rounded-lg transition-all hover:scale-105 active:scale-95 flex items-center justify-center"
+                      style={{
+                        borderColor: favorited ? '#ef4444' : '#e5e7eb',
+                        backgroundColor: favorited ? '#fef2f2' : 'white'
+                      }}
+                      type="button"
+                      aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
+                    >
+                      <Heart
+                        className={`h-6 w-6 transition-colors ${
+                          favorited
+                            ? 'text-red-500 fill-red-500'
+                            : 'text-gray-400 hover:text-red-400'
+                        }`}
+                      />
+                    </button>
+                    <button
+                      onClick={handleAddToCart}
+                      className="flex-1 bg-gradient-to-r from-pink-500 to-orange-500 text-white py-3 px-6 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center space-x-2 text-lg font-semibold"
+                    >
+                      <ShoppingCart className="h-5 w-5" />
+                      <span>Add {quantity} to Cart</span>
+                    </button>
+                  </div>
                 </div>
 
                 {/* Additional Product Info */}

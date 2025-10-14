@@ -1,6 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useRef } from 'react';
 import { Star, Heart, ShoppingCart } from 'lucide-react';
-import { motion } from 'framer-motion';
 import PriceDisplay from './PriceDisplay';
 import { useFavorites } from '../contexts/FavoritesContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -35,23 +34,10 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onAddToCart
 }) => {
   const { user } = useAuth();
-  const { isFavorite, toggleFavorite, animatingProductId } = useFavorites();
-  const [showAnimation, setShowAnimation] = useState(false);
+  const { isFavorite, toggleFavorite } = useFavorites();
   const cardRef = useRef<HTMLDivElement>(null);
-  const [animationStart, setAnimationStart] = useState({ x: 0, y: 0 });
 
   const favorited = user ? isFavorite(id) : false;
-  const isAnimating = animatingProductId === id;
-
-  useEffect(() => {
-    if (isAnimating && !favorited && cardRef.current) {
-      // Get card position for animation start point
-      const rect = cardRef.current.getBoundingClientRect();
-      setAnimationStart({ x: rect.left + rect.width / 2, y: rect.top + 50 });
-      setShowAnimation(true);
-      setTimeout(() => setShowAnimation(false), 1000);
-    }
-  }, [isAnimating, favorited]);
 
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     console.log('❤️ Heart button clicked!', { productId: id, user: user?.email, userId: user?.id });
@@ -94,48 +80,6 @@ const ProductCard: React.FC<ProductCardProps> = ({
             {category}
           </span>
         </div>
-
-        <button
-          onClick={handleFavoriteClick}
-          className="absolute top-2 right-2 p-3 bg-white rounded-full shadow-lg hover:shadow-xl cursor-pointer z-50 transition-all hover:scale-110 active:scale-95"
-          type="button"
-          aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
-        >
-          <Heart
-            className={`h-5 w-5 transition-colors ${
-              favorited
-                ? 'text-red-500 fill-red-500'
-                : 'text-gray-400 hover:text-red-400'
-            }`}
-          />
-        </button>
-
-        {/* Flying heart animation */}
-        {showAnimation && (
-          <motion.div
-            initial={{
-              position: 'fixed',
-              left: animationStart.x,
-              top: animationStart.y,
-              opacity: 1,
-              scale: 1
-            }}
-            animate={{
-              left: 100,
-              top: window.innerHeight / 2,
-              opacity: 0,
-              scale: 0.5
-            }}
-            transition={{
-              duration: 0.8,
-              ease: 'easeInOut'
-            }}
-            className="pointer-events-none z-40"
-            style={{ pointerEvents: 'none' }}
-          >
-            <Heart className="h-8 w-8 text-red-500 fill-red-500" />
-          </motion.div>
-        )}
 
         <div className="relative overflow-hidden rounded-lg bg-white">
           <img
@@ -199,14 +143,34 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <p className="text-xs text-gray-500 mt-1">+ tax</p>
         </div>
 
-        {/* Add to Cart Button */}
-        <button 
-          onClick={() => onAddToCart(id)}
-          className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-2 px-4 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center space-x-2"
-        >
-          <ShoppingCart className="h-4 w-4" />
-          <span>Add to Cart</span>
-        </button>
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={handleFavoriteClick}
+            className="p-2 border-2 rounded-lg transition-all hover:scale-105 active:scale-95 flex items-center justify-center"
+            style={{
+              borderColor: favorited ? '#ef4444' : '#e5e7eb',
+              backgroundColor: favorited ? '#fef2f2' : 'white'
+            }}
+            type="button"
+            aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <Heart
+              className={`h-5 w-5 transition-colors ${
+                favorited
+                  ? 'text-red-500 fill-red-500'
+                  : 'text-gray-400 hover:text-red-400'
+              }`}
+            />
+          </button>
+          <button
+            onClick={() => onAddToCart(id)}
+            className="flex-1 bg-gradient-to-r from-pink-500 to-orange-500 text-white py-2 px-4 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center space-x-2"
+          >
+            <ShoppingCart className="h-4 w-4" />
+            <span>Add to Cart</span>
+          </button>
+        </div>
       </div>
     </div>
   );
