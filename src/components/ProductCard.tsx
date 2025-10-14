@@ -54,15 +54,21 @@ const ProductCard: React.FC<ProductCardProps> = ({
   }, [isAnimating, favorited]);
 
   const handleFavoriteClick = async (e: React.MouseEvent) => {
-    console.log('❤️ Heart button clicked!', { id, user: user?.email });
+    console.log('❤️ Heart button clicked!', { productId: id, user: user?.email, userId: user?.id });
     e.stopPropagation();
     e.preventDefault();
-    if (user) {
-      console.log('✓ User is logged in, toggling favorite');
+
+    if (!user) {
+      console.warn('✗ User not logged in, cannot add to favorites');
+      return;
+    }
+
+    console.log('✓ User is logged in, calling toggleFavorite');
+    try {
       await toggleFavorite(id);
-    } else {
-      console.log('✗ User not logged in');
-      alert('Please log in to add favorites');
+      console.log('✅ toggleFavorite completed');
+    } catch (error) {
+      console.error('❌ Error toggling favorite:', error);
     }
   };
   const getDescriptionText = () => {
@@ -89,19 +95,20 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </span>
         </div>
 
-        <div
+        <button
           onClick={handleFavoriteClick}
-          className="absolute top-2 right-2 p-3 bg-white rounded-full shadow-lg hover:shadow-xl cursor-pointer z-50"
-          style={{ pointerEvents: 'auto' }}
+          className="absolute top-2 right-2 p-3 bg-white rounded-full shadow-lg hover:shadow-xl cursor-pointer z-50 transition-all hover:scale-110 active:scale-95"
+          type="button"
+          aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
         >
           <Heart
-            className={`h-5 w-5 ${
+            className={`h-5 w-5 transition-colors ${
               favorited
                 ? 'text-red-500 fill-red-500'
-                : 'text-gray-400 hover:text-gray-600'
+                : 'text-gray-400 hover:text-red-400'
             }`}
           />
-        </div>
+        </button>
 
         {/* Flying heart animation */}
         {showAnimation && (

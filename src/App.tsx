@@ -13,11 +13,13 @@ import Cart from '@/components/Cart';
 import Footer from '@/components/Footer';
 import OrganizationSelector from '@/components/OrganizationSelector';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
+import Toast from '@/components/Toast';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
 import { checkoutService, CartLineItem } from '@/services/checkout';
 import { useErrorLogger } from '@/hooks/useErrorLogger';
 import { cacheService } from '@/services/cache';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFavorites } from '@/contexts/FavoritesContext';
 import { contractPricingService } from '@/services/contractPricing';
 import { supabase } from '@/services/supabase';
 
@@ -50,6 +52,7 @@ function AppContent() {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { errors, logError, clearErrors } = useErrorLogger();
   const { user, profile, loading: authLoading } = useAuth();
+  const { toastMessage, toastType, clearToast } = useFavorites();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isOrgSelectorOpen, setIsOrgSelectorOpen] = useState(false);
   const [selectedOrganization, setSelectedOrganization] = useState<any>(null);
@@ -666,6 +669,13 @@ function AppContent() {
         />
 
         <ErrorDebugPanel errors={errors} onClearErrors={clearErrors} />
+
+        <Toast
+          message={toastMessage || ''}
+          type={toastType || 'success'}
+          isVisible={!!toastMessage}
+          onClose={clearToast}
+        />
       </div>
   );
 }
