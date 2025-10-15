@@ -530,26 +530,52 @@ const CommissionManagement: React.FC = () => {
                 </div>
 
                 {selectedCommission.margin_details && selectedCommission.margin_details.length > 0 && (
-                  <div className="mt-4">
-                    <label className="text-sm font-semibold text-gray-700 mb-2 block">Margin Breakdown</label>
-                    <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                      {selectedCommission.margin_details.map((item: any, index: number) => (
-                        <div key={index} className="flex justify-between items-center text-sm">
-                          <div className="flex-1">
-                            <p className="font-medium">{item.name}</p>
-                            <p className="text-xs text-gray-500">
-                              ${Number(item.price).toFixed(2)} - ${Number(item.cost).toFixed(2)} = ${(Number(item.price) - Number(item.cost)).toFixed(2)} × {item.quantity}
-                            </p>
+                  <>
+                    <div className="mt-4">
+                      <label className="text-sm font-semibold text-gray-700 mb-2 block">Margin Breakdown</label>
+                      <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                        {selectedCommission.margin_details.map((item: any, index: number) => (
+                          <div key={index} className="flex justify-between items-center text-sm">
+                            <div className="flex-1">
+                              <p className="font-medium">{item.name}</p>
+                              <p className="text-xs text-gray-500">
+                                ${Number(item.price).toFixed(2)} - ${Number(item.cost).toFixed(2)} = ${(Number(item.price) - Number(item.cost)).toFixed(2)} × {item.quantity}
+                              </p>
+                            </div>
+                            <p className="font-semibold text-blue-600">${Number(item.margin).toFixed(2)}</p>
                           </div>
-                          <p className="font-semibold text-blue-600">${Number(item.margin).toFixed(2)}</p>
+                        ))}
+                        <div className="border-t pt-2 mt-2 flex justify-between font-semibold">
+                          <span>Total Product Margin:</span>
+                          <span className="text-blue-600">${Number(selectedCommission.product_margin).toFixed(2)}</span>
                         </div>
-                      ))}
-                      <div className="border-t pt-2 mt-2 flex justify-between font-semibold">
-                        <span>Total Product Margin:</span>
-                        <span className="text-blue-600">${Number(selectedCommission.product_margin).toFixed(2)}</span>
                       </div>
                     </div>
-                  </div>
+
+                    <div className="mt-4">
+                      <label className="text-sm font-semibold text-gray-700 mb-2 block">Commission Breakdown</label>
+                      <div className="bg-gray-50 rounded-lg p-4 space-y-2">
+                        {selectedCommission.margin_details.map((item: any, index: number) => {
+                          const itemCommission = Number(item.margin) * (Number(selectedCommission.commission_rate) / 100);
+                          return (
+                            <div key={index} className="flex justify-between items-center text-sm">
+                              <div className="flex-1">
+                                <p className="font-medium">{item.name}</p>
+                                <p className="text-xs text-gray-500">
+                                  ${Number(item.margin).toFixed(2)} × {Number(selectedCommission.commission_rate).toFixed(2)}%
+                                </p>
+                              </div>
+                              <p className="font-semibold text-green-600">${itemCommission.toFixed(2)}</p>
+                            </div>
+                          );
+                        })}
+                        <div className="border-t pt-2 mt-2 flex justify-between font-semibold">
+                          <span>Total Commission:</span>
+                          <span className="text-green-600">${Number(selectedCommission.commission_amount).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 {selectedCommission.notes && (
