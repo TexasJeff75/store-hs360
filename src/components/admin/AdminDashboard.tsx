@@ -12,15 +12,15 @@ import SalesRepAssignment from './SalesRepAssignment';
 import SalesRepDashboard from './SalesRepDashboard';
 import CustomerPaymentMethods from './CustomerPaymentMethods';
 import Analytics from './Analytics';
-import SubscriptionManagement from './SubscriptionManagement';
-import MySubscriptions from '../MySubscriptions';
+import RecurringOrderManagement from './RecurringOrderManagement';
+import MyRecurringOrders from '../MyRecurringOrders';
 
 interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'analytics' | 'my-orgs' | 'payments' | 'subscriptions' | 'my-subscriptions';
+type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'analytics' | 'my-orgs' | 'payments' | 'recurring-orders' | 'my-recurring-orders';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const { profile, user } = useAuth();
@@ -53,8 +53,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2, roles: ['admin'] },
     { id: 'users' as AdminTab, label: 'Users', icon: Users, roles: ['admin'] },
     { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep', 'customer'] },
-    { id: 'my-subscriptions' as AdminTab, label: 'My Subscriptions', icon: Repeat, roles: ['customer'] },
-    { id: 'subscriptions' as AdminTab, label: 'Subscriptions', icon: Repeat, roles: ['admin'] },
+    { id: 'my-recurring-orders' as AdminTab, label: 'My Recurring Orders', icon: Repeat, roles: ['customer'] },
+    { id: 'recurring-orders' as AdminTab, label: 'Recurring Orders', icon: Repeat, roles: ['admin'] },
     { id: 'locations' as AdminTab, label: 'Locations', icon: MapPin, roles: ['customer'] },
     { id: 'payments' as AdminTab, label: 'Payment Methods', icon: CreditCard, roles: ['customer'] },
     { id: 'salesreps' as AdminTab, label: 'Sales Reps', icon: UserCheck, roles: ['admin'] },
@@ -89,10 +89,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
         return <LocationManagement organizationId={isCustomer ? userOrgId : undefined} />;
       case 'payments':
         return <CustomerPaymentMethods organizationId={isCustomer ? userOrgId : undefined} />;
-      case 'subscriptions':
-        return <SubscriptionManagement />;
-      case 'my-subscriptions':
-        return <MySubscriptions />;
+      case 'recurring-orders':
+        return <RecurringOrderManagement />;
+      case 'my-recurring-orders':
+        return <MyRecurringOrders />;
       case 'analytics':
         return <Analytics />;
       default:

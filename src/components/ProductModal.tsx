@@ -5,7 +5,7 @@ import PriceDisplay from './PriceDisplay';
 import { contractPricingService, ContractPrice } from '../services/contractPricing';
 import { useAuth } from '../contexts/AuthContext';
 import { useFavorites } from '../contexts/FavoritesContext';
-import SubscribeModal from './SubscribeModal';
+import RecurringOrderModal from './RecurringOrderModal';
 
 interface ProductModalProps {
   product: Product | null;
@@ -26,7 +26,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
   const [contractPrices, setContractPrices] = useState<ContractPrice[]>([]);
   const [loadingPrices, setLoadingPrices] = useState(false);
-  const [showSubscribeModal, setShowSubscribeModal] = useState(false);
+  const [showRecurringOrderModal, setShowRecurringOrderModal] = useState(false);
   const { user, profile } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
 
@@ -358,7 +358,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                       </button>
                     </div>
                     <button
-                      onClick={() => setShowSubscribeModal(true)}
+                      onClick={() => setShowRecurringOrderModal(true)}
                       className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 flex items-center justify-center space-x-2 text-lg font-semibold border-2 border-transparent"
                     >
                       <Repeat className="h-5 w-5" />
@@ -403,9 +403,9 @@ const ProductModal: React.FC<ProductModalProps> = ({
       </div>
 
       {product && (
-        <SubscribeModal
-          isOpen={showSubscribeModal}
-          onClose={() => setShowSubscribeModal(false)}
+        <RecurringOrderModal
+          isOpen={showRecurringOrderModal}
+          onClose={() => setShowRecurringOrderModal(false)}
           productId={product.id}
           productName={product.name}
           productPrice={product.price}

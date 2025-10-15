@@ -20,23 +20,23 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const today = new Date().toISOString().split('T')[0];
-    console.log(`Processing subscriptions for date: ${today}`);
+    console.log(`Processing recurring orders for date: ${today}`);
 
-    const { data: dueSubscriptions, error: fetchError } = await supabase
-      .from('subscriptions')
+    const { data: dueRecurringOrders, error: fetchError } = await supabase
+      .from('recurring_orders')
       .select('*')
       .eq('status', 'active')
       .lte('next_order_date', today);
 
     if (fetchError) {
-      throw new Error(`Error fetching subscriptions: ${fetchError.message}`);
+      throw new Error(`Error fetching recurring orders: ${fetchError.message}`);
     }
 
-    if (!dueSubscriptions || dueSubscriptions.length === 0) {
+    if (!dueRecurringOrders || dueRecurringOrders.length === 0) {
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'No subscriptions due for processing',
+          message: 'No recurring orders due for processing',
           processed: 0,
         }),
         {
@@ -48,7 +48,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log(`Found ${dueSubscriptions.length} subscriptions to process`);
+    console.log(`Found ${dueRecurringOrders.length} recurring orders to process`);
 
     const results = {
       processed: 0,
@@ -56,24 +56,24 @@ Deno.serve(async (req: Request) => {
       errors: [] as string[],
     };
 
-    for (const subscription of dueSubscriptions) {
+    for (const recurring_order of dueRecurringOrders) {
       try {
-        console.log(`Processing subscription ${subscription.id}`);
+        console.log(`Processing recurring_order ${recurring_order.id}`);
 
         const nextOrderDate = calculateNextOrderDate(
-          subscription.next_order_date,
-          subscription.frequency,
-          subscription.frequency_interval
+          recurring_order.next_order_date,
+          recurring_order.frequency,
+          recurring_order.frequency_interval
         );
 
         const orderAmount = 100;
 
         const { error: orderInsertError } = await supabase
-          .from('subscription_orders')
+          .from('recurring_order_history')
           .insert({
-            subscription_id: subscription.id,
+            recurring_order_id: recurring_order.id,
             status: 'pending',
-            scheduled_date: subscription.next_order_date,
+            scheduled_date: recurring_order.next_order_date,
             amount: orderAmount,
           });
 
@@ -82,30 +82,30 @@ Deno.serve(async (req: Request) => {
         }
 
         const { error: updateError } = await supabase
-          .from('subscriptions')
+          .from('recurring_orders')
           .update({
             next_order_date: nextOrderDate,
             last_order_date: today,
-            total_orders: subscription.total_orders + 1,
+            total_orders: recurring_order.total_orders + 1,
           })
-          .eq('id', subscription.id);
+          .eq('id', recurring_order.id);
 
         if (updateError) {
-          throw new Error(`Error updating subscription: ${updateError.message}`);
+          throw new Error(`Error updating recurring_order: ${updateError.message}`);
         }
 
         results.processed++;
-        console.log(`Successfully processed subscription ${subscription.id}`);
+        console.log(`Successfully processed recurring_order ${recurring_order.id}`);
       } catch (error) {
         results.failed++;
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        results.errors.push(`Subscription ${subscription.id}: ${errorMessage}`);
-        console.error(`Failed to process subscription ${subscription.id}:`, error);
+        results.errors.push(`RecurringOrder ${recurring_order.id}: ${errorMessage}`);
+        console.error(`Failed to process recurring_order ${recurring_order.id}:`, error);
 
-        await supabase.from('subscription_orders').insert({
-          subscription_id: subscription.id,
+        await supabase.from('recurring_order_history').insert({
+          recurring_order_id: recurring_order.id,
           status: 'failed',
-          scheduled_date: subscription.next_order_date,
+          scheduled_date: recurring_order.next_order_date,
           amount: 0,
           error_message: errorMessage,
         });
@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Processed ${results.processed} subscriptions, ${results.failed} failed`,
+        message: `Processed ${results.processed} recurring orders, ${results.failed} failed`,
         ...results,
       }),
       {
@@ -128,7 +128,7 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error) {
-    console.error('Error in process-subscriptions function:', error);
+    console.error('Error in process-recurring_orders function:', error);
     return new Response(
       JSON.stringify({
         success: false,
