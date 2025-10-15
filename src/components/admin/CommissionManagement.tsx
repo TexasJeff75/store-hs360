@@ -556,16 +556,31 @@ const CommissionManagement: React.FC = () => {
                       <label className="text-sm font-semibold text-gray-700 mb-2 block">Commission Breakdown</label>
                       <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                         {selectedCommission.margin_details.map((item: any, index: number) => {
-                          const itemCommission = Number(item.margin) * (Number(selectedCommission.commission_rate) / 100);
+                          const hasMarkup = item.hasMarkup || false;
+                          const baseCommission = Number(item.baseCommission || 0);
+                          const markupCommission = Number(item.markupCommission || 0);
+                          const totalCommission = Number(item.totalCommission || 0);
+                          const baseMargin = Number(item.baseMargin || 0);
+                          const markupAmount = Number(item.markupAmount || 0);
+
                           return (
-                            <div key={index} className="flex justify-between items-center text-sm">
-                              <div className="flex-1">
+                            <div key={index} className="text-sm border-b border-gray-200 pb-2 last:border-b-0 last:pb-0">
+                              <div className="flex justify-between items-start mb-1">
                                 <p className="font-medium">{item.name}</p>
-                                <p className="text-xs text-gray-500">
-                                  ${Number(item.margin).toFixed(2)} × {Number(selectedCommission.commission_rate).toFixed(2)}%
-                                </p>
+                                <p className="font-semibold text-green-600">${totalCommission.toFixed(2)}</p>
                               </div>
-                              <p className="font-semibold text-green-600">${itemCommission.toFixed(2)}</p>
+                              <div className="ml-2 space-y-0.5">
+                                <div className="flex justify-between text-xs text-gray-600">
+                                  <span>Base Commission ({Number(selectedCommission.commission_rate).toFixed(2)}% of ${baseMargin.toFixed(2)})</span>
+                                  <span className="text-green-600">${baseCommission.toFixed(2)}</span>
+                                </div>
+                                {hasMarkup && markupCommission > 0 && (
+                                  <div className="flex justify-between text-xs text-gray-600">
+                                    <span>Markup Commission (100% of ${markupAmount.toFixed(2)})</span>
+                                    <span className="text-green-600 font-semibold">${markupCommission.toFixed(2)}</span>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
