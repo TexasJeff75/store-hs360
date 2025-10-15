@@ -5,8 +5,10 @@ export interface OrderItem {
   name: string;
   quantity: number;
   price: number;
+  retailPrice?: number;
   cost?: number;
   image?: string;
+  hasMarkup?: boolean;
 }
 
 export interface Address {

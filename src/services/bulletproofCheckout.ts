@@ -389,19 +389,37 @@ class BulletproofCheckoutService {
     }
 
     try {
+      const productIds = session.cart_items.map(item => item.productId);
+      let productCosts: { [key: number]: any } = {};
+
+      try {
+        console.log('[Bulletproof Checkout] Fetching product costs for commission calculation');
+        productCosts = await bcRestAPI.getProductCosts(productIds);
+        console.log('[Bulletproof Checkout] Product costs fetched:', productCosts);
+      } catch (costError) {
+        console.warn('[Bulletproof Checkout] Failed to fetch product costs:', costError);
+      }
+
       const orderData: CreateOrderData = {
         userId: session.user_id,
         bigcommerceCartId: session.cart_id || '',
-        items: session.cart_items.map(item => ({
-          productId: item.productId,
-          name: item.name,
-          quantity: item.quantity,
-          price: item.price,
-          retailPrice: item.retailPrice || item.price,
-          cost: item.cost || 0,
-          image: item.image,
-          hasMarkup: item.hasMarkup || false,
-        })),
+        items: session.cart_items.map(item => {
+          const costFromAPI = productCosts[item.productId]?.cost_price;
+          const finalCost = item.cost !== undefined && item.cost !== null && item.cost !== 0
+            ? item.cost
+            : (costFromAPI !== undefined && costFromAPI !== null ? costFromAPI : 0);
+
+          return {
+            productId: item.productId,
+            name: item.name,
+            quantity: item.quantity,
+            price: item.price,
+            retailPrice: item.retailPrice || item.price,
+            cost: finalCost,
+            image: item.image,
+            hasMarkup: item.hasMarkup || false,
+          };
+        }),
         subtotal: session.subtotal,
         tax: session.tax,
         shipping: session.shipping,
