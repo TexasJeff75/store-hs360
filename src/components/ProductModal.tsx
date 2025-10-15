@@ -359,10 +359,10 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     </div>
                     <button
                       onClick={() => setShowRecurringOrderModal(true)}
-                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 text-white py-3 px-6 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 flex items-center justify-center space-x-2 text-lg font-semibold border-2 border-transparent"
+                      className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white py-3 px-6 rounded-lg hover:from-blue-700 hover:to-cyan-700 transition-all duration-200 flex items-center justify-center space-x-2 text-lg font-semibold border-2 border-transparent"
                     >
                       <Repeat className="h-5 w-5" />
-                      <span>Subscribe & Save 10%</span>
+                      <span>Create Recurring Order</span>
                     </button>
                   </div>
                 </div>

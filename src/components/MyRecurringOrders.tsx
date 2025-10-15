@@ -145,11 +145,6 @@ const MyRecurringOrders: React.FC = () => {
                   <p className="text-sm text-gray-600">
                     Quantity: {recurringOrder.quantity} • {recurringOrderService.getFrequencyDisplay(recurringOrder.frequency, recurringOrder.frequency_interval)}
                   </p>
-                  {recurringOrder.discount_percentage > 0 && (
-                    <p className="text-sm text-green-600 font-medium mt-1">
-                      {recurringOrder.discount_percentage}% recurring order discount applied
-                    </p>
-                  )}
                 </div>
                 <div className="flex gap-2">
                   {recurringOrder.status === 'active' && (

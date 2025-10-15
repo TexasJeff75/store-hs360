@@ -33,8 +33,6 @@ const RecurringOrderModal: React.FC<RecurringOrderModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
-  const discountPercentage = 10;
-
   useEffect(() => {
     if (isOpen && user?.id) {
       loadUserData();
@@ -57,16 +55,8 @@ const RecurringOrderModal: React.FC<RecurringOrderModalProps> = ({
     }
   };
 
-  const calculateSavings = () => {
-    const regularTotal = productPrice * quantity;
-    const discount = regularTotal * (discountPercentage / 100);
-    return discount;
-  };
-
-  const calculateRecurringPrice = () => {
-    const regularTotal = productPrice * quantity;
-    const discount = regularTotal * (discountPercentage / 100);
-    return regularTotal - discount;
+  const calculateTotalPrice = () => {
+    return productPrice * quantity;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -84,7 +74,7 @@ const RecurringOrderModal: React.FC<RecurringOrderModalProps> = ({
       start_date: startDate,
       shipping_address_id: selectedAddressId || undefined,
       payment_method_id: selectedPaymentId || undefined,
-      discount_percentage: discountPercentage,
+      discount_percentage: 0,
       notes: notes || undefined
     });
 
@@ -131,8 +121,8 @@ const RecurringOrderModal: React.FC<RecurringOrderModalProps> = ({
                       <Repeat className="h-6 w-6" />
                     </div>
                     <div>
-                      <h3 className="text-xl font-bold">Set Up Recurring Order</h3>
-                      <p className="text-blue-100 text-sm">Get {discountPercentage}% off with recurring delivery</p>
+                      <h3 className="text-xl font-bold">Create Recurring Order</h3>
+                      <p className="text-blue-100 text-sm">Automate your regular purchases</p>
                     </div>
                   </div>
                   <button
@@ -254,23 +244,11 @@ const RecurringOrderModal: React.FC<RecurringOrderModalProps> = ({
                   />
                 </div>
 
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
-                  <div className="flex items-center gap-2 text-green-800 mb-2">
-                    <TrendingDown className="h-5 w-5" />
-                    <span className="font-semibold">Recurring Order Savings</span>
-                  </div>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                   <div className="space-y-1 text-sm">
-                    <div className="flex justify-between">
-                      <span>Regular Price:</span>
-                      <span>${(productPrice * quantity).toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-green-700 font-semibold">
-                      <span>You Save ({discountPercentage}%):</span>
-                      <span>-${calculateSavings().toFixed(2)}</span>
-                    </div>
-                    <div className="flex justify-between text-lg font-bold border-t border-green-200 pt-2 mt-2">
-                      <span>Recurring Order Price:</span>
-                      <span>${calculateRecurringPrice().toFixed(2)}</span>
+                    <div className="flex justify-between text-lg font-bold">
+                      <span>Total per Order:</span>
+                      <span>${calculateTotalPrice().toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
