@@ -71,64 +71,65 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
   if (!isOpen || !product) return null;
 
-  const favorited = user ? isFavorite(product.id) : false;
-
-  const getSafeDescription = () => {
-    try {
-      if (product.plainTextDescription) {
-        return product.plainTextDescription;
-      }
-      if (product.description) {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = product.description;
-        const scripts = tempDiv.querySelectorAll('script');
-        scripts.forEach(script => script.remove());
-        return tempDiv.innerHTML;
-      }
-      return '';
-    } catch (error) {
-      console.error('Error processing product description:', error);
-      return 'Description not available';
-    }
-  };
-
-  const handleFavoriteClick = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    e.preventDefault();
-
-    if (!user) {
-      return;
-    }
-
-    try {
-      await toggleFavorite(product.id);
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-    }
-  };
-
-  const handleAddToCart = () => {
-    onAddToCart(product.id, quantity);
-    setTimeout(() => {
-      onClose();
-    }, 500);
-  };
-
-  const incrementQuantity = () => {
-    setQuantity(prev => prev + 1);
-  };
-
-  const decrementQuantity = () => {
-    setQuantity(prev => Math.max(1, prev - 1));
-  };
-
-  // Mock additional images - in real implementation, these would come from BigCommerce
-  const productImages = [
-    product.image,
-    // Add more images here when available from BigCommerce
-  ];
-
   try {
+    console.log('Rendering ProductModal for product:', product.name, 'ID:', product.id);
+
+    const favorited = user ? isFavorite(product.id) : false;
+
+    const getSafeDescription = () => {
+      try {
+        if (product.plainTextDescription) {
+          return product.plainTextDescription;
+        }
+        if (product.description) {
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = product.description;
+          const scripts = tempDiv.querySelectorAll('script');
+          scripts.forEach(script => script.remove());
+          return tempDiv.innerHTML;
+        }
+        return '';
+      } catch (error) {
+        console.error('Error processing product description:', error);
+        return 'Description not available';
+      }
+    };
+
+    const handleFavoriteClick = async (e: React.MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+
+      if (!user) {
+        return;
+      }
+
+      try {
+        await toggleFavorite(product.id);
+      } catch (error) {
+        console.error('Error toggling favorite:', error);
+      }
+    };
+
+    const handleAddToCart = () => {
+      onAddToCart(product.id, quantity);
+      setTimeout(() => {
+        onClose();
+      }, 500);
+    };
+
+    const incrementQuantity = () => {
+      setQuantity(prev => prev + 1);
+    };
+
+    const decrementQuantity = () => {
+      setQuantity(prev => Math.max(1, prev - 1));
+    };
+
+    // Mock additional images - in real implementation, these would come from BigCommerce
+    const productImages = [
+      product.image,
+      // Add more images here when available from BigCommerce
+    ];
     return (
       <div className="fixed inset-0 z-50 overflow-y-auto">
         <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -199,22 +200,22 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     {product.category}
                   </span>
                   
-                  {product.rating > 0 && (
+                  {product.rating && product.rating > 0 && (
                     <div className="flex items-center space-x-1">
                       <div className="flex items-center">
                         {[...Array(5)].map((_, i) => (
                           <Star
                             key={i}
                             className={`h-4 w-4 ${
-                              i < Math.floor(product.rating) 
-                                ? 'text-yellow-400 fill-current' 
+                              i < Math.floor(product.rating || 0)
+                                ? 'text-yellow-400 fill-current'
                                 : 'text-gray-300'
                             }`}
                           />
                         ))}
                       </div>
                       <span className="text-sm text-gray-600">
-                        {product.rating.toFixed(1)} ({product.reviews} reviews)
+                        {product.rating.toFixed(1)} ({product.reviews || 0} reviews)
                       </span>
                     </div>
                   )}
@@ -294,12 +295,12 @@ const ProductModal: React.FC<ProductModalProps> = ({
                 )}
 
                 {/* Benefits */}
-                {product.benefits.length > 0 && (
+                {product.benefits && Array.isArray(product.benefits) && product.benefits.length > 0 && (
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-3">Key Benefits</h3>
                     <div className="flex flex-wrap gap-2">
                       {product.benefits.map((benefit, index) => (
-                        <span 
+                        <span
                           key={index}
                           className="inline-flex px-3 py-1 text-sm font-medium rounded-full bg-blue-100 text-blue-800"
                         >
