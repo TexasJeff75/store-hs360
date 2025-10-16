@@ -37,7 +37,11 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
               src={product.image}
               alt={product.name}
               className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
-              onClick={() => onProductClick(product)}
+              onClick={() => {
+                console.log('🖱️ Product clicked in grid:', product.name, 'ID:', product.id);
+                console.log('Product data:', product);
+                onProductClick(product);
+              }}
             />
 
             {/* Description overlay on hover */}
@@ -66,9 +70,12 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
           </div>
 
           <div className="p-4">
-            <h3 
+            <h3
               className="font-semibold text-gray-900 mb-2 line-clamp-2 cursor-pointer hover:text-pink-600 transition-colors"
-              onClick={() => onProductClick(product)}
+              onClick={() => {
+                console.log('🖱️ Product name clicked:', product.name);
+                onProductClick(product);
+              }}
             >
               {product.name}
             </h3>
@@ -93,11 +100,11 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
             )}
 
             {/* Benefits */}
-            {product.benefits.length > 0 && (
+            {product.benefits && Array.isArray(product.benefits) && product.benefits.length > 0 && (
               <div className="mb-3">
                 <div className="flex flex-wrap gap-1">
                   {product.benefits.slice(0, 2).map((benefit, index) => (
-                    <span 
+                    <span
                       key={index}
                       className="text-xs bg-pink-50 text-pink-700 px-2 py-1 rounded-full"
                     >

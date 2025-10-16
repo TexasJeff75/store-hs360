@@ -54,6 +54,13 @@ function AppContent() {
   const { errors, logError, clearErrors } = useErrorLogger();
   const { user, profile, loading: authLoading, isPasswordRecovery } = useAuth();
   const { toastMessage, toastType, clearToast } = useFavorites();
+
+  useEffect(() => {
+    console.log('🔄 Modal state changed:', {
+      isProductModalOpen,
+      selectedProduct: selectedProduct ? selectedProduct.name : 'null'
+    });
+  }, [isProductModalOpen, selectedProduct]);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isOrgSelectorOpen, setIsOrgSelectorOpen] = useState(false);
   const [selectedOrganization, setSelectedOrganization] = useState<any>(null);
@@ -261,11 +268,16 @@ function AppContent() {
   };
 
   const handleProductClick = (product: Product) => {
+    console.log('📦 handleProductClick called with product:', product.name, 'ID:', product.id);
+    console.log('Full product object:', product);
     setSelectedProduct(product);
+    console.log('✅ setSelectedProduct called');
     setIsProductModalOpen(true);
+    console.log('✅ setIsProductModalOpen(true) called');
   };
 
   const handleCloseProductModal = () => {
+    console.log('❌ handleCloseProductModal called');
     setIsProductModalOpen(false);
     setSelectedProduct(null);
   };
