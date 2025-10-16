@@ -73,6 +73,25 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
   const favorited = user ? isFavorite(product.id) : false;
 
+  const getSafeDescription = () => {
+    try {
+      if (product.plainTextDescription) {
+        return product.plainTextDescription;
+      }
+      if (product.description) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = product.description;
+        const scripts = tempDiv.querySelectorAll('script');
+        scripts.forEach(script => script.remove());
+        return tempDiv.innerHTML;
+      }
+      return '';
+    } catch (error) {
+      console.error('Error processing product description:', error);
+      return 'Description not available';
+    }
+  };
+
   const handleFavoriteClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
@@ -109,14 +128,15 @@ const ProductModal: React.FC<ProductModalProps> = ({
     // Add more images here when available from BigCommerce
   ];
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        {/* Background overlay */}
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 transition-opacity" 
-          onClick={onClose}
-        ></div>
+  try {
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+          {/* Background overlay */}
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+            onClick={onClose}
+          ></div>
         
         {/* Modal panel */}
         <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
@@ -295,8 +315,10 @@ const ProductModal: React.FC<ProductModalProps> = ({
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900 mb-3">Description</h3>
                     <div className="prose prose-sm text-gray-600">
-                      {product.description ? (
-                        <div dangerouslySetInnerHTML={{ __html: product.description }} />
+                      {product.plainTextDescription ? (
+                        <p>{product.plainTextDescription}</p>
+                      ) : product.description ? (
+                        <div dangerouslySetInnerHTML={{ __html: getSafeDescription() }} />
                       ) : (
                         <p>{product.plainTextDescription}</p>
                       )}
@@ -402,17 +424,40 @@ const ProductModal: React.FC<ProductModalProps> = ({
         </div>
       </div>
 
-      {product && (
-        <RecurringOrderModal
-          isOpen={showRecurringOrderModal}
-          onClose={() => setShowRecurringOrderModal(false)}
-          productId={product.id}
-          productName={product.name}
-          productPrice={product.price}
-        />
-      )}
-    </div>
-  );
+        {product && (
+          <RecurringOrderModal
+            isOpen={showRecurringOrderModal}
+            onClose={() => setShowRecurringOrderModal(false)}
+            productId={product.id}
+            productName={product.name}
+            productPrice={product.price}
+          />
+        )}
+      </div>
+    );
+  } catch (error) {
+    console.error('Error rendering ProductModal:', error, 'Product:', product);
+    return (
+      <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20">
+          <div
+            className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+            onClick={onClose}
+          ></div>
+          <div className="relative bg-white rounded-lg p-8 max-w-md">
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to display product</h3>
+            <p className="text-gray-600 mb-4">There was an error loading this product's details.</p>
+            <button
+              onClick={onClose}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 };
 
 export default ProductModal;
