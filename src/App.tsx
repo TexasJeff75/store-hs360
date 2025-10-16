@@ -4,6 +4,7 @@ import { FavoritesProvider } from '@/contexts/FavoritesContext';
 import Header from '@/components/Header';
 import AuthModal from '@/components/AuthModal';
 import UserProfile from '@/components/UserProfile';
+import ResetPassword from '@/components/ResetPassword';
 import AdminDashboard from '@/components/admin/AdminDashboard';
 import ProductGrid from '@/components/ProductGrid';
 import ProductFilter from '@/components/ProductFilter';
@@ -51,7 +52,7 @@ function AppContent() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { errors, logError, clearErrors } = useErrorLogger();
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, isPasswordRecovery } = useAuth();
   const { toastMessage, toastType, clearToast } = useFavorites();
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isOrgSelectorOpen, setIsOrgSelectorOpen] = useState(false);
@@ -378,6 +379,10 @@ function AppContent() {
         />
       </div>
     );
+  }
+
+  if (isPasswordRecovery) {
+    return <ResetPassword onComplete={() => window.location.reload()} />;
   }
 
   return (
