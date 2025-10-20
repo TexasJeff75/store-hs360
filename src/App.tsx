@@ -270,6 +270,17 @@ function AppContent() {
   const handleProductClick = (product: Product) => {
     console.log('📦 handleProductClick called with product:', product.name, 'ID:', product.id);
     console.log('Full product object:', product);
+
+    // Add to window for debugging
+    if (typeof window !== 'undefined') {
+      (window as any).lastClickedProduct = {
+        name: product.name,
+        id: product.id,
+        timestamp: new Date().toISOString()
+      };
+      console.log('💾 Saved to window.lastClickedProduct');
+    }
+
     setSelectedProduct(product);
     console.log('✅ setSelectedProduct called');
     setIsProductModalOpen(true);

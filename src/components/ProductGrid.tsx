@@ -40,6 +40,13 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
               onClick={() => {
                 console.log('🖱️ Product clicked in grid:', product.name, 'ID:', product.id);
                 console.log('Product data:', product);
+
+                // Special handling for Proxigene - pause debugger
+                if (product.name.toLowerCase().includes('proxigene')) {
+                  console.log('🧪 PROXIGENE DETECTED! Pausing for debugging...');
+                  debugger; // This will pause execution in the browser
+                }
+
                 onProductClick(product);
               }}
             />
@@ -47,15 +54,23 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
             {/* Description overlay on hover */}
             {(product.plainTextDescription || product.description) && (
               <div className="absolute inset-0 bg-black bg-opacity-90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex items-center justify-center cursor-pointer"
-                onClick={() => onProductClick(product)}>
+                onClick={() => {
+                  console.log('🖱️ Product overlay clicked:', product.name);
+                  onProductClick(product);
+                }}>
                 <p className="text-white text-sm leading-relaxed overflow-y-auto max-h-full">
                   {product.plainTextDescription
                     ? product.plainTextDescription.slice(0, 200) + (product.plainTextDescription.length > 200 ? '...' : '')
                     : (() => {
-                        const tempDiv = document.createElement('div');
-                        tempDiv.innerHTML = product.description || '';
-                        const text = tempDiv.textContent || tempDiv.innerText || '';
-                        return text.slice(0, 200) + (text.length > 200 ? '...' : '');
+                        try {
+                          const tempDiv = document.createElement('div');
+                          tempDiv.innerHTML = product.description || '';
+                          const text = tempDiv.textContent || tempDiv.innerText || '';
+                          return text.slice(0, 200) + (text.length > 200 ? '...' : '');
+                        } catch (error) {
+                          console.error('Error parsing product description for', product.name, error);
+                          return 'Description unavailable';
+                        }
                       })()
                   }
                 </p>
