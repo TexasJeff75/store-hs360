@@ -152,7 +152,8 @@ class CommissionService {
         .from('commissions')
         .select(`
           *,
-          distributor:distributors(id, name, code)
+          distributor:distributors(id, name, code),
+          sales_rep:profiles!sales_rep_id(id, email, full_name)
         `)
         .eq('sales_rep_id', salesRepId)
         .order('created_at', { ascending: false });
@@ -167,6 +168,55 @@ class CommissionService {
       return { commissions: data || [] };
     } catch (error) {
       console.error('Error fetching commissions:', error);
+      return {
+        commissions: [],
+        error: error instanceof Error ? error.message : 'Failed to fetch commissions'
+      };
+    }
+  }
+
+  async getDistributorCommissions(
+    distributorId: string,
+    status?: string
+  ): Promise<{ commissions: Commission[]; error?: string }> {
+    try {
+      // Get all sales reps under this distributor
+      const { data: salesReps, error: salesRepsError } = await supabase
+        .from('distributor_sales_reps')
+        .select('sales_rep_id')
+        .eq('distributor_id', distributorId)
+        .eq('is_active', true);
+
+      if (salesRepsError) throw salesRepsError;
+
+      const salesRepIds = salesReps?.map(sr => sr.sales_rep_id) || [];
+
+      if (salesRepIds.length === 0) {
+        return { commissions: [] };
+      }
+
+      // Get all commissions for these sales reps
+      let query = supabase
+        .from('commissions')
+        .select(`
+          *,
+          distributor:distributors(id, name, code),
+          sales_rep:profiles!sales_rep_id(id, email, full_name),
+          organization:organizations(id, name)
+        `)
+        .in('sales_rep_id', salesRepIds)
+        .order('created_at', { ascending: false });
+
+      if (status) {
+        query = query.eq('status', status);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      return { commissions: data || [] };
+    } catch (error) {
+      console.error('Error fetching distributor commissions:', error);
       return {
         commissions: [],
         error: error instanceof Error ? error.message : 'Failed to fetch commissions'
@@ -213,6 +263,75 @@ class CommissionService {
       return { summary };
     } catch (error) {
       console.error('Error fetching commission summary:', error);
+      return {
+        summary: null,
+        error: error instanceof Error ? error.message : 'Failed to fetch summary'
+      };
+    }
+  }
+
+  async getDistributorCommissionSummary(
+    distributorId: string
+  ): Promise<{ summary: CommissionSummary | null; error?: string }> {
+    try {
+      // Get all sales reps under this distributor
+      const { data: salesReps, error: salesRepsError } = await supabase
+        .from('distributor_sales_reps')
+        .select('sales_rep_id')
+        .eq('distributor_id', distributorId)
+        .eq('is_active', true);
+
+      if (salesRepsError) throw salesRepsError;
+
+      const salesRepIds = salesReps?.map(sr => sr.sales_rep_id) || [];
+
+      if (salesRepIds.length === 0) {
+        return {
+          summary: {
+            total_commissions: 0,
+            pending_amount: 0,
+            approved_amount: 0,
+            paid_amount: 0,
+            total_orders: 0
+          }
+        };
+      }
+
+      const { data, error } = await supabase
+        .from('commissions')
+        .select('distributor_commission, status')
+        .in('sales_rep_id', salesRepIds);
+
+      if (error) throw error;
+
+      const summary: CommissionSummary = {
+        total_commissions: 0,
+        pending_amount: 0,
+        approved_amount: 0,
+        paid_amount: 0,
+        total_orders: data?.length || 0
+      };
+
+      data?.forEach(commission => {
+        const amount = Number(commission.distributor_commission || 0);
+        summary.total_commissions += amount;
+
+        switch (commission.status) {
+          case 'pending':
+            summary.pending_amount += amount;
+            break;
+          case 'approved':
+            summary.approved_amount += amount;
+            break;
+          case 'paid':
+            summary.paid_amount += amount;
+            break;
+        }
+      });
+
+      return { summary };
+    } catch (error) {
+      console.error('Error fetching distributor commission summary:', error);
       return {
         summary: null,
         error: error instanceof Error ? error.message : 'Failed to fetch summary'

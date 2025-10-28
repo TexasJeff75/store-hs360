@@ -34,17 +34,24 @@ const CommissionManagement: React.FC = () => {
       setError(null);
       console.log('Fetching commissions for user:', user.id, 'role:', profile?.role);
 
-      if (profile?.role === 'sales_rep') {
-        const { commissions: distCommissions, error: distError } = await commissionService.getDistributorCommissions(
-          user.id,
-          statusFilter !== 'all' ? statusFilter : undefined
-        );
+      if (profile?.role === 'distributor') {
+        // Get distributor ID for this user
+        const { data: distributorData } = await supabase
+          .from('distributors')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('is_active', true)
+          .maybeSingle();
 
-        if (!distError && distCommissions.length > 0) {
+        if (distributorData) {
           setIsDistributor(true);
-          setCommissions(distCommissions);
+          const { commissions: data } = await commissionService.getDistributorCommissions(
+            distributorData.id,
+            statusFilter !== 'all' ? statusFilter : undefined
+          );
+          setCommissions(data);
 
-          const { summary: summaryData } = await commissionService.getDistributorCommissionSummary(user.id);
+          const { summary: summaryData } = await commissionService.getDistributorCommissionSummary(distributorData.id);
           if (summaryData) {
             setSummary({
               total: summaryData.total_commissions,
@@ -54,22 +61,24 @@ const CommissionManagement: React.FC = () => {
             });
           }
         } else {
-          setIsDistributor(false);
-          const { commissions: data } = await commissionService.getSalesRepCommissions(
-            user.id,
-            statusFilter !== 'all' ? statusFilter : undefined
-          );
-          setCommissions(data);
+          setError('Distributor record not found');
+        }
+      } else if (profile?.role === 'sales_rep') {
+        setIsDistributor(false);
+        const { commissions: data } = await commissionService.getSalesRepCommissions(
+          user.id,
+          statusFilter !== 'all' ? statusFilter : undefined
+        );
+        setCommissions(data);
 
-          const { summary: summaryData } = await commissionService.getSalesRepCommissionSummary(user.id);
-          if (summaryData) {
-            setSummary({
-              total: summaryData.total_commissions,
-              pending: summaryData.pending_amount,
-              approved: summaryData.approved_amount,
-              paid: summaryData.paid_amount
-            });
-          }
+        const { summary: summaryData } = await commissionService.getSalesRepCommissionSummary(user.id);
+        if (summaryData) {
+          setSummary({
+            total: summaryData.total_commissions,
+            pending: summaryData.pending_amount,
+            approved: summaryData.approved_amount,
+            paid: summaryData.paid_amount
+          });
         }
       } else if (profile?.role === 'admin') {
         const { commissions: data, error: fetchError } = await commissionService.getAllCommissions({
@@ -97,7 +106,7 @@ const CommissionManagement: React.FC = () => {
           paid: paidSum
         });
       } else {
-        console.log('User role not admin or sales_rep:', profile?.role);
+        console.log('User role not authorized:', profile?.role);
         setError('You do not have permission to view commissions');
       }
     } catch (error) {
@@ -403,7 +412,7 @@ const CommissionManagement: React.FC = () => {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sales Rep</th>
-                {profile?.role === 'admin' && (
+                {(profile?.role === 'admin' || profile?.role === 'distributor') && (
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
                 )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Total</th>
@@ -418,7 +427,7 @@ const CommissionManagement: React.FC = () => {
             <tbody className="bg-white">
               {filteredCommissions.length === 0 ? (
                 <tr>
-                  <td colSpan={profile?.role === 'admin' ? 10 : 9} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={(profile?.role === 'admin' || profile?.role === 'distributor') ? 10 : 9} className="px-6 py-12 text-center text-gray-500">
                     <DollarSign className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                     <p>No commissions found</p>
                   </td>
@@ -428,7 +437,7 @@ const CommissionManagement: React.FC = () => {
                   <React.Fragment key={group.key}>
                     {groupByMonth && (
                       <tr className="bg-gray-100 border-y-2 border-gray-300">
-                        <td colSpan={profile?.role === 'admin' ? 10 : 9} className="px-6 py-3">
+                        <td colSpan={(profile?.role === 'admin' || profile?.role === 'distributor') ? 10 : 9} className="px-6 py-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3">
                               <span className="font-bold text-gray-900 text-sm">
@@ -456,7 +465,7 @@ const CommissionManagement: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {commission.sales_rep?.email || 'N/A'}
                         </td>
-                        {profile?.role === 'admin' && (
+                        {(profile?.role === 'admin' || profile?.role === 'distributor') && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             {commission.organization?.name || 'N/A'}
                           </td>
