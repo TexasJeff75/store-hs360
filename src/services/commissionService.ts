@@ -50,7 +50,8 @@ class CommissionService {
   async assignSalesRepToOrganization(
     organizationId: string,
     salesRepId: string,
-    commissionRate: number = 5.0
+    commissionRate: number = 5.0,
+    distributorId?: string
   ): Promise<{ success: boolean; error?: string; data?: OrganizationSalesRep }> {
     try {
       const { data: existingRep } = await supabase
@@ -69,6 +70,7 @@ class CommissionService {
           organization_id: organizationId,
           sales_rep_id: salesRepId,
           commission_rate: commissionRate,
+          distributor_id: distributorId || null,
           is_active: true
         }, {
           onConflict: 'organization_id,sales_rep_id'
