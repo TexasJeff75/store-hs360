@@ -15,7 +15,7 @@ console.log('  Both configured:', !!(BC_STORE_HASH && BC_STOREFRONT_TOKEN));
 // BigCommerce Store Hash for checkout URLs
 export async function gql<T>(query: string, variables?: Record<string, any>): Promise<T> {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const timeoutId = setTimeout(() => controller.abort(), 45000);
   try {
     const res = await fetch(GQL, {
       method: "POST",

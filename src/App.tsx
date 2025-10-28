@@ -84,7 +84,7 @@ function AppContent() {
         ]);
         
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Request timeout')), 35000)
+          setTimeout(() => reject(new Error('Request timeout')), 60000)
         );
         
         const [productsData, categoriesData] = await Promise.race([
