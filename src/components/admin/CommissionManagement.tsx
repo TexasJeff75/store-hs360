@@ -11,6 +11,7 @@ const CommissionManagement: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedCommission, setSelectedCommission] = useState<any | null>(null);
   const [groupByMonth, setGroupByMonth] = useState(true);
+  const [isDistributor, setIsDistributor] = useState(false);
   const [summary, setSummary] = useState({
     total: 0,
     pending: 0,
@@ -32,20 +33,41 @@ const CommissionManagement: React.FC = () => {
       console.log('Fetching commissions for user:', user.id, 'role:', profile?.role);
 
       if (profile?.role === 'sales_rep') {
-        const { commissions: data } = await commissionService.getSalesRepCommissions(
+        const { commissions: distCommissions, error: distError } = await commissionService.getDistributorCommissions(
           user.id,
           statusFilter !== 'all' ? statusFilter : undefined
         );
-        setCommissions(data);
 
-        const { summary: summaryData } = await commissionService.getSalesRepCommissionSummary(user.id);
-        if (summaryData) {
-          setSummary({
-            total: summaryData.total_commissions,
-            pending: summaryData.pending_amount,
-            approved: summaryData.approved_amount,
-            paid: summaryData.paid_amount
-          });
+        if (!distError && distCommissions.length > 0) {
+          setIsDistributor(true);
+          setCommissions(distCommissions);
+
+          const { summary: summaryData } = await commissionService.getDistributorCommissionSummary(user.id);
+          if (summaryData) {
+            setSummary({
+              total: summaryData.total_commissions,
+              pending: summaryData.pending_amount,
+              approved: summaryData.approved_amount,
+              paid: summaryData.paid_amount
+            });
+          }
+        } else {
+          setIsDistributor(false);
+          const { commissions: data } = await commissionService.getSalesRepCommissions(
+            user.id,
+            statusFilter !== 'all' ? statusFilter : undefined
+          );
+          setCommissions(data);
+
+          const { summary: summaryData } = await commissionService.getSalesRepCommissionSummary(user.id);
+          if (summaryData) {
+            setSummary({
+              total: summaryData.total_commissions,
+              pending: summaryData.pending_amount,
+              approved: summaryData.approved_amount,
+              paid: summaryData.paid_amount
+            });
+          }
         }
       } else if (profile?.role === 'admin') {
         const { commissions: data, error: fetchError } = await commissionService.getAllCommissions({
@@ -427,7 +449,11 @@ const CommissionManagement: React.FC = () => {
                           {Number(commission.commission_rate).toFixed(2)}%
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
-                          {commission.distributor_id ? (
+                          {isDistributor ? (
+                            <div className="text-blue-600">
+                              ${Number(commission.distributor_commission || 0).toFixed(2)}
+                            </div>
+                          ) : commission.distributor_id ? (
                             <div className="space-y-1">
                               <div className="text-green-600">
                                 Total: ${Number(commission.commission_amount).toFixed(2)}
