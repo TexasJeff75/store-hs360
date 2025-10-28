@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter } from 'lucide-react';
 import { commissionService, Commission } from '../../services/commissionService';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../services/supabase';
 
 const CommissionManagement: React.FC = () => {
   const { user, profile } = useAuth();
@@ -10,6 +11,7 @@ const CommissionManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedCommission, setSelectedCommission] = useState<any | null>(null);
+  const [orderItems, setOrderItems] = useState<any[]>([]);
   const [groupByMonth, setGroupByMonth] = useState(true);
   const [isDistributor, setIsDistributor] = useState(false);
   const [summary, setSummary] = useState({
@@ -105,6 +107,32 @@ const CommissionManagement: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const fetchOrderItems = async (orderId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('items')
+        .eq('id', orderId)
+        .maybeSingle();
+
+      if (error) throw error;
+      if (data?.items) {
+        setOrderItems(data.items);
+      }
+    } catch (error) {
+      console.error('Error fetching order items:', error);
+      setOrderItems([]);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedCommission?.order_id) {
+      fetchOrderItems(selectedCommission.order_id);
+    } else {
+      setOrderItems([]);
+    }
+  }, [selectedCommission?.order_id]);
 
   const handleApproveCommission = async (commissionId: string) => {
     if (!user) return;
@@ -612,13 +640,43 @@ const CommissionManagement: React.FC = () => {
                     <div className="mt-4">
                       <label className="text-sm font-semibold text-gray-700 mb-2 block">Commission Breakdown</label>
                       <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                        {selectedCommission.margin_details.map((item: any, index: number) => {
+                        {orderItems.length > 0 ? orderItems.map((item: any, index: number) => {
+                          const cost = Number(item.cost || 0);
+                          const price = Number(item.price || 0);
+                          const quantity = Number(item.quantity || 1);
+                          const markup = Number(item.markup || 0);
+                          const hasMarkup = markup > 0;
+
+                          const margin = (price - cost) * quantity;
+                          const effectiveRate = hasMarkup ? 100 : Number(selectedCommission.commission_rate);
+                          const commission = hasMarkup ? margin : (margin * effectiveRate / 100);
+
+                          return (
+                            <div key={index} className="text-sm border-b border-gray-200 pb-2 last:border-b-0 last:pb-0">
+                              <div className="flex justify-between items-start mb-1">
+                                <p className="font-medium">{item.name}</p>
+                                <p className="font-semibold text-green-600">${commission.toFixed(2)}</p>
+                              </div>
+                              <div className="ml-2 space-y-0.5">
+                                <div className="flex justify-between text-xs text-gray-600">
+                                  <span>Base Commission ({effectiveRate.toFixed(2)}% of ${margin.toFixed(2)})</span>
+                                  <span className="text-green-600">${commission.toFixed(2)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }) : selectedCommission.margin_details?.map((item: any, index: number) => {
                           const hasMarkup = item.hasMarkup || false;
                           const baseCommission = Number(item.baseCommission || 0);
                           const markupCommission = Number(item.markupCommission || 0);
                           const totalCommission = Number(item.totalCommission || 0);
                           const baseMargin = Number(item.baseMargin || 0);
                           const markupAmount = Number(item.markupAmount || 0);
+                          const margin = Number(item.margin || 0);
+
+                          // For items with markup, the commission is 100% of the total margin
+                          const effectiveRate = hasMarkup ? 100 : Number(selectedCommission.commission_rate);
+                          const displayMargin = hasMarkup ? margin : baseMargin;
 
                           return (
                             <div key={index} className="text-sm border-b border-gray-200 pb-2 last:border-b-0 last:pb-0">
@@ -628,15 +686,9 @@ const CommissionManagement: React.FC = () => {
                               </div>
                               <div className="ml-2 space-y-0.5">
                                 <div className="flex justify-between text-xs text-gray-600">
-                                  <span>Base Commission ({Number(selectedCommission.commission_rate).toFixed(2)}% of ${baseMargin.toFixed(2)})</span>
-                                  <span className="text-green-600">${baseCommission.toFixed(2)}</span>
+                                  <span>Base Commission ({effectiveRate.toFixed(2)}% of ${displayMargin.toFixed(2)})</span>
+                                  <span className="text-green-600">${totalCommission.toFixed(2)}</span>
                                 </div>
-                                {hasMarkup && markupCommission > 0 && (
-                                  <div className="flex justify-between text-xs text-gray-600">
-                                    <span>Markup Commission (100% of ${markupAmount.toFixed(2)})</span>
-                                    <span className="text-green-600 font-semibold">${markupCommission.toFixed(2)}</span>
-                                  </div>
-                                )}
                               </div>
                             </div>
                           );
