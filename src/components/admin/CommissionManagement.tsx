@@ -426,8 +426,24 @@ const CommissionManagement: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {Number(commission.commission_rate).toFixed(2)}%
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">
-                          ${Number(commission.commission_amount).toFixed(2)}
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
+                          {commission.distributor_id ? (
+                            <div className="space-y-1">
+                              <div className="text-green-600">
+                                Total: ${Number(commission.commission_amount).toFixed(2)}
+                              </div>
+                              <div className="text-xs text-gray-600">
+                                Rep: ${Number(commission.sales_rep_commission || 0).toFixed(2)}
+                              </div>
+                              <div className="text-xs text-blue-600">
+                                Dist: ${Number(commission.distributor_commission || 0).toFixed(2)}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="text-green-600">
+                              ${Number(commission.commission_amount).toFixed(2)}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-3 py-1 inline-flex items-center space-x-1 text-xs leading-5 font-semibold rounded-full border ${getStatusColor(commission.status)}`}>
@@ -521,7 +537,22 @@ const CommissionManagement: React.FC = () => {
                   </div>
                   <div>
                     <label className="text-sm text-gray-600">Commission Amount</label>
-                    <p className="font-bold text-green-600 text-lg">${Number(selectedCommission.commission_amount).toFixed(2)}</p>
+                    <div>
+                      <p className="font-bold text-green-600 text-lg">${Number(selectedCommission.commission_amount).toFixed(2)}</p>
+                      {selectedCommission.distributor_id && (
+                        <div className="mt-2 text-sm space-y-1">
+                          <p className="text-gray-700">
+                            Sales Rep Commission: <span className="font-semibold text-green-600">${Number(selectedCommission.sales_rep_commission || 0).toFixed(2)}</span>
+                          </p>
+                          <p className="text-gray-700">
+                            Distributor Commission: <span className="font-semibold text-blue-600">${Number(selectedCommission.distributor_commission || 0).toFixed(2)}</span>
+                          </p>
+                          <p className="text-xs text-gray-500 italic mt-1">
+                            Split Type: {selectedCommission.commission_split_type === 'percentage_of_distributor' ? 'Percentage of Distributor' : 'Fixed with Override'}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div>
                     <label className="text-sm text-gray-600">Created Date</label>
@@ -586,7 +617,15 @@ const CommissionManagement: React.FC = () => {
                         })}
                         <div className="border-t pt-2 mt-2 flex justify-between font-semibold">
                           <span>Total Commission:</span>
-                          <span className="text-green-600">${Number(selectedCommission.commission_amount).toFixed(2)}</span>
+                          <div>
+                            <span className="text-green-600 font-semibold">${Number(selectedCommission.commission_amount).toFixed(2)}</span>
+                            {selectedCommission.distributor_id && (
+                              <div className="mt-1 text-xs text-gray-600">
+                                (Rep: ${Number(selectedCommission.sales_rep_commission || 0).toFixed(2)} +
+                                Dist: ${Number(selectedCommission.distributor_commission || 0).toFixed(2)})
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

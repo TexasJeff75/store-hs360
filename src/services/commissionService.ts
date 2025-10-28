@@ -150,7 +150,10 @@ class CommissionService {
     try {
       let query = supabase
         .from('commissions')
-        .select('*')
+        .select(`
+          *,
+          distributor:distributors(id, name, code)
+        `)
         .eq('sales_rep_id', salesRepId)
         .order('created_at', { ascending: false });
 
@@ -291,7 +294,8 @@ class CommissionService {
         .select(`
           *,
           sales_rep:profiles!sales_rep_id(id, email),
-          organization:organizations(id, name)
+          organization:organizations(id, name),
+          distributor:distributors(id, name, code)
         `)
         .order('created_at', { ascending: false });
 
