@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building } from 'lucide-react';
+import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
@@ -15,13 +15,14 @@ import Analytics from './Analytics';
 import RecurringOrderManagement from './RecurringOrderManagement';
 import MyRecurringOrders from '../MyRecurringOrders';
 import DistributorManagement from './DistributorManagement';
+import HelpSection from './HelpSection';
 
 interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'distributors' | 'analytics' | 'my-orgs' | 'payments' | 'recurring-orders' | 'my-recurring-orders';
+type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'distributors' | 'analytics' | 'my-orgs' | 'payments' | 'recurring-orders' | 'my-recurring-orders' | 'help';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const { profile, user } = useAuth();
@@ -64,6 +65,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep', 'distributor'] },
     { id: 'products' as AdminTab, label: 'Products', icon: Package, roles: ['admin'] },
     { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3, roles: ['admin'] },
+    { id: 'help' as AdminTab, label: 'Help', icon: HelpCircle, roles: ['admin', 'sales_rep', 'distributor', 'customer'] },
   ];
 
   const tabs = adminTabs.filter(tab =>
@@ -101,6 +103,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
         return <MyRecurringOrders />;
       case 'analytics':
         return <Analytics />;
+      case 'help':
+        return <HelpSection />;
       default:
         return null;
     }
