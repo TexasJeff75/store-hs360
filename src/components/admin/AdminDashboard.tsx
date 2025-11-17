@@ -27,11 +27,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const { profile, user } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const isSalesRep = profile?.role === 'sales_rep';
+  const isDistributor = profile?.role === 'distributor';
   const isCustomer = profile?.role === 'customer';
   const [userOrgId, setUserOrgId] = React.useState<string | undefined>();
 
   const [activeTab, setActiveTab] = useState<AdminTab>(
-    isCustomer ? 'orders' : isSalesRep ? 'my-orgs' : 'organizations'
+    isCustomer ? 'orders' : isSalesRep ? 'my-orgs' : isDistributor ? 'commissions' : 'organizations'
   );
 
   React.useEffect(() => {
@@ -60,7 +61,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     { id: 'payments' as AdminTab, label: 'Payment Methods', icon: CreditCard, roles: ['customer'] },
     { id: 'distributors' as AdminTab, label: 'Distributors', icon: Building, roles: ['admin'] },
     { id: 'salesreps' as AdminTab, label: 'Sales Reps', icon: UserCheck, roles: ['admin'] },
-    { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep'] },
+    { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep', 'distributor'] },
     { id: 'products' as AdminTab, label: 'Products', icon: Package, roles: ['admin'] },
     { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3, roles: ['admin'] },
   ];
@@ -68,6 +69,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const tabs = adminTabs.filter(tab =>
     (isAdmin && tab.roles.includes('admin')) ||
     (isSalesRep && tab.roles.includes('sales_rep')) ||
+    (isDistributor && tab.roles.includes('distributor')) ||
     (isCustomer && tab.roles.includes('customer'))
   );
 

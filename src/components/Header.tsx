@@ -74,7 +74,7 @@ const Header: React.FC<HeaderProps> = ({
                   </button>
                 )}
 
-                {(profile?.role === 'admin' || profile?.role === 'sales_rep') && (
+                {(profile?.role === 'admin' || profile?.role === 'sales_rep' || profile?.role === 'distributor') && (
                   <button
                     onClick={onAdminClick}
                     className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
