@@ -322,20 +322,24 @@ const UserManagement: React.FC = () => {
 
   const hasPendingChanges = Object.keys(pendingChanges).length > 0;
 
-  const getRoleColor = (role: string) => {
+  const getRoleColor = (role: string | null) => {
     switch (role) {
       case 'admin': return 'bg-purple-100 text-purple-800';
+      case 'distributor': return 'bg-orange-100 text-orange-800';
       case 'sales_rep': return 'bg-blue-100 text-blue-800';
       case 'customer': return 'bg-green-100 text-green-800';
+      case null: return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getRoleIcon = (role: string) => {
+  const getRoleIcon = (role: string | null) => {
     switch (role) {
       case 'admin': return Shield;
+      case 'distributor': return Mail;
       case 'sales_rep': return Mail;
       case 'customer': return User;
+      case null: return Clock;
       default: return User;
     }
   };
@@ -436,6 +440,84 @@ const UserManagement: React.FC = () => {
         </div>
       )}
 
+      {/* Pending Users Section */}
+      {users.filter(u => !u.approved || u.role === null).length > 0 && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <div className="flex items-center space-x-2 mb-4">
+            <AlertCircle className="h-5 w-5 text-yellow-600" />
+            <h3 className="text-lg font-semibold text-yellow-900">
+              Pending Approval ({users.filter(u => !u.approved || u.role === null).length})
+            </h3>
+          </div>
+          <p className="text-sm text-yellow-700 mb-4">
+            These users have registered but need to be approved and assigned a role before they can access the system.
+          </p>
+          <div className="space-y-2">
+            {users.filter(u => !u.approved || u.role === null).map((user) => (
+              <div key={user.id} className="bg-white rounded-lg p-4 flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-gray-900">{user.email}</p>
+                  <p className="text-sm text-gray-500">
+                    Registered: {new Date(user.created_at).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <select
+                    onChange={async (e) => {
+                      const role = e.target.value;
+                      if (role && confirm(`Approve ${user.email} as ${role}?`)) {
+                        try {
+                          const { error } = await supabase
+                            .from('profiles')
+                            .update({ role, approved: true })
+                            .eq('id', user.id);
+
+                          if (error) throw error;
+                          await fetchUsers();
+                          setSaveMessage({ type: 'success', text: `User approved as ${role}!` });
+                        } catch (err) {
+                          setSaveMessage({ type: 'error', text: 'Failed to approve user' });
+                        }
+                      }
+                      e.target.value = '';
+                    }}
+                    defaultValue=""
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="" disabled>Approve as...</option>
+                    <option value="customer">Customer</option>
+                    <option value="sales_rep">Sales Rep</option>
+                    <option value="distributor">Distributor</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <button
+                    onClick={async () => {
+                      if (confirm(`Delete user ${user.email}?`)) {
+                        try {
+                          const { error } = await supabase
+                            .from('profiles')
+                            .delete()
+                            .eq('id', user.id);
+
+                          if (error) throw error;
+                          await fetchUsers();
+                          setSaveMessage({ type: 'success', text: 'User deleted!' });
+                        } catch (err) {
+                          setSaveMessage({ type: 'error', text: 'Failed to delete user' });
+                        }
+                      }
+                    }}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-md"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Filters */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
@@ -458,6 +540,7 @@ const UserManagement: React.FC = () => {
             <option value="all">All Roles</option>
             <option value="customer">Customer</option>
             <option value="sales_rep">Sales Rep</option>
+            <option value="distributor">Distributor</option>
             <option value="admin">Admin</option>
           </select>
         </div>

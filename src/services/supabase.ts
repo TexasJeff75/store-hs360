@@ -32,8 +32,8 @@ export const supabase = createClient(cleanSupabaseUrl, supabaseAnonKey);
 export interface Profile {
   id: string;
   email: string;
-  is_approved: boolean;
-  role: 'admin' | 'sales_rep' | 'customer';
+  approved: boolean;
+  role: 'admin' | 'distributor' | 'sales_rep' | 'customer' | null;
   created_at: string;
   updated_at: string;
 }
