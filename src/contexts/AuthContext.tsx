@@ -144,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           .from('profiles')
           .select('*')
           .eq('id', userId)
-          .single();
+          .maybeSingle();
         data = result.data;
         error = result.error;
       } catch (fetchError) {
@@ -156,15 +156,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       clearTimeout(timeoutId);
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         console.error('Error fetching profile:', error);
-        // Profile doesn't exist - this is handled in sign up
         if (error.code === 'PGRST116') {
           console.log('Profile not found, will be created on next sign up');
         }
-      } else {
-        console.log('Profile fetched:', data);
+        setProfile(null);
+      } else if (data) {
+        console.log('Profile fetched successfully:', {
+          email: data.email,
+          role: data.role,
+          approved: data.approved
+        });
         setProfile(data);
+      } else {
+        console.warn('No profile data returned for user:', userId);
+        setProfile(null);
       }
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
