@@ -50,6 +50,47 @@ This is also configured in `netlify.toml`, but setting it in the dashboard ensur
 
 ## Common Deployment Issues
 
+### Issue 0: "Cannot GET /" Error
+
+**Symptom:**
+```
+Cannot GET /
+```
+When accessing your deployed Netlify site.
+
+**Causes:**
+1. Build failed and no `dist` folder was created
+2. Build settings incorrect (wrong publish directory)
+3. Recent configuration changes not deployed yet
+
+**Solution:**
+
+1. **Check Latest Deploy Status:**
+   - Go to Netlify Dashboard → Deploys
+   - Check if latest deploy succeeded
+   - If failed, check error logs
+
+2. **Verify Build Settings:**
+   - Site Settings → Build & Deploy → Build Settings
+   - Publish directory: `dist`
+   - Build command: `npm run build`
+
+3. **Trigger Clean Deploy:**
+   - Deploys → Trigger deploy → "Clear cache and deploy site"
+   - This forces a fresh build with new configuration
+
+4. **Check Build Logs:**
+   Look for:
+   ```
+   ✓ dist/index.html created
+   ✓ built in XXs
+   ```
+
+5. **If Build Succeeds but Still Shows Error:**
+   - Wait 1-2 minutes for CDN to propagate
+   - Hard refresh browser (Ctrl+Shift+R or Cmd+Shift+R)
+   - Try incognito/private window
+
 ### Issue 1: 404 on Netlify Functions
 
 **Symptom:**

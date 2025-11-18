@@ -1,14 +1,19 @@
 # store-hs360
 
-## 🚨 Important: Getting 404 Errors?
+## 🚨 Common Issues
 
-If you see `Server returned non-JSON response (404)` errors:
+### "Cannot GET /" on Netlify
+If deployed site shows "Cannot GET /":
+1. Check Netlify Dashboard → Deploys (build must succeed)
+2. Verify publish directory is `dist`
+3. Trigger "Clear cache and deploy site"
+4. See [NETLIFY_DEPLOYMENT.md](./NETLIFY_DEPLOYMENT.md) for full fix
 
-**✅ Solution:** Use `npm run dev` and access `http://localhost:8888`
-
-**❌ Don't use:** `npm run dev:vite` or `http://localhost:5173`
-
-👉 See [TROUBLESHOOTING_404.md](./TROUBLESHOOTING_404.md) for complete fix.
+### 404 Errors in Development
+If you see `Server returned non-JSON response (404)` errors locally:
+- **✅ Solution:** Use `npm run dev` and access `http://localhost:8888`
+- **❌ Don't use:** `npm run dev:vite` or `http://localhost:5173`
+- 👉 See [TROUBLESHOOTING_404.md](./TROUBLESHOOTING_404.md) for complete fix
 
 ---
 
