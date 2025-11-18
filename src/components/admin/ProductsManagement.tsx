@@ -103,6 +103,9 @@ const ProductsManagement: React.FC = () => {
         try {
           const costData = await bcRestAPI.getProductCosts(productIds);
 
+          console.log('Cost data received:', Object.keys(costData).length, 'products');
+          console.log('Sample cost data:', costData[productIds[0]]);
+
           // Update products with actual cost_price and brand info from BigCommerce
           const updatedProducts = products.map(product => {
             const costInfo = costData[product.id];
@@ -117,6 +120,7 @@ const ProductsManagement: React.FC = () => {
             return product;
           });
 
+          console.log('Updated products sample:', updatedProducts[0]);
           setProducts(updatedProducts);
         } catch (costErr) {
           console.error('Failed to fetch product costs:', costErr);
@@ -419,16 +423,22 @@ const ProductsManagement: React.FC = () => {
     return matchesSearch && matchesCategory;
   }).sort((a, b) => {
     if (!sortField) return 0;
-    
+
     let aValue = a[sortField];
     let bValue = b[sortField];
-    
+
+    // Special handling for brand - use brandName if available
+    if (sortField === 'brand') {
+      aValue = a.brandName || a.brand || '';
+      bValue = b.brandName || b.brand || '';
+    }
+
     // Handle different data types
     if (typeof aValue === 'string' && typeof bValue === 'string') {
       aValue = aValue.toLowerCase();
       bValue = bValue.toLowerCase();
     }
-    
+
     if (aValue < bValue) {
       return sortDirection === 'asc' ? -1 : 1;
     }
@@ -565,6 +575,15 @@ const ProductsManagement: React.FC = () => {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <button
+                    onClick={() => handleSort('brand')}
+                    className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
+                  >
+                    <span>Brand</span>
+                    {getSortIcon('brand')}
+                  </button>
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <button
                     onClick={() => handleSort('category')}
                     className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
                   >
@@ -623,16 +642,20 @@ const ProductsManagement: React.FC = () => {
                         <div className="text-sm font-medium text-gray-900 max-w-xs truncate">
                           {product.name}
                         </div>
-                        {(product.brandName || product.brand) && (
-                          <div className="text-xs text-gray-500">
-                            Brand: {product.brandName || product.brand}
-                          </div>
-                        )}
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {product.sku || <span className="text-gray-400">-</span>}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    {(product.brandName || product.brand) ? (
+                      <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-blue-50 text-blue-700">
+                        {product.brandName || product.brand}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400">-</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
