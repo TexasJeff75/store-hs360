@@ -41,7 +41,7 @@ export default defineConfig(({ mode }) => {
   define: {
     'import.meta.env.VITE_BC_STORE_HASH': JSON.stringify(env.VITE_BC_STORE_HASH),
     'import.meta.env.VITE_BC_STOREFRONT_TOKEN': JSON.stringify(env.VITE_BC_STOREFRONT_TOKEN),
-    'import.meta.env.VITE_API_BASE': JSON.stringify(env.VITE_API_BASE || '/api'),
+    'import.meta.env.VITE_API_BASE': JSON.stringify(env.VITE_API_BASE || '/.netlify/functions'),
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
     'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
   },
