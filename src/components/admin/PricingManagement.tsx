@@ -65,6 +65,26 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
   const [bulkImportData, setBulkImportData] = useState<string>('');
   const [bulkImportResults, setBulkImportResults] = useState<{success: number; failed: number; errors: string[]}>({success: 0, failed: 0, errors: []});
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isMultiProductFormOpen, setIsMultiProductFormOpen] = useState(false);
+  const [multiProductFormData, setMultiProductFormData] = useState<{
+    type: PricingType;
+    entityId: string;
+    effectiveDate: string;
+    expiryDate?: string;
+    products: Array<{
+      productId: number;
+      contractPrice: string;
+      markupPrice: string;
+      minQuantity: string;
+      maxQuantity: string;
+    }>;
+  }>({
+    type: 'organization' as PricingType,
+    entityId: '',
+    effectiveDate: new Date().toISOString().split('T')[0],
+    expiryDate: undefined,
+    products: []
+  });
 
   useEffect(() => {
     checkCostAdmin();
@@ -486,6 +506,112 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     }
   };
 
+  const handleOpenMultiProductForm = () => {
+    setIsMultiProductFormOpen(true);
+
+    // Pre-select organization if viewing org-specific pricing
+    let defaultEntityId = '';
+    let defaultType: PricingType = 'organization';
+
+    if (organizationId) {
+      defaultEntityId = organizationId;
+      defaultType = 'organization';
+    }
+
+    // Initialize with all products
+    const initialProducts = products.map(product => ({
+      productId: product.id,
+      contractPrice: '',
+      markupPrice: '',
+      minQuantity: '1',
+      maxQuantity: ''
+    }));
+
+    setMultiProductFormData({
+      type: defaultType,
+      entityId: defaultEntityId,
+      effectiveDate: new Date().toISOString().split('T')[0],
+      expiryDate: undefined,
+      products: initialProducts
+    });
+  };
+
+  const handleMultiProductFormSubmit = async () => {
+    try {
+      setError(null);
+
+      if (!multiProductFormData.entityId) {
+        setError('Please select an entity (organization, location, or user)');
+        return;
+      }
+
+      // Filter products with pricing data
+      const productsToSave = multiProductFormData.products.filter(p =>
+        p.contractPrice || p.markupPrice
+      );
+
+      if (productsToSave.length === 0) {
+        setError('Please enter pricing for at least one product');
+        return;
+      }
+
+      let successCount = 0;
+      let failedCount = 0;
+      const errors: string[] = [];
+
+      for (const productData of productsToSave) {
+        try {
+          const contractPrice = productData.contractPrice ? parseFloat(productData.contractPrice) : undefined;
+          const markupPrice = productData.markupPrice ? parseFloat(productData.markupPrice) : undefined;
+          const minQuantity = parseInt(productData.minQuantity) || 1;
+          const maxQuantity = productData.maxQuantity ? parseInt(productData.maxQuantity) : undefined;
+
+          const result = await contractPricingService.setContractPrice(
+            multiProductFormData.entityId,
+            productData.productId,
+            contractPrice,
+            multiProductFormData.type,
+            minQuantity,
+            maxQuantity,
+            multiProductFormData.effectiveDate,
+            multiProductFormData.expiryDate,
+            markupPrice
+          );
+
+          if (result.success) {
+            successCount++;
+          } else {
+            const product = products.find(p => p.id === productData.productId);
+            errors.push(`${product?.name || productData.productId}: ${result.error || 'Failed to save'}`);
+            failedCount++;
+          }
+        } catch (err) {
+          const product = products.find(p => p.id === productData.productId);
+          errors.push(`${product?.name || productData.productId}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          failedCount++;
+        }
+      }
+
+      if (successCount > 0) {
+        setModalMessage({ type: 'success', text: `Successfully saved pricing for ${successCount} product(s)` });
+        await fetchPricingEntries();
+
+        if (failedCount === 0) {
+          setTimeout(() => {
+            setIsMultiProductFormOpen(false);
+            setModalMessage(null);
+          }, 2000);
+        }
+      }
+
+      if (failedCount > 0) {
+        setError(`Failed to save ${failedCount} product(s): ${errors.join(', ')}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save pricing');
+    }
+  };
+
   const handleEditPricing = (entry: PricingEntry) => {
     setSelectedEntry(entry);
     setNewEntryData({
@@ -735,11 +861,18 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
             </button>
           )}
           <button
+            onClick={handleOpenMultiProductForm}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Multi-Product Form</span>
+          </button>
+          <button
             onClick={handleCreatePricing}
             className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
           >
             <Plus className="h-5 w-5" />
-            <span>Add Pricing</span>
+            <span>Add Single Pricing</span>
           </button>
         </div>
       </div>
@@ -1543,6 +1676,258 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Multi-Product Pricing Form Modal */}
+      {isMultiProductFormOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsMultiProductFormOpen(false)}></div>
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-6xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4 flex items-center space-x-2">
+                      <DollarSign className="h-6 w-6 text-green-600" />
+                      <span>Multi-Product Contract Pricing</span>
+                    </h3>
+
+                    {modalMessage && (
+                      <div className={`mb-4 p-3 rounded-lg ${modalMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                        {modalMessage.text}
+                      </div>
+                    )}
+
+                    {error && (
+                      <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg">
+                        {error}
+                      </div>
+                    )}
+
+                    <div className="space-y-4">
+                      {/* Entity Selection */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Pricing Type
+                          </label>
+                          <select
+                            value={multiProductFormData.type}
+                            onChange={(e) => setMultiProductFormData({
+                              ...multiProductFormData,
+                              type: e.target.value as PricingType,
+                              entityId: ''
+                            })}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          >
+                            <option value="organization">Organization</option>
+                            <option value="location">Location</option>
+                            <option value="individual">Individual User</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            {multiProductFormData.type === 'organization' ? 'Organization' :
+                             multiProductFormData.type === 'location' ? 'Location' : 'User'}
+                          </label>
+                          <select
+                            value={multiProductFormData.entityId}
+                            onChange={(e) => setMultiProductFormData({
+                              ...multiProductFormData,
+                              entityId: e.target.value
+                            })}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          >
+                            <option value="">Select...</option>
+                            {multiProductFormData.type === 'organization' && organizations.map(org => (
+                              <option key={org.id} value={org.id}>{org.name}</option>
+                            ))}
+                            {multiProductFormData.type === 'location' && locations.map(loc => (
+                              <option key={loc.id} value={loc.id}>{loc.name}</option>
+                            ))}
+                            {multiProductFormData.type === 'individual' && users.map(user => (
+                              <option key={user.id} value={user.id}>{user.email}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Date Range */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Effective Date
+                          </label>
+                          <input
+                            type="date"
+                            value={multiProductFormData.effectiveDate}
+                            onChange={(e) => setMultiProductFormData({
+                              ...multiProductFormData,
+                              effectiveDate: e.target.value
+                            })}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Expiry Date (Optional)
+                          </label>
+                          <input
+                            type="date"
+                            value={multiProductFormData.expiryDate || ''}
+                            onChange={(e) => setMultiProductFormData({
+                              ...multiProductFormData,
+                              expiryDate: e.target.value || undefined
+                            })}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Products Table */}
+                      <div className="mt-4">
+                        <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                          Product Pricing (enter prices for products you want to update)
+                        </h4>
+                        <div className="max-h-96 overflow-y-auto border border-gray-300 rounded-lg">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50 sticky top-0">
+                              <tr>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Retail Price</th>
+                                {isCostAdmin && (
+                                  <>
+                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Cost</th>
+                                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Secret Cost</th>
+                                  </>
+                                )}
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Contract Price</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Markup Price</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Min Qty</th>
+                                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Max Qty</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {multiProductFormData.products.map((productData, index) => {
+                                const product = products.find(p => p.id === productData.productId);
+                                if (!product) return null;
+                                const cost = productCosts.get(product.id);
+
+                                return (
+                                  <tr key={productData.productId} className="hover:bg-gray-50">
+                                    <td className="px-4 py-3 text-sm text-gray-900">{product.name}</td>
+                                    <td className="px-4 py-3 text-sm text-right text-gray-700">${product.price.toFixed(2)}</td>
+                                    {isCostAdmin && (
+                                      <>
+                                        <td className="px-4 py-3 text-sm text-right text-gray-700">
+                                          {cost?.cost_price ? `$${cost.cost_price.toFixed(2)}` : '-'}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-right text-red-700 font-medium">
+                                          {cost?.secret_cost ? `$${cost.secret_cost.toFixed(2)}` : '-'}
+                                        </td>
+                                      </>
+                                    )}
+                                    <td className="px-4 py-3">
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={productData.contractPrice}
+                                        onChange={(e) => {
+                                          const newProducts = [...multiProductFormData.products];
+                                          newProducts[index].contractPrice = e.target.value;
+                                          setMultiProductFormData({
+                                            ...multiProductFormData,
+                                            products: newProducts
+                                          });
+                                        }}
+                                        className="w-24 px-2 py-1 border border-gray-300 rounded text-sm text-right"
+                                        placeholder="0.00"
+                                      />
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        value={productData.markupPrice}
+                                        onChange={(e) => {
+                                          const newProducts = [...multiProductFormData.products];
+                                          newProducts[index].markupPrice = e.target.value;
+                                          setMultiProductFormData({
+                                            ...multiProductFormData,
+                                            products: newProducts
+                                          });
+                                        }}
+                                        className="w-24 px-2 py-1 border border-gray-300 rounded text-sm text-right"
+                                        placeholder="0.00"
+                                      />
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <input
+                                        type="number"
+                                        value={productData.minQuantity}
+                                        onChange={(e) => {
+                                          const newProducts = [...multiProductFormData.products];
+                                          newProducts[index].minQuantity = e.target.value;
+                                          setMultiProductFormData({
+                                            ...multiProductFormData,
+                                            products: newProducts
+                                          });
+                                        }}
+                                        className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-right"
+                                      />
+                                    </td>
+                                    <td className="px-4 py-3">
+                                      <input
+                                        type="number"
+                                        value={productData.maxQuantity}
+                                        onChange={(e) => {
+                                          const newProducts = [...multiProductFormData.products];
+                                          newProducts[index].maxQuantity = e.target.value;
+                                          setMultiProductFormData({
+                                            ...multiProductFormData,
+                                            products: newProducts
+                                          });
+                                        }}
+                                        className="w-16 px-2 py-1 border border-gray-300 rounded text-sm text-right"
+                                        placeholder="∞"
+                                      />
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                        <p className="text-xs text-gray-500 mt-2">
+                          Tip: Leave contract price empty for products you don't want to update. Enter either contract price (discount) or markup price (premium).
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={handleMultiProductFormSubmit}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Save All Pricing
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsMultiProductFormOpen(false)}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Cancel
                 </button>
               </div>
             </div>
