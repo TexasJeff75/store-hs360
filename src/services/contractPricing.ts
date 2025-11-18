@@ -138,7 +138,9 @@ class ContractPricingService {
     effectiveDate?: string,
     expiryDate?: string,
     markupPrice?: number,
-    id?: string
+    id?: string,
+    allowBelowCost?: boolean,
+    overrideReason?: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const { data, error } = await supabase
@@ -156,6 +158,8 @@ class ContractPricingService {
           max_quantity: maxQuantity,
           effective_date: effectiveDate || new Date().toISOString(),
           expiry_date: expiryDate,
+          allow_below_cost: allowBelowCost || false,
+          override_reason: overrideReason || null,
         })
         .select()
         .single();
@@ -169,9 +173,9 @@ class ContractPricingService {
       return { success: true };
     } catch (error) {
       console.error('Error setting contract price:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
       };
     }
   }

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Plus, Edit, Trash2, Search, User, Building2, MapPin } from 'lucide-react';
+import { DollarSign, Plus, Edit, Trash2, Search, User, Building2, MapPin, AlertTriangle, Shield } from 'lucide-react';
 import { contractPricingService, type PricingType } from '@/services/contractPricing';
 import { multiTenantService } from '@/services/multiTenant';
 import { bigCommerceService } from '@/services/bigcommerce';
 import { supabase } from '@/services/supabase';
+import { productCostsService, type ProductCost } from '@/services/productCosts';
 import type { Organization, Location, Profile } from '@/services/supabase';
 
 interface PricingEntry {
@@ -51,9 +52,12 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     minQuantity: 1,
     maxQuantity: undefined as number | undefined,
     effectiveDate: new Date().toISOString().split('T')[0],
-    expiryDate: undefined as string | undefined
+    expiryDate: undefined as string | undefined,
+    allowBelowCost: false,
+    overrideReason: ''
   });
   const [productSettings, setProductSettings] = useState<Map<number, { allowMarkup: boolean }>>(new Map());
+  const [productCosts, setProductCosts] = useState<Map<number, ProductCost>>(new Map());
 
   useEffect(() => {
     fetchData();
@@ -144,6 +148,11 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
         });
       }
       setProductSettings(settingsMap);
+
+      // Fetch product costs
+      const productIds = productsData.products.map((p: any) => p.id);
+      const costsMap = await productCostsService.getProductCosts(productIds);
+      setProductCosts(costsMap);
       
       if (organizationId) {
         // Filter organizations to only the selected one
@@ -290,7 +299,9 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
         newEntryData.effectiveDate,
         newEntryData.expiryDate,
         selectedEntry.markupPrice,
-        isEditing ? selectedEntry.id : undefined
+        isEditing ? selectedEntry.id : undefined,
+        newEntryData.allowBelowCost,
+        newEntryData.overrideReason
       );
 
       if (result.success) {
@@ -762,6 +773,28 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Product Cost (Your Cost)
+                        </label>
+                        {productCosts.get(selectedEntry.productId || 0)?.cost_price ? (
+                          <div className="flex items-center space-x-2 mb-3">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={productCosts.get(selectedEntry.productId || 0)?.cost_price || 0}
+                              readOnly
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-50 font-semibold"
+                            />
+                            <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" title="Prices cannot be set below cost without admin override" />
+                          </div>
+                        ) : (
+                          <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <p className="text-xs text-yellow-700">No cost data available for validation</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
                           Contract Price (Discounted) {!productSettings.get(selectedEntry.productId || 0)?.allowMarkup && '*'}
                         </label>
                         <p className="text-xs text-gray-500 mb-2">
@@ -770,6 +803,16 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                             : 'Required. Set a price BELOW retail. This is the standard discounted price.'
                           }
                         </p>
+                        {productCosts.get(selectedEntry.productId || 0)?.cost_price &&
+                         selectedEntry.contractPrice &&
+                         selectedEntry.contractPrice < (productCosts.get(selectedEntry.productId || 0)?.cost_price || 0) && (
+                          <div className="mb-2 p-2 bg-red-50 border border-red-200 rounded-lg flex items-start space-x-2">
+                            <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-red-700">
+                              Warning: Price is below cost! You will lose ${((productCosts.get(selectedEntry.productId || 0)?.cost_price || 0) - (selectedEntry.contractPrice || 0)).toFixed(2)} per unit.
+                            </p>
+                          </div>
+                        )}
                         <input
                           type="number"
                           step="0.01"
@@ -790,6 +833,58 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                           placeholder={productSettings.get(selectedEntry.productId || 0)?.allowMarkup ? 'Optional if markup is set' : 'Required'}
                         />
                       </div>
+
+                      {productCosts.get(selectedEntry.productId || 0)?.cost_price &&
+                       selectedEntry.contractPrice &&
+                       selectedEntry.contractPrice < (productCosts.get(selectedEntry.productId || 0)?.cost_price || 0) && (
+                        <div className="border-2 border-amber-300 rounded-lg p-4 bg-amber-50">
+                          <div className="flex items-start space-x-2 mb-3">
+                            <Shield className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <h4 className="text-sm font-semibold text-amber-900 mb-1">Admin Override Required</h4>
+                              <p className="text-xs text-amber-700">This price is below cost and requires admin approval with justification.</p>
+                            </div>
+                          </div>
+
+                          <div className="mb-3">
+                            <label className="flex items-center space-x-2">
+                              <input
+                                type="checkbox"
+                                checked={newEntryData.allowBelowCost}
+                                onChange={(e) => {
+                                  setNewEntryData({
+                                    ...newEntryData,
+                                    allowBelowCost: e.target.checked
+                                  });
+                                }}
+                                className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                              />
+                              <span className="text-sm font-medium text-amber-900">I authorize below-cost pricing (Admin only)</span>
+                            </label>
+                          </div>
+
+                          {newEntryData.allowBelowCost && (
+                            <div>
+                              <label className="block text-sm font-medium text-amber-900 mb-1">
+                                Business Justification *
+                              </label>
+                              <textarea
+                                value={newEntryData.overrideReason}
+                                onChange={(e) => {
+                                  setNewEntryData({
+                                    ...newEntryData,
+                                    overrideReason: e.target.value
+                                  });
+                                }}
+                                className="w-full border border-amber-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                                rows={3}
+                                placeholder="Provide a business justification for below-cost pricing (e.g., promotional loss leader, contract obligation, inventory clearance)"
+                                required
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {productSettings.get(selectedEntry.productId || 0)?.allowMarkup && (
                         <>
