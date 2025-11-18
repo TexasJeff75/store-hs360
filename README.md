@@ -9,6 +9,13 @@ If deployed site shows "Cannot GET /":
 3. Trigger "Clear cache and deploy site"
 4. See [NETLIFY_DEPLOYMENT.md](./NETLIFY_DEPLOYMENT.md) for full fix
 
+### 404 Errors on Secret Cost Management (Production)
+If deployed site shows `Server returned non-JSON response (404)` on Secret Cost Management page:
+1. Test function: `https://your-site.netlify.app/.netlify/functions/bigcommerce-cart`
+2. Should show 405 error (not 404) - means function exists
+3. If 404: Functions not deployed - check build logs
+4. 👉 See [NETLIFY_FUNCTIONS_DIAGNOSTIC.md](./NETLIFY_FUNCTIONS_DIAGNOSTIC.md) for step-by-step fix
+
 ### 404 Errors in Development
 If you see `Server returned non-JSON response (404)` errors locally:
 - **✅ Solution:** Use `npm run dev` and access `http://localhost:8888`
@@ -43,6 +50,7 @@ npm run dev
 
 ### Deployment
 - [NETLIFY_DEPLOYMENT.md](./NETLIFY_DEPLOYMENT.md) - Netlify deployment guide & troubleshooting
+- [NETLIFY_FUNCTIONS_DIAGNOSTIC.md](./NETLIFY_FUNCTIONS_DIAGNOSTIC.md) - Fix 404 errors on Netlify Functions
 
 ### Reference
 - [BIGCOMMERCE_SCOPES.md](./BIGCOMMERCE_SCOPES.md) - API token scopes
