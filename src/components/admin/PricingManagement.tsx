@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { DollarSign, Plus, Edit, Trash2, Search, User, Building2, MapPin, AlertTriangle, Shield, Eye } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { DollarSign, Plus, Edit, Trash2, Search, User, Building2, MapPin, AlertTriangle, Shield, Eye, Upload, Download, FileText } from 'lucide-react';
 import { contractPricingService, type PricingType } from '@/services/contractPricing';
 import { multiTenantService } from '@/services/multiTenant';
 import { bigCommerceService } from '@/services/bigcommerce';
@@ -59,6 +59,10 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
   const [productSettings, setProductSettings] = useState<Map<number, { allowMarkup: boolean }>>(new Map());
   const [productCosts, setProductCosts] = useState<Map<number, ProductCost>>(new Map());
   const [isCostAdmin, setIsCostAdmin] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const [bulkImportData, setBulkImportData] = useState<string>('');
+  const [bulkImportResults, setBulkImportResults] = useState<{success: number; failed: number; errors: string[]}>({success: 0, failed: 0, errors: []});
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     checkCostAdmin();
@@ -151,7 +155,10 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
         supabase.from('product_settings').select('product_id, allow_markup')
       ]);
 
-      setProducts(productsData.products);
+      const sortedProducts = [...productsData.products].sort((a, b) => {
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+      });
+      setProducts(sortedProducts);
 
       // Build product settings map
       const settingsMap = new Map();
@@ -226,11 +233,156 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     setIsModalOpen(true);
   };
 
-  const handleBulkPricing = () => {
-    setBulkPricingData({
-      organizationId: organizationId || '',
-      discountPercentage: 10,
-    });
+  const handleBulkImport = () => {
+    setIsBulkImportOpen(true);
+    setBulkImportData('');
+    setBulkImportResults({success: 0, failed: 0, errors: []});
+  };
+
+  const handleDownloadTemplate = () => {
+    const csvContent = [
+      'Type,Entity Name/Email,Product Name,Contract Price,Markup Price,Min Quantity,Max Quantity,Effective Date,Expiry Date',
+      'organization,Example Organization Name,Product A,99.99,149.99,1,100,2025-01-01,2025-12-31',
+      'organization,Example Organization Name,Product B,49.99,,10,500,2025-01-01,',
+      'individual,user@example.com,Product C,79.99,,1,,2025-01-01,',
+      'location,Location Name,Product D,89.99,,5,50,2025-01-01,2025-06-30',
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pricing_import_template.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const text = e.target?.result as string;
+      setBulkImportData(text);
+    };
+    reader.readAsText(file);
+  };
+
+  const processBulkImport = async () => {
+    if (!bulkImportData.trim()) {
+      alert('Please paste CSV data or upload a file first.');
+      return;
+    }
+
+    const lines = bulkImportData.trim().split('\n');
+    if (lines.length < 2) {
+      alert('CSV must contain at least a header row and one data row.');
+      return;
+    }
+
+    let successCount = 0;
+    let failedCount = 0;
+    const errors: string[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      try {
+        const parts = line.split(',').map(p => p.trim());
+        if (parts.length < 5) {
+          errors.push(`Line ${i + 1}: Invalid format - expected at least 5 columns`);
+          failedCount++;
+          continue;
+        }
+
+        const [type, entityName, productName, contractPriceStr, markupPriceStr, minQtyStr, maxQtyStr, effectiveDateStr, expiryDateStr] = parts;
+
+        if (!['individual', 'organization', 'location'].includes(type)) {
+          errors.push(`Line ${i + 1}: Invalid type "${type}" - must be individual, organization, or location`);
+          failedCount++;
+          continue;
+        }
+
+        let entityId = '';
+        if (type === 'individual') {
+          const user = users.find(u => u.email.toLowerCase() === entityName.toLowerCase());
+          if (!user) {
+            errors.push(`Line ${i + 1}: User "${entityName}" not found`);
+            failedCount++;
+            continue;
+          }
+          entityId = user.id;
+        } else if (type === 'organization') {
+          const org = organizations.find(o => o.name.toLowerCase() === entityName.toLowerCase());
+          if (!org) {
+            errors.push(`Line ${i + 1}: Organization "${entityName}" not found`);
+            failedCount++;
+            continue;
+          }
+          entityId = org.id;
+        } else if (type === 'location') {
+          const location = locations.find(l => l.name.toLowerCase() === entityName.toLowerCase());
+          if (!location) {
+            errors.push(`Line ${i + 1}: Location "${entityName}" not found`);
+            failedCount++;
+            continue;
+          }
+          entityId = location.id;
+        }
+
+        const product = products.find(p => p.name.toLowerCase() === productName.toLowerCase());
+        if (!product) {
+          errors.push(`Line ${i + 1}: Product "${productName}" not found`);
+          failedCount++;
+          continue;
+        }
+
+        const contractPrice = contractPriceStr ? parseFloat(contractPriceStr) : undefined;
+        const markupPrice = markupPriceStr ? parseFloat(markupPriceStr) : undefined;
+        const minQuantity = minQtyStr ? parseInt(minQtyStr) : 1;
+        const maxQuantity = maxQtyStr ? parseInt(maxQtyStr) : undefined;
+        const effectiveDate = effectiveDateStr || new Date().toISOString().split('T')[0];
+        const expiryDate = expiryDateStr || undefined;
+
+        if (!contractPrice && !markupPrice) {
+          errors.push(`Line ${i + 1}: Must provide either contract price or markup price`);
+          failedCount++;
+          continue;
+        }
+
+        const result = await contractPricingService.setContractPrice(
+          entityId,
+          product.id,
+          contractPrice,
+          type as PricingType,
+          minQuantity,
+          maxQuantity,
+          effectiveDate,
+          expiryDate,
+          markupPrice
+        );
+
+        if (result.success) {
+          successCount++;
+        } else {
+          errors.push(`Line ${i + 1}: ${result.error || 'Failed to save pricing'}`);
+          failedCount++;
+        }
+      } catch (err) {
+        errors.push(`Line ${i + 1}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        failedCount++;
+      }
+    }
+
+    setBulkImportResults({ success: successCount, failed: failedCount, errors });
+
+    if (successCount > 0) {
+      await fetchPricingEntries();
+    }
   };
 
   const handleEditPricing = (entry: PricingEntry) => {
@@ -465,19 +617,28 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
         <div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Contract Pricing</h2>
           <p className="text-gray-600">
-            {organizationId 
+            {organizationId
               ? 'Manage contract pricing for this organization and its locations'
               : 'Manage contract pricing for users, organizations, and locations'
             }
           </p>
         </div>
-        <button
-          onClick={handleCreatePricing}
-          className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
-        >
-          <Plus className="h-5 w-5" />
-          <span>Add Pricing</span>
-        </button>
+        <div className="flex space-x-3">
+          <button
+            onClick={handleBulkImport}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+          >
+            <Upload className="h-5 w-5" />
+            <span>Bulk Import</span>
+          </button>
+          <button
+            onClick={handleCreatePricing}
+            className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+          >
+            <Plus className="h-5 w-5" />
+            <span>Add Pricing</span>
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -1137,6 +1298,135 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                 >
                   Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Import Modal */}
+      {isBulkImportOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setIsBulkImportOpen(false)}></div>
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4 flex items-center space-x-2">
+                      <Upload className="h-6 w-6 text-blue-600" />
+                      <span>Bulk Import Contract Pricing</span>
+                    </h3>
+
+                    <div className="space-y-4">
+                      {/* Instructions */}
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <h4 className="text-sm font-semibold text-blue-900 mb-2 flex items-center space-x-2">
+                          <FileText className="h-4 w-4" />
+                          <span>How to use bulk import:</span>
+                        </h4>
+                        <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                          <li>Download the CSV template using the button below</li>
+                          <li>Fill in your pricing data following the format shown</li>
+                          <li>Upload the completed CSV file or paste the data below</li>
+                          <li>Click "Process Import" to import all entries</li>
+                        </ol>
+                      </div>
+
+                      {/* Template Download */}
+                      <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-4">
+                        <div>
+                          <h4 className="text-sm font-semibold text-gray-900">CSV Template</h4>
+                          <p className="text-xs text-gray-600">Download a pre-formatted template with examples</p>
+                        </div>
+                        <button
+                          onClick={handleDownloadTemplate}
+                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center space-x-2"
+                        >
+                          <Download className="h-4 w-4" />
+                          <span>Download Template</span>
+                        </button>
+                      </div>
+
+                      {/* File Upload */}
+                      <div className="border-2 border-dashed border-gray-300 rounded-lg p-6">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".csv"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                        />
+                        <button
+                          onClick={() => fileInputRef.current?.click()}
+                          className="w-full bg-white border border-gray-300 text-gray-700 px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center space-x-2"
+                        >
+                          <Upload className="h-5 w-5" />
+                          <span>Upload CSV File</span>
+                        </button>
+                      </div>
+
+                      {/* CSV Data Input */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Or Paste CSV Data Here:
+                        </label>
+                        <textarea
+                          value={bulkImportData}
+                          onChange={(e) => setBulkImportData(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs"
+                          rows={10}
+                          placeholder="Type,Entity Name/Email,Product Name,Contract Price,Markup Price,Min Quantity,Max Quantity,Effective Date,Expiry Date\norganization,Example Org,Product A,99.99,149.99,1,100,2025-01-01,2025-12-31"
+                        />
+                      </div>
+
+                      {/* Import Results */}
+                      {(bulkImportResults.success > 0 || bulkImportResults.failed > 0) && (
+                        <div className="border rounded-lg p-4">
+                          <h4 className="text-sm font-semibold text-gray-900 mb-3">Import Results</h4>
+                          <div className="grid grid-cols-2 gap-4 mb-4">
+                            <div className="bg-green-50 border border-green-200 rounded p-3">
+                              <div className="text-2xl font-bold text-green-600">{bulkImportResults.success}</div>
+                              <div className="text-xs text-green-700">Successful</div>
+                            </div>
+                            <div className="bg-red-50 border border-red-200 rounded p-3">
+                              <div className="text-2xl font-bold text-red-600">{bulkImportResults.failed}</div>
+                              <div className="text-xs text-red-700">Failed</div>
+                            </div>
+                          </div>
+                          {bulkImportResults.errors.length > 0 && (
+                            <div className="bg-red-50 border border-red-200 rounded-lg p-3 max-h-48 overflow-y-auto">
+                              <h5 className="text-xs font-semibold text-red-900 mb-2">Errors:</h5>
+                              <ul className="text-xs text-red-700 space-y-1">
+                                {bulkImportResults.errors.map((error, idx) => (
+                                  <li key={idx}>{error}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={processBulkImport}
+                  disabled={!bulkImportData.trim()}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Process Import
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsBulkImportOpen(false)}
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  Close
                 </button>
               </div>
             </div>
