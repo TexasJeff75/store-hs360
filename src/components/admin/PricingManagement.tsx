@@ -518,14 +518,23 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       defaultType = 'organization';
     }
 
-    // Initialize with all products
-    const initialProducts = products.map(product => ({
-      productId: product.id,
-      contractPrice: '',
-      markupPrice: '',
-      minQuantity: '1',
-      maxQuantity: ''
-    }));
+    // Initialize with all products and populate existing pricing
+    const initialProducts = products.map(product => {
+      // Find existing pricing for this product and entity
+      const existingPricing = pricingEntries.find(entry =>
+        entry.productId === product.id &&
+        entry.entityId === defaultEntityId &&
+        entry.type === defaultType
+      );
+
+      return {
+        productId: product.id,
+        contractPrice: existingPricing?.contractPrice?.toString() || '',
+        markupPrice: existingPricing?.markupPrice?.toString() || '',
+        minQuantity: existingPricing?.minQuantity?.toString() || '1',
+        maxQuantity: existingPricing?.maxQuantity?.toString() || ''
+      };
+    });
 
     setMultiProductFormData({
       type: defaultType,
@@ -1719,11 +1728,23 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                           </label>
                           <select
                             value={multiProductFormData.type}
-                            onChange={(e) => setMultiProductFormData({
-                              ...multiProductFormData,
-                              type: e.target.value as PricingType,
-                              entityId: ''
-                            })}
+                            onChange={(e) => {
+                              // Reset products to empty when changing type
+                              const emptyProducts = products.map(product => ({
+                                productId: product.id,
+                                contractPrice: '',
+                                markupPrice: '',
+                                minQuantity: '1',
+                                maxQuantity: ''
+                              }));
+
+                              setMultiProductFormData({
+                                ...multiProductFormData,
+                                type: e.target.value as PricingType,
+                                entityId: '',
+                                products: emptyProducts
+                              });
+                            }}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                           >
                             <option value="organization">Organization</option>
@@ -1739,10 +1760,32 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                           </label>
                           <select
                             value={multiProductFormData.entityId}
-                            onChange={(e) => setMultiProductFormData({
-                              ...multiProductFormData,
-                              entityId: e.target.value
-                            })}
+                            onChange={(e) => {
+                              const newEntityId = e.target.value;
+
+                              // Reload pricing for the newly selected entity
+                              const updatedProducts = products.map(product => {
+                                const existingPricing = pricingEntries.find(entry =>
+                                  entry.productId === product.id &&
+                                  entry.entityId === newEntityId &&
+                                  entry.type === multiProductFormData.type
+                                );
+
+                                return {
+                                  productId: product.id,
+                                  contractPrice: existingPricing?.contractPrice?.toString() || '',
+                                  markupPrice: existingPricing?.markupPrice?.toString() || '',
+                                  minQuantity: existingPricing?.minQuantity?.toString() || '1',
+                                  maxQuantity: existingPricing?.maxQuantity?.toString() || ''
+                                };
+                              });
+
+                              setMultiProductFormData({
+                                ...multiProductFormData,
+                                entityId: newEntityId,
+                                products: updatedProducts
+                              });
+                            }}
                             className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
                           >
                             <option value="">Select...</option>
