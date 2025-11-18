@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Eye, DollarSign, Save, AlertTriangle, Package, Upload, Download, FileText } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import { bigCommerceService } from '@/services/bigcommerce';
+import { bcRestAPI } from '@/services/bigcommerceRestAPI';
 import { productCostsService } from '@/services/productCosts';
 import SortableTable, { Column } from './SortableTable';
 
@@ -65,21 +66,26 @@ const SecretCostManagement: React.FC = () => {
       // Fetch products from BigCommerce
       const { products: bcProducts } = await bigCommerceService.getProducts();
 
-      // Fetch product costs from database
+      // Fetch BigCommerce costs via REST API
       const productIds = bcProducts.map(p => p.id);
+      const bcCostsData = await bcRestAPI.getProductCosts(productIds);
+
+      // Fetch secret costs from database
       const costsMap = await productCostsService.getProductCosts(productIds);
 
       // Merge data
       const productsWithCosts: ProductWithCost[] = bcProducts.map(product => {
-        const costData = costsMap.get(product.id);
+        const bcCost = bcCostsData[product.id];
+        const dbCostData = costsMap.get(product.id);
+
         return {
           id: product.id,
           name: product.name,
           sku: product.sku || '',
           price: product.price,
-          cost_price: costData?.cost_price || null,
-          secret_cost: costData?.secret_cost || null,
-          retail_price: costData?.retail_price || product.price
+          cost_price: bcCost?.cost_price || null,
+          secret_cost: dbCostData?.secret_cost || null,
+          retail_price: product.price
         };
       });
 
@@ -109,13 +115,12 @@ const SecretCostManagement: React.FC = () => {
     try {
       setError(null);
 
-      const costPrice = editValues.cost_price ? parseFloat(editValues.cost_price) : null;
       const secretCost = editValues.secret_cost ? parseFloat(editValues.secret_cost) : null;
 
-      // Update in database
+      // Update only secret_cost in database (cost_price comes from BigCommerce)
       await productCostsService.upsertProductCost({
         product_id: product.id,
-        cost_price: costPrice,
+        cost_price: product.cost_price,
         secret_cost: secretCost,
         retail_price: product.retail_price,
         sale_price: null,
@@ -126,7 +131,7 @@ const SecretCostManagement: React.FC = () => {
       // Update local state
       setProducts(products.map(p =>
         p.id === product.id
-          ? { ...p, cost_price: costPrice, secret_cost: secretCost }
+          ? { ...p, secret_cost: secretCost }
           : p
       ));
 
@@ -253,13 +258,12 @@ const SecretCostManagement: React.FC = () => {
           continue;
         }
 
-        const publicCost = publicCostStr ? parseFloat(publicCostStr) : null;
         const secretCost = secretCostStr ? parseFloat(secretCostStr) : null;
 
-        // Update in database
+        // Update only secret_cost in database (public cost comes from BigCommerce)
         await productCostsService.upsertProductCost({
           product_id: productId,
-          cost_price: publicCost,
+          cost_price: product.cost_price,
           secret_cost: secretCost,
           retail_price: product.retail_price,
           sale_price: null,
@@ -270,7 +274,7 @@ const SecretCostManagement: React.FC = () => {
         // Update local state
         setProducts(prevProducts => prevProducts.map(p =>
           p.id === productId
-            ? { ...p, cost_price: publicCost, secret_cost: secretCost }
+            ? { ...p, secret_cost: secretCost }
             : p
         ));
 
@@ -332,26 +336,14 @@ const SecretCostManagement: React.FC = () => {
     },
     {
       key: 'cost_price',
-      label: 'Public Cost',
+      label: 'Public Cost (from BC)',
       sortable: true,
       className: 'whitespace-nowrap text-right',
       headerClassName: 'text-right',
       render: (product) => (
-        editingProduct === product.id ? (
-          <input
-            type="number"
-            step="0.01"
-            value={editValues.cost_price}
-            onChange={(e) => setEditValues({ ...editValues, cost_price: e.target.value })}
-            className="w-24 px-2 py-1 border border-gray-300 rounded text-sm text-right"
-            placeholder="0.00"
-            onClick={(e) => e.stopPropagation()}
-          />
-        ) : (
-          <div className="text-sm font-medium text-gray-900">
-            {product.cost_price ? `$${product.cost_price.toFixed(2)}` : '-'}
-          </div>
-        )
+        <div className="text-sm font-medium text-blue-900" title="This cost comes from BigCommerce and cannot be edited here">
+          {product.cost_price ? `$${product.cost_price.toFixed(2)}` : '-'}
+        </div>
       )
     },
     {
@@ -497,9 +489,9 @@ const SecretCostManagement: React.FC = () => {
           <div>
             <h3 className="text-sm font-semibold text-red-900 mb-1">Understanding Cost Types</h3>
             <ul className="text-sm text-red-800 space-y-1">
-              <li><strong>Public Cost (cost_price)</strong>: Shown to all admins for pricing validation. Can be higher than true cost.</li>
-              <li><strong>Secret Cost (secret_cost)</strong>: Your TRUE acquisition cost. Only cost admins see this. Used for real profit calculations.</li>
-              <li><strong>Why have both?</strong>: You can show higher "costs" to regular admins while protecting your true margins.</li>
+              <li><strong>Public Cost</strong>: Comes from BigCommerce cost_price field. Synced automatically and shown to all admins for pricing validation.</li>
+              <li><strong>Secret Cost</strong>: Your TRUE acquisition cost. Only cost admins can see and edit this. Used for real profit calculations.</li>
+              <li><strong>Why have both?</strong>: BigCommerce cost may include markup or be outdated. Secret cost is your actual cost, giving you true profit visibility.</li>
             </ul>
           </div>
         </div>
@@ -563,10 +555,10 @@ const SecretCostManagement: React.FC = () => {
                         </h4>
                         <ol className="text-sm text-red-800 space-y-1 list-decimal list-inside">
                           <li>Download the CSV template with all products pre-filled</li>
-                          <li>Edit the "Public Cost" and "Secret Cost" columns</li>
-                          <li>Do NOT modify Product ID, Name, SKU, or Retail Price columns</li>
+                          <li>Edit ONLY the "Secret Cost" column (Public Cost is from BigCommerce)</li>
+                          <li>Public Cost is for reference only - it cannot be changed via import</li>
                           <li>Upload the completed CSV or paste the data below</li>
-                          <li>Click "Process Import" to import all cost updates</li>
+                          <li>Click "Process Import" to import secret cost updates</li>
                         </ol>
                         <div className="mt-3 p-2 bg-red-100 border border-red-300 rounded">
                           <p className="text-xs text-red-900 font-medium flex items-center">
