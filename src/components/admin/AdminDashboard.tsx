@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle } from 'lucide-react';
+import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
@@ -16,13 +16,14 @@ import RecurringOrderManagement from './RecurringOrderManagement';
 import MyRecurringOrders from '../MyRecurringOrders';
 import DistributorManagement from './DistributorManagement';
 import HelpSection from './HelpSection';
+import ProfitReport from './ProfitReport';
 
 interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'distributors' | 'analytics' | 'my-orgs' | 'payments' | 'recurring-orders' | 'my-recurring-orders' | 'help';
+type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'distributors' | 'analytics' | 'profit-report' | 'my-orgs' | 'payments' | 'recurring-orders' | 'my-recurring-orders' | 'help';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const { profile, user } = useAuth();
@@ -56,6 +57,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2, roles: ['admin'] },
     { id: 'users' as AdminTab, label: 'Users', icon: Users, roles: ['admin'] },
     { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep', 'customer'] },
+    { id: 'profit-report' as AdminTab, label: 'Profit Report', icon: PieChart, roles: ['admin'] },
     { id: 'my-recurring-orders' as AdminTab, label: 'My Recurring Orders', icon: Repeat, roles: ['customer'] },
     { id: 'recurring-orders' as AdminTab, label: 'Recurring Orders', icon: Repeat, roles: ['admin'] },
     { id: 'locations' as AdminTab, label: 'Locations', icon: MapPin, roles: ['customer'] },
@@ -85,6 +87,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
         return <UserManagement />;
       case 'orders':
         return <OrderManagement />;
+      case 'profit-report':
+        return <ProfitReport />;
       case 'distributors':
         return <DistributorManagement />;
       case 'salesreps':

@@ -3,6 +3,7 @@ import { supabase } from './supabase';
 export interface ProductCost {
   product_id: number;
   cost_price: number | null;
+  secret_cost: number | null;
   retail_price: number | null;
   sale_price: number | null;
   product_name: string | null;

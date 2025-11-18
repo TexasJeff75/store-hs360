@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, Plus, Edit, Trash2, Search, User, Building2, MapPin, AlertTriangle, Shield } from 'lucide-react';
+import { DollarSign, Plus, Edit, Trash2, Search, User, Building2, MapPin, AlertTriangle, Shield, Eye } from 'lucide-react';
 import { contractPricingService, type PricingType } from '@/services/contractPricing';
 import { multiTenantService } from '@/services/multiTenant';
 import { bigCommerceService } from '@/services/bigcommerce';
@@ -58,10 +58,23 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
   });
   const [productSettings, setProductSettings] = useState<Map<number, { allowMarkup: boolean }>>(new Map());
   const [productCosts, setProductCosts] = useState<Map<number, ProductCost>>(new Map());
+  const [isCostAdmin, setIsCostAdmin] = useState(false);
 
   useEffect(() => {
+    checkCostAdmin();
     fetchData();
   }, []);
+
+  const checkCostAdmin = async () => {
+    try {
+      const { data, error } = await supabase.rpc('is_cost_admin');
+      if (!error && data) {
+        setIsCostAdmin(true);
+      }
+    } catch (err) {
+      console.error('Error checking cost admin status:', err);
+    }
+  };
 
   const fetchPricingEntries = async () => {
     try {
@@ -838,7 +851,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Product Cost (Your Cost)
+                          Product Cost {isCostAdmin && productCosts.get(selectedEntry.productId || 0)?.secret_cost && '(Public Cost)'}
                         </label>
                         {productCosts.get(selectedEntry.productId || 0)?.cost_price ? (
                           <div className="flex items-center space-x-2 mb-3">
@@ -857,6 +870,25 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                           </div>
                         )}
                       </div>
+
+                      {isCostAdmin && productCosts.get(selectedEntry.productId || 0)?.secret_cost && (
+                        <div className="border-2 border-red-300 rounded-lg p-4 bg-red-50 mb-3">
+                          <div className="flex items-start space-x-2 mb-2">
+                            <Eye className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+                            <div>
+                              <h4 className="text-sm font-bold text-red-900">TRUE COST (Confidential)</h4>
+                              <p className="text-xs text-red-700">Only visible to cost admins. This is your actual acquisition cost.</p>
+                            </div>
+                          </div>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={productCosts.get(selectedEntry.productId || 0)?.secret_cost || 0}
+                            readOnly
+                            className="w-full border border-red-400 rounded-lg px-3 py-2 bg-white font-bold text-red-900 text-lg"
+                          />
+                        </div>
+                      )}
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
