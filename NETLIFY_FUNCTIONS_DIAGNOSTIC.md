@@ -35,12 +35,29 @@ This means the BigCommerce REST API function at `/.netlify/functions/bigcommerce
 
 2. **Look for this line:**
    ```
-   ◈ Bundling Functions from netlify/functions directory:
-      - bigcommerce-cart.js
-      - gql.js
+   ◈ Packaging Functions from netlify/functions directory:
+      - bigcommerce-cart.cjs
+      - gql.cjs
    ```
 
-3. **If you DON'T see this:**
+3. **Check for warnings:**
+   ```
+   ▲ [WARNING] The CommonJS "exports" variable is treated as a global variable...
+   ```
+
+   **If you see this warning:**
+   - Functions are using `.js` extension but package.json has `"type": "module"`
+   - **FIX:** Rename function files from `.js` to `.cjs`:
+     ```bash
+     cd netlify/functions
+     mv bigcommerce-cart.js bigcommerce-cart.cjs
+     mv gql.js gql.cjs
+     git add .
+     git commit -m "Fix: Rename Netlify Functions to .cjs extension"
+     git push
+     ```
+
+4. **If you DON'T see functions being packaged:**
    - Functions directory not detected
    - **FIX:** Update `netlify.toml`:
      ```toml
@@ -51,9 +68,9 @@ This means the BigCommerce REST API function at `/.netlify/functions/bigcommerce
        directory = "netlify/functions"
      ```
 
-4. **If you see "No functions found":**
+5. **If you see "No functions found":**
    - Check that `netlify/functions/` directory exists in your repo
-   - Verify files have `.js` extension (not `.ts`)
+   - Verify files have `.cjs` or `.js` extension (not `.ts`)
    - Functions must be committed to git
 
 ### Step 3: Test Function Directly
