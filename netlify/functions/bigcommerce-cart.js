@@ -124,13 +124,22 @@ exports.handler = async (event, context) => {
 
       case 'getProductCosts': {
         const { productIds } = data;
-        console.log('[BigCommerce Cart Function] Fetching costs for products:', productIds);
+        console.log('[BigCommerce Cart Function] Fetching costs for products:', productIds.length, 'products');
 
         const productCosts = {};
 
-        for (const productId of productIds) {
+        // Fetch products in bulk (BigCommerce supports up to 250 products per request)
+        const BATCH_SIZE = 250;
+        const batches = [];
+        for (let i = 0; i < productIds.length; i += BATCH_SIZE) {
+          batches.push(productIds.slice(i, i + BATCH_SIZE));
+        }
+
+        // Process all batches in parallel
+        const batchPromises = batches.map(async (batch) => {
+          const idsParam = batch.join(',');
           const response = await fetch(
-            `https://api.bigcommerce.com/stores/${BC_STORE_HASH}/v3/catalog/products/${productId}?include=variants`,
+            `https://api.bigcommerce.com/stores/${BC_STORE_HASH}/v3/catalog/products?id:in=${idsParam}&include=variants`,
             {
               method: 'GET',
               headers,
@@ -139,42 +148,46 @@ exports.handler = async (event, context) => {
 
           if (response.ok) {
             const result = await response.json();
-            const product = result.data;
-
-            // Use variant cost_price if available and product has variants
-            let costPrice = product.cost_price;
-            if (product.variants && product.variants.length > 0) {
-              // Use the first variant's cost_price if available
-              const variant = product.variants[0];
-              if (variant.cost_price !== undefined && variant.cost_price !== null) {
-                costPrice = variant.cost_price;
-              }
-            }
-
-            productCosts[productId] = {
-              id: product.id,
-              name: product.name,
-              sku: product.sku || null,
-              cost_price: costPrice !== undefined && costPrice !== null ? costPrice : 0,
-              price: product.price || 0,
-              brand_id: product.brand_id || null,
-              brand_name: null, // Will be fetched separately if needed
-            };
+            return result.data || [];
           }
-        }
+          return [];
+        });
 
-        // Fetch brand names for products that have brand_id
+        const batchResults = await Promise.all(batchPromises);
+        const allProducts = batchResults.flat();
+
+        // Process all products
+        allProducts.forEach(product => {
+          // Use variant cost_price if available and product has variants
+          let costPrice = product.cost_price;
+          if (product.variants && product.variants.length > 0) {
+            const variant = product.variants[0];
+            if (variant.cost_price !== undefined && variant.cost_price !== null) {
+              costPrice = variant.cost_price;
+            }
+          }
+
+          productCosts[product.id] = {
+            id: product.id,
+            name: product.name,
+            sku: product.sku || null,
+            cost_price: costPrice !== undefined && costPrice !== null ? costPrice : 0,
+            price: product.price || 0,
+            brand_id: product.brand_id || null,
+            brand_name: null,
+          };
+        });
+
+        // Fetch brand names in bulk
         const brandIds = [...new Set(
           Object.values(productCosts)
             .map(p => p.brand_id)
             .filter(id => id !== null)
         )];
 
-        const brandNames = {};
         if (brandIds.length > 0) {
-          // Fetch brands in bulk
           const brandsResponse = await fetch(
-            `https://api.bigcommerce.com/stores/${BC_STORE_HASH}/v3/catalog/brands?id:in=${brandIds.join(',')}`,
+            `https://api.bigcommerce.com/stores/${BC_STORE_HASH}/v3/catalog/brands?id:in=${brandIds.join(',')}&limit=250`,
             {
               method: 'GET',
               headers,
@@ -183,18 +196,21 @@ exports.handler = async (event, context) => {
 
           if (brandsResponse.ok) {
             const brandsResult = await brandsResponse.json();
+            const brandNames = {};
             brandsResult.data.forEach(brand => {
               brandNames[brand.id] = brand.name;
+            });
+
+            // Update product costs with brand names
+            Object.values(productCosts).forEach(product => {
+              if (product.brand_id && brandNames[product.brand_id]) {
+                product.brand_name = brandNames[product.brand_id];
+              }
             });
           }
         }
 
-        // Update product costs with brand names
-        Object.values(productCosts).forEach(product => {
-          if (product.brand_id && brandNames[product.brand_id]) {
-            product.brand_name = brandNames[product.brand_id];
-          }
-        });
+        console.log('[BigCommerce Cart Function] Successfully fetched', Object.keys(productCosts).length, 'products');
 
         return {
           statusCode: 200,
