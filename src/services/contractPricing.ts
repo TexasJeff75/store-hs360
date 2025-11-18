@@ -141,7 +141,7 @@ class ContractPricingService {
     id?: string,
     allowBelowCost?: boolean,
     overrideReason?: string
-  ): Promise<{ success: boolean; error?: string }> {
+  ): Promise<{ success: boolean; error?: string; data?: any }> {
     try {
       const { data, error } = await supabase
         .from('contract_pricing')
@@ -170,7 +170,7 @@ class ContractPricingService {
 
       // Invalidate related cache entries
       this.invalidatePricingCache(entityId, productId, pricingType);
-      return { success: true };
+      return { success: true, data };
     } catch (error) {
       console.error('Error setting contract price:', error);
       return {

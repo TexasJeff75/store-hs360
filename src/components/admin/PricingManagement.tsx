@@ -289,6 +289,53 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
         return;
       }
 
+      // Check if price is below cost
+      const productCost = productCosts.get(selectedEntry.productId || 0);
+      const priceToCheck = selectedEntry.contractPrice || selectedEntry.markupPrice;
+
+      if (productCost?.cost_price && priceToCheck && priceToCheck < productCost.cost_price) {
+        const lossPerUnit = productCost.cost_price - priceToCheck;
+
+        // Show alert to admin
+        const confirmed = window.confirm(
+          `⚠️ BELOW-COST PRICING WARNING ⚠️\n\n` +
+          `Product: ${productCost.product_name || 'Product ' + selectedEntry.productId}\n` +
+          `Your Cost: $${productCost.cost_price.toFixed(2)}\n` +
+          `Your Price: $${priceToCheck.toFixed(2)}\n` +
+          `Loss Per Unit: $${lossPerUnit.toFixed(2)}\n\n` +
+          `This pricing will result in a LOSS on every sale!\n\n` +
+          `Are you sure you want to continue?\n\n` +
+          `If you click OK, you MUST provide a business justification in the next step.`
+        );
+
+        if (!confirmed) {
+          return;
+        }
+
+        // If confirmed but no override reason provided, prompt for it
+        if (!newEntryData.overrideReason || newEntryData.overrideReason.trim() === '') {
+          setModalMessage({
+            type: 'error',
+            text: 'Business justification is required for below-cost pricing. Please scroll down and provide a reason in the "Business Justification" field.'
+          });
+
+          // Automatically check the override checkbox and scroll to it
+          setNewEntryData({
+            ...newEntryData,
+            allowBelowCost: true
+          });
+          return;
+        }
+
+        // Set the override flag since admin confirmed
+        if (!newEntryData.allowBelowCost) {
+          setNewEntryData({
+            ...newEntryData,
+            allowBelowCost: true
+          });
+        }
+      }
+
       const result = await contractPricingService.setContractPrice(
         selectedEntry.entityId!,
         selectedEntry.productId!,
@@ -305,6 +352,24 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
       );
 
       if (result.success) {
+        // Log the below-cost approval if applicable
+        if (newEntryData.allowBelowCost && productCost?.cost_price && priceToCheck && priceToCheck < productCost.cost_price) {
+          try {
+            const { data: profileData } = await supabase.auth.getUser();
+
+            await supabase.from('below_cost_pricing_audit').insert({
+              pricing_id: result.data?.id,
+              product_id: selectedEntry.productId!,
+              contract_price: priceToCheck,
+              product_cost: productCost.cost_price,
+              override_reason: newEntryData.overrideReason,
+              approved_by: profileData.user?.id
+            });
+          } catch (auditError) {
+            console.error('Failed to log below-cost pricing audit:', auditError);
+          }
+        }
+
         setModalMessage({ type: 'success', text: 'Pricing saved successfully!' });
         setIsModalOpen(false);
         setSelectedEntry(null);
