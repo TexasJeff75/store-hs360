@@ -285,9 +285,21 @@ const SecretCostManagement: React.FC = () => {
   if (loading) {
     return (
       <div className="p-6">
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-4"></div>
-          <div className="h-64 bg-gray-200 rounded"></div>
+        <div className="mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Secret Cost Management</h2>
+          <p className="text-sm text-red-600 flex items-center">
+            <Eye className="w-4 h-4 mr-1" />
+            Confidential: This page contains true acquisition costs
+          </p>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <div className="flex items-center justify-center">
+            <Package className="h-8 w-8 text-blue-600 animate-pulse mr-3" />
+            <div>
+              <p className="text-blue-700 font-medium">Loading product costs...</p>
+              <p className="text-blue-600 text-sm">Fetching confidential cost data from BigCommerce</p>
+            </div>
+          </div>
         </div>
       </div>
     );

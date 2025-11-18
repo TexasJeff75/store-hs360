@@ -19,6 +19,7 @@ const ProductsManagement: React.FC = () => {
   const { user, profile } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingCosts, setLoadingCosts] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
@@ -86,9 +87,9 @@ const ProductsManagement: React.FC = () => {
   const fetchProducts = async (forceRefresh = false) => {
     try {
       setLoading(true);
+      setLoadingCosts(false);
 
       if (forceRefresh) {
-        // Clear the products cache
         cacheService.delete('products_all');
         console.log('🗑️ Product cache cleared');
       }
@@ -98,7 +99,10 @@ const ProductsManagement: React.FC = () => {
       if (errorMessage) {
         setError(errorMessage);
       } else {
-        // Fetch actual cost_price and brand info from BigCommerce REST API
+        setProducts(products);
+        setLoading(false);
+        setLoadingCosts(true);
+
         const productIds = products.map(p => p.id);
         try {
           const costData = await bcRestAPI.getProductCosts(productIds);
@@ -106,7 +110,6 @@ const ProductsManagement: React.FC = () => {
           console.log('Cost data received:', Object.keys(costData).length, 'products');
           console.log('Sample cost data:', costData[productIds[0]]);
 
-          // Update products with actual cost_price and brand info from BigCommerce
           const updatedProducts = products.map(product => {
             const costInfo = costData[product.id];
             if (costInfo) {
@@ -124,14 +127,15 @@ const ProductsManagement: React.FC = () => {
           setProducts(updatedProducts);
         } catch (costErr) {
           console.error('Failed to fetch product costs:', costErr);
-          // Still set products even if cost fetch fails
-          setProducts(products);
+        } finally {
+          setLoadingCosts(false);
         }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch products');
     } finally {
       setLoading(false);
+      setLoadingCosts(false);
     }
   };
 
@@ -470,6 +474,15 @@ const ProductsManagement: React.FC = () => {
       {error && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
           <p className="text-red-700">{error}</p>
+        </div>
+      )}
+
+      {loadingCosts && (
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center">
+            <RefreshCw className="h-5 w-5 text-blue-600 animate-spin mr-3" />
+            <p className="text-blue-700 font-medium">Loading product costs and brand information...</p>
+          </div>
         </div>
       )}
 
