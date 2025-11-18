@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Building2, Plus, Trash2, DollarSign } from 'lucide-react';
 import { commissionService } from '../../services/commissionService';
 import { supabase } from '../../services/supabase';
+import SortableTable, { Column } from './SortableTable';
 
 interface Organization {
   id: string;
@@ -20,6 +21,16 @@ interface Assignment {
   sales_rep_id: string;
   commission_rate: number;
   sales_rep: { email: string };
+}
+
+interface FlatAssignment {
+  id: string;
+  organization_id: string;
+  organization_name: string;
+  organization_code: string;
+  sales_rep_id: string;
+  sales_rep_email: string;
+  commission_rate: number;
 }
 
 const SalesRepAssignment: React.FC = () => {
@@ -226,79 +237,114 @@ const SalesRepAssignment: React.FC = () => {
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Organization</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sales Rep</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commission Rate</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {organizations.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
-                  <Building2 className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p>No organizations found</p>
-                </td>
-              </tr>
-            ) : (
-              organizations.map(org => {
-                const orgAssignments = assignments[org.id] || [];
-                if (orgAssignments.length === 0) {
-                  return (
-                    <tr key={org.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm text-gray-900">{org.name}</td>
-                      <td className="px-6 py-4 text-sm text-gray-500" colSpan={2}>
-                        No sales rep assigned
-                      </td>
-                      <td className="px-6 py-4"></td>
-                    </tr>
-                  );
-                }
-                return orgAssignments.map((assignment, index) => (
-                  <tr key={`${org.id}-${assignment.sales_rep_id}`} className="hover:bg-gray-50">
-                    {index === 0 && (
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900" rowSpan={orgAssignments.length}>
-                        {org.name}
-                        <div className="text-xs text-gray-500">{org.code}</div>
-                      </td>
-                    )}
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      <div className="flex items-center space-x-2">
-                        <Users className="h-4 w-4 text-gray-400" />
-                        <span>{assignment.sales_rep.email}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      <div className="flex items-center space-x-2">
-                        <DollarSign className="h-4 w-4 text-green-600" />
-                        <span className="font-semibold">{Number(assignment.commission_rate).toFixed(2)}%</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right text-sm">
-                      <button
-                        onClick={() => handleUpdateRate(org.id, assignment.sales_rep_id)}
-                        className="text-blue-600 hover:text-blue-900 mr-3"
-                      >
-                        Edit Rate
-                      </button>
-                      <button
-                        onClick={() => handleRemove(org.id, assignment.sales_rep_id)}
-                        className="text-red-600 hover:text-red-900"
-                      >
-                        <Trash2 className="h-4 w-4 inline" />
-                      </button>
-                    </td>
-                  </tr>
-                ));
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
+      <SortableTable
+        data={(() => {
+          const flatData: FlatAssignment[] = [];
+          organizations.forEach(org => {
+            const orgAssignments = assignments[org.id] || [];
+            if (orgAssignments.length === 0) {
+              flatData.push({
+                id: `empty-${org.id}`,
+                organization_id: org.id,
+                organization_name: org.name,
+                organization_code: org.code,
+                sales_rep_id: '',
+                sales_rep_email: 'No sales rep assigned',
+                commission_rate: 0
+              });
+            } else {
+              orgAssignments.forEach(assignment => {
+                flatData.push({
+                  id: assignment.id,
+                  organization_id: org.id,
+                  organization_name: org.name,
+                  organization_code: org.code,
+                  sales_rep_id: assignment.sales_rep_id,
+                  sales_rep_email: assignment.sales_rep.email,
+                  commission_rate: assignment.commission_rate
+                });
+              });
+            }
+          });
+          return flatData;
+        })()}
+        columns={[
+          {
+            key: 'organization_name',
+            label: 'Organization',
+            sortable: true,
+            filterable: true,
+            render: (row) => (
+              <div>
+                <div className="text-sm font-medium text-gray-900">{row.organization_name}</div>
+                <div className="text-xs text-gray-500">{row.organization_code}</div>
+              </div>
+            )
+          },
+          {
+            key: 'sales_rep_email',
+            label: 'Sales Rep',
+            sortable: true,
+            filterable: true,
+            render: (row) => (
+              <div className="flex items-center space-x-2">
+                <Users className="h-4 w-4 text-gray-400" />
+                <span className={`text-sm ${row.sales_rep_id ? 'text-gray-900' : 'text-gray-500'}`}>
+                  {row.sales_rep_email}
+                </span>
+              </div>
+            )
+          },
+          {
+            key: 'commission_rate',
+            label: 'Commission Rate',
+            sortable: true,
+            render: (row) => (
+              row.sales_rep_id ? (
+                <div className="flex items-center space-x-2">
+                  <DollarSign className="h-4 w-4 text-green-600" />
+                  <span className="font-semibold text-sm">{Number(row.commission_rate).toFixed(2)}%</span>
+                </div>
+              ) : null
+            )
+          },
+          {
+            key: 'actions',
+            label: 'Actions',
+            sortable: false,
+            headerClassName: 'text-right',
+            className: 'text-right',
+            render: (row) => (
+              row.sales_rep_id ? (
+                <div className="flex items-center justify-end space-x-2">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleUpdateRate(row.organization_id, row.sales_rep_id);
+                    }}
+                    className="text-blue-600 hover:text-blue-900"
+                  >
+                    Edit Rate
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleRemove(row.organization_id, row.sales_rep_id);
+                    }}
+                    className="text-red-600 hover:text-red-900"
+                  >
+                    <Trash2 className="h-4 w-4 inline" />
+                  </button>
+                </div>
+              ) : null
+            )
+          }
+        ]}
+        keyExtractor={(row) => row.id}
+        searchPlaceholder="Search organizations or sales reps..."
+        emptyMessage="No organizations found"
+        emptyIcon={<Building2 className="h-12 w-12 mx-auto text-gray-400" />}
+      />
 
       {salesReps.length === 0 && (
         <div className="mt-4 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
