@@ -240,19 +240,50 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
   };
 
   const handleDownloadTemplate = () => {
-    const csvContent = [
-      'Type,Entity Name/Email,Product Name,Contract Price,Markup Price,Min Quantity,Max Quantity,Effective Date,Expiry Date',
-      'organization,Example Organization Name,Product A,99.99,149.99,1,100,2025-01-01,2025-12-31',
-      'organization,Example Organization Name,Product B,49.99,,10,500,2025-01-01,',
-      'individual,user@example.com,Product C,79.99,,1,,2025-01-01,',
-      'location,Location Name,Product D,89.99,,5,50,2025-01-01,2025-06-30',
-    ].join('\n');
+    const csvLines = ['Type,Entity Name/Email,Product Name,Contract Price,Markup Price,Min Quantity,Max Quantity,Effective Date,Expiry Date'];
 
+    if (organizationId) {
+      const org = organizations.find(o => o.id === organizationId);
+      const orgName = org?.name || 'Organization';
+
+      products.forEach(product => {
+        csvLines.push(`organization,${orgName},${product.name},${product.price},,1,,,${new Date().toISOString().split('T')[0]},`);
+      });
+
+      locations.forEach(location => {
+        products.slice(0, 5).forEach(product => {
+          csvLines.push(`location,${location.name},${product.name},${product.price},,1,,,${new Date().toISOString().split('T')[0]},`);
+        });
+      });
+    } else {
+      organizations.forEach(org => {
+        products.slice(0, 5).forEach(product => {
+          csvLines.push(`organization,${org.name},${product.name},${product.price},,1,,,${new Date().toISOString().split('T')[0]},`);
+        });
+      });
+
+      locations.slice(0, 3).forEach(location => {
+        products.slice(0, 3).forEach(product => {
+          csvLines.push(`location,${location.name},${product.name},${product.price},,1,,,${new Date().toISOString().split('T')[0]},`);
+        });
+      });
+
+      users.slice(0, 3).forEach(user => {
+        products.slice(0, 3).forEach(product => {
+          csvLines.push(`individual,${user.email},${product.name},${product.price},,1,,,${new Date().toISOString().split('T')[0]},`);
+        });
+      });
+    }
+
+    const csvContent = csvLines.join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'pricing_import_template.csv';
+    const filename = organizationId
+      ? `pricing_template_${organizations.find(o => o.id === organizationId)?.name.replace(/[^a-z0-9]/gi, '_')}_${new Date().toISOString().split('T')[0]}.csv`
+      : `pricing_template_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
