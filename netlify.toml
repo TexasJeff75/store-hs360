@@ -2,7 +2,7 @@
   command = "npm run build"
   publish = "dist"
   functions = "netlify/functions"
-  environment = { SECRETS_SCAN_ENABLED = "false" }
+  environment = { NODE_VERSION = "18", SECRETS_SCAN_ENABLED = "false" }
 
 [dev]
   command = "npm run dev:functions"
@@ -12,11 +12,13 @@
   autoLaunch = false
 
 [functions]
+  directory = "netlify/functions"
   # Make environment variables available to functions
   # Note: In Netlify UI, set these environment variables without the VITE_ prefix:
   # - BC_STORE_HASH
   # - BC_STOREFRONT_TOKEN
   # - BC_ACCESS_TOKEN
+  node_bundler = "esbuild"
   included_files = ["netlify/functions/**"]
 
 [[redirects]]
@@ -24,7 +26,10 @@
   to = "/.netlify/functions/gql"
   status = 200
 
+# SPA fallback - must be last
+# force = false ensures it doesn't override actual files or Netlify Functions
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  force = false
