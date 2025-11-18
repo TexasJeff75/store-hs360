@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Search, Eye, DollarSign, Tag, Hash, ChevronUp, ChevronDown, Building2, CheckCircle2, XCircle, Truck, RefreshCw } from 'lucide-react';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
+import { bcRestAPI } from '@/services/bigcommerceRestAPI';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { cacheService } from '@/services/cache';
@@ -97,7 +98,29 @@ const ProductsManagement: React.FC = () => {
       if (errorMessage) {
         setError(errorMessage);
       } else {
-        setProducts(products);
+        // Fetch actual cost_price from BigCommerce REST API
+        const productIds = products.map(p => p.id);
+        try {
+          const costData = await bcRestAPI.getProductCosts(productIds);
+
+          // Update products with actual cost_price from BigCommerce
+          const updatedProducts = products.map(product => {
+            const costInfo = costData[product.id];
+            if (costInfo && costInfo.cost_price !== undefined) {
+              return {
+                ...product,
+                cost: costInfo.cost_price
+              };
+            }
+            return product;
+          });
+
+          setProducts(updatedProducts);
+        } catch (costErr) {
+          console.error('Failed to fetch product costs:', costErr);
+          // Still set products even if cost fetch fails
+          setProducts(products);
+        }
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch products');
