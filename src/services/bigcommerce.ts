@@ -149,6 +149,8 @@ export interface Product {
   hasDescription: boolean;
   category: string;
   brand?: string;
+  brandId?: number | null;
+  brandName?: string | null;
   condition?: string;
   weight?: number;
   weightUnit?: string;

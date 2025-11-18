@@ -154,11 +154,47 @@ exports.handler = async (event, context) => {
             productCosts[productId] = {
               id: product.id,
               name: product.name,
+              sku: product.sku || null,
               cost_price: costPrice !== undefined && costPrice !== null ? costPrice : 0,
               price: product.price || 0,
+              brand_id: product.brand_id || null,
+              brand_name: null, // Will be fetched separately if needed
             };
           }
         }
+
+        // Fetch brand names for products that have brand_id
+        const brandIds = [...new Set(
+          Object.values(productCosts)
+            .map(p => p.brand_id)
+            .filter(id => id !== null)
+        )];
+
+        const brandNames = {};
+        if (brandIds.length > 0) {
+          // Fetch brands in bulk
+          const brandsResponse = await fetch(
+            `https://api.bigcommerce.com/stores/${BC_STORE_HASH}/v3/catalog/brands?id:in=${brandIds.join(',')}`,
+            {
+              method: 'GET',
+              headers,
+            }
+          );
+
+          if (brandsResponse.ok) {
+            const brandsResult = await brandsResponse.json();
+            brandsResult.data.forEach(brand => {
+              brandNames[brand.id] = brand.name;
+            });
+          }
+        }
+
+        // Update product costs with brand names
+        Object.values(productCosts).forEach(product => {
+          if (product.brand_id && brandNames[product.brand_id]) {
+            product.brand_name = brandNames[product.brand_id];
+          }
+        });
 
         return {
           statusCode: 200,

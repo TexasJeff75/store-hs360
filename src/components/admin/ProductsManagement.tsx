@@ -98,18 +98,20 @@ const ProductsManagement: React.FC = () => {
       if (errorMessage) {
         setError(errorMessage);
       } else {
-        // Fetch actual cost_price from BigCommerce REST API
+        // Fetch actual cost_price and brand info from BigCommerce REST API
         const productIds = products.map(p => p.id);
         try {
           const costData = await bcRestAPI.getProductCosts(productIds);
 
-          // Update products with actual cost_price from BigCommerce
+          // Update products with actual cost_price and brand info from BigCommerce
           const updatedProducts = products.map(product => {
             const costInfo = costData[product.id];
-            if (costInfo && costInfo.cost_price !== undefined) {
+            if (costInfo) {
               return {
                 ...product,
-                cost: costInfo.cost_price
+                cost: costInfo.cost_price !== undefined ? costInfo.cost_price : product.cost,
+                brandId: costInfo.brand_id,
+                brandName: costInfo.brand_name || product.brand
               };
             }
             return product;
@@ -621,9 +623,9 @@ const ProductsManagement: React.FC = () => {
                         <div className="text-sm font-medium text-gray-900 max-w-xs truncate">
                           {product.name}
                         </div>
-                        {product.brand && (
+                        {(product.brandName || product.brand) && (
                           <div className="text-xs text-gray-500">
-                            {product.brand}
+                            Brand: {product.brandName || product.brand}
                           </div>
                         )}
                       </div>
