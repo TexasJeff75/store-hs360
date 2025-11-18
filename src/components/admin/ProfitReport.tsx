@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, DollarSign, Download, Calendar, Filter, Eye } from 'lucide-react';
 import { supabase } from '@/services/supabase';
+import SortableTable, { Column } from './SortableTable';
 
 interface OrderProfit {
   order_id: string;
@@ -353,90 +354,101 @@ const ProfitReport: React.FC = () => {
       </div>
 
       {/* Orders Table */}
-      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Order
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Revenue
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  True Cost
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Gross Profit
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Margin %
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {orders.map((order) => (
-                <tr key={order.order_id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{order.order_number}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">
-                      {new Date(order.created_at).toLocaleDateString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      order.status === 'completed' ? 'bg-green-100 text-green-800' :
-                      order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {order.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="text-sm font-medium text-gray-900">
-                      ${order.revenue.toFixed(2)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className="text-sm font-medium text-red-900">
-                      ${order.total_cost.toFixed(2)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className={`text-sm font-bold ${order.gross_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      ${order.gross_profit.toFixed(2)}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <div className={`text-sm font-bold ${order.profit_margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {order.profit_margin.toFixed(1)}%
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {orders.length === 0 && (
-          <div className="text-center py-12">
-            <TrendingUp className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No orders found</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              Try adjusting your date range or filters.
-            </p>
-          </div>
-        )}
-      </div>
+      <SortableTable
+        data={orders}
+        columns={[
+          {
+            key: 'order_number',
+            label: 'Order',
+            sortable: true,
+            filterable: true,
+            className: 'whitespace-nowrap',
+            render: (order) => (
+              <div className="text-sm font-medium text-gray-900">{order.order_number}</div>
+            )
+          },
+          {
+            key: 'created_at',
+            label: 'Date',
+            sortable: true,
+            filterable: true,
+            className: 'whitespace-nowrap',
+            render: (order) => (
+              <div className="text-sm text-gray-900">
+                {new Date(order.created_at).toLocaleDateString()}
+              </div>
+            )
+          },
+          {
+            key: 'status',
+            label: 'Status',
+            sortable: true,
+            filterable: true,
+            className: 'whitespace-nowrap',
+            render: (order) => (
+              <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                order.status === 'completed' ? 'bg-green-100 text-green-800' :
+                order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                'bg-gray-100 text-gray-800'
+              }`}>
+                {order.status}
+              </span>
+            )
+          },
+          {
+            key: 'revenue',
+            label: 'Revenue',
+            sortable: true,
+            className: 'whitespace-nowrap text-right',
+            headerClassName: 'text-right',
+            render: (order) => (
+              <div className="text-sm font-medium text-gray-900">
+                ${order.revenue.toFixed(2)}
+              </div>
+            )
+          },
+          {
+            key: 'total_cost',
+            label: 'True Cost',
+            sortable: true,
+            className: 'whitespace-nowrap text-right',
+            headerClassName: 'text-right',
+            render: (order) => (
+              <div className="text-sm font-medium text-red-900">
+                ${order.total_cost.toFixed(2)}
+              </div>
+            )
+          },
+          {
+            key: 'gross_profit',
+            label: 'Gross Profit',
+            sortable: true,
+            className: 'whitespace-nowrap text-right',
+            headerClassName: 'text-right',
+            render: (order) => (
+              <div className={`text-sm font-bold ${order.gross_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                ${order.gross_profit.toFixed(2)}
+              </div>
+            )
+          },
+          {
+            key: 'profit_margin',
+            label: 'Margin %',
+            sortable: true,
+            className: 'whitespace-nowrap text-right',
+            headerClassName: 'text-right',
+            render: (order) => (
+              <div className={`text-sm font-bold ${order.profit_margin >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {order.profit_margin.toFixed(1)}%
+              </div>
+            )
+          }
+        ]}
+        keyExtractor={(order) => order.order_id}
+        searchPlaceholder="Search orders..."
+        emptyMessage="Try adjusting your date range or filters."
+        emptyIcon={<TrendingUp className="mx-auto h-12 w-12 text-gray-400" />}
+      />
     </div>
   );
 };
