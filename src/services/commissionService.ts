@@ -447,7 +447,7 @@ class CommissionService {
     }
   }
 
-  async getDistributorCommissions(
+  async getDistributorCommissionsByUserId(
     userId: string,
     status?: string
   ): Promise<{ commissions: any[]; error?: string }> {
@@ -492,7 +492,7 @@ class CommissionService {
     }
   }
 
-  async getDistributorCommissionSummary(
+  async getDistributorCommissionSummaryByUserId(
     userId: string
   ): Promise<{ summary: CommissionSummary | null; error?: string }> {
     try {

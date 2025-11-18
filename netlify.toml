@@ -26,9 +26,8 @@
   status = 200
 
 # SPA fallback - must be last
-# force = false ensures it doesn't override actual files or Netlify Functions
+# This should NOT match /.netlify/functions/* paths
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
-  force = false
