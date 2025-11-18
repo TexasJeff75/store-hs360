@@ -55,23 +55,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   const adminTabs = [
+    // User-facing items (all roles)
     { id: 'my-orgs' as AdminTab, label: 'My Organizations', icon: Building2, roles: ['sales_rep'] },
+    { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep', 'customer'] },
+    { id: 'my-recurring-orders' as AdminTab, label: 'My Recurring Orders', icon: Repeat, roles: ['customer'] },
+    { id: 'locations' as AdminTab, label: 'Locations', icon: MapPin, roles: ['customer'] },
+    { id: 'payments' as AdminTab, label: 'Payment Methods', icon: CreditCard, roles: ['customer'] },
+    { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep', 'distributor'] },
+    { id: 'help' as AdminTab, label: 'Help', icon: HelpCircle, roles: ['admin', 'sales_rep', 'distributor', 'customer'] },
+
+    // Admin-only items
     { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2, roles: ['admin'] },
     { id: 'users' as AdminTab, label: 'Users', icon: Users, roles: ['admin'] },
-    { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep', 'customer'] },
+    { id: 'distributors' as AdminTab, label: 'Distributors', icon: Building, roles: ['admin'] },
+    { id: 'salesreps' as AdminTab, label: 'Sales Reps', icon: UserCheck, roles: ['admin'] },
+    { id: 'products' as AdminTab, label: 'Products', icon: Package, roles: ['admin'] },
+    { id: 'recurring-orders' as AdminTab, label: 'Recurring Orders', icon: Repeat, roles: ['admin'] },
+    { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3, roles: ['admin'] },
     { id: 'profit-report' as AdminTab, label: 'Profit Report', icon: PieChart, roles: ['admin'] },
     { id: 'cost-admins' as AdminTab, label: 'Cost Admins', icon: Shield, roles: ['admin'] },
     { id: 'secret-costs' as AdminTab, label: 'Secret Costs', icon: Eye, roles: ['admin'] },
-    { id: 'my-recurring-orders' as AdminTab, label: 'My Recurring Orders', icon: Repeat, roles: ['customer'] },
-    { id: 'recurring-orders' as AdminTab, label: 'Recurring Orders', icon: Repeat, roles: ['admin'] },
-    { id: 'locations' as AdminTab, label: 'Locations', icon: MapPin, roles: ['customer'] },
-    { id: 'payments' as AdminTab, label: 'Payment Methods', icon: CreditCard, roles: ['customer'] },
-    { id: 'distributors' as AdminTab, label: 'Distributors', icon: Building, roles: ['admin'] },
-    { id: 'salesreps' as AdminTab, label: 'Sales Reps', icon: UserCheck, roles: ['admin'] },
-    { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep', 'distributor'] },
-    { id: 'products' as AdminTab, label: 'Products', icon: Package, roles: ['admin'] },
-    { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3, roles: ['admin'] },
-    { id: 'help' as AdminTab, label: 'Help', icon: HelpCircle, roles: ['admin', 'sales_rep', 'distributor', 'customer'] },
   ];
 
   const tabs = adminTabs.filter(tab =>
