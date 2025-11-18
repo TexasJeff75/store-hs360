@@ -6,6 +6,7 @@ import { bigCommerceService } from '@/services/bigcommerce';
 import { supabase } from '@/services/supabase';
 import { productCostsService, type ProductCost } from '@/services/productCosts';
 import type { Organization, Location, Profile } from '@/services/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface PricingEntry {
   id: string;
@@ -30,6 +31,7 @@ interface PricingManagementProps {
 }
 
 const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId }) => {
+  const { profile } = useAuth();
   const [pricingEntries, setPricingEntries] = useState<PricingEntry[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
@@ -240,37 +242,95 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
   };
 
   const handleDownloadTemplate = () => {
-    const csvLines = ['Type,Entity Name/Email,Product Name,Contract Price,Markup Price,Min Quantity,Max Quantity,Effective Date,Expiry Date'];
+    const headerColumns = ['Type', 'Entity Name/Email', 'Product Name', 'Retail Price', 'Cost Price'];
+
+    if (isCostAdmin) {
+      headerColumns.push('Secret Cost');
+    }
+
+    headerColumns.push('Contract Price', 'Markup Price', 'Min Quantity', 'Max Quantity', 'Effective Date', 'Expiry Date');
+
+    const csvLines = [headerColumns.join(',')];
 
     if (organizationId) {
       const org = organizations.find(o => o.id === organizationId);
       const orgName = org?.name || 'Organization';
 
       products.forEach(product => {
-        csvLines.push(`organization,${orgName},${product.name},${product.price},,1,,,${new Date().toISOString().split('T')[0]},`);
+        const cost = productCosts.get(product.id);
+        const costPrice = cost?.cost_price || '';
+        const secretCost = cost?.secret_cost || '';
+
+        const row = ['organization', orgName, product.name, product.price, costPrice];
+        if (isCostAdmin) {
+          row.push(secretCost);
+        }
+        row.push(product.price, '', '1', '', new Date().toISOString().split('T')[0], '');
+
+        csvLines.push(row.join(','));
       });
 
       locations.forEach(location => {
         products.slice(0, 5).forEach(product => {
-          csvLines.push(`location,${location.name},${product.name},${product.price},,1,,,${new Date().toISOString().split('T')[0]},`);
+          const cost = productCosts.get(product.id);
+          const costPrice = cost?.cost_price || '';
+          const secretCost = cost?.secret_cost || '';
+
+          const row = ['location', location.name, product.name, product.price, costPrice];
+          if (isCostAdmin) {
+            row.push(secretCost);
+          }
+          row.push(product.price, '', '1', '', new Date().toISOString().split('T')[0], '');
+
+          csvLines.push(row.join(','));
         });
       });
     } else {
       organizations.forEach(org => {
         products.slice(0, 5).forEach(product => {
-          csvLines.push(`organization,${org.name},${product.name},${product.price},,1,,,${new Date().toISOString().split('T')[0]},`);
+          const cost = productCosts.get(product.id);
+          const costPrice = cost?.cost_price || '';
+          const secretCost = cost?.secret_cost || '';
+
+          const row = ['organization', org.name, product.name, product.price, costPrice];
+          if (isCostAdmin) {
+            row.push(secretCost);
+          }
+          row.push(product.price, '', '1', '', new Date().toISOString().split('T')[0], '');
+
+          csvLines.push(row.join(','));
         });
       });
 
       locations.slice(0, 3).forEach(location => {
         products.slice(0, 3).forEach(product => {
-          csvLines.push(`location,${location.name},${product.name},${product.price},,1,,,${new Date().toISOString().split('T')[0]},`);
+          const cost = productCosts.get(product.id);
+          const costPrice = cost?.cost_price || '';
+          const secretCost = cost?.secret_cost || '';
+
+          const row = ['location', location.name, product.name, product.price, costPrice];
+          if (isCostAdmin) {
+            row.push(secretCost);
+          }
+          row.push(product.price, '', '1', '', new Date().toISOString().split('T')[0], '');
+
+          csvLines.push(row.join(','));
         });
       });
 
       users.slice(0, 3).forEach(user => {
         products.slice(0, 3).forEach(product => {
-          csvLines.push(`individual,${user.email},${product.name},${product.price},,1,,,${new Date().toISOString().split('T')[0]},`);
+          const cost = productCosts.get(product.id);
+          const costPrice = cost?.cost_price || '';
+          const secretCost = cost?.secret_cost || '';
+
+          const row = ['individual', user.email, product.name, product.price, costPrice];
+          if (isCostAdmin) {
+            row.push(secretCost);
+          }
+          row.push(product.price, '', '1', '', new Date().toISOString().split('T')[0], '');
+
+          csvLines.push(row.join(','));
         });
       });
     }
@@ -324,13 +384,23 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
 
       try {
         const parts = line.split(',').map(p => p.trim());
-        if (parts.length < 5) {
-          errors.push(`Line ${i + 1}: Invalid format - expected at least 5 columns`);
+        if (parts.length < 7) {
+          errors.push(`Line ${i + 1}: Invalid format - expected at least 7 columns`);
           failedCount++;
           continue;
         }
 
-        const [type, entityName, productName, contractPriceStr, markupPriceStr, minQtyStr, maxQtyStr, effectiveDateStr, expiryDateStr] = parts;
+        let type, entityName, productName, contractPriceStr, markupPriceStr, minQtyStr, maxQtyStr, effectiveDateStr, expiryDateStr;
+
+        if (isCostAdmin && parts.length >= 12) {
+          [type, entityName, productName, , , , contractPriceStr, markupPriceStr, minQtyStr, maxQtyStr, effectiveDateStr, expiryDateStr] = parts;
+        } else if (parts.length >= 11) {
+          [type, entityName, productName, , , contractPriceStr, markupPriceStr, minQtyStr, maxQtyStr, effectiveDateStr, expiryDateStr] = parts;
+        } else {
+          errors.push(`Line ${i + 1}: Invalid format - incorrect number of columns`);
+          failedCount++;
+          continue;
+        }
 
         if (!['individual', 'organization', 'location'].includes(type)) {
           errors.push(`Line ${i + 1}: Invalid type "${type}" - must be individual, organization, or location`);
@@ -655,13 +725,15 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
           </p>
         </div>
         <div className="flex space-x-3">
-          <button
-            onClick={handleBulkImport}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
-          >
-            <Upload className="h-5 w-5" />
-            <span>Bulk Import</span>
-          </button>
+          {profile?.role === 'admin' && (
+            <button
+              onClick={handleBulkImport}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            >
+              <Upload className="h-5 w-5" />
+              <span>Bulk Import</span>
+            </button>
+          )}
           <button
             onClick={handleCreatePricing}
             className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
@@ -1356,14 +1428,24 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                         <h4 className="text-sm font-semibold text-blue-900 mb-2 flex items-center space-x-2">
                           <FileText className="h-4 w-4" />
-                          <span>How to use bulk import:</span>
+                          <span>How to use bulk import (Admin Only):</span>
                         </h4>
                         <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
-                          <li>Download the CSV template using the button below</li>
-                          <li>Fill in your pricing data following the format shown</li>
-                          <li>Upload the completed CSV file or paste the data below</li>
+                          <li>Download the CSV template pre-filled with products and organizations</li>
+                          <li>Template includes retail prices, cost prices{isCostAdmin ? ', and secret costs' : ''}</li>
+                          <li>Edit the "Contract Price" column to set discounted prices</li>
+                          <li>Optionally add markup prices or adjust quantities</li>
+                          <li>Upload the completed CSV or paste the data below</li>
                           <li>Click "Process Import" to import all entries</li>
                         </ol>
+                        {isCostAdmin && (
+                          <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded">
+                            <p className="text-xs text-red-700 font-medium">
+                              <Shield className="inline w-3 h-3 mr-1" />
+                              Secret Cost column is visible only to cost admins
+                            </p>
+                          </div>
+                        )}
                       </div>
 
                       {/* Template Download */}
@@ -1409,7 +1491,10 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
                           onChange={(e) => setBulkImportData(e.target.value)}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-xs"
                           rows={10}
-                          placeholder="Type,Entity Name/Email,Product Name,Contract Price,Markup Price,Min Quantity,Max Quantity,Effective Date,Expiry Date\norganization,Example Org,Product A,99.99,149.99,1,100,2025-01-01,2025-12-31"
+                          placeholder={isCostAdmin
+                            ? "Type,Entity Name/Email,Product Name,Retail Price,Cost Price,Secret Cost,Contract Price,Markup Price,Min Quantity,Max Quantity,Effective Date,Expiry Date\norganization,Example Org,Product A,150.00,75.00,60.00,99.99,149.99,1,100,2025-01-01,2025-12-31"
+                            : "Type,Entity Name/Email,Product Name,Retail Price,Cost Price,Contract Price,Markup Price,Min Quantity,Max Quantity,Effective Date,Expiry Date\norganization,Example Org,Product A,150.00,75.00,99.99,149.99,1,100,2025-01-01,2025-12-31"
+                          }
                         />
                       </div>
 
