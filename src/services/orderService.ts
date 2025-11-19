@@ -246,7 +246,8 @@ class OrderService {
       let query = supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
-        .eq('viewed_by_admin', false);
+        .eq('viewed_by_admin', false)
+        .in('status', ['pending', 'processing']);
 
       // Apply same filtering as OrderManagement component
       if (userRole === 'sales_rep' && userId) {
