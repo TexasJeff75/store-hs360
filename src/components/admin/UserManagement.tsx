@@ -77,56 +77,65 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved }) => {
   const updateUserRole = async (userId: string, newRole: string, isApproved: boolean) => {
     try {
       setModalMessage(null);
-      
+
       // Check if email was changed
       const originalUser = users.find(u => u.id === userId);
       const emailChanged = originalUser && selectedUser && originalUser.email !== selectedUser.email;
-      
+
       // Update profile in our database
       const { error } = await supabase
         .from('profiles')
-        .update({ 
+        .update({
           role: newRole,
-          is_approved: isApproved,
+          approval_status: selectedUser?.approval_status,
           email: selectedUser?.email || originalUser?.email
         })
         .eq('id', userId);
 
       if (error) throw error;
-      
+
       // If email changed, update it in Supabase Auth (admin only operation)
       if (emailChanged && selectedUser?.email) {
         const { error: authError } = await supabase.auth.admin.updateUserById(
           userId,
           { email: selectedUser.email }
         );
-        
+
         if (authError) {
           console.warn('Could not update email in auth system:', authError.message);
-          setModalMessage({ 
-            type: 'error', 
-            text: 'Role updated but email change failed. User may need to update email manually.' 
+          setModalMessage({
+            type: 'error',
+            text: 'Role updated but email change failed. User may need to update email manually.'
           });
         } else {
-          setModalMessage({ 
-            type: 'success', 
-            text: 'User updated successfully including email change.' 
+          setModalMessage({
+            type: 'success',
+            text: 'User updated successfully including email change.'
           });
         }
       } else {
-        setModalMessage({ 
-          type: 'success', 
-          text: 'User updated successfully.' 
+        setModalMessage({
+          type: 'success',
+          text: 'User updated successfully.'
         });
       }
-      
+
       // Update local state
-      setUsers(prev => prev.map(user => 
-        user.id === userId 
-          ? { ...user, role: newRole as any, is_approved: isApproved, email: selectedUser?.email || user.email }
+      setUsers(prev => prev.map(user =>
+        user.id === userId
+          ? {
+              ...user,
+              role: newRole as any,
+              approval_status: selectedUser?.approval_status || user.approval_status,
+              approved: selectedUser?.approval_status === 'approved',
+              email: selectedUser?.email || user.email
+            }
           : user
       ));
-      
+
+      // Refresh the pending users count
+      onUserApproved?.();
+
       // Don't close modal immediately if there was an error, let user see the message
       if (!emailChanged || !authError) {
         setTimeout(() => {
@@ -826,26 +835,33 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved }) => {
                           Role
                         </label>
                         <select
-                          value={selectedUser.role}
+                          value={selectedUser.role || ''}
                           onChange={(e) => setSelectedUser({...selectedUser, role: e.target.value as any})}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                         >
                           <option value="customer">Customer</option>
                           <option value="sales_rep">Sales Rep</option>
+                          <option value="distributor">Distributor</option>
                           <option value="admin">Admin</option>
                         </select>
                       </div>
-                      
+
                       <div>
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={selectedUser.is_approved}
-                            onChange={(e) => setSelectedUser({...selectedUser, is_approved: e.target.checked})}
-                            className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
-                          />
-                          <span className="ml-2 text-sm text-gray-700">Account Approved</span>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Approval Status
                         </label>
+                        <select
+                          value={selectedUser.approval_status}
+                          onChange={(e) => setSelectedUser({...selectedUser, approval_status: e.target.value as any})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        >
+                          <option value="pending">Pending</option>
+                          <option value="approved">Approved</option>
+                          <option value="denied">Denied</option>
+                        </select>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Denied users cannot log in to the system.
+                        </p>
                       </div>
                       
                       {/* Password Reset Section */}
@@ -881,9 +897,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved }) => {
               <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                 <button
                   type="button"
-                  onClick={() => updateUserRole(selectedUser.id, selectedUser.role, selectedUser.is_approved)}
+                  onClick={() => updateUserRole(selectedUser.id, selectedUser.role, selectedUser.approval_status === 'approved')}
                   disabled={!selectedUser.email.trim()}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Save Changes
                 </button>
