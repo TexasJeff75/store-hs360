@@ -29,10 +29,13 @@ if (!cleanSupabaseUrl.match(/^https:\/\/[a-z0-9-]+\.supabase\.co$/)) {
 export const supabase = createClient(cleanSupabaseUrl, supabaseAnonKey);
 
 // Database types
+export type ApprovalStatus = 'pending' | 'approved' | 'denied';
+
 export interface Profile {
   id: string;
   email: string;
   approved: boolean;
+  approval_status: ApprovalStatus;
   role: 'admin' | 'distributor' | 'sales_rep' | 'customer' | null;
   can_view_secret_cost?: boolean;
   created_at: string;

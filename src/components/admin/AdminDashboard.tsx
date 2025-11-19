@@ -65,7 +65,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
       const { count, error } = await supabase
         .from('profiles')
         .select('*', { count: 'exact', head: true })
-        .eq('approved', false);
+        .eq('approval_status', 'pending');
 
       if (error) throw error;
       setPendingUsersCount(count || 0);
