@@ -645,7 +645,7 @@ const ProductsManagement: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <button
                     onClick={() => handleSort('name')}
                     className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
@@ -654,7 +654,7 @@ const ProductsManagement: React.FC = () => {
                     {getSortIcon('name')}
                   </button>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <button
                     onClick={() => handleSort('sku')}
                     className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
@@ -663,7 +663,7 @@ const ProductsManagement: React.FC = () => {
                     {getSortIcon('sku')}
                   </button>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <button
                     onClick={() => handleSort('brand')}
                     className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
@@ -672,16 +672,16 @@ const ProductsManagement: React.FC = () => {
                     {getSortIcon('brand')}
                   </button>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <button
                     onClick={() => handleSort('category')}
                     className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
                   >
-                    <span>Category</span>
+                    <span>Cat.</span>
                     {getSortIcon('category')}
                   </button>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <button
                     onClick={() => handleSort('price')}
                     className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
@@ -690,7 +690,7 @@ const ProductsManagement: React.FC = () => {
                     {getSortIcon('price')}
                   </button>
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   <button
                     onClick={() => handleSort('cost')}
                     className="flex items-center space-x-1 hover:text-gray-700 transition-colors"
@@ -700,26 +700,26 @@ const ProductsManagement: React.FC = () => {
                   </button>
                 </th>
                 {isCostAdmin && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    <div className="flex items-center space-x-1">
+                  <th className="px-2 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div className="flex items-center justify-end space-x-1">
                       <Lock className="h-3 w-3 text-red-500" />
-                      <span className="text-red-700">Secret Cost</span>
+                      <span className="text-red-700">Secret</span>
                     </div>
                   </th>
                 )}
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Image
+                <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Img
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Description
+                <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Desc
                 </th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Stock
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contract Pricing
+                <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Pricing
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-2 py-2 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -727,43 +727,43 @@ const ProductsManagement: React.FC = () => {
             <tbody className="bg-white divide-y divide-gray-200">
               {filteredProducts.map((product) => (
                 <tr key={product.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-3 py-2">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
+                      <div className="flex-shrink-0 h-8 w-8">
                         <img
-                          className="h-10 w-10 rounded object-cover"
+                          className="h-8 w-8 rounded object-cover"
                           src={product.image}
                           alt={product.name}
                         />
                       </div>
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900 max-w-xs truncate">
+                      <div className="ml-2">
+                        <div className="text-xs font-medium text-gray-900 max-w-[200px] truncate">
                           {product.name}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">
                     {product.sku || <span className="text-gray-400">-</span>}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-700">
                     {(product.brandName || product.brand) ? (
-                      <span className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-blue-50 text-blue-700">
+                      <span className="inline-flex items-center px-1.5 py-0.5 text-xs font-medium rounded bg-blue-50 text-blue-700">
                         {product.brandName || product.brand}
                       </span>
                     ) : (
                       <span className="text-gray-400">-</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
+                  <td className="px-2 py-2 whitespace-nowrap">
+                    <span className="inline-flex px-1.5 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-800">
                       {product.category}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900 text-right">
                     <span className="font-medium">${product.price.toFixed(2)}</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900 text-right">
                     {product.cost !== undefined && product.cost !== null ? (
                       <span className={`font-medium ${product.cost === 0 ? 'text-orange-600' : 'text-gray-700'}`}>
                         ${product.cost.toFixed(2)}
@@ -773,48 +773,48 @@ const ProductsManagement: React.FC = () => {
                     )}
                   </td>
                   {isCostAdmin && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-2 py-2 whitespace-nowrap text-xs text-right">
                       {editingSecretCost === product.id ? (
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center justify-end space-x-1">
                           <input
                             type="number"
                             step="0.01"
                             min="0"
                             value={editSecretCostValue}
                             onChange={(e) => setEditSecretCostValue(e.target.value)}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-red-500"
+                            className="w-20 px-1 py-1 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-red-500"
                             disabled={savingSecretCost}
                             autoFocus
                           />
                           <button
                             onClick={() => handleSaveSecretCost(product.id)}
                             disabled={savingSecretCost}
-                            className="p-1 text-green-600 hover:text-green-800 disabled:opacity-50"
+                            className="p-0.5 text-green-600 hover:text-green-800 disabled:opacity-50"
                             title="Save"
                           >
-                            <Save className="h-4 w-4" />
+                            <Save className="h-3 w-3" />
                           </button>
                           <button
                             onClick={handleCancelEditSecretCost}
                             disabled={savingSecretCost}
-                            className="p-1 text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                            className="p-0.5 text-gray-600 hover:text-gray-800 disabled:opacity-50"
                             title="Cancel"
                           >
-                            <XIcon className="h-4 w-4" />
+                            <XIcon className="h-3 w-3" />
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center justify-end space-x-1">
                           {secretCosts[product.id] ? (
                             <span className="font-bold text-red-900">
                               ${secretCosts[product.id].secret_cost.toFixed(2)}
                             </span>
                           ) : (
-                            <span className="text-gray-400 italic">Not set</span>
+                            <span className="text-gray-400 italic text-xs">-</span>
                           )}
                           <button
                             onClick={() => handleEditSecretCost(product.id, secretCosts[product.id]?.secret_cost)}
-                            className="p-1 text-blue-600 hover:text-blue-800"
+                            className="p-0.5 text-blue-600 hover:text-blue-800"
                             title="Edit Secret Cost"
                           >
                             <Edit2 className="h-3 w-3" />
@@ -823,31 +823,31 @@ const ProductsManagement: React.FC = () => {
                       )}
                     </td>
                   )}
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                  <td className="px-2 py-2 whitespace-nowrap text-center">
                     {product.hasImage ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto" />
+                      <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
                     ) : (
-                      <XCircle className="h-5 w-5 text-red-400 mx-auto" />
+                      <XCircle className="h-4 w-4 text-red-400 mx-auto" />
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                  <td className="px-2 py-2 whitespace-nowrap text-center">
                     {product.hasDescription ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto" />
+                      <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
                     ) : (
-                      <XCircle className="h-5 w-5 text-red-400 mx-auto" />
+                      <XCircle className="h-4 w-4 text-red-400 mx-auto" />
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                  <td className="px-2 py-2 whitespace-nowrap text-center">
                     {product.isInStock ? (
-                      <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto" />
+                      <CheckCircle2 className="h-4 w-4 text-green-600 mx-auto" />
                     ) : (
-                      <XCircle className="h-5 w-5 text-red-400 mx-auto" />
+                      <XCircle className="h-4 w-4 text-red-400 mx-auto" />
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900 text-center">
                     {contractPricingCounts[product.id] > 0 ? (
-                      <div className="flex items-center">
-                        <DollarSign className="h-4 w-4 text-green-600 mr-1" />
+                      <div className="flex items-center justify-center">
+                        <DollarSign className="h-3 w-3 text-green-600 mr-0.5" />
                         <span className="font-medium text-green-700">
                           {contractPricingCounts[product.id]}
                         </span>
@@ -856,10 +856,10 @@ const ProductsManagement: React.FC = () => {
                       <span className="text-gray-400">-</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                  <td className="px-2 py-2 whitespace-nowrap text-center">
                     <button
                       onClick={() => handleViewProduct(product)}
-                      className="text-blue-600 hover:text-blue-900 p-1 rounded"
+                      className="text-blue-600 hover:text-blue-900 p-0.5 rounded"
                       title="View Details"
                     >
                       <Eye className="h-4 w-4" />
