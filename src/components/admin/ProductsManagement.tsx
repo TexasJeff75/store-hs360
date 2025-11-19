@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Search, Eye, DollarSign, Tag, Hash, ChevronUp, ChevronDown, Building2, CheckCircle2, XCircle, Truck, RefreshCw } from 'lucide-react';
+import { Package, Search, Eye, EyeOff, DollarSign, Tag, Hash, ChevronUp, ChevronDown, Building2, CheckCircle2, XCircle, Truck, RefreshCw, Lock, Edit2, Save, X as XIcon } from 'lucide-react';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
 import { bcRestAPI } from '@/services/bigcommerceRestAPI';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { cacheService } from '@/services/cache';
+import { secretCostService, SecretCostMap } from '@/services/secretCostService';
 
 interface ContractPricingInfo {
   organization_name: string;
@@ -32,12 +33,76 @@ const ProductsManagement: React.FC = () => {
   const [loadingPricingDetails, setLoadingPricingDetails] = useState(false);
   const [productSettings, setProductSettings] = useState<Map<number, { allowMarkup: boolean }>>(new Map());
   const [savingMarkupSetting, setSavingMarkupSetting] = useState(false);
+  const [isCostAdmin, setIsCostAdmin] = useState(false);
+  const [secretCosts, setSecretCosts] = useState<SecretCostMap>({});
+  const [editingSecretCost, setEditingSecretCost] = useState<number | null>(null);
+  const [editSecretCostValue, setEditSecretCostValue] = useState<string>('');
+  const [savingSecretCost, setSavingSecretCost] = useState(false);
 
   useEffect(() => {
+    checkCostAdmin();
     fetchProducts();
     fetchContractPricingCounts();
     fetchProductSettings();
   }, []);
+
+  useEffect(() => {
+    if (isCostAdmin && products.length > 0) {
+      fetchSecretCosts();
+    }
+  }, [isCostAdmin, products]);
+
+  const checkCostAdmin = async () => {
+    const isAdmin = await secretCostService.checkIsCostAdmin();
+    setIsCostAdmin(isAdmin);
+  };
+
+  const fetchSecretCosts = async () => {
+    try {
+      const productIds = products.map(p => p.id);
+      const costs = await secretCostService.getAllSecretCosts();
+      setSecretCosts(costs);
+    } catch (err) {
+      console.error('Error fetching secret costs:', err);
+    }
+  };
+
+  const handleEditSecretCost = (productId: number, currentCost?: number) => {
+    setEditingSecretCost(productId);
+    setEditSecretCostValue(currentCost?.toString() || '');
+  };
+
+  const handleCancelEditSecretCost = () => {
+    setEditingSecretCost(null);
+    setEditSecretCostValue('');
+  };
+
+  const handleSaveSecretCost = async (productId: number) => {
+    try {
+      setSavingSecretCost(true);
+      const cost = parseFloat(editSecretCostValue);
+
+      if (isNaN(cost) || cost < 0) {
+        alert('Please enter a valid cost');
+        return;
+      }
+
+      const result = await secretCostService.updateSecretCost(productId, cost);
+
+      if (result.success) {
+        await fetchSecretCosts();
+        setEditingSecretCost(null);
+        setEditSecretCostValue('');
+      } else {
+        alert(result.error || 'Failed to update secret cost');
+      }
+    } catch (err) {
+      console.error('Error saving secret cost:', err);
+      alert('Failed to save secret cost');
+    } finally {
+      setSavingSecretCost(false);
+    }
+  };
 
   const fetchProductSettings = async () => {
     try {
@@ -486,6 +551,18 @@ const ProductsManagement: React.FC = () => {
         </div>
       )}
 
+      {isCostAdmin && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center">
+            <Lock className="h-5 w-5 text-red-600 mr-3" />
+            <div>
+              <p className="text-red-900 font-semibold">Cost Admin Mode Active</p>
+              <p className="text-red-700 text-sm">You can view and edit confidential secret costs. All actions are logged.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Summary Stats */}
       <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
@@ -622,6 +699,14 @@ const ProductsManagement: React.FC = () => {
                     {getSortIcon('cost')}
                   </button>
                 </th>
+                {isCostAdmin && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <div className="flex items-center space-x-1">
+                      <Lock className="h-3 w-3 text-red-500" />
+                      <span className="text-red-700">Secret Cost</span>
+                    </div>
+                  </th>
+                )}
                 <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Image
                 </th>
@@ -687,6 +772,57 @@ const ProductsManagement: React.FC = () => {
                       <span className="text-gray-400">-</span>
                     )}
                   </td>
+                  {isCostAdmin && (
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {editingSecretCost === product.id ? (
+                        <div className="flex items-center space-x-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={editSecretCostValue}
+                            onChange={(e) => setEditSecretCostValue(e.target.value)}
+                            className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-red-500"
+                            disabled={savingSecretCost}
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => handleSaveSecretCost(product.id)}
+                            disabled={savingSecretCost}
+                            className="p-1 text-green-600 hover:text-green-800 disabled:opacity-50"
+                            title="Save"
+                          >
+                            <Save className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={handleCancelEditSecretCost}
+                            disabled={savingSecretCost}
+                            className="p-1 text-gray-600 hover:text-gray-800 disabled:opacity-50"
+                            title="Cancel"
+                          >
+                            <XIcon className="h-4 w-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center space-x-2">
+                          {secretCosts[product.id] ? (
+                            <span className="font-bold text-red-900">
+                              ${secretCosts[product.id].secret_cost.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400 italic">Not set</span>
+                          )}
+                          <button
+                            onClick={() => handleEditSecretCost(product.id, secretCosts[product.id]?.secret_cost)}
+                            className="p-1 text-blue-600 hover:text-blue-800"
+                            title="Edit Secret Cost"
+                          >
+                            <Edit2 className="h-3 w-3" />
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  )}
                   <td className="px-6 py-4 whitespace-nowrap text-center">
                     {product.hasImage ? (
                       <CheckCircle2 className="h-5 w-5 text-green-600 mx-auto" />
@@ -823,6 +959,57 @@ const ProductsManagement: React.FC = () => {
                             )}
                           </div>
                         </div>
+
+                        {/* Secret Cost (Cost Admin Only) */}
+                        {isCostAdmin && selectedProduct && (
+                          <div className="border-t pt-4">
+                            <h5 className="text-sm font-medium text-red-700 mb-3 flex items-center">
+                              <Lock className="h-4 w-4 mr-2" />
+                              Secret Cost (Confidential)
+                            </h5>
+                            <div className="bg-red-50 rounded-lg p-4 border border-red-200">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <span className="text-sm text-gray-700">True Acquisition Cost:</span>
+                                  {secretCosts[selectedProduct.id] ? (
+                                    <div className="mt-1">
+                                      <span className="text-2xl font-bold text-red-900">
+                                        ${secretCosts[selectedProduct.id].secret_cost.toFixed(2)}
+                                      </span>
+                                      {secretCosts[selectedProduct.id].notes && (
+                                        <p className="mt-2 text-xs text-gray-600 italic">
+                                          Note: {secretCosts[selectedProduct.id].notes}
+                                        </p>
+                                      )}
+                                    </div>
+                                  ) : (
+                                    <div className="mt-1">
+                                      <span className="text-sm text-gray-500 italic">Not set</span>
+                                    </div>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => handleEditSecretCost(selectedProduct.id, secretCosts[selectedProduct.id]?.secret_cost)}
+                                  className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+                                >
+                                  <Edit2 className="h-4 w-4 inline mr-1" />
+                                  Edit
+                                </button>
+                              </div>
+                              {selectedProduct.cost && secretCosts[selectedProduct.id] && (
+                                <div className="mt-3 pt-3 border-t border-red-300">
+                                  <div className="text-xs text-gray-600">
+                                    <p>Public Cost: ${selectedProduct.cost.toFixed(2)}</p>
+                                    <p>Secret Cost: ${secretCosts[selectedProduct.id].secret_cost.toFixed(2)}</p>
+                                    <p className="font-semibold mt-1">
+                                      Difference: ${Math.abs(selectedProduct.cost - secretCosts[selectedProduct.id].secret_cost).toFixed(2)}
+                                    </p>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
 
                         {/* Markup Settings (Admin Only) */}
                         {profile?.role === 'admin' && (

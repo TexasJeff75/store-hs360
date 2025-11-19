@@ -34,6 +34,7 @@ export interface Profile {
   email: string;
   approved: boolean;
   role: 'admin' | 'distributor' | 'sales_rep' | 'customer' | null;
+  can_view_secret_cost?: boolean;
   created_at: string;
   updated_at: string;
 }
