@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../services/supabase';
 import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
 import LocationManagement from './LocationManagement';
@@ -34,6 +35,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const isCustomer = profile?.role === 'customer';
   const [userOrgId, setUserOrgId] = React.useState<string | undefined>();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [pendingUsersCount, setPendingUsersCount] = useState(0);
 
   const [activeTab, setActiveTab] = useState<AdminTab>(
     isCustomer ? 'orders' : isSalesRep ? 'my-orgs' : isDistributor ? 'commissions' : 'organizations'
@@ -51,6 +53,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
       fetchUserOrg();
     }
   }, [isCustomer, user?.id]);
+
+  React.useEffect(() => {
+    if (isAdmin) {
+      fetchPendingUsersCount();
+    }
+  }, [isAdmin]);
+
+  const fetchPendingUsersCount = async () => {
+    try {
+      const { count, error } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('approved', false);
+
+      if (error) throw error;
+      setPendingUsersCount(count || 0);
+    } catch (err) {
+      console.error('Error fetching pending users count:', err);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -90,7 +112,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
       case 'organizations':
         return <OrganizationManagement />;
       case 'users':
-        return <UserManagement />;
+        return <UserManagement onUserApproved={fetchPendingUsersCount} />;
       case 'orders':
         return <OrderManagement />;
       case 'profit-report':
@@ -168,19 +190,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
               <nav className="p-4 space-y-2">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
+                  const showBadge = tab.id === 'users' && pendingUsersCount > 0;
+
                   return (
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'space-x-3'} px-4 py-3 rounded-lg text-left transition-colors ${
+                      className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} px-4 py-3 rounded-lg text-left transition-colors relative ${
                         activeTab === tab.id
                           ? 'bg-purple-100 text-purple-700 border border-purple-200'
                           : 'text-gray-700 hover:bg-gray-100'
                       }`}
                       title={isSidebarCollapsed ? tab.label : undefined}
                     >
-                      <Icon className="h-5 w-5 flex-shrink-0" />
-                      {!isSidebarCollapsed && <span className="font-medium">{tab.label}</span>}
+                      <div className="flex items-center space-x-3">
+                        <Icon className="h-5 w-5 flex-shrink-0" />
+                        {!isSidebarCollapsed && <span className="font-medium">{tab.label}</span>}
+                      </div>
+                      {showBadge && (
+                        <span className={`${isSidebarCollapsed ? 'absolute -top-1 -right-1' : ''} flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full`}>
+                          {pendingUsersCount}
+                        </span>
+                      )}
                     </button>
                   );
                 })}

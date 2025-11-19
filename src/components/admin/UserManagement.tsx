@@ -3,7 +3,11 @@ import { User, Mail, Shield, Clock, CheckCircle, CreditCard as Edit, Trash2, Sea
 import { supabase } from '@/services/supabase';
 import type { Profile } from '@/services/supabase';
 
-const UserManagement: React.FC = () => {
+interface UserManagementProps {
+  onUserApproved?: () => void;
+}
+
+const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved }) => {
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -202,8 +206,9 @@ const UserManagement: React.FC = () => {
       });
       
       await Promise.all(updatePromises);
-      
+
       setPendingChanges({});
+      onUserApproved?.();
       setSaveMessage({ type: 'success', text: 'All changes saved successfully!' });
       
       setTimeout(() => {
@@ -474,6 +479,7 @@ const UserManagement: React.FC = () => {
 
                           if (error) throw error;
                           await fetchUsers();
+                          onUserApproved?.();
                           setSaveMessage({ type: 'success', text: `User approved as ${role}!` });
                         } catch (err) {
                           setSaveMessage({ type: 'error', text: 'Failed to approve user' });
