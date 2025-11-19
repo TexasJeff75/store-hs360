@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { orderService } from '../../services/orderService';
 import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface OrderItem {
@@ -711,7 +712,11 @@ const OrderManagement: React.FC = () => {
                   <div className="flex items-center gap-4">
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => setSelectedOrder(order)}
+                        onClick={async () => {
+                          setSelectedOrder(order);
+                          await orderService.markOrderAsViewed(order.id);
+                          await fetchOrders();
+                        }}
                         className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                         title="View Full Details"
                       >

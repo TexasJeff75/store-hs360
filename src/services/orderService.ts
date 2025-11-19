@@ -240,6 +240,50 @@ class OrderService {
       };
     }
   }
+
+  async getNewOrderCount(): Promise<{ count: number; error?: string }> {
+    try {
+      const { count, error } = await supabase
+        .from('orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('viewed_by_admin', false);
+
+      if (error) {
+        console.error('Error fetching new order count:', error);
+        return { count: 0, error: error.message };
+      }
+
+      return { count: count || 0 };
+    } catch (error) {
+      console.error('Error fetching new order count:', error);
+      return {
+        count: 0,
+        error: error instanceof Error ? error.message : 'Failed to fetch new order count'
+      };
+    }
+  }
+
+  async markOrderAsViewed(orderId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ viewed_by_admin: true })
+        .eq('id', orderId);
+
+      if (error) {
+        console.error('Error marking order as viewed:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error marking order as viewed:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to mark order as viewed'
+      };
+    }
+  }
 }
 
 export const orderService = new OrderService();
