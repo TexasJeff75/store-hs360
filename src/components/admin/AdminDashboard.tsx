@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart, Shield } from 'lucide-react';
+import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
@@ -33,6 +33,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const isDistributor = profile?.role === 'distributor';
   const isCustomer = profile?.role === 'customer';
   const [userOrgId, setUserOrgId] = React.useState<string | undefined>();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 
   const [activeTab, setActiveTab] = useState<AdminTab>(
     isCustomer ? 'orders' : isSalesRep ? 'my-orgs' : isDistributor ? 'commissions' : 'organizations'
@@ -54,25 +55,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   const adminTabs = [
-    // User-facing items (all roles)
-    { id: 'my-orgs' as AdminTab, label: 'My Organizations', icon: Building2, roles: ['sales_rep'] },
+    // Admin items in specified order
+    { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2, roles: ['admin'] },
+    { id: 'users' as AdminTab, label: 'Users', icon: Users, roles: ['admin'] },
     { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep', 'customer'] },
+    { id: 'recurring-orders' as AdminTab, label: 'Recurring Orders', icon: Repeat, roles: ['admin'] },
+    { id: 'distributors' as AdminTab, label: 'Distributors', icon: Building, roles: ['admin'] },
+    { id: 'salesreps' as AdminTab, label: 'Sales Reps', icon: UserCheck, roles: ['admin'] },
+    { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep', 'distributor'] },
+    { id: 'products' as AdminTab, label: 'Products', icon: Package, roles: ['admin'] },
+    { id: 'profit-report' as AdminTab, label: 'Profit Report', icon: PieChart, roles: ['admin'] },
+    { id: 'cost-admins' as AdminTab, label: 'Cost Admins', icon: Shield, roles: ['admin'] },
+    { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3, roles: ['admin'] },
+    { id: 'help' as AdminTab, label: 'Help', icon: HelpCircle, roles: ['admin', 'sales_rep', 'distributor', 'customer'] },
+
+    // User-facing items (non-admin)
+    { id: 'my-orgs' as AdminTab, label: 'My Organizations', icon: Building2, roles: ['sales_rep'] },
     { id: 'my-recurring-orders' as AdminTab, label: 'My Recurring Orders', icon: Repeat, roles: ['customer'] },
     { id: 'locations' as AdminTab, label: 'Locations', icon: MapPin, roles: ['customer'] },
     { id: 'payments' as AdminTab, label: 'Payment Methods', icon: CreditCard, roles: ['customer'] },
-    { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep', 'distributor'] },
-    { id: 'help' as AdminTab, label: 'Help', icon: HelpCircle, roles: ['admin', 'sales_rep', 'distributor', 'customer'] },
-
-    // Admin-only items
-    { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2, roles: ['admin'] },
-    { id: 'users' as AdminTab, label: 'Users', icon: Users, roles: ['admin'] },
-    { id: 'distributors' as AdminTab, label: 'Distributors', icon: Building, roles: ['admin'] },
-    { id: 'salesreps' as AdminTab, label: 'Sales Reps', icon: UserCheck, roles: ['admin'] },
-    { id: 'products' as AdminTab, label: 'Products', icon: Package, roles: ['admin'] },
-    { id: 'recurring-orders' as AdminTab, label: 'Recurring Orders', icon: Repeat, roles: ['admin'] },
-    { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3, roles: ['admin'] },
-    { id: 'profit-report' as AdminTab, label: 'Profit Report', icon: PieChart, roles: ['admin'] },
-    { id: 'cost-admins' as AdminTab, label: 'Cost Admins', icon: Shield, roles: ['admin'] },
   ];
 
   const tabs = adminTabs.filter(tab =>
@@ -150,7 +151,20 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
 
           <div className="flex flex-1 overflow-hidden">
             {/* Sidebar */}
-            <div className="w-64 bg-gray-50 border-r border-gray-200">
+            <div className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-gray-50 border-r border-gray-200 transition-all duration-300 relative`}>
+              {/* Collapse/Expand Button */}
+              <button
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className="absolute -right-3 top-6 bg-white border border-gray-300 rounded-full p-1 shadow-md hover:bg-gray-100 z-10"
+                title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+              >
+                {isSidebarCollapsed ? (
+                  <ChevronRight className="h-4 w-4 text-gray-600" />
+                ) : (
+                  <ChevronLeft className="h-4 w-4 text-gray-600" />
+                )}
+              </button>
+
               <nav className="p-4 space-y-2">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
@@ -158,14 +172,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                      className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'space-x-3'} px-4 py-3 rounded-lg text-left transition-colors ${
                         activeTab === tab.id
                           ? 'bg-purple-100 text-purple-700 border border-purple-200'
                           : 'text-gray-700 hover:bg-gray-100'
                       }`}
+                      title={isSidebarCollapsed ? tab.label : undefined}
                     >
-                      <Icon className="h-5 w-5" />
-                      <span className="font-medium">{tab.label}</span>
+                      <Icon className="h-5 w-5 flex-shrink-0" />
+                      {!isSidebarCollapsed && <span className="font-medium">{tab.label}</span>}
                     </button>
                   );
                 })}
