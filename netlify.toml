@@ -6,7 +6,7 @@
 
 [dev]
   command = "npm run dev:functions"
-  targetPort = 5173
+  targetPort = 3000
   port = 8888
   autoLaunch = false
 

@@ -38,6 +38,9 @@ export default defineConfig(({ mode }) => {
       }
     }
   },
+  preview: {
+    port: 3000
+  },
   define: {
     'import.meta.env.VITE_BC_STORE_HASH': JSON.stringify(env.VITE_BC_STORE_HASH),
     'import.meta.env.VITE_BC_STOREFRONT_TOKEN': JSON.stringify(env.VITE_BC_STOREFRONT_TOKEN),
