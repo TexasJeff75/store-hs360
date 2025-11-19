@@ -46,22 +46,6 @@ CREATE INDEX IF NOT EXISTS idx_recurring_orders_user_id ON public.recurring_orde
 CREATE INDEX IF NOT EXISTS idx_user_organization_roles_location_id ON public.user_organization_roles(location_id);
 
 -- Drop unused indexes to reduce maintenance overhead
-DROP INDEX IF EXISTS idx_product_costs_synced;
-DROP INDEX IF EXISTS idx_below_cost_audit_product;
-DROP INDEX IF EXISTS idx_below_cost_audit_approver;
-DROP INDEX IF EXISTS idx_cost_admin_audit_user;
-DROP INDEX IF EXISTS idx_cost_admin_audit_product;
 DROP INDEX IF EXISTS idx_org_audit_user_time;
 DROP INDEX IF EXISTS idx_org_audit_org_time;
 DROP INDEX IF EXISTS idx_org_audit_failed;
-
--- Fix RLS performance issue in cost_admin_audit table
-DROP POLICY IF EXISTS "System can log cost access" ON public.cost_admin_audit;
-
-CREATE POLICY "System can log cost access"
-  ON public.cost_admin_audit
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (
-    user_id = (select auth.uid())
-  );

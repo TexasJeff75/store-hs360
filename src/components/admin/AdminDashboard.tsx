@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart, Eye, Shield } from 'lucide-react';
+import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart, Shield } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
@@ -18,14 +18,13 @@ import DistributorManagement from './DistributorManagement';
 import HelpSection from './HelpSection';
 import ProfitReport from './ProfitReport';
 import CostAdminManagement from './CostAdminManagement';
-import SecretCostManagement from './SecretCostManagement';
 
 interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'distributors' | 'analytics' | 'profit-report' | 'cost-admins' | 'secret-costs' | 'my-orgs' | 'payments' | 'recurring-orders' | 'my-recurring-orders' | 'help';
+type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'distributors' | 'analytics' | 'profit-report' | 'cost-admins' | 'my-orgs' | 'payments' | 'recurring-orders' | 'my-recurring-orders' | 'help';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const { profile, user } = useAuth();
@@ -74,7 +73,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
     { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3, roles: ['admin'] },
     { id: 'profit-report' as AdminTab, label: 'Profit Report', icon: PieChart, roles: ['admin'] },
     { id: 'cost-admins' as AdminTab, label: 'Cost Admins', icon: Shield, roles: ['admin'] },
-    { id: 'secret-costs' as AdminTab, label: 'Secret Costs', icon: Eye, roles: ['admin'] },
   ];
 
   const tabs = adminTabs.filter(tab =>
@@ -98,8 +96,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
         return <ProfitReport />;
       case 'cost-admins':
         return <CostAdminManagement />;
-      case 'secret-costs':
-        return <SecretCostManagement />;
       case 'distributors':
         return <DistributorManagement />;
       case 'salesreps':
