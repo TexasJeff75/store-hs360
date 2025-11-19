@@ -241,12 +241,19 @@ class OrderService {
     }
   }
 
-  async getNewOrderCount(): Promise<{ count: number; error?: string }> {
+  async getNewOrderCount(userId?: string, userRole?: string): Promise<{ count: number; error?: string }> {
     try {
-      const { count, error } = await supabase
+      let query = supabase
         .from('orders')
         .select('*', { count: 'exact', head: true })
         .eq('viewed_by_admin', false);
+
+      // Apply same filtering as OrderManagement component
+      if (userRole === 'sales_rep' && userId) {
+        query = query.eq('sales_rep_id', userId);
+      }
+
+      const { count, error } = await query;
 
       if (error) {
         console.error('Error fetching new order count:', error);

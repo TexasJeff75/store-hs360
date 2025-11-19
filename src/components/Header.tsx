@@ -29,7 +29,7 @@ const Header: React.FC<HeaderProps> = ({
   useEffect(() => {
     const fetchNewOrderCount = async () => {
       if (user && profile && ['admin', 'sales_rep', 'distributor'].includes(profile.role)) {
-        const { count } = await orderService.getNewOrderCount();
+        const { count } = await orderService.getNewOrderCount(user.id, profile.role);
         setNewOrderCount(count);
       }
     };
