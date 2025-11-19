@@ -292,6 +292,28 @@ class OrderService {
       };
     }
   }
+
+  async getPendingUserCount(): Promise<{ count: number; error?: string }> {
+    try {
+      const { count, error } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('approval_status', 'pending');
+
+      if (error) {
+        console.error('Error fetching pending user count:', error);
+        return { count: 0, error: error.message };
+      }
+
+      return { count: count || 0 };
+    } catch (error) {
+      console.error('Error fetching pending user count:', error);
+      return {
+        count: 0,
+        error: error instanceof Error ? error.message : 'Failed to fetch pending user count'
+      };
+    }
+  }
 }
 
 export const orderService = new OrderService();

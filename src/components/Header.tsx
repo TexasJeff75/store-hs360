@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ShoppingCart, User, Settings, Users, Home, Package } from 'lucide-react';
+import { ShoppingCart, User, Settings, Users, Home, Package, UserCheck } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { orderService } from '../services/orderService';
 
@@ -24,6 +24,7 @@ const Header: React.FC<HeaderProps> = ({
 }) => {
   const { user, profile, loading } = useAuth();
   const [newOrderCount, setNewOrderCount] = useState(0);
+  const [pendingUserCount, setPendingUserCount] = useState(0);
 
   // Fetch new order count for admin/sales_rep/distributor users
   useEffect(() => {
@@ -38,6 +39,22 @@ const Header: React.FC<HeaderProps> = ({
 
     // Refresh count every 30 seconds
     const interval = setInterval(fetchNewOrderCount, 30000);
+    return () => clearInterval(interval);
+  }, [user, profile]);
+
+  // Fetch pending user count for admin users only
+  useEffect(() => {
+    const fetchPendingUserCount = async () => {
+      if (user && profile && profile.role === 'admin') {
+        const { count } = await orderService.getPendingUserCount();
+        setPendingUserCount(count);
+      }
+    };
+
+    fetchPendingUserCount();
+
+    // Refresh count every 30 seconds
+    const interval = setInterval(fetchPendingUserCount, 30000);
     return () => clearInterval(interval);
   }, [user, profile]);
 
@@ -93,18 +110,43 @@ const Header: React.FC<HeaderProps> = ({
                 )}
 
                 {(profile?.role === 'admin' || profile?.role === 'sales_rep' || profile?.role === 'distributor') && (
-                  <button
-                    onClick={onAdminClick}
-                    className="relative flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
-                  >
-                    <Settings className="w-5 h-5" />
-                    <span className="hidden sm:inline">Admin</span>
-                    {newOrderCount > 0 && (
-                      <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold animate-pulse">
-                        {newOrderCount > 99 ? '99+' : newOrderCount}
-                      </span>
+                  <>
+                    <button
+                      onClick={onAdminClick}
+                      className="relative flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
+                    >
+                      <Package className="w-5 h-5" />
+                      <span className="hidden sm:inline">Orders</span>
+                      {newOrderCount > 0 && (
+                        <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold animate-pulse">
+                          {newOrderCount > 99 ? '99+' : newOrderCount}
+                        </span>
+                      )}
+                    </button>
+
+                    {profile?.role === 'admin' && (
+                      <button
+                        onClick={onAdminClick}
+                        className="relative flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
+                      >
+                        <UserCheck className="w-5 h-5" />
+                        <span className="hidden sm:inline">Users</span>
+                        {pendingUserCount > 0 && (
+                          <span className="absolute -top-2 -right-2 bg-orange-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold animate-pulse">
+                            {pendingUserCount > 99 ? '99+' : pendingUserCount}
+                          </span>
+                        )}
+                      </button>
                     )}
-                  </button>
+
+                    <button
+                      onClick={onAdminClick}
+                      className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
+                    >
+                      <Settings className="w-5 h-5" />
+                      <span className="hidden sm:inline">Admin</span>
+                    </button>
+                  </>
                 )}
 
                 {profile?.role === 'customer' && (
