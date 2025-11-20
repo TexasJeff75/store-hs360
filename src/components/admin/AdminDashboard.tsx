@@ -23,11 +23,12 @@ import CostAdminManagement from './CostAdminManagement';
 interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
+  initialTab?: AdminTab;
 }
 
 type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'distributors' | 'analytics' | 'profit-report' | 'cost-admins' | 'my-orgs' | 'payments' | 'recurring-orders' | 'my-recurring-orders' | 'help';
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initialTab }) => {
   const { profile, user } = useAuth();
   const isAdmin = profile?.role === 'admin';
   const isSalesRep = profile?.role === 'sales_rep';
@@ -37,9 +38,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [pendingUsersCount, setPendingUsersCount] = useState(0);
 
-  const [activeTab, setActiveTab] = useState<AdminTab>(
-    isCustomer ? 'orders' : isSalesRep ? 'my-orgs' : isDistributor ? 'commissions' : 'organizations'
-  );
+  const getDefaultTab = (): AdminTab => {
+    if (initialTab) return initialTab;
+    if (isCustomer) return 'orders';
+    if (isSalesRep) return 'my-orgs';
+    if (isDistributor) return 'commissions';
+    return 'organizations';
+  };
+
+  const [activeTab, setActiveTab] = useState<AdminTab>(getDefaultTab());
+
+  React.useEffect(() => {
+    if (initialTab && isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, isOpen]);
 
   React.useEffect(() => {
     if (isCustomer && user?.id) {

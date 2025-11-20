@@ -9,6 +9,8 @@ interface HeaderProps {
   onAuthClick: () => void;
   onProfileClick: () => void;
   onAdminClick: () => void;
+  onOrdersClick: () => void;
+  onUsersClick: () => void;
   onSalesRepClick: () => void;
   onOrderHistoryClick: () => void;
 }
@@ -19,6 +21,8 @@ const Header: React.FC<HeaderProps> = ({
   onAuthClick,
   onProfileClick,
   onAdminClick,
+  onOrdersClick,
+  onUsersClick,
   onSalesRepClick,
   onOrderHistoryClick
 }) => {
@@ -112,7 +116,7 @@ const Header: React.FC<HeaderProps> = ({
                 {(profile?.role === 'admin' || profile?.role === 'sales_rep' || profile?.role === 'distributor') && (
                   <>
                     <button
-                      onClick={onAdminClick}
+                      onClick={onOrdersClick}
                       className="relative flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
                     >
                       <Package className="w-5 h-5" />
@@ -126,7 +130,7 @@ const Header: React.FC<HeaderProps> = ({
 
                     {profile?.role === 'admin' && (
                       <button
-                        onClick={onAdminClick}
+                        onClick={onUsersClick}
                         className="relative flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
                       >
                         <UserCheck className="w-5 h-5" />

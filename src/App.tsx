@@ -45,6 +45,7 @@ function AppContent() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
+  const [adminInitialTab, setAdminInitialTab] = useState<'orders' | 'users' | undefined>(undefined);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -363,6 +364,8 @@ function AppContent() {
           onAuthClick={() => setIsAuthModalOpen(true)}
           onProfileClick={() => {}}
           onAdminClick={() => {}}
+          onOrdersClick={() => {}}
+          onUsersClick={() => {}}
           onSalesRepClick={() => {}}
           onOrderHistoryClick={() => setIsAdminOpen(true)}
         />
@@ -482,9 +485,23 @@ function AppContent() {
           onCartClick={() => setIsCartOpen(true)}
           onAuthClick={() => setIsAuthModalOpen(true)}
           onProfileClick={() => setIsProfileOpen(true)}
-          onAdminClick={() => setIsAdminOpen(true)}
+          onAdminClick={() => {
+            setAdminInitialTab(undefined);
+            setIsAdminOpen(true);
+          }}
+          onOrdersClick={() => {
+            setAdminInitialTab('orders');
+            setIsAdminOpen(true);
+          }}
+          onUsersClick={() => {
+            setAdminInitialTab('users');
+            setIsAdminOpen(true);
+          }}
           onSalesRepClick={() => setIsOrgSelectorOpen(true)}
-          onOrderHistoryClick={() => setIsAdminOpen(true)}
+          onOrderHistoryClick={() => {
+            setAdminInitialTab('orders');
+            setIsAdminOpen(true);
+          }}
         />
 
         {/* Products Section */}
@@ -753,7 +770,11 @@ function AppContent() {
 
         <AdminDashboard
           isOpen={isAdminOpen}
-          onClose={() => setIsAdminOpen(false)}
+          onClose={() => {
+            setIsAdminOpen(false);
+            setAdminInitialTab(undefined);
+          }}
+          initialTab={adminInitialTab}
         />
 
         <OrganizationSelector
