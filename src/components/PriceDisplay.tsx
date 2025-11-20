@@ -56,9 +56,17 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
 
   return (
     <div className={`flex flex-col space-y-1 ${className}`}>
+      {/* Show retail price with strikethrough if user has contract pricing */}
+      {isContractPrice && savings > 0 && (
+        <div className="flex items-center space-x-2">
+          <span className="text-sm text-gray-500 line-through">${regularPrice.toFixed(2)}</span>
+          <span className="text-xs text-gray-500">Retail Price</span>
+        </div>
+      )}
+
       <div className="flex items-center space-x-2 flex-wrap">
         <span className="text-lg font-bold text-gray-900">${displayPrice.toFixed(2)}</span>
-        
+
         {/* Contract Price Badge */}
         {isContractPrice && (
           <div className="flex items-center space-x-1 bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap">
@@ -70,8 +78,8 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
           </div>
         )}
       </div>
-        
-      {/* Show special pricing discount */}
+
+      {/* Show savings amount if user has contract pricing */}
       {isContractPrice && savings > 0 && showSavings && (
         <div className="text-sm text-green-600 font-medium">
           ${savings.toFixed(2)} off retail
