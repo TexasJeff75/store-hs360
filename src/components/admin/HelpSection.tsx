@@ -4,21 +4,17 @@ import {
   ChevronDown,
   ChevronRight,
   BookOpen,
-  Users,
-  Building2,
-  DollarSign,
   ShoppingCart,
-  Shield,
   AlertTriangle,
   CheckCircle2,
-  FileText,
-  TrendingUp,
   MapPin,
-  Package,
   CreditCard,
   Repeat,
-  Building
+  Building2,
+  TrendingUp,
+  Package
 } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface HelpSectionProps {}
 
@@ -27,6 +23,7 @@ interface HelpTopic {
   title: string;
   icon: React.ElementType;
   content: HelpItem[];
+  roles: string[];
 }
 
 interface HelpItem {
@@ -36,6 +33,8 @@ interface HelpItem {
 }
 
 const HelpSection: React.FC<HelpSectionProps> = () => {
+  const { profile } = useAuth();
+  const userRole = profile?.role || 'customer';
   const [expandedTopic, setExpandedTopic] = useState<string | null>('getting-started');
   const [expandedItem, setExpandedItem] = useState<string | null>(null);
 
@@ -44,364 +43,121 @@ const HelpSection: React.FC<HelpSectionProps> = () => {
       id: 'getting-started',
       title: 'Getting Started',
       icon: BookOpen,
+      roles: ['admin', 'sales_rep', 'distributor', 'customer'],
       content: [
         {
-          question: 'What is the Admin Dashboard?',
-          answer: 'The Admin Dashboard is your central control panel for managing the entire platform. You can manage users, organizations, pricing, orders, commissions, and more.',
+          question: 'What is this dashboard?',
+          answer: userRole === 'admin'
+            ? 'The Admin Dashboard is your central control panel for managing the entire platform. You can manage users, organizations, pricing, orders, commissions, and more.'
+            : userRole === 'sales_rep'
+            ? 'This is your Sales Dashboard where you can view orders from your assigned organizations and track your commission earnings.'
+            : userRole === 'distributor'
+            ? 'This is your Distributor Dashboard where you can view commissions from your sales representatives.'
+            : 'This is your Account Dashboard where you can manage orders, delivery locations, and payment methods.',
           type: 'info'
         },
         {
-          question: 'What are the different user roles?',
-          answer: [
-            'Admin: Full access to all features and settings',
-            'Sales Rep: Manage assigned organizations and view commissions',
-            'Distributor: View distributor hierarchy and commissions',
-            'Customer: Place orders and manage their organization'
-          ]
-        },
-        {
-          question: 'How do I approve new users?',
-          answer: 'Navigate to Users tab, find pending users (marked with "Pending Approval"), and click Approve. Users cannot access the system until approved.',
-          type: 'warning'
-        }
-      ]
-    },
-    {
-      id: 'organizations',
-      title: 'Organizations & Locations',
-      icon: Building2,
-      content: [
-        {
-          question: 'How do I create a new organization?',
-          answer: [
-            '1. Go to the Organizations tab',
-            '2. Click "Add Organization" button',
-            '3. Enter organization name, code (must be unique), and contact information',
-            '4. Assign a default sales rep if needed',
-            '5. Mark as house account if no commission should be paid'
-          ]
-        },
-        {
-          question: 'What is a house account?',
-          answer: 'House accounts are organizations that do not generate sales commissions. Orders from house accounts will have 0% commission regardless of margin.',
-          type: 'info'
-        },
-        {
-          question: 'Can I prevent duplicate organizations?',
-          answer: 'Yes! The system automatically detects similar organization names and codes to prevent duplicates. This protects against account theft by sales reps.',
-          type: 'success'
-        },
-        {
-          question: 'How do locations work?',
-          answer: 'Locations are shipping/billing addresses within an organization. Each location can have its own pricing overrides and payment methods.'
-        },
-        {
-          question: 'What happens if I deactivate an organization?',
-          answer: 'Deactivated organizations cannot place new orders, but their historical data remains intact. Users can no longer access the organization.',
-          type: 'warning'
-        }
-      ]
-    },
-    {
-      id: 'users',
-      title: 'User Management',
-      icon: Users,
-      content: [
-        {
-          question: 'How does user approval work?',
-          answer: [
-            'When users sign up, they are in "pending" status and cannot access the system.',
-            'Admins must review and approve each user before they can log in.',
-            'This prevents unauthorized access and ensures proper organization assignment.',
-            'You can also reject users if needed.'
-          ],
-          type: 'warning'
-        },
-        {
-          question: 'How do I assign users to organizations?',
-          answer: 'In the Users tab, select a user and assign them to an organization with an appropriate role (admin, manager, member, or viewer).'
-        },
-        {
-          question: 'Can users belong to multiple organizations?',
-          answer: 'Yes! Users can be assigned to multiple organizations with different roles in each. This is useful for consultants or multi-location managers.'
-        },
-        {
-          question: 'What are organization roles?',
-          answer: [
-            'Admin: Full control over the organization and its locations',
-            'Manager: Can manage orders and users within the organization',
-            'Member: Can place orders and view organization data',
-            'Viewer: Read-only access to organization data'
-          ]
-        }
-      ]
-    },
-    {
-      id: 'sales-reps',
-      title: 'Sales Reps & Assignments',
-      icon: TrendingUp,
-      content: [
-        {
-          question: 'How do I assign a sales rep to an organization?',
-          answer: [
-            '1. Go to Sales Reps tab',
-            '2. Click "Assign Sales Rep"',
-            '3. Select the sales rep and organization',
-            '4. Set commission rate and split percentage',
-            '5. Mark as active'
-          ]
-        },
-        {
-          question: 'Can an organization have multiple sales reps?',
-          answer: 'Yes! You can assign multiple sales reps with different commission splits. The total split percentage should equal 100%.',
-          type: 'info'
-        },
-        {
-          question: 'How are sales rep assignments protected?',
-          answer: [
-            'Only admins can create organizations and assign sales reps.',
-            'Sales reps cannot create duplicate organizations to steal accounts.',
-            'Sales reps can only create orders for their assigned organizations.',
-            'All unauthorized attempts are logged for security monitoring.'
-          ],
-          type: 'success'
-        },
-        {
-          question: 'What is a default sales rep?',
-          answer: 'The default sales rep is automatically assigned to new orders from that organization if no specific sales rep is selected.'
-        }
-      ]
-    },
-    {
-      id: 'pricing',
-      title: 'Pricing & Contracts',
-      icon: DollarSign,
-      content: [
-        {
-          question: 'What are the pricing hierarchy levels?',
-          answer: [
-            '1. Individual User Pricing (highest priority)',
-            '2. Location Pricing',
-            '3. Organization Pricing',
-            '4. Product Base Price + Markup (lowest priority)',
-            'The system uses the most specific pricing available.'
-          ]
-        },
-        {
-          question: 'How do I set contract pricing?',
-          answer: [
-            '1. Go to Pricing Management tab',
-            '2. Choose pricing type (Organization, Location, or Individual)',
-            '3. Select the entity and product',
-            '4. Enter contract price or markup percentage',
-            '5. Set effective dates and quantity ranges'
-          ]
-        },
-        {
-          question: 'What is markup pricing?',
-          answer: 'Instead of setting a fixed contract price, you can set a markup percentage. The price is calculated as: Base Cost × (1 + Markup %). This ensures pricing stays current with cost changes.',
-          type: 'info'
-        },
-        {
-          question: 'Can pricing overlap?',
-          answer: 'No. The system prevents overlapping quantity ranges for the same product/entity combination. This ensures clear, unambiguous pricing.',
-          type: 'warning'
-        },
-        {
-          question: 'How do expiration dates work?',
-          answer: 'You can set expiration dates on contract pricing. After expiration, the system falls back to the next pricing level in the hierarchy.'
+          question: userRole === 'customer' ? 'How do I place an order?' : 'What can I do here?',
+          answer: userRole === 'customer'
+            ? [
+                '1. Browse products in the main catalog',
+                '2. Add items to your cart',
+                '3. Click the cart icon to review your order',
+                '4. Select a delivery address',
+                '5. Choose a payment method',
+                '6. Complete checkout'
+              ]
+            : userRole === 'sales_rep'
+            ? [
+                'View and manage orders from your assigned organizations',
+                'Track commission earnings from your sales',
+                'Access your organization assignments',
+                'Contact support for assistance'
+              ]
+            : userRole === 'distributor'
+            ? [
+                'View commission earnings from your sales representatives',
+                'Track performance across your team',
+                'Access reports and analytics',
+                'Contact support for assistance'
+              ]
+            : [
+                'Manage all users and their roles',
+                'Create and manage organizations',
+                'Set pricing and commission structures',
+                'View all orders and approve commissions',
+                'Access comprehensive analytics'
+              ]
         }
       ]
     },
     {
       id: 'orders',
-      title: 'Orders & Processing',
+      title: 'Orders & Order History',
       icon: ShoppingCart,
+      roles: ['admin', 'sales_rep', 'customer'],
       content: [
         {
-          question: 'How do customers place orders?',
-          answer: 'Customers browse products, add to cart, select shipping address and payment method, then complete checkout. Orders sync with BigCommerce for fulfillment.'
+          question: userRole === 'customer' ? 'How do I track my orders?' : 'How do I view orders?',
+          answer: userRole === 'customer'
+            ? 'Click on the Orders tab to view your complete order history. You can see order status, tracking information, and order details.'
+            : userRole === 'sales_rep'
+            ? 'The Orders tab shows all orders from organizations you manage. You can filter, search, and view detailed order information including commission details.'
+            : 'The Orders tab displays all orders across the platform. You can filter by organization, date range, status, and more.'
         },
         {
-          question: 'Can I edit orders?',
-          answer: 'Only pending orders can be edited. Once an order is processing or completed, it cannot be modified. You can cancel and create a new order if needed.',
-          type: 'warning'
-        },
-        {
-          question: 'What are order statuses?',
+          question: 'What are the different order statuses?',
           answer: [
             'Pending: Order created but not yet submitted',
-            'Processing: Order submitted and being prepared',
-            'Shipped: Order dispatched to customer',
-            'Delivered: Order received by customer',
-            'Cancelled: Order cancelled before shipment'
+            'Processing: Order is being prepared for shipment',
+            'Shipped: Order has been dispatched',
+            'Delivered: Order has been received',
+            'Cancelled: Order was cancelled before shipment'
           ]
         },
         {
-          question: 'How does commission calculation work?',
-          answer: [
-            'Commission is based on product margin (selling price - cost)',
-            'Commission % × Margin = Commission Amount',
-            'Split between sales rep and distributor based on split percentages',
-            'House accounts generate 0% commission'
-          ]
-        }
-      ]
-    },
-    {
-      id: 'recurring-orders',
-      title: 'Recurring Orders',
-      icon: Repeat,
-      content: [
-        {
-          question: 'What are recurring orders?',
-          answer: 'Recurring orders automatically create and process orders on a regular schedule (daily, weekly, monthly, quarterly, yearly).',
-          type: 'info'
-        },
-        {
-          question: 'How do I set up a recurring order?',
-          answer: [
-            '1. Add products to cart',
-            '2. Click "Subscribe" instead of checkout',
-            '3. Choose frequency (daily, weekly, monthly, etc.)',
-            '4. Select start date',
-            '5. Choose end date or keep it ongoing',
-            '6. Select shipping address and payment method',
-            '7. Confirm subscription'
-          ]
-        },
-        {
-          question: 'Can customers pause subscriptions?',
-          answer: 'Yes! Customers can pause, resume, or cancel recurring orders at any time from their account dashboard.'
-        },
-        {
-          question: 'How are recurring orders processed?',
-          answer: 'A scheduled job runs daily to check for recurring orders due. Orders are automatically created and charged to the saved payment method.'
-        },
-        {
-          question: 'What if a payment fails?',
-          answer: 'Failed orders are marked as "failed" and customers are notified. The recurring order remains active and will try again on the next scheduled date.',
-          type: 'warning'
-        }
-      ]
-    },
-    {
-      id: 'commissions',
-      title: 'Commissions & Payouts',
-      icon: TrendingUp,
-      content: [
-        {
-          question: 'How are commissions calculated?',
-          answer: [
-            '1. Calculate margin: Selling Price - Product Cost',
-            '2. Apply commission rate: Margin × Commission %',
-            '3. Split between sales rep and distributor',
-            '4. Sales Rep gets: Commission × Split %',
-            '5. Distributor gets: Commission × (100% - Split %)'
-          ]
-        },
-        {
-          question: 'What is the distributor hierarchy?',
-          answer: 'Distributors can have multiple sales reps under them. When a sales rep makes a sale, both the rep and their distributor earn commission based on the split percentage.',
-          type: 'info'
-        },
-        {
-          question: 'When are commissions paid?',
-          answer: 'Commissions are calculated immediately when an order is placed but remain in "pending" status. Admins approve commissions for payout periodically.'
-        },
-        {
-          question: 'Can I recalculate commissions?',
-          answer: 'Yes! Use the recalculate-commissions script if pricing or commission rates change. This updates all existing orders with correct commission amounts.',
+          question: userRole === 'customer' ? 'Can I cancel or modify my order?' : 'Can orders be modified?',
+          answer: userRole === 'customer'
+            ? 'Only pending orders can be modified. Once an order is processing, it cannot be changed. Please contact support immediately if you need to cancel a processing order.'
+            : 'Only pending orders can be edited. Processing and shipped orders cannot be modified. To make changes to a submitted order, you must cancel it and create a new one.',
           type: 'warning'
         },
         {
-          question: 'How do I approve commissions for payout?',
-          answer: 'In the Commissions tab, select pending commissions and click "Approve". This marks them as approved and ready for payment processing.'
+          question: userRole === 'customer' ? 'How do I reorder items?' : 'What is the quickest way to reorder?',
+          answer: userRole === 'customer'
+            ? 'Use the Favorites feature to save products you order frequently. You can quickly add favorite items to your cart with one click.'
+            : 'Use the Recurring Orders feature for items that need to be ordered on a regular schedule. This automates the ordering process.'
         }
       ]
     },
     {
-      id: 'distributors',
-      title: 'Distributors',
-      icon: Building,
+      id: 'locations',
+      title: 'Delivery Locations',
+      icon: MapPin,
+      roles: ['customer'],
       content: [
         {
-          question: 'What is a distributor?',
-          answer: 'Distributors are higher-level partners who manage multiple sales reps. They receive a portion of commissions from all their reps\' sales.'
-        },
-        {
-          question: 'How do I create a distributor?',
+          question: 'How do I add a delivery address?',
           answer: [
-            '1. Go to Distributors tab',
-            '2. Click "Add Distributor"',
-            '3. Enter distributor name and code',
-            '4. Link to a user profile if applicable',
-            '5. Set commission tier',
-            '6. Assign sales reps to this distributor'
+            '1. Go to the Locations tab',
+            '2. Click "Add Location"',
+            '3. Enter the address details',
+            '4. Give it a name for easy identification (e.g., "Main Office", "Warehouse")',
+            '5. Save the location'
           ]
         },
         {
-          question: 'Can a sales rep have multiple distributors?',
-          answer: 'No. Each sales rep can only be assigned to one distributor at a time. However, distributors can have multiple sales reps.',
-          type: 'info'
-        }
-      ]
-    },
-    {
-      id: 'products',
-      title: 'Products & Inventory',
-      icon: Package,
-      content: [
-        {
-          question: 'How are products managed?',
-          answer: 'Products are synced from BigCommerce. You can view product details, set base costs, and configure markup settings in the Products tab.'
-        },
-        {
-          question: 'What is product cost?',
-          answer: 'Product cost is your acquisition cost (what you pay). This is used to calculate margins and commissions. Keep costs updated for accurate commission calculations.',
-          type: 'warning'
-        },
-        {
-          question: 'Can I allow markup pricing for specific products?',
-          answer: 'Yes! In Products Management, enable "Allow Markup Pricing" for products where you want percentage-based pricing instead of fixed contract prices.'
-        }
-      ]
-    },
-    {
-      id: 'security',
-      title: 'Security & Access Control',
-      icon: Shield,
-      content: [
-        {
-          question: 'How is data protected?',
-          answer: [
-            'Row Level Security (RLS) ensures users only see their own data',
-            'All database queries are validated and restricted',
-            'Payment card data is tokenized and never stored directly',
-            'Passwords are hashed using industry-standard bcrypt',
-            'All actions are logged for audit trails'
-          ],
-          type: 'success'
-        },
-        {
-          question: 'What prevents account theft?',
-          answer: [
-            'Only admins can create organizations',
-            'Duplicate organization detection prevents creating similar orgs',
-            'Sales reps can only access assigned organizations',
-            'Order creation is validated against sales rep assignments',
-            'Failed access attempts are logged'
-          ],
-          type: 'success'
-        },
-        {
-          question: 'How can I monitor suspicious activity?',
-          answer: 'Check the Login Audit Log in the Users section. This shows all login attempts, including failed ones, with timestamps and IP addresses.',
+          question: 'Can I have multiple delivery locations?',
+          answer: 'Yes! You can save multiple delivery addresses. This is useful if you have multiple offices, warehouses, or job sites.',
           type: 'info'
         },
         {
-          question: 'What if I suspect unauthorized access?',
-          answer: 'Immediately deactivate the user account, review their recent actions in audit logs, and change any compromised passwords. Contact support if needed.',
+          question: 'How do I choose which location to deliver to?',
+          answer: 'During checkout, select your preferred delivery location from your saved addresses.'
+        },
+        {
+          question: 'Can I edit or delete a location?',
+          answer: 'Yes, you can edit or delete any saved location from the Locations tab. Note that you cannot delete a location that has pending orders.',
           type: 'warning'
         }
       ]
@@ -410,99 +166,193 @@ const HelpSection: React.FC<HelpSectionProps> = () => {
       id: 'payment-methods',
       title: 'Payment Methods',
       icon: CreditCard,
+      roles: ['customer'],
       content: [
         {
-          question: 'How are payment methods stored?',
-          answer: 'Payment card data is tokenized through BigCommerce Payments. Only encrypted tokens are stored in the database - never actual card numbers.',
+          question: 'How do I save a payment method?',
+          answer: [
+            '1. Go to the Payment Methods tab',
+            '2. Click "Add Payment Method"',
+            '3. Enter your card details securely',
+            '4. Give it a name for easy identification',
+            '5. Your card information is encrypted and stored securely'
+          ],
           type: 'success'
         },
         {
-          question: 'Can customers save multiple payment methods?',
-          answer: 'Yes! Customers can save multiple payment methods for their organization and choose which to use at checkout.'
+          question: 'Is my payment information secure?',
+          answer: 'Yes! Your card details are encrypted and tokenized. We never store actual card numbers. All payment processing meets industry security standards.',
+          type: 'success'
         },
         {
-          question: 'How do I delete a payment method?',
-          answer: 'In Payment Methods tab, customers can view and delete saved payment methods. Admins can also manage payment methods for any organization.',
+          question: 'Can I use different payment methods for different orders?',
+          answer: 'Yes, you can select which saved payment method to use during checkout. You can also add a new payment method at checkout.'
+        },
+        {
+          question: 'How do I remove a saved payment method?',
+          answer: 'In the Payment Methods tab, click the delete icon next to any saved payment method. Note that you cannot delete a payment method that is used for active recurring orders.',
           type: 'warning'
         }
       ]
     },
     {
-      id: 'analytics',
-      title: 'Analytics & Reporting',
-      icon: FileText,
+      id: 'recurring-orders',
+      title: 'Recurring Orders',
+      icon: Repeat,
+      roles: ['customer', 'admin'],
       content: [
         {
-          question: 'What reports are available?',
+          question: 'What are recurring orders?',
+          answer: 'Recurring orders automatically place orders for products you need on a regular schedule - daily, weekly, monthly, quarterly, or yearly. This ensures you never run out of essential items.',
+          type: 'info'
+        },
+        {
+          question: userRole === 'customer' ? 'How do I set up a recurring order?' : 'How do recurring orders work?',
+          answer: userRole === 'customer'
+            ? [
+                '1. Add products to your cart',
+                '2. Click "Subscribe" instead of "Checkout"',
+                '3. Choose your delivery frequency',
+                '4. Select a start date',
+                '5. Optionally set an end date',
+                '6. Choose delivery address and payment method',
+                '7. Confirm your subscription'
+              ]
+            : [
+                'Customers can create recurring orders for any product',
+                'Orders are automatically processed on the scheduled date',
+                'Payment is charged to the saved payment method',
+                'Customers can pause, resume, or cancel anytime',
+                'Failed orders are flagged and customers are notified'
+              ]
+        },
+        {
+          question: userRole === 'customer' ? 'Can I pause or cancel a recurring order?' : 'Can recurring orders be paused?',
+          answer: userRole === 'customer'
+            ? 'Yes! Go to My Recurring Orders tab to view all your subscriptions. You can pause, resume, or cancel any recurring order at any time.'
+            : 'Yes, customers can pause, resume, or cancel their recurring orders at any time from their dashboard.'
+        },
+        {
+          question: 'What happens if a payment fails?',
+          answer: 'If a payment fails, the order is marked as failed and the customer is notified. The recurring order remains active and will try again on the next scheduled date.',
+          type: 'warning'
+        }
+      ]
+    },
+    {
+      id: 'pricing',
+      title: 'Pricing & Discounts',
+      icon: Package,
+      roles: ['customer'],
+      content: [
+        {
+          question: 'Why do I see discounted prices?',
+          answer: 'Your account may have special contract pricing that reflects your negotiated rates. These discounts are automatically applied to your orders.',
+          type: 'info'
+        },
+        {
+          question: 'How do I know if I have special pricing?',
+          answer: 'Products with special pricing will show the original price crossed out and your discounted price. The discount is applied automatically at checkout.'
+        },
+        {
+          question: 'Can pricing change?',
+          answer: 'Contract pricing may have expiration dates or quantity requirements. If you have questions about your pricing, please contact support.',
+          type: 'info'
+        }
+      ]
+    },
+    {
+      id: 'commissions',
+      title: 'Commission Tracking',
+      icon: TrendingUp,
+      roles: ['sales_rep', 'distributor'],
+      content: [
+        {
+          question: 'How do I view my commissions?',
+          answer: userRole === 'sales_rep'
+            ? 'The Commissions tab shows all your commission earnings from orders placed by your assigned organizations. You can filter by date range and status.'
+            : 'The Commissions tab displays earnings from all sales representatives in your network. You can view individual rep performance and overall totals.'
+        },
+        {
+          question: 'When are commissions paid?',
+          answer: 'Commissions are calculated when orders are placed but remain in "pending" status. Once approved by management, they become available for payout.',
+          type: 'info'
+        },
+        {
+          question: 'What do the commission statuses mean?',
           answer: [
-            'Sales by organization and time period',
-            'Commission summaries by sales rep and distributor',
-            'Top products and customers',
-            'Order trends and patterns',
-            'Revenue and margin analysis'
+            'Pending: Commission has been calculated but not yet approved',
+            'Approved: Commission has been approved and is ready for payment',
+            'Paid: Commission has been paid out'
           ]
+        }
+      ]
+    },
+    {
+      id: 'organizations',
+      title: 'My Organizations',
+      icon: Building2,
+      roles: ['sales_rep'],
+      content: [
+        {
+          question: 'What organizations am I assigned to?',
+          answer: 'The My Organizations tab shows all organizations you manage. You can view organization details, contact information, and order history.'
         },
         {
-          question: 'How do I export data?',
-          answer: 'Most reports have an "Export" button that downloads data as CSV. You can then analyze in Excel or other tools.'
-        },
-        {
-          question: 'Can I customize date ranges?',
-          answer: 'Yes! Most reports allow you to select custom date ranges for analysis.'
+          question: 'How do I help my customers place orders?',
+          answer: 'You can view your organizations and their order history. Encourage customers to use the online ordering system for fastest processing. You can also assist them by phone if needed.',
+          type: 'info'
         }
       ]
     },
     {
       id: 'troubleshooting',
-      title: 'Troubleshooting',
+      title: 'Common Issues',
       icon: AlertTriangle,
+      roles: ['admin', 'sales_rep', 'distributor', 'customer'],
       content: [
         {
-          question: 'User cannot log in after approval',
-          answer: [
-            '1. Verify user is marked as approved in Users tab',
-            '2. Check if user is assigned to an organization',
-            '3. Confirm user email is verified',
-            '4. Check login audit log for error messages',
-            '5. Try resetting the user\'s password'
-          ],
+          question: userRole === 'customer' ? 'I cannot complete checkout' : 'Checkout issues',
+          answer: userRole === 'customer'
+            ? [
+                'Ensure you have a delivery address saved',
+                'Verify you have a payment method saved',
+                'Check that all cart items are in stock',
+                'Try refreshing the page',
+                'If the issue persists, contact support'
+              ]
+            : 'Checkout issues are usually related to missing delivery addresses or payment methods. Ensure customers have both configured before attempting checkout.',
           type: 'warning'
         },
         {
-          question: 'Orders not syncing with BigCommerce',
-          answer: [
-            'Check BigCommerce API credentials in environment variables',
-            'Verify products exist in BigCommerce catalog',
-            'Check order status - only processing orders sync',
-            'Review error logs for API failures'
-          ],
+          question: userRole === 'customer' ? 'My payment was declined' : 'Payment declined',
+          answer: userRole === 'customer'
+            ? [
+                'Verify your card details are correct',
+                'Check that your card has not expired',
+                'Ensure you have sufficient funds',
+                'Contact your bank if the card should be valid',
+                'Try a different payment method'
+              ]
+            : 'Payment declines are typically related to insufficient funds, expired cards, or bank security holds. Customers should contact their bank to resolve the issue.',
           type: 'warning'
         },
         {
-          question: 'Commissions calculating incorrectly',
-          answer: [
-            'Verify product costs are up to date',
-            'Check contract pricing is active and not expired',
-            'Confirm sales rep commission rate is set correctly',
-            'Run commission recalculation script if rates changed',
-            'Verify commission split percentages total 100%'
-          ],
-          type: 'warning'
+          question: userRole === 'customer' ? 'I forgot my password' : 'Password reset',
+          answer: userRole === 'customer'
+            ? 'Click "Forgot Password" on the login screen. Enter your email address and follow the instructions sent to your email to reset your password.'
+            : 'Users can reset their passwords using the "Forgot Password" link on the login page. They will receive an email with reset instructions.'
         },
         {
-          question: 'Pricing not applying correctly',
-          answer: [
-            'Check pricing hierarchy: Individual > Location > Organization > Base Price',
-            'Verify effective and expiration dates',
-            'Ensure quantity ranges don\'t overlap',
-            'Check if pricing is marked as active',
-            'Clear browser cache and refresh'
-          ],
-          type: 'warning'
+          question: userRole === 'customer' ? 'How do I contact support?' : 'Support contact',
+          answer: 'For assistance, email support@example.com or call during business hours. Have your order number ready if inquiring about a specific order.',
+          type: 'info'
         }
       ]
     }
   ];
+
+  const filteredTopics = helpTopics.filter(topic => topic.roles.includes(userRole));
 
   const toggleTopic = (topicId: string) => {
     setExpandedTopic(expandedTopic === topicId ? null : topicId);
@@ -537,17 +387,41 @@ const HelpSection: React.FC<HelpSectionProps> = () => {
     }
   };
 
+  const getDashboardTitle = () => {
+    switch (userRole) {
+      case 'admin':
+        return 'Admin Help Center';
+      case 'sales_rep':
+        return 'Sales Rep Help Center';
+      case 'distributor':
+        return 'Distributor Help Center';
+      default:
+        return 'Help Center';
+    }
+  };
+
+  const getDashboardSubtitle = () => {
+    switch (userRole) {
+      case 'admin':
+        return 'Everything you need to know about managing the platform';
+      case 'sales_rep':
+        return 'Resources to help you manage your organizations and commissions';
+      case 'distributor':
+        return 'Track your team performance and commissions';
+      default:
+        return 'Get help with orders, locations, and account management';
+    }
+  };
+
   return (
     <div className="p-6">
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Admin Help Center</h2>
-        <p className="text-gray-600">
-          Everything you need to know about managing the platform
-        </p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">{getDashboardTitle()}</h2>
+        <p className="text-gray-600">{getDashboardSubtitle()}</p>
       </div>
 
       <div className="space-y-4">
-        {helpTopics.map((topic) => {
+        {filteredTopics.map((topic) => {
           const Icon = topic.icon;
           const isExpanded = expandedTopic === topic.id;
 
@@ -627,18 +501,12 @@ const HelpSection: React.FC<HelpSectionProps> = () => {
           <div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Still need help?</h3>
             <p className="text-gray-600 text-sm mb-4">
-              If you can't find what you're looking for, check the documentation or contact support.
+              If you cannot find what you are looking for, contact our support team for assistance.
             </p>
             <div className="flex space-x-3">
               <a
-                href="/docs"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              >
-                View Documentation
-              </a>
-              <a
                 href="mailto:support@example.com"
-                className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
               >
                 Contact Support
               </a>
