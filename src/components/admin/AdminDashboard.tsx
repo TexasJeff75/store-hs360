@@ -26,7 +26,8 @@ interface AdminDashboardProps {
   initialTab?: AdminTab;
 }
 
-type AdminTab = 'users' | 'organizations' | 'locations' | 'pricing' | 'products' | 'orders' | 'commissions' | 'salesreps' | 'distributors' | 'analytics' | 'profit-report' | 'cost-admins' | 'my-orgs' | 'payments' | 'recurring-orders' | 'my-recurring-orders' | 'help';
+type AdminTab = 'users' | 'orders' | 'commissions' | 'help' | 'my-orgs' | 'my-recurring-orders' | 'locations' | 'payments' | 'admin-settings';
+type AdminSettingsTab = 'organizations' | 'pricing' | 'products' | 'recurring-orders' | 'distributors' | 'salesreps' | 'analytics' | 'profit-report' | 'cost-admins';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initialTab }) => {
   const { profile, user } = useAuth();
@@ -47,10 +48,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
   };
 
   const [activeTab, setActiveTab] = useState<AdminTab>(getDefaultTab());
+  const [adminSettingsTab, setAdminSettingsTab] = useState<AdminSettingsTab>('organizations');
+  const [isAdminSettingsOpen, setIsAdminSettingsOpen] = useState(false);
 
   React.useEffect(() => {
     if (initialTab && isOpen) {
       setActiveTab(initialTab);
+      setIsAdminSettingsOpen(false);
     }
   }, [initialTab, isOpen]);
 
@@ -90,18 +94,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
   if (!isOpen) return null;
 
   const adminTabs = [
-    // Admin items in specified order
-    { id: 'organizations' as AdminTab, label: 'Organizations', icon: Building2, roles: ['admin'] },
     { id: 'users' as AdminTab, label: 'Users', icon: Users, roles: ['admin'] },
     { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep', 'customer'] },
-    { id: 'recurring-orders' as AdminTab, label: 'Recurring Orders', icon: Repeat, roles: ['admin'] },
-    { id: 'distributors' as AdminTab, label: 'Distributors', icon: Building, roles: ['admin'] },
-    { id: 'salesreps' as AdminTab, label: 'Sales Reps', icon: UserCheck, roles: ['admin'] },
     { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep', 'distributor'] },
-    { id: 'products' as AdminTab, label: 'Products', icon: Package, roles: ['admin'] },
-    { id: 'profit-report' as AdminTab, label: 'Profit Report', icon: PieChart, roles: ['admin'] },
-    { id: 'cost-admins' as AdminTab, label: 'Cost Admins', icon: Shield, roles: ['admin'] },
-    { id: 'analytics' as AdminTab, label: 'Analytics', icon: BarChart3, roles: ['admin'] },
+    { id: 'admin-settings' as AdminTab, label: 'Admin Settings', icon: Settings, roles: ['admin'] },
     { id: 'help' as AdminTab, label: 'Help', icon: HelpCircle, roles: ['admin', 'sales_rep', 'distributor', 'customer'] },
 
     // User-facing items (non-admin)
@@ -111,6 +107,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
     { id: 'payments' as AdminTab, label: 'Payment Methods', icon: CreditCard, roles: ['customer'] },
   ];
 
+  const adminSettingsTabs = [
+    { id: 'organizations' as AdminSettingsTab, label: 'Organizations', icon: Building2 },
+    { id: 'products' as AdminSettingsTab, label: 'Products', icon: Package },
+    { id: 'recurring-orders' as AdminSettingsTab, label: 'Recurring Orders', icon: Repeat },
+    { id: 'distributors' as AdminSettingsTab, label: 'Distributors', icon: Building },
+    { id: 'salesreps' as AdminSettingsTab, label: 'Sales Reps', icon: UserCheck },
+    { id: 'analytics' as AdminSettingsTab, label: 'Analytics', icon: BarChart3 },
+    { id: 'profit-report' as AdminSettingsTab, label: 'Profit Report', icon: PieChart },
+    { id: 'cost-admins' as AdminSettingsTab, label: 'Cost Admins', icon: Shield },
+  ];
+
   const tabs = adminTabs.filter(tab =>
     (isAdmin && tab.roles.includes('admin')) ||
     (isSalesRep && tab.roles.includes('sales_rep')) ||
@@ -118,38 +125,82 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
     (isCustomer && tab.roles.includes('customer'))
   );
 
-  const renderTabContent = () => {
-    switch (activeTab) {
-      case 'my-orgs':
-        return <SalesRepDashboard />;
+  const renderAdminSettingsContent = () => {
+    switch (adminSettingsTab) {
       case 'organizations':
         return <OrganizationManagement />;
-      case 'users':
-        return <UserManagement onUserApproved={fetchPendingUsersCount} />;
-      case 'orders':
-        return <OrderManagement />;
-      case 'profit-report':
-        return <ProfitReport />;
-      case 'cost-admins':
-        return <CostAdminManagement />;
+      case 'products':
+        return <ProductsManagement />;
+      case 'recurring-orders':
+        return <RecurringOrderManagement />;
       case 'distributors':
         return <DistributorManagement />;
       case 'salesreps':
         return <SalesRepAssignment />;
+      case 'analytics':
+        return <Analytics />;
+      case 'profit-report':
+        return <ProfitReport />;
+      case 'cost-admins':
+        return <CostAdminManagement />;
+      default:
+        return null;
+    }
+  };
+
+  const renderTabContent = () => {
+    if (activeTab === 'admin-settings') {
+      return (
+        <div className="flex h-full">
+          {/* Admin Settings Sidebar */}
+          <div className="w-64 bg-gray-50 border-r border-gray-200">
+            <div className="p-4">
+              <h2 className="text-lg font-bold text-gray-900 mb-4">Admin Settings</h2>
+              <nav className="space-y-2">
+                {adminSettingsTabs.map((tab) => {
+                  const Icon = tab.icon;
+                  return (
+                    <button
+                      key={tab.id}
+                      onClick={() => setAdminSettingsTab(tab.id)}
+                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                        adminSettingsTab === tab.id
+                          ? 'bg-purple-100 text-purple-700 border border-purple-200'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5 flex-shrink-0" />
+                      <span className="font-medium">{tab.label}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+            </div>
+          </div>
+
+          {/* Admin Settings Content */}
+          <div className="flex-1 overflow-y-auto">
+            {renderAdminSettingsContent()}
+          </div>
+        </div>
+      );
+    }
+
+    switch (activeTab) {
+      case 'my-orgs':
+        return <SalesRepDashboard />;
+      case 'users':
+        return <UserManagement onUserApproved={fetchPendingUsersCount} />;
+      case 'orders':
+        return <OrderManagement />;
       case 'commissions':
         return <CommissionManagement />;
-      case 'products':
-        return <ProductsManagement />;
       case 'locations':
         return <LocationManagement organizationId={isCustomer ? userOrgId : undefined} />;
       case 'payments':
         return <CustomerPaymentMethods organizationId={isCustomer ? userOrgId : undefined} />;
-      case 'recurring-orders':
-        return <RecurringOrderManagement />;
       case 'my-recurring-orders':
         return <MyRecurringOrders />;
-      case 'analytics':
-        return <Analytics />;
       case 'help':
         return <HelpSection />;
       default:
