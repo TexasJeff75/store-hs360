@@ -1,8 +1,9 @@
 import React from 'react';
-import { X, Plus, Minus, ShoppingBag, AlertCircle, Tag } from 'lucide-react';
+import { X, Plus, Minus, ShoppingBag, AlertCircle, Tag, Building2 } from 'lucide-react';
 import CheckoutModal from './checkout/CheckoutModal';
 import PriceDisplay from './PriceDisplay';
 import { useContractPricing } from '../hooks/useContractPricing';
+import { multiTenantService } from '../services/multiTenant';
 
 interface CartItem {
   id: number;
@@ -180,6 +181,25 @@ const Cart: React.FC<CartProps> = ({
 }) => {
   const [isCheckoutOpen, setIsCheckoutOpen] = React.useState(false);
   const [showOrgWarning, setShowOrgWarning] = React.useState(false);
+  const [organizationName, setOrganizationName] = React.useState<string>('');
+
+  React.useEffect(() => {
+    const fetchOrganizationName = async () => {
+      if (organizationId) {
+        try {
+          const org = await multiTenantService.getOrganizationById(organizationId);
+          setOrganizationName(org?.name || '');
+        } catch (error) {
+          console.error('Error fetching organization name:', error);
+          setOrganizationName('');
+        }
+      } else {
+        setOrganizationName('');
+      }
+    };
+
+    fetchOrganizationName();
+  }, [organizationId]);
 
   const handleCheckoutClick = () => {
     if (!organizationId) {
@@ -208,14 +228,22 @@ const Cart: React.FC<CartProps> = ({
       <div className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl">
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">Shopping Cart</h2>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X className="h-6 w-6" />
-            </button>
+          <div className="p-6 border-b border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-semibold text-gray-900">Shopping Cart</h2>
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            {organizationName && (
+              <div className="flex items-center space-x-2 bg-blue-50 px-3 py-2 rounded-lg">
+                <Building2 className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-900">{organizationName}</span>
+              </div>
+            )}
           </div>
 
           {/* Cart Items */}

@@ -23,6 +23,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { contractPricingService } from '@/services/contractPricing';
 import { supabase } from '@/services/supabase';
+import { cartService } from '@/services/cartService';
 
 interface CartItem {
   id: number;
@@ -156,6 +157,42 @@ function AppContent() {
 
     loadUserOrganization();
   }, [user?.id, selectedOrganization]);
+
+  // Load cart from database when user or organization changes
+  useEffect(() => {
+    const loadCart = async () => {
+      if (!user?.id) {
+        setCartItems([]);
+        return;
+      }
+
+      try {
+        const items = await cartService.getCart(user.id, selectedOrganization?.id);
+        setCartItems(items);
+      } catch (error) {
+        console.error('Error loading cart:', error);
+      }
+    };
+
+    loadCart();
+  }, [user?.id, selectedOrganization?.id]);
+
+  // Save cart to database whenever it changes
+  useEffect(() => {
+    const saveCart = async () => {
+      if (!user?.id) return;
+
+      try {
+        await cartService.saveCart(user.id, cartItems, selectedOrganization?.id);
+      } catch (error) {
+        console.error('Error saving cart:', error);
+      }
+    };
+
+    // Debounce the save operation
+    const timeoutId = setTimeout(saveCart, 500);
+    return () => clearTimeout(timeoutId);
+  }, [cartItems, user?.id, selectedOrganization?.id]);
 
   // Fetch products with contract pricing when organization or user changes
   useEffect(() => {
