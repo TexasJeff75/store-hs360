@@ -9,6 +9,8 @@ export interface OrderItem {
   cost?: number;
   image?: string;
   hasMarkup?: boolean;
+  backorder?: boolean;
+  backorder_reason?: string;
 }
 
 export interface Address {
@@ -62,6 +64,14 @@ export interface Order {
   created_at: string;
   updated_at: string;
   completed_at?: string;
+  parent_order_id?: string;
+  split_from_order_id?: string;
+  order_type?: string;
+  payment_status?: string;
+  payment_authorization_id?: string;
+  payment_captured_at?: string;
+  shipped_at?: string;
+  backorder_reason?: string;
 }
 
 class OrderService {
@@ -311,6 +321,212 @@ class OrderService {
       return {
         count: 0,
         error: error instanceof Error ? error.message : 'Failed to fetch pending user count'
+      };
+    }
+  }
+
+  async splitOrderByBackorder(
+    orderId: string,
+    backorderedItemIds: number[]
+  ): Promise<{ originalOrder: Order | null; backorder: Order | null; error?: string }> {
+    try {
+      const { order: originalOrder, error: fetchError } = await this.getOrderById(orderId);
+
+      if (fetchError || !originalOrder) {
+        return {
+          originalOrder: null,
+          backorder: null,
+          error: fetchError || 'Order not found'
+        };
+      }
+
+      const availableItems = originalOrder.items.filter(
+        item => !backorderedItemIds.includes(item.productId)
+      );
+      const backorderedItems = originalOrder.items.filter(
+        item => backorderedItemIds.includes(item.productId)
+      );
+
+      if (backorderedItems.length === 0) {
+        return {
+          originalOrder: null,
+          backorder: null,
+          error: 'No backordered items specified'
+        };
+      }
+
+      const availableSubtotal = availableItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const backorderSubtotal = backorderedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+      const taxRatio = originalOrder.subtotal > 0 ? originalOrder.tax / originalOrder.subtotal : 0;
+      const shippingRatio = originalOrder.subtotal > 0 ? originalOrder.shipping / originalOrder.subtotal : 0;
+
+      const availableTax = availableSubtotal * taxRatio;
+      const availableShipping = availableSubtotal * shippingRatio;
+      const backorderTax = backorderSubtotal * taxRatio;
+      const backorderShipping = backorderSubtotal * shippingRatio;
+
+      const { data: updatedOriginal, error: updateError } = await supabase
+        .from('orders')
+        .update({
+          items: availableItems,
+          subtotal: availableSubtotal,
+          tax: availableTax,
+          shipping: availableShipping,
+          total: availableSubtotal + availableTax + availableShipping,
+          order_type: 'partial',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Error updating original order:', updateError);
+        return { originalOrder: null, backorder: null, error: updateError.message };
+      }
+
+      const { data: backorderOrder, error: backorderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: originalOrder.user_id,
+          bigcommerce_cart_id: originalOrder.bigcommerce_cart_id,
+          status: 'backorder',
+          order_type: 'backorder',
+          subtotal: backorderSubtotal,
+          tax: backorderTax,
+          shipping: backorderShipping,
+          total: backorderSubtotal + backorderTax + backorderShipping,
+          currency: originalOrder.currency,
+          items: backorderedItems,
+          shipping_address: originalOrder.shipping_address,
+          billing_address: originalOrder.billing_address,
+          customer_email: originalOrder.customer_email,
+          organization_id: originalOrder.organization_id,
+          location_id: originalOrder.location_id,
+          parent_order_id: originalOrder.parent_order_id || orderId,
+          split_from_order_id: orderId,
+          payment_status: originalOrder.payment_status,
+          payment_authorization_id: originalOrder.payment_authorization_id,
+          notes: `Backordered items from order ${originalOrder.order_number || orderId}`
+        })
+        .select()
+        .single();
+
+      if (backorderError) {
+        console.error('Error creating backorder:', backorderError);
+        return { originalOrder: null, backorder: null, error: backorderError.message };
+      }
+
+      return { originalOrder: updatedOriginal, backorder: backorderOrder };
+    } catch (error) {
+      console.error('Error splitting order:', error);
+      return {
+        originalOrder: null,
+        backorder: null,
+        error: error instanceof Error ? error.message : 'Failed to split order'
+      };
+    }
+  }
+
+  async updatePaymentStatus(
+    orderId: string,
+    paymentStatus: string,
+    paymentAuthorizationId?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const updateData: any = {
+        payment_status: paymentStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      if (paymentAuthorizationId) {
+        updateData.payment_authorization_id = paymentAuthorizationId;
+      }
+
+      if (paymentStatus === 'captured') {
+        updateData.payment_captured_at = new Date().toISOString();
+      }
+
+      const { error } = await supabase
+        .from('orders')
+        .update(updateData)
+        .eq('id', orderId);
+
+      if (error) {
+        console.error('Error updating payment status:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating payment status:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update payment status'
+      };
+    }
+  }
+
+  async capturePaymentOnShipment(orderId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { order, error: fetchError } = await this.getOrderById(orderId);
+
+      if (fetchError || !order) {
+        return { success: false, error: fetchError || 'Order not found' };
+      }
+
+      if (order.payment_status === 'captured') {
+        return { success: true };
+      }
+
+      if (order.payment_status !== 'authorized') {
+        return { success: false, error: 'Payment must be authorized before capture' };
+      }
+
+      const captureResult = await this.updatePaymentStatus(orderId, 'captured');
+
+      if (!captureResult.success) {
+        return captureResult;
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error capturing payment:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to capture payment'
+      };
+    }
+  }
+
+  async getRelatedOrders(orderId: string): Promise<{ orders: Order[]; error?: string }> {
+    try {
+      const { order, error: fetchError } = await this.getOrderById(orderId);
+
+      if (fetchError || !order) {
+        return { orders: [], error: fetchError || 'Order not found' };
+      }
+
+      const parentId = order.parent_order_id || orderId;
+
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .or(`id.eq.${parentId},parent_order_id.eq.${parentId},split_from_order_id.eq.${orderId}`)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching related orders:', error);
+        return { orders: [], error: error.message };
+      }
+
+      return { orders: data || [] };
+    } catch (error) {
+      console.error('Error fetching related orders:', error);
+      return {
+        orders: [],
+        error: error instanceof Error ? error.message : 'Failed to fetch related orders'
       };
     }
   }

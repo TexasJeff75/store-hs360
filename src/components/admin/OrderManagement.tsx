@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { orderService } from '../../services/orderService';
-import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp } from 'lucide-react';
+import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle } from 'lucide-react';
 
 interface OrderItem {
   productId: number;
@@ -69,6 +69,11 @@ const OrderManagement: React.FC = () => {
   const [canManageOrders, setCanManageOrders] = useState(false);
   const [locationNames, setLocationNames] = useState<Record<string, string>>({});
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [showBackorderModal, setShowBackorderModal] = useState(false);
+  const [selectedBackorderItems, setSelectedBackorderItems] = useState<Set<number>>(new Set());
+  const [backorderReason, setBackorderReason] = useState('');
+  const [processingBackorder, setProcessingBackorder] = useState(false);
+  const [relatedOrders, setRelatedOrders] = useState<Order[]>([]);
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -151,12 +156,21 @@ const OrderManagement: React.FC = () => {
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
+      const updateData: any = {
+        status: newStatus,
+        updated_at: new Date().toISOString()
+      };
+
+      if (newStatus === 'shipped') {
+        const captureResult = await orderService.capturePaymentOnShipment(orderId);
+        if (!captureResult.success) {
+          alert(`Warning: Payment capture failed: ${captureResult.error}`);
+        }
+      }
+
       const { error } = await supabase
         .from('orders')
-        .update({
-          status: newStatus,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', orderId);
 
       if (error) throw error;
@@ -167,6 +181,78 @@ const OrderManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating order status:', error);
+    }
+  };
+
+  const handleOpenBackorderModal = (order: Order) => {
+    setSelectedOrder(order);
+    setSelectedBackorderItems(new Set());
+    setBackorderReason('');
+    setShowBackorderModal(true);
+  };
+
+  const toggleBackorderItem = (productId: number) => {
+    const newSet = new Set(selectedBackorderItems);
+    if (newSet.has(productId)) {
+      newSet.delete(productId);
+    } else {
+      newSet.add(productId);
+    }
+    setSelectedBackorderItems(newSet);
+  };
+
+  const handleSplitBackorder = async () => {
+    if (!selectedOrder || selectedBackorderItems.size === 0) {
+      alert('Please select at least one item to backorder');
+      return;
+    }
+
+    if (!backorderReason.trim()) {
+      alert('Please provide a reason for the backorder');
+      return;
+    }
+
+    setProcessingBackorder(true);
+    try {
+      const result = await orderService.splitOrderByBackorder(
+        selectedOrder.id,
+        Array.from(selectedBackorderItems)
+      );
+
+      if (result.error) {
+        alert(`Error splitting order: ${result.error}`);
+        return;
+      }
+
+      if (result.backorder) {
+        await supabase
+          .from('orders')
+          .update({ backorder_reason: backorderReason })
+          .eq('id', result.backorder.id);
+      }
+
+      alert('Order successfully split! Back-ordered items moved to a new order.');
+      setShowBackorderModal(false);
+      setSelectedBackorderItems(new Set());
+      setBackorderReason('');
+      await fetchOrders();
+      setSelectedOrder(null);
+    } catch (error) {
+      console.error('Error processing backorder:', error);
+      alert('Failed to process backorder');
+    } finally {
+      setProcessingBackorder(false);
+    }
+  };
+
+  const loadRelatedOrders = async (orderId: string) => {
+    try {
+      const result = await orderService.getRelatedOrders(orderId);
+      if (!result.error) {
+        setRelatedOrders(result.orders);
+      }
+    } catch (error) {
+      console.error('Error loading related orders:', error);
     }
   };
 
@@ -405,8 +491,41 @@ const OrderManagement: React.FC = () => {
               </div>
             )}
 
+            {canManageOrders && order.status !== 'completed' && order.status !== 'cancelled' && order.order_type !== 'backorder' && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <AlertTriangle className="h-5 w-5 text-orange-600" />
+                    <div>
+                      <h4 className="font-semibold text-orange-900">Back-Order Management</h4>
+                      <p className="text-sm text-orange-700">Split items that are out of stock into a separate back-order</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleOpenBackorderModal(order)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                  >
+                    <Split className="h-4 w-4" />
+                    <span>Split Back-Order</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div>
-              <h4 className="font-semibold text-gray-900 mb-3">Order Items</h4>
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-semibold text-gray-900">Order Items</h4>
+                {order.payment_status && (
+                  <span className={`px-3 py-1 text-xs font-medium rounded-full ${
+                    order.payment_status === 'captured' ? 'bg-green-100 text-green-800' :
+                    order.payment_status === 'authorized' ? 'bg-yellow-100 text-yellow-800' :
+                    order.payment_status === 'pending' ? 'bg-gray-100 text-gray-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    Payment: {order.payment_status}
+                  </span>
+                )}
+              </div>
               <div className="bg-gray-50 rounded-lg overflow-hidden">
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-100">
@@ -895,6 +1014,117 @@ const OrderManagement: React.FC = () => {
       </div>
 
       {selectedOrder && <OrderDetailsModal order={selectedOrder} />}
+
+      {showBackorderModal && selectedOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                <Split className="h-5 w-5 mr-2 text-orange-600" />
+                Split Order - Create Back-Order
+              </h3>
+              <button
+                onClick={() => setShowBackorderModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <p className="text-sm text-orange-800">
+                  Select items that are out of stock or need to be back-ordered. These items will be moved to a new separate order.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Back-Order Reason *
+                </label>
+                <textarea
+                  value={backorderReason}
+                  onChange={(e) => setBackorderReason(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  rows={2}
+                  placeholder="e.g., Out of stock, Supplier delay, Discontinued item..."
+                />
+              </div>
+
+              <div>
+                <h4 className="font-semibold text-gray-900 mb-3">Select Items to Back-Order</h4>
+                <div className="space-y-2">
+                  {selectedOrder.items.map((item) => (
+                    <div
+                      key={item.productId}
+                      className={`flex items-center justify-between p-3 border-2 rounded-lg cursor-pointer transition-colors ${
+                        selectedBackorderItems.has(item.productId)
+                          ? 'border-orange-500 bg-orange-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => toggleBackorderItem(item.productId)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedBackorderItems.has(item.productId)}
+                          onChange={() => toggleBackorderItem(item.productId)}
+                          className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div>
+                          <p className="font-medium text-gray-900">{item.name}</p>
+                          <p className="text-sm text-gray-600">
+                            Qty: {item.quantity} × ${item.price.toFixed(2)} = ${(item.quantity * item.price).toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-2">Summary</h4>
+                <div className="text-sm space-y-1">
+                  <p className="text-gray-600">
+                    Items to back-order: <span className="font-medium text-gray-900">{selectedBackorderItems.size}</span>
+                  </p>
+                  <p className="text-gray-600">
+                    Items remaining in original order: <span className="font-medium text-gray-900">{selectedOrder.items.length - selectedBackorderItems.size}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 p-6 border-t border-gray-200 bg-gray-50">
+              <button
+                onClick={() => setShowBackorderModal(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSplitBackorder}
+                disabled={processingBackorder || selectedBackorderItems.size === 0 || !backorderReason.trim()}
+                className="flex items-center space-x-2 px-6 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {processingBackorder ? (
+                  <>
+                    <Loader className="h-4 w-4 animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Split className="h-4 w-4" />
+                    <span>Split Order</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
