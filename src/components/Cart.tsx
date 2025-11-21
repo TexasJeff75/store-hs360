@@ -33,6 +33,30 @@ const CartItemRow: React.FC<{
 }> = ({ item, onUpdateQuantity, onRemoveItem, organizationId }) => {
   const { price } = useContractPricing(item.id, item.price, item.quantity, organizationId);
   const itemTotal = price * item.quantity;
+  const [quantityInput, setQuantityInput] = React.useState(item.quantity.toString());
+
+  React.useEffect(() => {
+    setQuantityInput(item.quantity.toString());
+  }, [item.quantity]);
+
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    setQuantityInput(value);
+  };
+
+  const handleQuantityBlur = () => {
+    const numValue = quantityInput === '' ? 1 : Math.min(999999, Math.max(1, parseInt(quantityInput)));
+    setQuantityInput(numValue.toString());
+    if (numValue !== item.quantity) {
+      onUpdateQuantity(item.id, numValue);
+    }
+  };
+
+  const handleQuantityKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      handleQuantityBlur();
+    }
+  };
 
   return (
     <div className="flex items-center space-x-4 bg-gray-50 rounded-lg p-4">
@@ -58,12 +82,20 @@ const CartItemRow: React.FC<{
         {/* Quantity Controls */}
         <div className="flex items-center space-x-2 mt-2">
           <button
-            onClick={() => onUpdateQuantity(item.id, Math.max(0, item.quantity - 1))}
+            onClick={() => onUpdateQuantity(item.id, Math.max(1, item.quantity - 1))}
             className="p-1 hover:bg-gray-200 rounded-full transition-colors"
           >
             <Minus className="h-4 w-4" />
           </button>
-          <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+          <input
+            type="text"
+            value={quantityInput}
+            onChange={handleQuantityChange}
+            onBlur={handleQuantityBlur}
+            onKeyDown={handleQuantityKeyDown}
+            className="w-20 px-2 py-1 border border-gray-300 rounded text-center text-sm font-medium focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            maxLength={6}
+          />
           <button
             onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
             className="p-1 hover:bg-gray-200 rounded-full transition-colors"

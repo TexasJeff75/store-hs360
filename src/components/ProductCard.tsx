@@ -16,7 +16,7 @@ interface ProductCardProps {
   benefits: string[];
   description?: string;
   plainTextDescription?: string;
-  onAddToCart: (id: number) => void;
+  onAddToCart: (id: number, quantity: number) => void;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({
@@ -36,6 +36,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const { user } = useAuth();
   const { isFavorite, toggleFavorite } = useFavorites();
   const cardRef = useRef<HTMLDivElement>(null);
+  const [quantity, setQuantity] = React.useState(1);
 
   const favorited = user ? isFavorite(id) : false;
 
@@ -71,6 +72,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
   };
 
   const descriptionText = getDescriptionText();
+
+  const handleQuantityChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value.replace(/\D/g, '');
+    const numValue = value === '' ? 1 : Math.min(999999, Math.max(1, parseInt(value)));
+    setQuantity(numValue);
+  };
+
+  const handleAddToCart = () => {
+    onAddToCart(id, quantity);
+  };
 
   return (
     <div ref={cardRef} className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 group relative">
@@ -143,6 +154,18 @@ const ProductCard: React.FC<ProductCardProps> = ({
           <p className="text-xs text-gray-500 mt-1">+ tax</p>
         </div>
 
+        {/* Quantity Input */}
+        <div className="mb-3">
+          <label className="text-xs text-gray-600 mb-1 block">Quantity</label>
+          <input
+            type="text"
+            value={quantity}
+            onChange={handleQuantityChange}
+            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent text-center font-medium"
+            maxLength={6}
+          />
+        </div>
+
         {/* Action Buttons */}
         <div className="flex gap-2">
           <button
@@ -164,7 +187,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             />
           </button>
           <button
-            onClick={() => onAddToCart(id)}
+            onClick={handleAddToCart}
             className="flex-1 bg-gradient-to-r from-pink-500 to-orange-500 text-white py-2 px-4 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center space-x-2"
           >
             <ShoppingCart className="h-4 w-4" />

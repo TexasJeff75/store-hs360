@@ -5,7 +5,7 @@ import PriceDisplay from './PriceDisplay';
 
 interface ProductGridProps {
   products: Product[];
-  onAddToCart: (id: number) => void;
+  onAddToCart: (id: number, quantity: number) => void;
   onProductClick: (product: Product) => void;
   organizationId?: string;
 }
@@ -157,8 +157,8 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
             </div>
 
             {/* Add to Cart Button */}
-            <button 
-              onClick={() => onAddToCart(product.id)}
+            <button
+              onClick={() => onAddToCart(product.id, 1)}
               className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-2 px-4 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 flex items-center justify-center space-x-2"
             >
               <ShoppingCart className="h-4 w-4" />
