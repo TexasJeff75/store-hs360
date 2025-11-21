@@ -71,6 +71,7 @@ const OrderManagement: React.FC = () => {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [showBackorderModal, setShowBackorderModal] = useState(false);
   const [selectedBackorderItems, setSelectedBackorderItems] = useState<Set<number>>(new Set());
+  const [backorderQuantities, setBackorderQuantities] = useState<Record<number, number>>({});
   const [backorderReason, setBackorderReason] = useState('');
   const [processingBackorder, setProcessingBackorder] = useState(false);
   const [relatedOrders, setRelatedOrders] = useState<Order[]>([]);
@@ -187,18 +188,33 @@ const OrderManagement: React.FC = () => {
   const handleOpenBackorderModal = (order: Order) => {
     setSelectedOrder(order);
     setSelectedBackorderItems(new Set());
+    setBackorderQuantities({});
     setBackorderReason('');
     setShowBackorderModal(true);
   };
 
-  const toggleBackorderItem = (productId: number) => {
+  const toggleBackorderItem = (productId: number, maxQuantity: number) => {
     const newSet = new Set(selectedBackorderItems);
+    const newQuantities = { ...backorderQuantities };
+
     if (newSet.has(productId)) {
       newSet.delete(productId);
+      delete newQuantities[productId];
     } else {
       newSet.add(productId);
+      newQuantities[productId] = maxQuantity;
     }
+
     setSelectedBackorderItems(newSet);
+    setBackorderQuantities(newQuantities);
+  };
+
+  const updateBackorderQuantity = (productId: number, quantity: number, maxQuantity: number) => {
+    const clampedQuantity = Math.min(Math.max(1, quantity), maxQuantity);
+    setBackorderQuantities(prev => ({
+      ...prev,
+      [productId]: clampedQuantity
+    }));
   };
 
   const handleSplitBackorder = async () => {
@@ -214,9 +230,14 @@ const OrderManagement: React.FC = () => {
 
     setProcessingBackorder(true);
     try {
-      const result = await orderService.splitOrderByBackorder(
+      const backorderItemsData = Array.from(selectedBackorderItems).map(productId => ({
+        productId,
+        quantity: backorderQuantities[productId] || 0
+      }));
+
+      const result = await orderService.splitOrderByBackorderWithQuantities(
         selectedOrder.id,
-        Array.from(selectedBackorderItems)
+        backorderItemsData
       );
 
       if (result.error) {
@@ -234,6 +255,7 @@ const OrderManagement: React.FC = () => {
       alert('Order successfully split! Back-ordered items moved to a new order.');
       setShowBackorderModal(false);
       setSelectedBackorderItems(new Set());
+      setBackorderQuantities({});
       setBackorderReason('');
       await fetchOrders();
       setSelectedOrder(null);
@@ -1057,28 +1079,71 @@ const OrderManagement: React.FC = () => {
                   {selectedOrder.items.map((item) => (
                     <div
                       key={item.productId}
-                      className={`flex items-center justify-between p-3 border-2 rounded-lg cursor-pointer transition-colors ${
+                      className={`p-3 border-2 rounded-lg transition-colors ${
                         selectedBackorderItems.has(item.productId)
                           ? 'border-orange-500 bg-orange-50'
-                          : 'border-gray-200 hover:border-gray-300'
+                          : 'border-gray-200'
                       }`}
-                      onClick={() => toggleBackorderItem(item.productId)}
                     >
-                      <div className="flex items-center space-x-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedBackorderItems.has(item.productId)}
-                          onChange={() => toggleBackorderItem(item.productId)}
-                          className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <div>
-                          <p className="font-medium text-gray-900">{item.name}</p>
-                          <p className="text-sm text-gray-600">
-                            Qty: {item.quantity} × ${item.price.toFixed(2)} = ${(item.quantity * item.price).toFixed(2)}
-                          </p>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start space-x-3 flex-1">
+                          <input
+                            type="checkbox"
+                            checked={selectedBackorderItems.has(item.productId)}
+                            onChange={() => toggleBackorderItem(item.productId, item.quantity)}
+                            className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded mt-1"
+                          />
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">{item.name}</p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Available Qty: {item.quantity} × ${item.price.toFixed(2)}
+                            </p>
+                          </div>
                         </div>
+
+                        {selectedBackorderItems.has(item.productId) && (
+                          <div className="ml-3">
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Backorder Qty
+                            </label>
+                            <input
+                              type="number"
+                              min="1"
+                              max={item.quantity}
+                              value={backorderQuantities[item.productId] || item.quantity}
+                              onChange={(e) => updateBackorderQuantity(
+                                item.productId,
+                                parseInt(e.target.value) || 1,
+                                item.quantity
+                              )}
+                              onClick={(e) => e.stopPropagation()}
+                              className="w-20 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                            />
+                            <p className="text-xs text-gray-500 mt-1">
+                              of {item.quantity}
+                            </p>
+                          </div>
+                        )}
                       </div>
+
+                      {selectedBackorderItems.has(item.productId) && (
+                        <div className="mt-2 pt-2 border-t border-orange-200">
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <div className="bg-white rounded px-2 py-1">
+                              <span className="text-gray-600">Backorder:</span>
+                              <span className="font-medium text-orange-700 ml-1">
+                                {backorderQuantities[item.productId] || item.quantity} units
+                              </span>
+                            </div>
+                            <div className="bg-white rounded px-2 py-1">
+                              <span className="text-gray-600">Keep in order:</span>
+                              <span className="font-medium text-green-700 ml-1">
+                                {item.quantity - (backorderQuantities[item.productId] || item.quantity)} units
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -1088,10 +1153,12 @@ const OrderManagement: React.FC = () => {
                 <h4 className="font-semibold text-gray-900 mb-2">Summary</h4>
                 <div className="text-sm space-y-1">
                   <p className="text-gray-600">
-                    Items to back-order: <span className="font-medium text-gray-900">{selectedBackorderItems.size}</span>
+                    Total units to backorder: <span className="font-medium text-orange-700">
+                      {Object.values(backorderQuantities).reduce((sum, qty) => sum + qty, 0)} units
+                    </span>
                   </p>
                   <p className="text-gray-600">
-                    Items remaining in original order: <span className="font-medium text-gray-900">{selectedOrder.items.length - selectedBackorderItems.size}</span>
+                    Line items selected: <span className="font-medium text-gray-900">{selectedBackorderItems.size}</span>
                   </p>
                 </div>
               </div>

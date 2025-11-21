@@ -429,6 +429,138 @@ class OrderService {
     }
   }
 
+  async splitOrderByBackorderWithQuantities(
+    orderId: string,
+    backorderedItems: Array<{ productId: number; quantity: number }>
+  ): Promise<{ originalOrder: Order | null; backorder: Order | null; error?: string }> {
+    try {
+      const { order: originalOrder, error: fetchError } = await this.getOrderById(orderId);
+
+      if (fetchError || !originalOrder) {
+        return {
+          originalOrder: null,
+          backorder: null,
+          error: fetchError || 'Order not found'
+        };
+      }
+
+      if (backorderedItems.length === 0) {
+        return {
+          originalOrder: null,
+          backorder: null,
+          error: 'No backordered items specified'
+        };
+      }
+
+      const backorderMap = new Map(backorderedItems.map(item => [item.productId, item.quantity]));
+
+      const updatedOriginalItems: OrderItem[] = [];
+      const backorderItemsList: OrderItem[] = [];
+
+      originalOrder.items.forEach(item => {
+        const backorderQty = backorderMap.get(item.productId);
+
+        if (backorderQty && backorderQty > 0) {
+          const remainingQty = item.quantity - backorderQty;
+
+          if (remainingQty > 0) {
+            updatedOriginalItems.push({
+              ...item,
+              quantity: remainingQty
+            });
+          }
+
+          backorderItemsList.push({
+            ...item,
+            quantity: backorderQty
+          });
+        } else {
+          updatedOriginalItems.push(item);
+        }
+      });
+
+      if (backorderItemsList.length === 0) {
+        return {
+          originalOrder: null,
+          backorder: null,
+          error: 'No valid backorder quantities specified'
+        };
+      }
+
+      const availableSubtotal = updatedOriginalItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      const backorderSubtotal = backorderItemsList.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+      const taxRatio = originalOrder.subtotal > 0 ? originalOrder.tax / originalOrder.subtotal : 0;
+      const shippingRatio = originalOrder.subtotal > 0 ? originalOrder.shipping / originalOrder.subtotal : 0;
+
+      const availableTax = availableSubtotal * taxRatio;
+      const availableShipping = availableSubtotal * shippingRatio;
+      const backorderTax = backorderSubtotal * taxRatio;
+      const backorderShipping = backorderSubtotal * shippingRatio;
+
+      const { data: updatedOriginal, error: updateError } = await supabase
+        .from('orders')
+        .update({
+          items: updatedOriginalItems,
+          subtotal: availableSubtotal,
+          tax: availableTax,
+          shipping: availableShipping,
+          total: availableSubtotal + availableTax + availableShipping,
+          order_type: 'partial',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Error updating original order:', updateError);
+        return { originalOrder: null, backorder: null, error: updateError.message };
+      }
+
+      const { data: backorderOrder, error: backorderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: originalOrder.user_id,
+          bigcommerce_cart_id: originalOrder.bigcommerce_cart_id,
+          status: 'backorder',
+          order_type: 'backorder',
+          subtotal: backorderSubtotal,
+          tax: backorderTax,
+          shipping: backorderShipping,
+          total: backorderSubtotal + backorderTax + backorderShipping,
+          currency: originalOrder.currency,
+          items: backorderItemsList,
+          shipping_address: originalOrder.shipping_address,
+          billing_address: originalOrder.billing_address,
+          customer_email: originalOrder.customer_email,
+          organization_id: originalOrder.organization_id,
+          location_id: originalOrder.location_id,
+          parent_order_id: originalOrder.parent_order_id || orderId,
+          split_from_order_id: orderId,
+          payment_status: originalOrder.payment_status,
+          payment_authorization_id: originalOrder.payment_authorization_id,
+          notes: `Backordered items from order ${originalOrder.order_number || orderId}`
+        })
+        .select()
+        .single();
+
+      if (backorderError) {
+        console.error('Error creating backorder:', backorderError);
+        return { originalOrder: null, backorder: null, error: backorderError.message };
+      }
+
+      return { originalOrder: updatedOriginal, backorder: backorderOrder };
+    } catch (error) {
+      console.error('Error splitting order:', error);
+      return {
+        originalOrder: null,
+        backorder: null,
+        error: error instanceof Error ? error.message : 'Failed to split order'
+      };
+    }
+  }
+
   async updatePaymentStatus(
     orderId: string,
     paymentStatus: string,
