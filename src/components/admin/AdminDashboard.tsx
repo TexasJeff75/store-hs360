@@ -6,7 +6,7 @@ import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
 import LocationManagement from './LocationManagement';
 import PricingManagement from './PricingManagement';
-import ProductsManagement from './ProductsManagement';
+import ProductsManagement from './products/ProductsManagement';
 import OrderManagement from './OrderManagement';
 import CommissionManagement from './CommissionManagement';
 import SalesRepAssignment from './SalesRepAssignment';
