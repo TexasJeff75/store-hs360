@@ -5,13 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "netlify dev",
-    "dev:vite": "node -r dotenv/config node_modules/.bin/vite",
+    "dev:vite": "node -r dotenv/config node_modules/.bin/vite --port 3000 --host",
     "dev:functions": "concurrently \"npm run dev:vite\" \"node server/gql.cjs\"",
     "build": "npm run build:netlify",
     "build:netlify": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview",
-    "start": "vite preview"
+    "preview": "vite preview --port 3000 --host",
+    "start": "vite preview --port 3000 --host"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
