@@ -9,24 +9,24 @@ if (!supabaseUrl || !supabaseAnonKey) {
     VITE_SUPABASE_URL: !!supabaseUrl,
     VITE_SUPABASE_ANON_KEY: !!supabaseAnonKey
   });
-  throw new Error('Missing required Supabase environment variables. Please check your .env file.');
 }
 
-if (!supabaseUrl || !supabaseUrl.startsWith('https://')) {
+if (supabaseUrl && !supabaseUrl.startsWith('https://')) {
   console.error('Invalid Supabase URL format:', supabaseUrl);
-  throw new Error('VITE_SUPABASE_URL must be a valid HTTPS URL (e.g., https://your-project.supabase.co)');
 }
 
 // Clean the URL by removing trailing slashes but preserve the base domain
-const cleanSupabaseUrl = supabaseUrl.replace(/\/$/, '');
+const cleanSupabaseUrl = supabaseUrl ? supabaseUrl.replace(/\/$/, '') : '';
 
-if (!cleanSupabaseUrl.match(/^https:\/\/[a-z0-9-]+\.supabase\.co$/)) {
+if (cleanSupabaseUrl && !cleanSupabaseUrl.match(/^https:\/\/[a-z0-9-]+\.supabase\.co$/)) {
   console.error('Invalid Supabase URL format:', supabaseUrl);
-  throw new Error('VITE_SUPABASE_URL must be in format: https://your-project-ref.supabase.co (without any paths)');
 }
 
-// Create Supabase client
-export const supabase = createClient(cleanSupabaseUrl, supabaseAnonKey);
+// Create Supabase client with fallback for missing env vars
+export const supabase = createClient(
+  cleanSupabaseUrl || 'https://placeholder.supabase.co',
+  supabaseAnonKey || 'placeholder-key'
+);
 
 // Database types
 export type ApprovalStatus = 'pending' | 'approved' | 'denied';
