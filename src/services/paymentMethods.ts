@@ -18,7 +18,7 @@
 
 import { supabase } from './supabase';
 
-export interface PaymentMethod {
+interface PaymentMethod {
   id: string;
   organization_id: string;
   location_id?: string;
@@ -38,7 +38,7 @@ export interface PaymentMethod {
   updated_at: string;
 }
 
-export interface CreatePaymentMethodData {
+interface CreatePaymentMethodData {
   organization_id: string;
   location_id?: string;
   label: string;
@@ -95,7 +95,7 @@ export async function getPaymentMethods(
  * IMPORTANT: The payment_token must be obtained from a payment processor first
  * NEVER pass raw card numbers or account numbers to this function
  */
-export async function addPaymentMethod(
+async function addPaymentMethod(
   paymentMethodData: CreatePaymentMethodData
 ): Promise<{ data: PaymentMethod | null; error: string | null }> {
   try {
@@ -179,7 +179,7 @@ export async function addPaymentMethod(
  * Update a payment method
  * Note: payment_token should not be updated after creation
  */
-export async function updatePaymentMethod(
+async function updatePaymentMethod(
   id: string,
   updates: Partial<Omit<CreatePaymentMethodData, 'payment_token' | 'payment_processor'>>
 ): Promise<{ data: PaymentMethod | null; error: string | null }> {
@@ -223,7 +223,7 @@ export async function updatePaymentMethod(
 /**
  * Delete a payment method
  */
-export async function deletePaymentMethod(
+async function deletePaymentMethod(
   id: string
 ): Promise<{ error: string | null }> {
   try {
@@ -247,7 +247,7 @@ export async function deletePaymentMethod(
 /**
  * Set a payment method as default
  */
-export async function setDefaultPaymentMethod(
+async function setDefaultPaymentMethod(
   id: string
 ): Promise<{ error: string | null }> {
   try {
@@ -289,7 +289,7 @@ export async function setDefaultPaymentMethod(
 /**
  * Get the default payment method for an organization
  */
-export async function getDefaultPaymentMethod(
+async function getDefaultPaymentMethod(
   organizationId: string,
   locationId?: string
 ): Promise<{ data: PaymentMethod | null; error: string | null }> {
@@ -323,7 +323,7 @@ export async function getDefaultPaymentMethod(
 /**
  * Helper function to format payment method for display
  */
-export function formatPaymentMethodDisplay(method: PaymentMethod): string {
+function formatPaymentMethodDisplay(method: PaymentMethod): string {
   const typeLabel = method.payment_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
 
   if (method.payment_type === 'credit_card' || method.payment_type === 'debit_card') {
@@ -338,7 +338,7 @@ export function formatPaymentMethodDisplay(method: PaymentMethod): string {
 /**
  * Check if a payment method is expired (for cards only)
  */
-export function isPaymentMethodExpired(method: PaymentMethod): boolean {
+function isPaymentMethodExpired(method: PaymentMethod): boolean {
   if (method.payment_type !== 'credit_card' && method.payment_type !== 'debit_card') {
     return false;
   }

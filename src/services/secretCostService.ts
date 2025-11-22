@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export interface SecretCost {
+interface SecretCost {
   id: string;
   product_id: number;
   secret_cost: number;

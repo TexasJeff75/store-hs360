@@ -6,7 +6,7 @@ export const ENV = {
   SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
 } as const;
 
-export function validateEnv(): { isValid: boolean; missing: string[] } {
+function validateEnv(): { isValid: boolean; missing: string[] } {
   const required = {
     BC_STORE_HASH: ENV.BC_STORE_HASH,
     BC_STOREFRONT_TOKEN: ENV.BC_STOREFRONT_TOKEN,

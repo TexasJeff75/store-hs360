@@ -42,7 +42,7 @@ export interface CreateOrderData {
   notes?: string;
 }
 
-export interface Order {
+interface Order {
   id: string;
   user_id: string;
   bigcommerce_order_id?: string;

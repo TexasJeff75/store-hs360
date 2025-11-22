@@ -70,7 +70,7 @@ export interface CartLineItem {
   variant_id?: number;
 }
 
-export interface CreateCartRequest {
+interface CreateCartRequest {
   line_items: CartLineItem[];
   channel_id?: number;
   locale?: string;
@@ -90,7 +90,7 @@ export interface AddressData {
   phone?: string;
 }
 
-export interface CreateCheckoutRequest {
+interface CreateCheckoutRequest {
   cart_id: string;
   billing_address: AddressData;
   consignments: Array<{

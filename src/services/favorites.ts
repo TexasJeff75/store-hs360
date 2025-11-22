@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export interface Favorite {
+interface Favorite {
   id: string;
   user_id: string;
   product_id: number;

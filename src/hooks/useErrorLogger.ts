@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 
-export interface ErrorLog {
+interface ErrorLog {
   id: string;
   message: string;
   context?: string;

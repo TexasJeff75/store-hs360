@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export interface CartItem {
+interface CartItem {
   id: number;
   name: string;
   price: number;
@@ -11,7 +11,7 @@ export interface CartItem {
   hasMarkup?: boolean;
 }
 
-export interface ShoppingCart {
+interface ShoppingCart {
   id: string;
   user_id: string;
   organization_id: string | null;

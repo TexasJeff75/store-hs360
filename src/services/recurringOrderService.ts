@@ -36,7 +36,7 @@ export interface RecurringOrderHistory {
   created_at: string;
 }
 
-export interface CreateRecurringOrderData {
+interface CreateRecurringOrderData {
   user_id: string;
   product_id: number;
   quantity: number;
@@ -52,7 +52,7 @@ export interface CreateRecurringOrderData {
   notes?: string;
 }
 
-export interface UpdateRecurringOrderData {
+interface UpdateRecurringOrderData {
   quantity?: number;
   frequency?: 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly';
   frequency_interval?: number;

@@ -1,7 +1,7 @@
 import { supabase, ContractPricing } from './supabase';
 import { cacheService, CacheKeys, CacheTTL } from './cache';
 
-export type PricingType = 'individual' | 'organization' | 'location';
+type PricingType = 'individual' | 'organization' | 'location';
 
 export interface ContractPrice {
   id: string;

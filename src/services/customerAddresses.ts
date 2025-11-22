@@ -24,7 +24,7 @@ export interface CustomerAddress {
   updated_at: string;
 }
 
-export interface CreateAddressData {
+interface CreateAddressData {
   user_id: string;
   organization_id?: string;
   location_id?: string;

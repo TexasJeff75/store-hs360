@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import { bcRestAPI, CartLineItem, AddressData } from './bigcommerceRestAPI';
 import { orderService, CreateOrderData, OrderItem, Address } from './orderService';
 
-export interface CheckoutSessionData {
+interface CheckoutSessionData {
   id: string;
   user_id: string;
   organization_id?: string;
@@ -21,7 +21,7 @@ export interface CheckoutSessionData {
   updated_at: string;
 }
 
-export interface CheckoutFlowResult {
+interface CheckoutFlowResult {
   success: boolean;
   sessionId?: string;
   cartId?: string;

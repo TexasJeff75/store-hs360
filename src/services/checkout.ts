@@ -76,7 +76,7 @@ export interface CartLineItem {
   variantId?: number;
 }
 
-export interface CheckoutResult {
+interface CheckoutResult {
   success: boolean;
   checkoutUrl?: string;
   cartId?: string;

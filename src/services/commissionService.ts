@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
 
-export interface OrganizationSalesRep {
+interface OrganizationSalesRep {
   id: string;
   organization_id: string;
   sales_rep_id: string;
@@ -38,7 +38,7 @@ export interface Commission {
   updated_at: string;
 }
 
-export interface CommissionSummary {
+interface CommissionSummary {
   total_commissions: number;
   pending_amount: number;
   approved_amount: number;

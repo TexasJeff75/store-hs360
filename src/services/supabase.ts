@@ -29,7 +29,7 @@ export const supabase = createClient(
 );
 
 // Database types
-export type ApprovalStatus = 'pending' | 'approved' | 'denied';
+type ApprovalStatus = 'pending' | 'approved' | 'denied';
 
 export interface Profile {
   id: string;
@@ -88,7 +88,7 @@ export interface ContractPricing {
   updated_at: string;
 }
 
-export interface OrganizationPricing {
+interface OrganizationPricing {
   id: string;
   organization_id: string;
   product_id: number;
@@ -102,7 +102,7 @@ export interface OrganizationPricing {
   updated_at: string;
 }
 
-export interface LocationPricing {
+interface LocationPricing {
   id: string;
   location_id: string;
   product_id: number;
