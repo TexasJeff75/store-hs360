@@ -25,25 +25,14 @@ export default defineConfig(({ mode }) => {
     }
   },
   server: {
-    host: '0.0.0.0',
+    host: true,
     port: 3000,
-    strictPort: true,
-    proxy: {
-      '/api': {
-        target: 'http://localhost:4000',
-        changeOrigin: true
-      },
-      '/.netlify/functions': {
-        target: 'http://localhost:4000',
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/\.netlify\/functions/, '/api')
-      }
-    }
+    strictPort: false
   },
   preview: {
-    host: '0.0.0.0',
+    host: true,
     port: 3000,
-    strictPort: true
+    strictPort: false
   },
   define: {
     'import.meta.env.VITE_BC_STORE_HASH': JSON.stringify(env.VITE_BC_STORE_HASH),
