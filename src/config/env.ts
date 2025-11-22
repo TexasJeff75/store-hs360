@@ -29,6 +29,5 @@ if (typeof window !== 'undefined') {
   if (!validation.isValid) {
     console.warn('⚠️ Missing environment variables:', validation.missing);
   } else {
-    console.log('✅ All required environment variables are configured');
   }
 }

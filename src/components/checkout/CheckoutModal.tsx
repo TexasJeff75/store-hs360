@@ -259,7 +259,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       }
 
       setSessionId(sessionResult.sessionId);
-      console.log('[CheckoutModal] Checkout session created:', sessionResult.sessionId);
     } catch (err) {
       setError('Failed to initialize checkout. Please try again.');
       console.error('Checkout initialization error:', err);
@@ -864,7 +863,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       <BigCommercePaymentForm
         onPaymentReady={(ready) => console.log('Payment ready:', ready)}
         onPaymentSubmit={(paymentData) => {
-          console.log('Payment submitted:', paymentData);
           setCurrentStep('review');
         }}
         billingAddress={billingAddress}

@@ -3,7 +3,6 @@ import { ENV } from '../config/env';
 
 const BC_STORE_HASH = ENV.BC_STORE_HASH;
 
-console.log('[Checkout Service] Environment check:', {
   storeHash: BC_STORE_HASH ? '✓ Configured' : '✗ Missing',
   storeHashValue: BC_STORE_HASH || 'undefined'
 });
@@ -91,8 +90,6 @@ class CheckoutService {
    */
   async createCart(lineItems: CartLineItem[]): Promise<{ cartId: string | null; error?: string }> {
     try {
-      console.log('[Checkout Service] Creating cart with line items:', lineItems);
-      console.log('[Checkout Service] BC_STORE_HASH:', BC_STORE_HASH);
 
       if (!BC_STORE_HASH) {
         console.error('[Checkout Service] BigCommerce credentials missing!');
@@ -174,7 +171,6 @@ class CheckoutService {
         };
       }
 
-      console.log('Created cart for checkout:', { cartId });
 
       return {
         success: true,

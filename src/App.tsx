@@ -16,7 +16,6 @@ import OrganizationSelector from '@/components/OrganizationSelector';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
 import Toast from '@/components/Toast';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
-import { checkoutService, CartLineItem } from '@/services/checkout';
 import { useErrorLogger } from '@/hooks/useErrorLogger';
 import { cacheService } from '@/services/cache';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,7 +37,6 @@ interface CartItem {
 
 function AppContent() {
   const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
@@ -57,15 +55,8 @@ function AppContent() {
   const { user, profile, loading: authLoading, isPasswordRecovery } = useAuth();
   const { toastMessage, toastType, clearToast } = useFavorites();
 
-  useEffect(() => {
-    console.log('🔄 Modal state changed:', {
-      isProductModalOpen,
-      selectedProduct: selectedProduct ? selectedProduct.name : 'null'
-    });
-  }, [isProductModalOpen, selectedProduct]);
-  const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [isOrgSelectorOpen, setIsOrgSelectorOpen] = useState(false);
-  const [selectedOrganization, setSelectedOrganization] = useState<any>(null);
+  const [selectedOrganization, setSelectedOrganization] = useState<{id: string; name: string} | null>(null);
   const [userHasMultipleOrgs, setUserHasMultipleOrgs] = useState(false);
   const [showOnlyContractPricing, setShowOnlyContractPricing] = useState(false);
   const [productsWithContractPricing, setProductsWithContractPricing] = useState<number[]>([]);
@@ -76,8 +67,6 @@ function AppContent() {
         setLoading(true);
         setError(null);
         
-        console.log('🔄 Starting data fetch...');
-        console.log('📊 Cache stats:', cacheService.getStats());
         
         // Add timeout to the entire fetch operation
         const fetchPromise = Promise.all([
@@ -92,26 +81,20 @@ function AppContent() {
         const [productsData, categoriesData] = await Promise.race([
           fetchPromise,
           timeoutPromise
-        ]) as any;
+        ]) as [{products: Product[]; errorMessage?: string}, {categories: string[]; errorMessage?: string}];
         
-        console.log('🔍 Products fetched from BigCommerce:', productsData.products);
         setProducts(productsData.products);
-        setCategories(categoriesData.categories);
         
         // Set error message if either API call failed
         if (productsData.errorMessage || categoriesData.errorMessage) {
           const errorMsg = productsData.errorMessage || categoriesData.errorMessage;
-          console.log('⚠️ API Error:', errorMsg);
           setError(errorMsg);
         }
         
-        console.log('✅ Data fetch completed');
-        console.log('📊 Updated cache stats:', cacheService.getStats());
       } catch (err) {
         const errorMessage = err instanceof Error && err.message === 'Request timeout' 
           ? 'Request timed out. Please check your connection and try again.'
           : 'Failed to load data from BigCommerce. Please check your API configuration.';
-        console.log('❌ Fetch error:', err);
         setError(errorMessage);
         logError(err, 'fetchData');
       } finally {
@@ -124,7 +107,6 @@ function AppContent() {
 
   // Debug auth state
   useEffect(() => {
-    console.log('Auth state:', { user: user?.email, profile: profile?.role, authLoading });
   }, [user, profile, authLoading]);
 
   // Auto-load user's organization
@@ -233,7 +215,6 @@ function AppContent() {
     if (user && (profile || selectedOrganization)) {
       try {
         let priceResult;
-        let productPricingData;
 
         if (selectedOrganization) {
           // Sales rep mode - get organization pricing
@@ -243,7 +224,6 @@ function AppContent() {
           if (productPricing &&
               quantity >= (productPricing.min_quantity || 1) &&
               (!productPricing.max_quantity || quantity <= productPricing.max_quantity)) {
-            productPricingData = productPricing;
 
             // Check if markup_price is being used
             if (productPricing.markup_price !== null && productPricing.markup_price !== undefined) {
@@ -306,8 +286,6 @@ function AppContent() {
   };
 
   const handleProductClick = (product: Product) => {
-    console.log('📦 handleProductClick called with product:', product.name, 'ID:', product.id);
-    console.log('Full product object:', product);
 
     // Add to window for debugging
     if (typeof window !== 'undefined') {
@@ -316,17 +294,13 @@ function AppContent() {
         id: product.id,
         timestamp: new Date().toISOString()
       };
-      console.log('💾 Saved to window.lastClickedProduct');
     }
 
     setSelectedProduct(product);
-    console.log('✅ setSelectedProduct called');
     setIsProductModalOpen(true);
-    console.log('✅ setIsProductModalOpen(true) called');
   };
 
   const handleCloseProductModal = () => {
-    console.log('❌ handleCloseProductModal called');
     setIsProductModalOpen(false);
     setSelectedProduct(null);
   };
@@ -364,8 +338,6 @@ function AppContent() {
     return acc;
   }, {} as { [key: string]: Product[] });
   
-  console.log('📂 Products grouped by category:', productsByCategory);
-  console.log('🏷️ Available categories:', Object.keys(productsByCategory));
 
   // Filter products based on search and filters
   const filteredProducts = products

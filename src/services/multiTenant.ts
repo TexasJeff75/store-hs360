@@ -55,7 +55,6 @@ export const multiTenantService = {
   },
 
   async createLocation(location: Omit<Location, 'id' | 'created_at' | 'updated_at'>) {
-    console.log('Creating location:', location);
     const { data, error } = await supabase
       .from('locations')
       .insert(location)

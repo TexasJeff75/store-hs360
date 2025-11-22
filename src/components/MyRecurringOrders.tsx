@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Package, Calendar, Play, Pause, X, Edit2, Trash2, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Package, Calendar, Play, Pause, X, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { recurringOrderService, RecurringOrder, RecurringOrderHistory } from '../services/recurringOrderService';
 import { bigCommerceService } from '../services/bigcommerce';

@@ -172,7 +172,6 @@ class RestCheckoutService {
     }
   ): Promise<CheckoutFlowResult> {
     try {
-      console.log('[RestCheckout] Processing payment for session:', sessionId);
 
       await supabase
         .from('checkout_sessions')
@@ -192,7 +191,6 @@ class RestCheckoutService {
         throw new Error('Checkout session not found');
       }
 
-      console.log('[RestCheckout] Creating order in database...');
 
       // NOTE: This creates the order in the local Supabase database only.
       // To sync orders to BigCommerce, you would need to:
@@ -228,7 +226,6 @@ class RestCheckoutService {
         throw new Error(result.error || 'Failed to create order');
       }
 
-      console.log('[RestCheckout] Order created:', result.order.id);
 
       await supabase
         .from('checkout_sessions')

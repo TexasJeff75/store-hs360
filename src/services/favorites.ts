@@ -15,7 +15,6 @@ export const favoritesService = {
     }
 
     try {
-      console.log('📚 favoritesService.getUserFavorites called for:', userId);
 
       const { data, error } = await supabase
         .from('favorites')
@@ -32,7 +31,6 @@ export const favoritesService = {
         return [];
       }
 
-      console.log('✅ Favorites data from DB:', data);
       return data?.map(f => f.product_id) || [];
     } catch (err) {
       console.error('❌ Unexpected error in getUserFavorites:', err);
@@ -47,7 +45,6 @@ export const favoritesService = {
     }
 
     try {
-      console.log('➕ Adding favorite:', { userId, productId });
 
       const { error } = await supabase
         .from('favorites')
@@ -68,7 +65,6 @@ export const favoritesService = {
         return { success: false, error: error.message };
       }
 
-      console.log('✅ Favorite added successfully');
       return { success: true };
     } catch (err) {
       console.error('❌ Unexpected error in addFavorite:', err);
@@ -83,7 +79,6 @@ export const favoritesService = {
     }
 
     try {
-      console.log('➖ Removing favorite:', { userId, productId });
 
       const { error } = await supabase
         .from('favorites')
@@ -101,7 +96,6 @@ export const favoritesService = {
         return { success: false, error: error.message };
       }
 
-      console.log('✅ Favorite removed successfully');
       return { success: true };
     } catch (err) {
       console.error('❌ Unexpected error in removeFavorite:', err);

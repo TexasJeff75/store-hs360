@@ -1,5 +1,5 @@
 import React from 'react';
-import { Tag, Loader2, Building2, MapPin, User } from 'lucide-react';
+import { Tag, Building2, MapPin, User } from 'lucide-react';
 import { useContractPricing } from '../hooks/useContractPricing';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -16,14 +16,13 @@ interface PriceDisplayProps {
 const PriceDisplay: React.FC<PriceDisplayProps> = ({
   productId,
   regularPrice,
-  originalPrice,
   className = '',
   showSavings = true,
   quantity,
   organizationId
 }) => {
   const { user, profile } = useAuth();
-  const { price, source, savings, loading } = useContractPricing(productId, regularPrice, quantity, organizationId);
+  const { price, source, savings } = useContractPricing(productId, regularPrice, quantity, organizationId);
 
   // regularPrice is the wholesale/cost price from BigCommerce
   // price is the retail selling price (either contract or default markup)

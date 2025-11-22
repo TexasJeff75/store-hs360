@@ -32,15 +32,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
   useEffect(() => {
     const fetchContractPrices = async () => {
-      console.log('💰 fetchContractPrices called', {
-        productId: product?.id,
-        productName: product?.name,
-        userId: user?.id,
-        organizationId
-      });
-
       if (!product || !user) {
-        console.log('⚠️ Skipping price fetch - missing product or user');
         setContractPrices([]);
         return;
       }
@@ -50,13 +42,9 @@ const ProductModal: React.FC<ProductModalProps> = ({
         let prices: ContractPrice[] = [];
 
         if (organizationId) {
-          console.log('🏢 Fetching organization pricing for org:', organizationId);
           prices = await contractPricingService.getOrganizationPricing(organizationId);
-          console.log('✅ Organization pricing fetched:', prices.length, 'entries');
           prices = prices.filter(p => p.product_id === product.id);
-          console.log('✅ Filtered to product', product.id, ':', prices.length, 'entries');
         } else if (user.id) {
-          console.log('👤 Fetching user pricing for user:', user.id);
           const userPrices = await contractPricingService.getEntityContractPrices(user.id, 'individual');
           const orgPrice = await contractPricingService.getOrganizationPrice(user.id, product.id);
           const locPrice = await contractPricingService.getLocationPrice(user.id, product.id);
@@ -66,12 +54,10 @@ const ProductModal: React.FC<ProductModalProps> = ({
             ...(orgPrice ? [orgPrice] : []),
             ...(locPrice ? [locPrice] : [])
           ];
-          console.log('✅ User pricing fetched:', prices.length, 'entries');
         }
 
         prices.sort((a, b) => a.contract_price - b.contract_price);
         setContractPrices(prices);
-        console.log('✅ Contract prices set successfully');
       } catch (error) {
         console.error('❌ ERROR fetching contract prices:', error);
         console.error('Error details:', {
@@ -81,7 +67,6 @@ const ProductModal: React.FC<ProductModalProps> = ({
         setContractPrices([]);
       } finally {
         setLoadingPrices(false);
-        console.log('✅ Finished loading prices');
       }
     };
 
@@ -91,7 +76,6 @@ const ProductModal: React.FC<ProductModalProps> = ({
   if (!isOpen || !product) return null;
 
   try {
-    console.log('Rendering ProductModal for product:', product.name, 'ID:', product.id);
 
     const favorited = user ? isFavorite(product.id) : false;
 

@@ -7,10 +7,6 @@ const BC_STOREFRONT_TOKEN = ENV.BC_STOREFRONT_TOKEN;
 const API_BASE = ENV.API_BASE;
 const GQL = `${API_BASE}/gql`;
 
-console.log('🔧 BigCommerce Environment Variables:');
-console.log('  BC_STORE_HASH:', BC_STORE_HASH ? `"${BC_STORE_HASH}"` : 'undefined');
-console.log('  BC_STOREFRONT_TOKEN:', BC_STOREFRONT_TOKEN ? `"${BC_STOREFRONT_TOKEN.substring(0, 20)}..."` : 'undefined');
-console.log('  Both configured:', !!(BC_STORE_HASH && BC_STOREFRONT_TOKEN));
 
 // BigCommerce Store Hash for checkout URLs
 export async function gql<T>(query: string, variables?: Record<string, any>): Promise<T> {
@@ -219,14 +215,10 @@ class BigCommerceService {
     const cacheKey = CacheKeys.products();
     const cached = cacheService.get<{ products: Product[]; errorMessage?: string }>(cacheKey);
     if (cached) {
-      console.log('📦 Products loaded from cache');
       return cached;
     }
 
     try {
-      console.log('Fetching products from BigCommerce...');
-      console.log('Using store hash:', BC_STORE_HASH);
-      console.log('Token configured:', !!BC_STOREFRONT_TOKEN);
       
       let allProducts: Product[] = [];
       let hasNextPage = true;
@@ -238,7 +230,6 @@ class BigCommerceService {
         const remainingProducts = maxProducts - fetchedCount;
         const batchSize = Math.min(50, remainingProducts);
         
-        console.log(`Fetching batch: ${fetchedCount + 1}-${fetchedCount + batchSize}`);
         
         const variables: any = { first: batchSize };
         if (cursor) {
@@ -246,7 +237,6 @@ class BigCommerceService {
         }
         
         const data = await gql(PRODUCTS_Q, variables);
-        console.log(`Batch data received:`, data?.site?.products?.edges?.length || 0, 'products');
         
         const edges = data?.site?.products?.edges ?? [];
         const pageInfo = data?.site?.products?.pageInfo;
@@ -265,15 +255,12 @@ class BigCommerceService {
         hasNextPage = pageInfo?.hasNextPage || false;
         cursor = pageInfo?.endCursor || null;
         
-        console.log(`Total products fetched so far: ${allProducts.length}`);
         
         if (!hasNextPage) {
-          console.log('No more pages available');
           break;
         }
       }
       
-      console.log(`Final product count: ${allProducts.length}`);
 
       if (allProducts.length === 0) {
         console.warn('No products found from BigCommerce API');
@@ -284,7 +271,6 @@ class BigCommerceService {
       }
 
       try {
-        console.log('Fetching product costs from REST API...');
         const productIds = allProducts.map(p => p.id);
         const costsData = await bcRestAPI.getProductCosts(productIds);
 
@@ -296,7 +282,6 @@ class BigCommerceService {
           return product;
         });
 
-        console.log('✅ Product costs merged');
       } catch (costError) {
         console.warn('Failed to fetch product costs, continuing with data from GraphQL:', costError);
       }
@@ -304,7 +289,6 @@ class BigCommerceService {
       const result = { products: allProducts };
 
       cacheService.set(cacheKey, result, CacheTTL.products);
-      console.log('💾 Products cached for', CacheTTL.products / 1000 / 60, 'minutes');
 
       return result;
     } catch (error) {
@@ -347,12 +331,10 @@ class BigCommerceService {
     const cacheKey = CacheKeys.categories();
     const cached = cacheService.get<{ categories: string[]; errorMessage?: string }>(cacheKey);
     if (cached) {
-      console.log('📦 Categories loaded from cache');
       return cached;
     }
 
     try {
-      console.log('Fetching categories from BigCommerce...');
       const data = await gql(CATEGORIES_Q, { root: 0 });
       const categoryTree = data?.site?.categoryTree ?? [];
       const categories = categoryTree.map((cat: any) => cat.name);
@@ -369,7 +351,6 @@ class BigCommerceService {
       
       // Cache successful results
       cacheService.set(cacheKey, result, CacheTTL.categories);
-      console.log('💾 Categories cached for', CacheTTL.categories / 1000 / 60, 'minutes');
       
       return result;
     } catch (error) {

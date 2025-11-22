@@ -210,7 +210,6 @@ const Cart: React.FC<CartProps> = ({
   };
 
   const handleOrderComplete = (orderId: string) => {
-    console.log('Order completed:', orderId);
     // Clear the cart
     onClearCart();
     // Close checkout modal

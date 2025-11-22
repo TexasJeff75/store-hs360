@@ -37,25 +37,13 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
               src={product.image}
               alt={product.name}
               className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"
-              onClick={() => {
-                console.log('🖱️ Product clicked in grid:', product.name, 'ID:', product.id);
-                console.log('Product data:', product);
-
-                // Special handling for Proxigene - pause debugger
-                if (product.name.toLowerCase().includes('proxigene')) {
-                  console.log('🧪 PROXIGENE DETECTED! Pausing for debugging...');
-                  debugger; // This will pause execution in the browser
-                }
-
-                onProductClick(product);
-              }}
+              onClick={() => onProductClick(product)}
             />
 
             {/* Description overlay on hover */}
             {(product.plainTextDescription || product.description) && (
               <div className="absolute inset-0 bg-black bg-opacity-90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex items-center justify-center cursor-pointer"
                 onClick={() => {
-                  console.log('🖱️ Product overlay clicked:', product.name);
                   onProductClick(product);
                 }}>
                 <p className="text-white text-sm leading-relaxed overflow-y-auto max-h-full">
@@ -88,10 +76,6 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
             <h3
               className="font-semibold text-gray-900 mb-2 line-clamp-2 cursor-pointer hover:text-pink-600 transition-colors"
               onClick={(e) => {
-                console.log('🖱️ Product name clicked:', product.name);
-                console.log('Click event:', e);
-                console.log('Event target:', e.target);
-                console.log('Current target:', e.currentTarget);
 
                 // Try alert for visibility
                 if (product.name.toLowerCase().includes('proxigene')) {

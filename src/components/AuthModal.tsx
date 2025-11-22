@@ -36,7 +36,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Form submitted, mode:', mode, 'email:', email);
     setLoading(true);
     setError(null);
     setSuccess(null);
@@ -61,7 +60,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
 
     try {
       if (mode === 'signin') {
-        console.log('Attempting sign in...');
         const { error } = await signIn(email, password, ageVerified);
         if (error) {
           console.error('Sign in error:', error);
@@ -73,14 +71,12 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
             setError(error.message || 'Failed to sign in. Please try again.');
           }
         } else {
-          console.log('Sign in successful');
           setSuccess('Successfully signed in!');
           setTimeout(() => {
             handleClose();
           }, 1000);
         }
       } else {
-        console.log('Attempting sign up...');
         const { error } = await signUp(email, password);
         if (error) {
           console.error('Sign up error:', error);
@@ -90,7 +86,6 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
             setError(error.message || 'Failed to create account. Please try again.');
           }
         } else {
-          console.log('Sign up successful');
           setSuccess('Account created successfully! You can now sign in.');
           setTimeout(() => {
             setMode('signin');

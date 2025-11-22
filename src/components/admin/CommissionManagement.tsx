@@ -32,7 +32,6 @@ const CommissionManagement: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      console.log('Fetching commissions for user:', user.id, 'role:', profile?.role);
 
       if (profile?.role === 'distributor') {
         // Get distributor ID for this user
@@ -91,7 +90,6 @@ const CommissionManagement: React.FC = () => {
           return;
         }
 
-        console.log('Fetched commissions:', data);
         setCommissions(data);
 
         const totalSum = data.reduce((acc, c) => acc + Number(c.commission_amount), 0);
@@ -106,7 +104,6 @@ const CommissionManagement: React.FC = () => {
           paid: paidSum
         });
       } else {
-        console.log('User role not authorized:', profile?.role);
         setError('You do not have permission to view commissions');
       }
     } catch (error) {

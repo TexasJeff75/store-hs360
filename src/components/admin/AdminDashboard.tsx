@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
-import { Users, Building2, MapPin, DollarSign, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
 import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
 import LocationManagement from './LocationManagement';
-import PricingManagement from './PricingManagement';
 import ProductsManagement from './products/ProductsManagement';
 import OrderManagement from './OrderManagement';
 import CommissionManagement from './CommissionManagement';

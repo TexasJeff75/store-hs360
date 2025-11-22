@@ -47,7 +47,6 @@ interface CreateAddressData {
 class CustomerAddressService {
   async getUserAddresses(userId: string, addressType?: 'shipping' | 'billing'): Promise<CustomerAddress[]> {
     try {
-      console.log('getUserAddresses called with:', { userId, addressType });
 
       let query = supabase
         .from('customer_addresses')
@@ -64,14 +63,6 @@ class CustomerAddressService {
       }
 
       const { data, error } = await query;
-
-      console.log('getUserAddresses result:', {
-        userId,
-        addressType,
-        count: data?.length || 0,
-        data,
-        error
-      });
 
       if (error) {
         console.error('Query error:', error);

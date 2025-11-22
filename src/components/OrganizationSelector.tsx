@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Check, Search, Users, MapPin, X } from 'lucide-react';
+import { Building2, Check, Search, X } from 'lucide-react';
 import { multiTenantService } from '@/services/multiTenant';
 import type { Organization } from '@/services/supabase';
 

@@ -385,7 +385,6 @@ class ContractPricingService {
     const effectivePriceKey = CacheKeys.effectivePrice(entityId, productId);
     cacheService.delete(effectivePriceKey);
     
-    console.log('🗑️ Invalidated pricing cache for', pricingType, entityId, productId);
   }
 
   /**
@@ -395,7 +394,6 @@ class ContractPricingService {
     // This is a simple implementation - in a more sophisticated system,
     // we might track cache keys by category
     cacheService.clear();
-    console.log('🗑️ All pricing cache cleared');
   }
 
   /**

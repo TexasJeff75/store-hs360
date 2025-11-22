@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, X, ChevronDown, ChevronUp, Copy, Trash2 } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronUp, Copy, Trash2 } from 'lucide-react';
 import { cacheService } from '@/services/cache';
 
 interface ErrorLog {
@@ -31,7 +31,6 @@ const ErrorDebugPanel: React.FC<ErrorDebugPanelProps> = ({ errors, onClearErrors
 
   const clearCache = () => {
     cacheService.clear();
-    console.log('🗑️ Cache cleared from debug panel');
   };
 
   const formatTimestamp = (date: Date) => {

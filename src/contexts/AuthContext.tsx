@@ -31,7 +31,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Get initial session with proper error handling
     const initializeAuth = async () => {
       try {
-        console.log('Initializing authentication...');
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -40,7 +39,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // Handle invalid refresh token by clearing stale session data
           if (error.message?.includes('refresh_token_not_found') || 
               error.message?.includes('Invalid Refresh Token')) {
-            console.log('Invalid refresh token detected, clearing session...');
             await supabase.auth.signOut();
           }
           
@@ -53,7 +51,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
         
-        console.log('Initial session:', session?.user?.email || 'No session');
         
         if (mounted) {
           setSession(session);
@@ -83,12 +80,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email);
 
       if (mounted) {
         // Handle password recovery event
         if (event === 'PASSWORD_RECOVERY') {
-          console.log('Password recovery event detected');
           setIsPasswordRecovery(true);
           setSession(session);
           setUser(session?.user ?? null);
@@ -123,7 +118,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
-      console.log('Fetching profile for user:', userId);
       setLoading(true);
       
       // Check if Supabase is properly configured
@@ -159,15 +153,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (error) {
         console.error('Error fetching profile:', error);
         if (error.code === 'PGRST116') {
-          console.log('Profile not found, will be created on next sign up');
         }
         setProfile(null);
       } else if (data) {
-        console.log('Profile fetched successfully:', {
-          email: data.email,
-          role: data.role,
-          approved: data.approved
-        });
         setProfile(data);
       } else {
         console.warn('No profile data returned for user:', userId);
@@ -188,17 +176,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signUp = async (email: string, password: string) => {
-    console.log('Attempting sign up for:', email);
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
     });
 
-    console.log('Sign up result:', { data, error });
 
     if (!error && data.user) {
       // Create profile
-      console.log('Creating profile for user:', data.user.id);
       const { error: profileError } = await supabase
         .from('profiles')
         .insert([
@@ -213,7 +198,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (profileError) {
         console.error('Error creating profile:', profileError);
       } else {
-        console.log('Profile created successfully');
       }
     }
 
@@ -221,13 +205,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signIn = async (email: string, password: string, ageVerified: boolean) => {
-    console.log('Attempting sign in for:', email);
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
-    console.log('Sign in result:', { error });
 
     if (!error && data.user) {
       // Log audit record asynchronously without blocking login
@@ -247,7 +229,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           if (auditError) {
             console.error('Error logging audit record:', auditError);
           } else {
-            console.log('Login audit record created successfully');
           }
         } catch (auditException) {
           console.error('Failed to create audit log:', auditException);
@@ -259,7 +240,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    console.log('Signing out user');
     const { error } = await supabase.auth.signOut();
     return { error };
   };
@@ -280,13 +260,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const resetPassword = async (newPassword: string) => {
-    console.log('Attempting to reset password');
     const { error } = await supabase.auth.updateUser({
       password: newPassword,
     });
 
     if (!error) {
-      console.log('Password reset successful');
       setIsPasswordRecovery(false);
     } else {
       console.error('Password reset failed:', error);

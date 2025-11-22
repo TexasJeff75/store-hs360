@@ -47,7 +47,6 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
   };
 
   useEffect(() => {
-    console.log('🔄 FavoritesProvider useEffect - user changed:', user?.email);
     if (user) {
       loadFavorites();
     } else {
@@ -58,10 +57,8 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
   const loadFavorites = async () => {
     if (!user) return;
 
-    console.log('📥 Loading favorites for user:', user.email);
     setIsLoading(true);
     const userFavorites = await favoritesService.getUserFavorites(user.id);
-    console.log('✅ Loaded favorites:', userFavorites);
     setFavorites(userFavorites);
     setIsLoading(false);
   };
@@ -71,14 +68,12 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
   };
 
   const toggleFavorite = async (productId: number) => {
-    console.log('🎯 toggleFavorite called:', { productId, user: user?.email, userId: user?.id });
     if (!user) {
       console.error('❌ No user authenticated, cannot toggle favorite');
       return;
     }
 
     const currentlyFavorited = isFavorite(productId);
-    console.log('Current favorite status:', currentlyFavorited, 'Favorites array:', favorites);
 
     setAnimatingProductId(productId);
 
@@ -88,9 +83,7 @@ export const FavoritesProvider: React.FC<FavoritesProviderProps> = ({ children }
       setFavorites(prev => [...prev, productId]);
     }
 
-    console.log('📡 Calling favoritesService.toggleFavorite with:', { userId: user.id, productId, currentlyFavorited });
     const result = await favoritesService.toggleFavorite(user.id, productId, currentlyFavorited);
-    console.log('📡 toggleFavorite result:', result);
 
     if (!result.success) {
       console.error('❌ Failed to toggle favorite:', result.error);

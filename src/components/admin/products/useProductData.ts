@@ -16,7 +16,6 @@ export function useProductData() {
 
       if (forceRefresh) {
         cacheService.delete('products_all');
-        console.log('🗑️ Product cache cleared');
       }
 
       const { products, errorMessage } = await bigCommerceService.getProducts();
@@ -32,8 +31,6 @@ export function useProductData() {
         try {
           const costData = await bcRestAPI.getProductCosts(productIds);
 
-          console.log('Cost data received:', Object.keys(costData).length, 'products');
-          console.log('Sample cost data:', costData[productIds[0]]);
 
           const updatedProducts = products.map(product => {
             const costInfo = costData[product.id];
@@ -48,7 +45,6 @@ export function useProductData() {
             return product;
           });
 
-          console.log('Updated products sample:', updatedProducts[0]);
           setProducts(updatedProducts);
         } catch (costErr) {
           console.error('Failed to fetch product costs:', costErr);

@@ -5,8 +5,6 @@ const API_BASE = ENV.API_BASE;
 
 async function callServerlessFunction(action: string, data: any) {
   const url = `${API_BASE}/bigcommerce-cart`;
-  console.log('[BC REST API] Calling serverless function:', url);
-  console.log('[BC REST API] Action:', action);
 
   try {
     const response = await fetch(url, {
@@ -17,8 +15,6 @@ async function callServerlessFunction(action: string, data: any) {
       body: JSON.stringify({ action, data }),
     });
 
-    console.log('[BC REST API] Response status:', response.status);
-    console.log('[BC REST API] Response headers:', Object.fromEntries(response.headers.entries()));
 
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
@@ -104,13 +100,11 @@ interface CreateCheckoutRequest {
 
 class BigCommerceRestAPIService {
   async createCart(items: CartLineItem[]) {
-    console.log('[BC REST API] Creating cart with items:', items);
 
     const response = await callServerlessFunction('createCart', {
       line_items: items,
     });
 
-    console.log('[BC REST API] Cart created:', response.cartId);
 
     return {
       cartId: response.cartId,
@@ -119,7 +113,6 @@ class BigCommerceRestAPIService {
   }
 
   async getCart(cartId: string) {
-    console.log('[BC REST API] Getting cart:', cartId);
 
     const response = await callServerlessFunction('getCart', { cartId });
 
@@ -127,8 +120,6 @@ class BigCommerceRestAPIService {
   }
 
   async createCheckout(cartId: string, billingAddress: AddressData, shippingAddress: AddressData) {
-    console.log('[BC REST API] Adding addresses to checkout:', cartId);
-    console.log('[BC REST API] Note: Cart ID and Checkout ID are the same in BigCommerce');
 
     const cart = await this.getCart(cartId);
 
@@ -148,7 +139,6 @@ class BigCommerceRestAPIService {
       body: billingAddress,
     });
 
-    console.log('[BC REST API] Billing address added');
 
     // Add consignment (shipping address + line items)
     const consignmentBody = [
@@ -163,7 +153,6 @@ class BigCommerceRestAPIService {
       body: consignmentBody,
     });
 
-    console.log('[BC REST API] Shipping consignment added');
 
     return {
       checkoutId: cartId,
@@ -173,7 +162,6 @@ class BigCommerceRestAPIService {
   }
 
   async getCheckout(checkoutId: string) {
-    console.log('[BC REST API] Getting checkout:', checkoutId);
 
     const response = await callRestAPI(`/checkouts/${checkoutId}`);
 
@@ -181,7 +169,6 @@ class BigCommerceRestAPIService {
   }
 
   async addBillingAddress(checkoutId: string, address: AddressData) {
-    console.log('[BC REST API] Adding billing address to checkout:', checkoutId);
 
     const response = await callRestAPI(`/checkouts/${checkoutId}/billing-address`, {
       method: 'POST',
@@ -192,7 +179,6 @@ class BigCommerceRestAPIService {
   }
 
   async getShippingOptions(checkoutId: string, consignmentId: string) {
-    console.log('[BC REST API] Getting shipping options for checkout:', checkoutId);
 
     const response = await callRestAPI(
       `/checkouts/${checkoutId}/consignments/${consignmentId}/shipping-options`
@@ -202,7 +188,6 @@ class BigCommerceRestAPIService {
   }
 
   async updateShippingOption(checkoutId: string, consignmentId: string, shippingOptionId: string) {
-    console.log('[BC REST API] Updating shipping option:', shippingOptionId);
 
     const response = await callRestAPI(
       `/checkouts/${checkoutId}/consignments/${consignmentId}`,
@@ -218,14 +203,12 @@ class BigCommerceRestAPIService {
   }
 
   async createOrder(checkoutId: string) {
-    console.log('[BC REST API] Creating order from checkout:', checkoutId);
 
     const response = await callRestAPI(`/checkouts/${checkoutId}/orders`, {
       method: 'POST',
       body: {},
     });
 
-    console.log('[BC REST API] Order created:', response.data?.id);
 
     return {
       orderId: response.data?.id,
@@ -243,7 +226,6 @@ class BigCommerceRestAPIService {
       verification_value: string;
     };
   }) {
-    console.log('[BC REST API] Processing payment for checkout:', checkoutId);
 
     const response = await callRestAPI(`/checkouts/${checkoutId}/payments`, {
       method: 'POST',
@@ -252,17 +234,14 @@ class BigCommerceRestAPIService {
       },
     });
 
-    console.log('[BC REST API] Payment processed');
 
     return response.data;
   }
 
   async getProductCosts(productIds: number[]) {
-    console.log('[BC REST API] Fetching product costs for:', productIds);
 
     const response = await callServerlessFunction('getProductCosts', { productIds });
 
-    console.log('[BC REST API] Received cost data:', response);
 
     return response;
   }
