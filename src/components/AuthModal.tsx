@@ -160,7 +160,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                 <div className="relative">
                   <input
                     id="email"
+                    name="email"
                     type="email"
+                    autoComplete="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
@@ -179,7 +181,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                 <div className="relative">
                   <input
                     id="password"
+                    name="password"
                     type="password"
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -199,7 +203,9 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                   <div className="relative">
                     <input
                       id="confirmPassword"
+                      name="confirmPassword"
                       type="password"
+                      autoComplete="new-password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       required
@@ -215,6 +221,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                 <label className="flex items-start space-x-3 cursor-pointer">
                   <input
+                    id="age-verification"
+                    name="age-verification"
                     type="checkbox"
                     checked={ageVerified}
                     onChange={(e) => setAgeVerified(e.target.checked)}

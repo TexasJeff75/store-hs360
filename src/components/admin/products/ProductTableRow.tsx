@@ -54,6 +54,8 @@ export const ProductTableRow: React.FC<ProductTableRowProps> = ({
           {editingSecretCost === product.id ? (
             <div className="flex items-center justify-end space-x-1">
               <input
+                id={`secret-cost-${product.id}`}
+                name={`secret-cost-${product.id}`}
                 type="number"
                 step="0.01"
                 value={editSecretCostValue}

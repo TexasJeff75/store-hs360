@@ -164,6 +164,8 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
                             <div className="flex-1">
                               <label className="flex items-center cursor-pointer">
                                 <input
+                                  id={`allow-markup-${product.id}`}
+                                  name={`allow-markup-${product.id}`}
                                   type="checkbox"
                                   checked={productSettings.get(product.id)?.allowMarkup || false}
                                   onChange={() => onToggleMarkupAllowance(
