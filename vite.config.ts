@@ -25,7 +25,9 @@ export default defineConfig(({ mode }) => {
     }
   },
   server: {
+    host: '0.0.0.0',
     port: 3000,
+    strictPort: true,
     proxy: {
       '/api': {
         target: 'http://localhost:4000',
@@ -39,7 +41,9 @@ export default defineConfig(({ mode }) => {
     }
   },
   preview: {
-    port: 3000
+    host: '0.0.0.0',
+    port: 3000,
+    strictPort: true
   },
   define: {
     'import.meta.env.VITE_BC_STORE_HASH': JSON.stringify(env.VITE_BC_STORE_HASH),

@@ -5,9 +5,9 @@
   environment = { NODE_VERSION = "18", SECRETS_SCAN_ENABLED = "false" }
 
 [dev]
-  command = "npm run dev:functions"
+  command = "npm run dev:vite"
   targetPort = 3000
-  port = 8888
+  port = 3000
   autoLaunch = false
 
 [functions]
