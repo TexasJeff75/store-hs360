@@ -1,3 +1,8 @@
 {
-  "template": "bolt-vite-react-ts"
+  "name": "HealthSpan360 E-commerce Store",
+  "description": "E-commerce platform with Supabase backend and BigCommerce integration",
+  "devCommand": "npm run dev",
+  "buildCommand": "npm run build",
+  "startCommand": "npm start",
+  "previewPort": 3000
 }
