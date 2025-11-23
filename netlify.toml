@@ -11,6 +11,10 @@
   autoLaunch = false
   framework = "#custom"
 
+[edge_functions]
+  # Disable edge functions since we're only using regular functions
+  enabled = false
+
 [functions]
   directory = "netlify/functions"
   # Make environment variables available to functions
