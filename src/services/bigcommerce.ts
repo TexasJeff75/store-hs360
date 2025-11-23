@@ -22,7 +22,21 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
     clearTimeout(timeoutId);
 
     const txt = await res.text();
-    const json = JSON.parse(txt);
+
+    // Check for empty response
+    if (!txt || txt.trim() === '') {
+      console.error('Empty response from GraphQL endpoint');
+      throw new Error('Empty response from server. Make sure Netlify dev server is running.');
+    }
+
+    // Try to parse JSON
+    let json;
+    try {
+      json = JSON.parse(txt);
+    } catch (parseError) {
+      console.error('Failed to parse response:', txt.substring(0, 200));
+      throw new Error(`Invalid JSON response from server: ${txt.substring(0, 100)}`);
+    }
 
     if (!res.ok) {
       if (res.status === 500 && json.error === 'MISSING_CREDENTIALS') {
