@@ -5,10 +5,11 @@
   environment = { NODE_VERSION = "18", SECRETS_SCAN_ENABLED = "false" }
 
 [dev]
-  command = "npm run dev:vite"
+  command = "vite --port 3000 --host"
   targetPort = 3000
   port = 8888
   autoLaunch = false
+  framework = "#custom"
 
 [functions]
   directory = "netlify/functions"
