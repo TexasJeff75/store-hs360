@@ -27,12 +27,12 @@ export default defineConfig(({ mode }) => {
   server: {
     host: true,
     port: 3000,
-    strictPort: false
+    strictPort: true
   },
   preview: {
     host: true,
     port: 3000,
-    strictPort: false
+    strictPort: true
   },
   define: {
     'import.meta.env.VITE_BC_STORE_HASH': JSON.stringify(env.VITE_BC_STORE_HASH),
