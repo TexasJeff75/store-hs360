@@ -13,6 +13,7 @@ import ProductModal from '@/components/ProductModal';
 import Cart from '@/components/Cart';
 import Footer from '@/components/Footer';
 import OrganizationSelector from '@/components/OrganizationSelector';
+import FirstTimeSetup from '@/components/FirstTimeSetup';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
 import Toast from '@/components/Toast';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
@@ -60,6 +61,8 @@ function AppContent() {
   const [userHasMultipleOrgs, setUserHasMultipleOrgs] = useState(false);
   const [showOnlyContractPricing, setShowOnlyContractPricing] = useState(false);
   const [productsWithContractPricing, setProductsWithContractPricing] = useState<number[]>([]);
+  const [needsOrganizationSetup, setNeedsOrganizationSetup] = useState(false);
+  const [checkingOrganization, setCheckingOrganization] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -109,12 +112,21 @@ function AppContent() {
   useEffect(() => {
   }, [user, profile, authLoading]);
 
-  // Auto-load user's organization
+  // Auto-load user's organization and check if setup is needed
   useEffect(() => {
     const loadUserOrganization = async () => {
-      if (!user?.id || selectedOrganization) return;
+      if (!user?.id) {
+        setCheckingOrganization(false);
+        return;
+      }
+
+      if (selectedOrganization) {
+        setCheckingOrganization(false);
+        return;
+      }
 
       try {
+        setCheckingOrganization(true);
         const { data, error } = await supabase
           .from('user_organization_roles')
           .select(`
@@ -126,14 +138,20 @@ function AppContent() {
 
         if (!error && data && data.length > 0) {
           setUserHasMultipleOrgs(data.length > 1);
+          setNeedsOrganizationSetup(false);
 
           // Auto-select if only one organization
           if (data.length === 1) {
             setSelectedOrganization(data[0].organizations);
           }
+        } else {
+          // User has no organization - needs first-time setup
+          setNeedsOrganizationSetup(true);
         }
       } catch (error) {
         console.error('Error loading user organization:', error);
+      } finally {
+        setCheckingOrganization(false);
       }
     };
 
@@ -482,6 +500,30 @@ function AppContent() {
               Sign Out
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show first-time setup if user needs to create an organization
+  if (user && profile && profile.approval_status === 'approved' && needsOrganizationSetup && !checkingOrganization) {
+    return (
+      <FirstTimeSetup
+        onComplete={() => {
+          setNeedsOrganizationSetup(false);
+          window.location.reload();
+        }}
+      />
+    );
+  }
+
+  // Show loading while checking organization status
+  if (user && profile && profile.approval_status === 'approved' && checkingOrganization) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Setting up your account...</p>
         </div>
       </div>
     );
