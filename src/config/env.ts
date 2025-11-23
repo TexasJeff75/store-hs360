@@ -1,7 +1,7 @@
 export const ENV = {
   BC_STORE_HASH: import.meta.env.VITE_BC_STORE_HASH || '',
   BC_STOREFRONT_TOKEN: import.meta.env.VITE_BC_STOREFRONT_TOKEN || '',
-  API_BASE: import.meta.env.VITE_API_BASE || '/.netlify/functions',
+  API_BASE: import.meta.env.VITE_API_BASE || (import.meta.env.DEV ? 'http://localhost:8888/.netlify/functions' : '/.netlify/functions'),
   SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || '',
   SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
 } as const;
