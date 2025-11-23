@@ -505,28 +505,37 @@ function AppContent() {
     );
   }
 
-  // Show first-time setup if user needs to create an organization
+  // Show first-time setup ONLY for customer users who need to join an organization
+  // Admins, sales reps, and distributors don't need organization setup
   if (user && profile && profile.approval_status === 'approved' && needsOrganizationSetup && !checkingOrganization) {
-    return (
-      <FirstTimeSetup
-        onComplete={() => {
-          setNeedsOrganizationSetup(false);
-          window.location.reload();
-        }}
-      />
-    );
+    const skipSetupRoles = ['admin', 'sales_rep', 'distributor'];
+
+    if (!skipSetupRoles.includes(profile.role)) {
+      return (
+        <FirstTimeSetup
+          onComplete={() => {
+            setNeedsOrganizationSetup(false);
+            window.location.reload();
+          }}
+        />
+      );
+    }
   }
 
-  // Show loading while checking organization status
+  // Show loading while checking organization status for customer users only
   if (user && profile && profile.approval_status === 'approved' && checkingOrganization) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Setting up your account...</p>
+    const skipSetupRoles = ['admin', 'sales_rep', 'distributor'];
+
+    if (!skipSetupRoles.includes(profile.role)) {
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Setting up your account...</p>
+          </div>
         </div>
-      </div>
-    );
+      );
+    }
   }
 
   return (
