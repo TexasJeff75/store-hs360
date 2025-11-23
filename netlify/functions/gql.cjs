@@ -120,7 +120,40 @@ exports.handler = async (event, context) => {
     
     const responseText = await response.text();
     console.log('Response text length:', responseText.length);
-    
+    console.log('Response text preview:', responseText.substring(0, 200));
+
+    // Validate that we got valid JSON back
+    if (!responseText || responseText.trim() === '') {
+      console.error('❌ Empty response from BigCommerce');
+      return {
+        statusCode: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          errors: [{ message: 'Empty response from BigCommerce API' }]
+        })
+      };
+    }
+
+    // Try to parse to ensure it's valid JSON
+    try {
+      JSON.parse(responseText);
+    } catch (e) {
+      console.error('❌ Invalid JSON from BigCommerce:', responseText.substring(0, 500));
+      return {
+        statusCode: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          errors: [{ message: 'Invalid JSON response from BigCommerce API' }]
+        })
+      };
+    }
+
     return {
       statusCode: response.status,
       headers: {
