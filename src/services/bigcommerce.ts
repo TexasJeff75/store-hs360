@@ -185,6 +185,9 @@ function transformBigCommerceProduct(bc: any): Product {
   const hasImage = !!bc.defaultImage?.url;
   const hasDescription = !!(bc.description || bc.plainTextDescription);
 
+  // Debug: Log brand information
+  console.log(`Product: ${bc.name}, Brand from BC:`, bc.brand);
+
   return {
     id: bc.entityId,
     name: bc.name,

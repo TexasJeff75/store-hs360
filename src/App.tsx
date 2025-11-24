@@ -297,7 +297,7 @@ function AppContent() {
             : item
         );
       } else {
-        return [...prev, {
+        const newItem = {
           id: product.id,
           name: product.name,
           price: effectivePrice,
@@ -307,7 +307,9 @@ function AppContent() {
           image: product.image,
           hasMarkup: hasMarkup,
           brand: product.brand
-        }];
+        };
+        console.log('Adding to cart:', { name: product.name, brand: product.brand });
+        return [...prev, newItem];
       }
     });
   };
