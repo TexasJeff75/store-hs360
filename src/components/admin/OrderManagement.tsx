@@ -461,6 +461,37 @@ const OrderManagement: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // Group orders: parent orders with their sub-orders
+  const groupedOrders = React.useMemo(() => {
+    const groups: Array<{ parent: Order; subOrders: Order[] }> = [];
+    const processedIds = new Set<string>();
+
+    filteredOrders.forEach(order => {
+      if (processedIds.has(order.id)) return;
+
+      // If this is a parent order (has split children)
+      if (order.order_type === 'split_parent' || order.parent_order_id === null &&
+          filteredOrders.some(o => o.parent_order_id === order.id)) {
+        const subOrders = filteredOrders.filter(o => o.parent_order_id === order.id);
+        groups.push({ parent: order, subOrders });
+        processedIds.add(order.id);
+        subOrders.forEach(sub => processedIds.add(sub.id));
+      }
+      // If this is a standalone order (not a parent, not a sub-order)
+      else if (!order.is_sub_order && !order.parent_order_id) {
+        groups.push({ parent: order, subOrders: [] });
+        processedIds.add(order.id);
+      }
+      // If this is an orphaned sub-order (parent not in filtered list)
+      else if (order.is_sub_order && !filteredOrders.some(o => o.id === order.parent_order_id)) {
+        groups.push({ parent: order, subOrders: [] });
+        processedIds.add(order.id);
+      }
+    });
+
+    return groups;
+  }, [filteredOrders]);
+
   const toggleRowExpansion = (orderId: string) => {
     setExpandedRows(prev => {
       const newSet = new Set(prev);
@@ -995,94 +1026,129 @@ const OrderManagement: React.FC = () => {
       </div>
 
       <div className="space-y-4">
-        {filteredOrders.length === 0 ? (
+        {groupedOrders.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <Package className="h-16 w-16 mx-auto mb-4 text-gray-400" />
             <p className="text-gray-500 text-lg">No orders found</p>
           </div>
         ) : (
-          filteredOrders.map((order) => {
-            const isExpanded = expandedRows.has(order.id);
+          groupedOrders.map(({ parent, subOrders }) => {
+            const isExpanded = expandedRows.has(parent.id);
+            const hasSubOrders = subOrders.length > 0;
+            const isParentOrder = parent.order_type === 'split_parent';
+            const isSubOrder = parent.is_sub_order;
+
             return (
-              <div key={order.id} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-4 hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center space-x-2">
-                      <button
-                        onClick={async () => {
-                          setSelectedOrder(order);
-                          await orderService.markOrderAsViewed(order.id);
-                          await fetchOrders();
-                        }}
-                        className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                        title="View Full Details"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => toggleRowExpansion(order.id)}
-                        className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                        title={isExpanded ? "Collapse" : "Expand"}
-                      >
-                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                      </button>
-                    </div>
-                    <div className="flex-1 grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Order ID</p>
-                        <p className="text-sm font-mono font-medium text-gray-900">{order.id.slice(0, 8)}...</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Customer</p>
-                        <p className="text-sm text-gray-900">{order.customer_email}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Location</p>
-                        {order.location_id ? (
-                          <p className="text-sm text-gray-900 flex items-center">
-                            <Building2 className="h-3 w-3 mr-1 text-blue-600" />
-                            {locationNames[order.location_id] || 'Unknown'}
-                          </p>
-                        ) : (
-                          <p className="text-sm text-gray-400">—</p>
-                        )}
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Date</p>
-                        <p className="text-sm text-gray-900">{new Date(order.created_at).toLocaleDateString()}</p>
-                      </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Tracking</p>
-                        {order.shipments && order.shipments.length > 0 ? (
-                          <div className="space-y-1">
-                            {order.shipments.slice(0, 2).map((shipment, idx) => (
-                              <div key={idx} className="flex items-center space-x-2">
-                                <Truck className="h-3 w-3 text-blue-600" />
-                                <span className="text-xs font-mono text-gray-900">{shipment.tracking_number}</span>
-                                <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${getShipmentStatusColor(shipment.status)}`}>
-                                  {shipment.status.replace('_', ' ')}
-                                </span>
-                              </div>
-                            ))}
-                            {order.shipments.length > 2 && (
-                              <p className="text-xs text-gray-500">+{order.shipments.length - 2} more</p>
+              <div key={parent.id} className="space-y-2">
+                {/* Parent/Main Order */}
+                <div className={`rounded-lg shadow-sm border overflow-hidden ${
+                  isParentOrder ? 'border-purple-300 bg-purple-50/30' :
+                  isSubOrder ? 'border-blue-300 bg-blue-50/30' :
+                  'border-gray-200 bg-white'
+                }`}>
+                  <div className="p-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center gap-4">
+                      {/* Visual Indicator Badge */}
+                      {isParentOrder && (
+                        <div className="flex-shrink-0">
+                          <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-100 border border-purple-300 rounded-full">
+                            <Split className="h-3.5 w-3.5 text-purple-700" />
+                            <span className="text-xs font-semibold text-purple-900">SPLIT ORDER</span>
+                            <span className="text-xs font-medium text-purple-700 bg-purple-200 px-1.5 py-0.5 rounded">
+                              {subOrders.length} vendors
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      {isSubOrder && (
+                        <div className="flex-shrink-0">
+                          <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-100 border border-blue-300 rounded-full">
+                            <Package className="h-3.5 w-3.5 text-blue-700" />
+                            <span className="text-xs font-semibold text-blue-900">VENDOR ORDER</span>
+                            {parent.vendor_brand && (
+                              <span className="text-xs font-medium text-blue-700 bg-blue-200 px-1.5 py-0.5 rounded">
+                                {parent.vendor_brand}
+                              </span>
                             )}
                           </div>
-                        ) : (
-                          <p className="text-sm text-gray-400">No tracking</p>
-                        )}
+                        </div>
+                      )}
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={async () => {
+                            setSelectedOrder(parent);
+                            await orderService.markOrderAsViewed(parent.id);
+                            await fetchOrders();
+                          }}
+                          className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                          title="View Full Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => toggleRowExpansion(parent.id)}
+                          className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                          title={isExpanded ? "Collapse" : "Expand"}
+                        >
+                          {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        </button>
                       </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Total</p>
-                        <p className="text-sm font-semibold text-gray-900">${Number(order.total).toFixed(2)}</p>
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Order ID</p>
+                          <p className="text-sm font-mono font-medium text-gray-900">{parent.id.slice(0, 8)}...</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Customer</p>
+                          <p className="text-sm text-gray-900">{parent.customer_email}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Location</p>
+                          {parent.location_id ? (
+                            <p className="text-sm text-gray-900 flex items-center">
+                              <Building2 className="h-3 w-3 mr-1 text-blue-600" />
+                              {locationNames[parent.location_id] || 'Unknown'}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-gray-400">—</p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Date</p>
+                          <p className="text-sm text-gray-900">{new Date(parent.created_at).toLocaleDateString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Tracking</p>
+                          {parent.shipments && parent.shipments.length > 0 ? (
+                            <div className="space-y-1">
+                              {parent.shipments.slice(0, 2).map((shipment, idx) => (
+                                <div key={idx} className="flex items-center space-x-2">
+                                  <Truck className="h-3 w-3 text-blue-600" />
+                                  <span className="text-xs font-mono text-gray-900">{shipment.tracking_number}</span>
+                                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${getShipmentStatusColor(shipment.status)}`}>
+                                    {shipment.status.replace('_', ' ')}
+                                  </span>
+                                </div>
+                              ))}
+                              {parent.shipments.length > 2 && (
+                                <p className="text-xs text-gray-500">+{parent.shipments.length - 2} more</p>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-400">No tracking</p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Total</p>
+                          <p className="text-sm font-semibold text-gray-900">${Number(parent.total).toFixed(2)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Status</p>
+                          <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getStatusColor(parent.status)}`}>
+                            {parent.status}
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-xs text-gray-500 mb-1">Status</p>
-                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getStatusColor(order.status)}`}>
-                          {order.status}
-                        </span>
-                      </div>
-                    </div>
                   </div>
                 </div>
 
@@ -1092,7 +1158,7 @@ const OrderManagement: React.FC = () => {
                       <div>
                         <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
                           <Package className="h-4 w-4 mr-2 text-gray-600" />
-                          Order Items ({order.items.length})
+                          Order Items ({parent.items.length})
                         </h4>
                         <div className="bg-white rounded-lg overflow-hidden border border-gray-200">
                           <table className="min-w-full divide-y divide-gray-200">
@@ -1105,7 +1171,7 @@ const OrderManagement: React.FC = () => {
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {order.items.map((item, index) => (
+                              {parent.items.map((item, index) => (
                                 <tr key={index} className="hover:bg-gray-50">
                                   <td className="px-4 py-2 text-sm text-gray-900">{item.name}</td>
                                   <td className="px-4 py-2 text-sm text-gray-900 text-center">{item.quantity}</td>
@@ -1120,14 +1186,14 @@ const OrderManagement: React.FC = () => {
                         </div>
                       </div>
 
-                      {order.shipments && order.shipments.length > 0 && (
+                      {parent.shipments && parent.shipments.length > 0 && (
                         <div>
                           <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center">
                             <Truck className="h-4 w-4 mr-2 text-gray-600" />
-                            Shipment Tracking ({order.shipments.length})
+                            Shipment Tracking ({parent.shipments.length})
                           </h4>
                           <div className="space-y-2">
-                            {order.shipments.map((shipment, index) => (
+                            {parent.shipments.map((shipment, index) => (
                               <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
                                 <div className="flex items-start justify-between">
                                   <div className="flex-1">
@@ -1166,19 +1232,19 @@ const OrderManagement: React.FC = () => {
                         </div>
                       )}
 
-                      {order.shipping_address && (
+                      {parent.shipping_address && (
                         <div>
                           <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
                             <MapPin className="h-4 w-4 mr-2 text-gray-600" />
                             Shipping Address
                           </h4>
                           <div className="bg-white rounded-lg p-3 border border-gray-200 text-xs text-gray-700">
-                            <p className="font-medium">{order.shipping_address.firstName} {order.shipping_address.lastName}</p>
-                            {order.shipping_address.company && <p>{order.shipping_address.company}</p>}
-                            <p>{order.shipping_address.address1}</p>
-                            {order.shipping_address.address2 && <p>{order.shipping_address.address2}</p>}
-                            <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postalCode}</p>
-                            {order.shipping_address.phone && <p className="mt-1">Phone: {order.shipping_address.phone}</p>}
+                            <p className="font-medium">{parent.shipping_address.firstName} {parent.shipping_address.lastName}</p>
+                            {parent.shipping_address.company && <p>{parent.shipping_address.company}</p>}
+                            <p>{parent.shipping_address.address1}</p>
+                            {parent.shipping_address.address2 && <p>{parent.shipping_address.address2}</p>}
+                            <p>{parent.shipping_address.city}, {parent.shipping_address.state} {parent.shipping_address.postalCode}</p>
+                            {parent.shipping_address.phone && <p className="mt-1">Phone: {parent.shipping_address.phone}</p>}
                           </div>
                         </div>
                       )}
@@ -1186,6 +1252,65 @@ const OrderManagement: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {/* Sub-Orders (Vendor Split Orders) */}
+              {subOrders.length > 0 && (
+                <div className="ml-12 space-y-2">
+                  {subOrders.map((subOrder) => (
+                    <div key={subOrder.id} className="bg-blue-50/50 border-l-4 border-blue-400 rounded-r-lg shadow-sm overflow-hidden">
+                      <div className="p-3 hover:bg-blue-100/30 transition-colors">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-shrink-0">
+                            <div className="flex items-center gap-2 px-2.5 py-1 bg-blue-200 border border-blue-400 rounded-md">
+                              <Package className="h-3 w-3 text-blue-800" />
+                              <span className="text-xs font-bold text-blue-900">{subOrder.vendor_brand || 'Unknown Vendor'}</span>
+                            </div>
+                          </div>
+                          <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-3 items-center text-xs">
+                            <div>
+                              <p className="text-[10px] text-gray-500 mb-0.5">Sub-Order ID</p>
+                              <p className="font-mono font-medium text-gray-900">{subOrder.id.slice(0, 8)}...</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-gray-500 mb-0.5">Items</p>
+                              <p className="text-gray-900">{subOrder.items.length} item(s)</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-gray-500 mb-0.5">Total</p>
+                              <p className="font-semibold text-gray-900">${Number(subOrder.total).toFixed(2)}</p>
+                            </div>
+                            <div>
+                              <p className="text-[10px] text-gray-500 mb-0.5">Tracking</p>
+                              {subOrder.shipments && subOrder.shipments.length > 0 ? (
+                                <span className="text-[10px] font-mono text-blue-700">{subOrder.shipments[0].tracking_number}</span>
+                              ) : (
+                                <span className="text-gray-400">—</span>
+                              )}
+                            </div>
+                            <div>
+                              <span className={`px-2 py-0.5 inline-flex text-[10px] font-semibold rounded-full border ${getStatusColor(subOrder.status)}`}>
+                                {subOrder.status}
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              setSelectedOrder(subOrder);
+                              await orderService.markOrderAsViewed(subOrder.id);
+                              await fetchOrders();
+                            }}
+                            className="p-1.5 text-blue-600 bg-blue-100 hover:bg-blue-200 rounded transition-colors"
+                            title="View Sub-Order Details"
+                          >
+                            <Eye className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
             );
           })
         )}
