@@ -283,12 +283,35 @@ const OrderManagement: React.FC = () => {
     }
   };
 
-  const handleOpenBackorderModal = (order: Order) => {
+  const handleOpenBackorderModal = async (order: Order) => {
     setSelectedOrder(order);
     setSelectedBackorderItems(new Set());
     setBackorderQuantities({});
     setBackorderReason('');
+
+    await loadRelatedOrders(order.id);
+
     setShowBackorderModal(true);
+  };
+
+  const getSplitQuantitiesForItem = (productId: number): number => {
+    let totalSplitQty = 0;
+
+    relatedOrders.forEach(relatedOrder => {
+      if (relatedOrder.split_from_order_id === selectedOrder?.id) {
+        const splitItem = relatedOrder.items.find((item: OrderItem) => item.productId === productId);
+        if (splitItem) {
+          totalSplitQty += splitItem.quantity;
+        }
+      }
+    });
+
+    return totalSplitQty;
+  };
+
+  const getAvailableQuantityForItem = (item: OrderItem): number => {
+    const splitQty = getSplitQuantitiesForItem(item.productId);
+    return Math.max(0, item.quantity - splitQty);
   };
 
   const toggleBackorderItem = (productId: number, maxQuantity: number) => {
@@ -1608,76 +1631,104 @@ const OrderManagement: React.FC = () => {
               <div>
                 <h4 className="font-semibold text-gray-900 mb-3">Select Items to Back-Order</h4>
                 <div className="space-y-2">
-                  {selectedOrder.items.map((item) => (
-                    <div
-                      key={item.productId}
-                      className={`p-3 border-2 rounded-lg transition-colors ${
-                        selectedBackorderItems.has(item.productId)
-                          ? 'border-orange-500 bg-orange-50'
-                          : 'border-gray-200'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start space-x-3 flex-1">
-                          <input
-                            type="checkbox"
-                            checked={selectedBackorderItems.has(item.productId)}
-                            onChange={() => toggleBackorderItem(item.productId, item.quantity)}
-                            className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded mt-1"
-                          />
-                          <div className="flex-1">
-                            <p className="font-medium text-gray-900">{item.name}</p>
-                            <p className="text-sm text-gray-600 mt-1">
-                              Available Qty: {item.quantity} × ${item.price.toFixed(2)}
-                            </p>
+                  {selectedOrder.items.map((item) => {
+                    const availableQty = getAvailableQuantityForItem(item);
+                    const splitQty = getSplitQuantitiesForItem(item.productId);
+                    const isFullySplit = availableQty === 0;
+
+                    return (
+                      <div
+                        key={item.productId}
+                        className={`p-3 border-2 rounded-lg transition-colors ${
+                          isFullySplit
+                            ? 'border-gray-200 bg-gray-50 opacity-60'
+                            : selectedBackorderItems.has(item.productId)
+                            ? 'border-orange-500 bg-orange-50'
+                            : 'border-gray-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex items-start space-x-3 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={selectedBackorderItems.has(item.productId)}
+                              onChange={() => toggleBackorderItem(item.productId, availableQty)}
+                              disabled={isFullySplit}
+                              className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded mt-1 disabled:opacity-50 disabled:cursor-not-allowed"
+                            />
+                            <div className="flex-1">
+                              <p className={`font-medium ${isFullySplit ? 'text-gray-500' : 'text-gray-900'}`}>
+                                {item.name}
+                                {isFullySplit && (
+                                  <span className="ml-2 text-xs font-semibold text-red-600 bg-red-100 px-2 py-0.5 rounded">
+                                    FULLY SPLIT
+                                  </span>
+                                )}
+                              </p>
+                              <div className="text-sm mt-1 space-y-0.5">
+                                <p className="text-gray-600">
+                                  Original Qty: {item.quantity} × ${item.price.toFixed(2)}
+                                </p>
+                                {splitQty > 0 && (
+                                  <p className="text-red-600">
+                                    Already split: {splitQty} units
+                                  </p>
+                                )}
+                                {!isFullySplit && (
+                                  <p className="text-green-700 font-medium">
+                                    Available to split: {availableQty} units
+                                  </p>
+                                )}
+                              </div>
+                            </div>
                           </div>
+
+                          {selectedBackorderItems.has(item.productId) && !isFullySplit && (
+                            <div className="ml-3">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">
+                                Backorder Qty
+                              </label>
+                              <input
+                                type="number"
+                                min="1"
+                                max={availableQty}
+                                value={backorderQuantities[item.productId] || availableQty}
+                                onChange={(e) => updateBackorderQuantity(
+                                  item.productId,
+                                  parseInt(e.target.value) || 1,
+                                  availableQty
+                                )}
+                                onClick={(e) => e.stopPropagation()}
+                                className="w-20 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">
+                                of {availableQty}
+                              </p>
+                            </div>
+                          )}
                         </div>
 
-                        {selectedBackorderItems.has(item.productId) && (
-                          <div className="ml-3">
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Backorder Qty
-                            </label>
-                            <input
-                              type="number"
-                              min="1"
-                              max={item.quantity}
-                              value={backorderQuantities[item.productId] || item.quantity}
-                              onChange={(e) => updateBackorderQuantity(
-                                item.productId,
-                                parseInt(e.target.value) || 1,
-                                item.quantity
-                              )}
-                              onClick={(e) => e.stopPropagation()}
-                              className="w-20 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                            />
-                            <p className="text-xs text-gray-500 mt-1">
-                              of {item.quantity}
-                            </p>
+                        {selectedBackorderItems.has(item.productId) && !isFullySplit && (
+                          <div className="mt-2 pt-2 border-t border-orange-200">
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div className="bg-white rounded px-2 py-1">
+                                <span className="text-gray-600">Backorder:</span>
+                                <span className="font-medium text-orange-700 ml-1">
+                                  {backorderQuantities[item.productId] || availableQty} units
+                                </span>
+                              </div>
+                              <div className="bg-white rounded px-2 py-1">
+                                <span className="text-gray-600">Keep in order:</span>
+                                <span className="font-medium text-green-700 ml-1">
+                                  {availableQty - (backorderQuantities[item.productId] || availableQty)} units
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         )}
                       </div>
-
-                      {selectedBackorderItems.has(item.productId) && (
-                        <div className="mt-2 pt-2 border-t border-orange-200">
-                          <div className="grid grid-cols-2 gap-2 text-xs">
-                            <div className="bg-white rounded px-2 py-1">
-                              <span className="text-gray-600">Backorder:</span>
-                              <span className="font-medium text-orange-700 ml-1">
-                                {backorderQuantities[item.productId] || item.quantity} units
-                              </span>
-                            </div>
-                            <div className="bg-white rounded px-2 py-1">
-                              <span className="text-gray-600">Keep in order:</span>
-                              <span className="font-medium text-green-700 ml-1">
-                                {item.quantity - (backorderQuantities[item.productId] || item.quantity)} units
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
