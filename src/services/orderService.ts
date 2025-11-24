@@ -418,6 +418,9 @@ class OrderService {
         return { originalOrder: null, backorder: null, error: updateError.message };
       }
 
+      const uniqueBrands = [...new Set(backorderedItems.map(item => item.brand).filter(Boolean))];
+      const vendorBrand = uniqueBrands.length === 1 ? uniqueBrands[0] : undefined;
+
       const { data: backorderOrder, error: backorderError } = await supabase
         .from('orders')
         .insert({
@@ -440,6 +443,7 @@ class OrderService {
           split_from_order_id: orderId,
           payment_status: originalOrder.payment_status,
           payment_authorization_id: originalOrder.payment_authorization_id,
+          vendor_brand: vendorBrand,
           notes: `Backordered items from order ${originalOrder.order_number || orderId}`
         })
         .select()
@@ -550,6 +554,9 @@ class OrderService {
         return { originalOrder: null, backorder: null, error: updateError.message };
       }
 
+      const uniqueBrands = [...new Set(backorderItemsList.map(item => item.brand).filter(Boolean))];
+      const vendorBrand = uniqueBrands.length === 1 ? uniqueBrands[0] : undefined;
+
       const { data: backorderOrder, error: backorderError } = await supabase
         .from('orders')
         .insert({
@@ -572,6 +579,7 @@ class OrderService {
           split_from_order_id: orderId,
           payment_status: originalOrder.payment_status,
           payment_authorization_id: originalOrder.payment_authorization_id,
+          vendor_brand: vendorBrand,
           notes: `Backordered items from order ${originalOrder.order_number || orderId}`
         })
         .select()
