@@ -16,15 +16,15 @@ async function callServerlessFunction(action: string, data: any) {
       body: JSON.stringify({ action, data }),
     });
 
+    const text = await response.text();
 
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const text = await response.text();
-      console.error('[BC REST API] Non-JSON response:', text.substring(0, 500));
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch (parseError) {
+      console.error('[BC REST API] Failed to parse JSON response:', text.substring(0, 500));
       throw new Error(`Server returned non-JSON response (${response.status}): ${text.substring(0, 200)}`);
     }
-
-    const result = await response.json();
 
     if (!response.ok) {
       console.error('[BC REST API] Error response:', result);
