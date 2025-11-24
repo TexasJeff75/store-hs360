@@ -238,6 +238,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setError(null);
 
     try {
+      console.log('🔍 CheckoutModal - Items before mapping:', items.map(i => ({ name: i.name, brand: i.brand })));
+
       const cartItems = items.map(item => ({
         productId: item.id,
         name: item.name,
@@ -249,6 +251,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         image: item.image,
         hasMarkup: item.hasMarkup || false
       }));
+
+      console.log('🔍 CheckoutModal - CartItems after mapping:', cartItems.map(i => ({ name: i.name, brand: i.brand })));
 
       const sessionResult = await restCheckoutService.createCheckoutSession(
         user.id,
