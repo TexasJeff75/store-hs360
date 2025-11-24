@@ -65,6 +65,9 @@ interface Order {
   parent_order_id?: string;
   split_from_order_id?: string;
   viewed_by_admin?: boolean;
+  payment_status?: string;
+  payment_authorization_id?: string;
+  payment_captured_at?: string;
 }
 
 const OrderManagement: React.FC = () => {
@@ -230,10 +233,31 @@ const OrderManagement: React.FC = () => {
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
+      const order = orders.find(o => o.id === orderId);
+
+      if (newStatus === 'completed') {
+        if (!order?.payment_status || order.payment_status === 'pending') {
+          alert('Cannot complete order: No payment information available. Please ensure a valid payment method is on file.');
+          return;
+        }
+
+        if (order.payment_status !== 'captured') {
+          const captureResult = await orderService.capturePaymentOnShipment(orderId);
+          if (!captureResult.success) {
+            alert(`Cannot complete order: Payment capture failed: ${captureResult.error}\n\nPlease ensure the payment method is valid before completing the order.`);
+            return;
+          }
+        }
+      }
+
       const updateData: any = {
         status: newStatus,
         updated_at: new Date().toISOString()
       };
+
+      if (newStatus === 'completed') {
+        updateData.completed_at = new Date().toISOString();
+      }
 
       if (newStatus === 'shipped') {
         const captureResult = await orderService.capturePaymentOnShipment(orderId);
@@ -255,6 +279,7 @@ const OrderManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error updating order status:', error);
+      alert('Failed to update order status. Please try again.');
     }
   };
 
@@ -569,6 +594,21 @@ const OrderManagement: React.FC = () => {
     });
   };
 
+  const getPaymentStatusColor = (paymentStatus?: string) => {
+    switch (paymentStatus?.toLowerCase()) {
+      case 'authorized':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'captured':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'failed':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'pending':
@@ -702,6 +742,25 @@ const OrderManagement: React.FC = () => {
                   <div className="border-t border-gray-300 pt-2 flex justify-between font-semibold text-base">
                     <span>Total:</span>
                     <span>${Number(order.total).toFixed(2)}</span>
+                  </div>
+                  <div className="border-t border-gray-300 pt-2 mt-2">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Payment Status:</span>
+                      {order.payment_status ? (
+                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getPaymentStatusColor(order.payment_status)}`}>
+                          {order.payment_status}
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border bg-gray-100 text-gray-500">
+                          No Payment Info
+                        </span>
+                      )}
+                    </div>
+                    {order.payment_captured_at && (
+                      <div className="mt-2 text-xs text-gray-500">
+                        Captured: {new Date(order.payment_captured_at).toLocaleString()}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1260,7 +1319,7 @@ const OrderManagement: React.FC = () => {
                           {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </button>
                       </div>
-                      <div className="flex-1 grid grid-cols-1 md:grid-cols-8 gap-4 items-center">
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-9 gap-4 items-center">
                         <div>
                           <p className="text-xs text-gray-500 mb-1">Order ID</p>
                           <p className="text-sm font-mono font-medium text-gray-900">{parent.id.slice(0, 8)}...</p>
@@ -1325,6 +1384,20 @@ const OrderManagement: React.FC = () => {
                           <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getStatusColor(parent.status)}`}>
                             {parent.status}
                           </span>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Payment</p>
+                          {parent.payment_status ? (
+                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getPaymentStatusColor(parent.payment_status)}`}>
+                              {parent.payment_status === 'authorized' ? 'Auth' :
+                               parent.payment_status === 'captured' ? 'Paid' :
+                               parent.payment_status}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border bg-gray-100 text-gray-500">
+                              None
+                            </span>
+                          )}
                         </div>
                       </div>
                   </div>

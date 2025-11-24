@@ -240,6 +240,12 @@ class RestCheckoutService {
         throw new Error(result.error || 'Failed to create order');
       }
 
+      const paymentAuthId = `auth_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      await orderService.updatePaymentStatus(
+        result.order.id,
+        'authorized',
+        paymentAuthId
+      );
 
       await supabase
         .from('checkout_sessions')
