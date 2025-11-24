@@ -37,7 +37,7 @@ export function useProductData() {
             if (costInfo) {
               return {
                 ...product,
-                cost: costInfo.cost_price !== undefined ? costInfo.cost_price : product.cost,
+                cost: costInfo.cost_price !== null && costInfo.cost_price !== undefined ? costInfo.cost_price : undefined,
                 brandId: costInfo.brand_id,
                 brandName: costInfo.brand_name || product.brand
               };

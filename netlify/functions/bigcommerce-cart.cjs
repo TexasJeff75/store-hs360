@@ -171,7 +171,7 @@ exports.handler = async (event, context) => {
             id: product.id,
             name: product.name,
             sku: product.sku || null,
-            cost_price: costPrice !== undefined && costPrice !== null ? costPrice : 0,
+            cost_price: (costPrice !== undefined && costPrice !== null && costPrice > 0) ? costPrice : null,
             price: product.price || 0,
             brand_id: product.brand_id || null,
             brand_name: null,
