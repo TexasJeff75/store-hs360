@@ -28,6 +28,10 @@ if (typeof window !== 'undefined') {
   const validation = validateEnv();
   if (!validation.isValid) {
     console.warn('⚠️ Missing environment variables:', validation.missing);
-  } else {
   }
+
+  console.log('🔧 Environment Configuration:');
+  console.log('  - DEV mode:', import.meta.env.DEV);
+  console.log('  - API_BASE:', ENV.API_BASE);
+  console.log('  - VITE_API_BASE env var:', import.meta.env.VITE_API_BASE || '(not set - using auto-detection)');
 }

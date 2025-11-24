@@ -5,6 +5,7 @@ const API_BASE = ENV.API_BASE;
 
 async function callServerlessFunction(action: string, data: any) {
   const url = `${API_BASE}/bigcommerce-cart`;
+  console.log(`[BC REST API] Calling function: ${url}`);
 
   try {
     const response = await fetch(url, {
