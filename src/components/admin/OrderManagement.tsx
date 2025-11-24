@@ -9,6 +9,9 @@ interface OrderItem {
   name: string;
   quantity: number;
   price: number;
+  brand?: string;
+  backorder?: boolean;
+  backorder_reason?: string;
 }
 
 interface Address {
@@ -56,6 +59,12 @@ interface Order {
   shipments?: Shipment[];
   created_at: string;
   updated_at: string;
+  order_type?: string;
+  is_sub_order?: boolean;
+  vendor_brand?: string;
+  parent_order_id?: string;
+  split_from_order_id?: string;
+  viewed_by_admin?: boolean;
 }
 
 const OrderManagement: React.FC = () => {
@@ -75,6 +84,8 @@ const OrderManagement: React.FC = () => {
   const [backorderReason, setBackorderReason] = useState('');
   const [processingBackorder, setProcessingBackorder] = useState(false);
   const [relatedOrders, setRelatedOrders] = useState<Order[]>([]);
+  const [subOrders, setSubOrders] = useState<Order[]>([]);
+  const [showSubOrders, setShowSubOrders] = useState(false);
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -88,6 +99,15 @@ const OrderManagement: React.FC = () => {
     fetchOrders();
     checkManagementPermissions();
   }, [user, profile]);
+
+  useEffect(() => {
+    if (selectedOrder) {
+      loadSubOrders(selectedOrder.id);
+    } else {
+      setSubOrders([]);
+      setShowSubOrders(false);
+    }
+  }, [selectedOrder]);
 
   const checkManagementPermissions = async () => {
     if (!user) {
@@ -304,6 +324,43 @@ const OrderManagement: React.FC = () => {
       }
     } catch (error) {
       console.error('Error loading related orders:', error);
+    }
+  };
+
+  const loadSubOrders = async (orderId: string) => {
+    try {
+      const result = await orderService.getSubOrders(orderId);
+      if (!result.error) {
+        setSubOrders(result.subOrders);
+        setShowSubOrders(result.subOrders.length > 0);
+      }
+    } catch (error) {
+      console.error('Error loading sub-orders:', error);
+    }
+  };
+
+  const handleSplitByVendor = async (orderId: string) => {
+    if (!confirm('This will split the order into separate sub-orders by vendor/brand. Continue?')) {
+      return;
+    }
+
+    try {
+      const result = await orderService.splitOrderByVendor(orderId);
+
+      if (result.error) {
+        alert(result.error);
+        return;
+      }
+
+      alert(`Order split successfully into ${result.subOrders.length} vendor orders`);
+      await fetchOrders();
+
+      if (selectedOrder?.id === orderId) {
+        await loadSubOrders(orderId);
+      }
+    } catch (error) {
+      console.error('Error splitting order by vendor:', error);
+      alert('Failed to split order by vendor');
     }
   };
 
@@ -543,22 +600,82 @@ const OrderManagement: React.FC = () => {
             )}
 
             {canManageOrders && order.status !== 'completed' && order.status !== 'cancelled' && order.order_type !== 'backorder' && (
-              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <AlertTriangle className="h-5 w-5 text-orange-600" />
-                    <div>
-                      <h4 className="font-semibold text-orange-900">Back-Order Management</h4>
-                      <p className="text-sm text-orange-700">Split items that are out of stock into a separate back-order</p>
+              <div className="space-y-3">
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <AlertTriangle className="h-5 w-5 text-orange-600" />
+                      <div>
+                        <h4 className="font-semibold text-orange-900">Back-Order Management</h4>
+                        <p className="text-sm text-orange-700">Split items that are out of stock into a separate back-order</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleOpenBackorderModal(order)}
+                      className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
+                    >
+                      <Split className="h-4 w-4" />
+                      <span>Split Back-Order</span>
+                    </button>
+                  </div>
+                </div>
+
+                {!order.is_sub_order && order.order_type !== 'split_parent' && (
+                  <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <Package className="h-5 w-5 text-purple-600" />
+                        <div>
+                          <h4 className="font-semibold text-purple-900">Vendor Fulfillment</h4>
+                          <p className="text-sm text-purple-700">Split order by vendor/brand for separate fulfillment</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleSplitByVendor(order.id)}
+                        className="flex items-center space-x-2 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+                      >
+                        <Split className="h-4 w-4" />
+                        <span>Split by Vendor</span>
+                      </button>
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleOpenBackorderModal(order)}
-                    className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors"
-                  >
-                    <Split className="h-4 w-4" />
-                    <span>Split Back-Order</span>
-                  </button>
+                )}
+              </div>
+            )}
+
+            {showSubOrders && subOrders.length > 0 && (
+              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                <h4 className="font-semibold text-indigo-900 mb-3 flex items-center">
+                  <Package className="h-4 w-4 mr-2" />
+                  Vendor Sub-Orders ({subOrders.length})
+                </h4>
+                <div className="space-y-2">
+                  {subOrders.map((subOrder) => (
+                    <div key={subOrder.id} className="bg-white border border-indigo-200 rounded p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <div>
+                          <p className="font-semibold text-gray-900">{subOrder.vendor_brand || 'Unknown Vendor'}</p>
+                          <p className="text-xs text-gray-500">ID: {subOrder.id.slice(0, 8)}...</p>
+                        </div>
+                        <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                          subOrder.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          subOrder.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                          subOrder.status === 'shipped' ? 'bg-purple-100 text-purple-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {subOrder.status}
+                        </span>
+                      </div>
+                      <div className="text-sm space-y-1">
+                        <p className="text-gray-600">{subOrder.items.length} items - ${Number(subOrder.total).toFixed(2)}</p>
+                        {subOrder.items.map((item, idx) => (
+                          <p key={idx} className="text-xs text-gray-500 pl-2">
+                            • {item.name} (x{item.quantity})
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}

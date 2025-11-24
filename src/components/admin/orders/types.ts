@@ -3,6 +3,9 @@ export interface OrderItem {
   name: string;
   quantity: number;
   price: number;
+  brand?: string;
+  backorder?: boolean;
+  backorder_reason?: string;
 }
 
 export interface Address {
@@ -50,4 +53,10 @@ export interface Order {
   shipments?: Shipment[];
   created_at: string;
   updated_at: string;
+  order_type?: string;
+  is_sub_order?: boolean;
+  vendor_brand?: string;
+  parent_order_id?: string;
+  split_from_order_id?: string;
+  viewed_by_admin?: boolean;
 }
