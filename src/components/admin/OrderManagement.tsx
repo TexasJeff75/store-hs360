@@ -86,6 +86,8 @@ const OrderManagement: React.FC = () => {
   const [relatedOrders, setRelatedOrders] = useState<Order[]>([]);
   const [subOrders, setSubOrders] = useState<Order[]>([]);
   const [showSubOrders, setShowSubOrders] = useState(false);
+  const [showDebugModal, setShowDebugModal] = useState(false);
+  const [debugOrder, setDebugOrder] = useState<Order | null>(null);
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -340,12 +342,20 @@ const OrderManagement: React.FC = () => {
   };
 
   const handleSplitByVendor = async (orderId: string) => {
-    if (!confirm('This will split the order into separate sub-orders by vendor/brand. Continue?')) {
-      return;
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      setDebugOrder(order);
+      setShowDebugModal(true);
     }
+  };
+
+  const confirmSplitByVendor = async () => {
+    if (!debugOrder) return;
+
+    setShowDebugModal(false);
 
     try {
-      const result = await orderService.splitOrderByVendor(orderId);
+      const result = await orderService.splitOrderByVendor(debugOrder.id);
 
       if (result.error) {
         alert(result.error);
@@ -355,8 +365,8 @@ const OrderManagement: React.FC = () => {
       alert(`Order split successfully into ${result.subOrders.length} vendor orders`);
       await fetchOrders();
 
-      if (selectedOrder?.id === orderId) {
-        await loadSubOrders(orderId);
+      if (selectedOrder?.id === debugOrder.id) {
+        await loadSubOrders(debugOrder.id);
       }
     } catch (error) {
       console.error('Error splitting order by vendor:', error);
@@ -1334,6 +1344,134 @@ const OrderManagement: React.FC = () => {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Debug Modal for Vendor Split */}
+      {showDebugModal && debugOrder && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between">
+              <h2 className="text-2xl font-bold text-gray-900">Split Order by Vendor - Debug Info</h2>
+              <button
+                onClick={() => setShowDebugModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Order Info */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-900 mb-2">Order Information</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="font-medium">Order ID:</span> {debugOrder.id}</div>
+                  <div><span className="font-medium">Order Number:</span> {debugOrder.order_number || 'N/A'}</div>
+                  <div><span className="font-medium">Total Items:</span> {debugOrder.items.length}</div>
+                  <div><span className="font-medium">Status:</span> {debugOrder.status}</div>
+                </div>
+              </div>
+
+              {/* Items Debug */}
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-900 mb-4">Line Items with Brand Information</h3>
+                <div className="space-y-3">
+                  {debugOrder.items.map((item, index) => (
+                    <div key={index} className="bg-white border border-gray-300 rounded-lg p-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        <div>
+                          <div className="font-semibold text-gray-900">{item.name}</div>
+                          <div className="text-sm text-gray-600 mt-1">
+                            <span className="font-medium">Product ID:</span> {item.productId}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            <span className="font-medium">Quantity:</span> {item.quantity}
+                          </div>
+                          <div className="text-sm text-gray-600">
+                            <span className="font-medium">Price:</span> ${item.price}
+                          </div>
+                        </div>
+                        <div>
+                          <div className={`text-lg font-bold ${item.brand ? 'text-green-600' : 'text-red-600'}`}>
+                            Brand: {item.brand || '❌ NO BRAND DATA'}
+                          </div>
+                          {!item.brand && (
+                            <div className="text-xs text-red-500 mt-1">
+                              This item has no brand information. It will be grouped as "Unknown".
+                            </div>
+                          )}
+                          {item.brand && (
+                            <div className="text-xs text-green-600 mt-1">
+                              ✓ Brand data available
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Brand Summary */}
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h3 className="font-semibold text-yellow-900 mb-2">Brand Analysis</h3>
+                <div className="text-sm space-y-2">
+                  {(() => {
+                    const brandGroups = new Map<string, number>();
+                    debugOrder.items.forEach(item => {
+                      const brand = item.brand || 'Unknown';
+                      brandGroups.set(brand, (brandGroups.get(brand) || 0) + 1);
+                    });
+
+                    return (
+                      <div>
+                        <div className="font-medium mb-2">Brands found in this order:</div>
+                        <ul className="list-disc list-inside space-y-1">
+                          {Array.from(brandGroups.entries()).map(([brand, count]) => (
+                            <li key={brand} className={brand === 'Unknown' ? 'text-red-600' : 'text-green-600'}>
+                              <span className="font-semibold">{brand}</span>: {count} item(s)
+                            </li>
+                          ))}
+                        </ul>
+                        {brandGroups.size <= 1 && (
+                          <div className="mt-3 p-3 bg-red-100 border border-red-300 rounded text-red-800">
+                            <strong>⚠️ Cannot split:</strong> This order only contains items from {brandGroups.size === 1 ? 'one brand' : 'no brands'}.
+                            You need items from at least 2 different brands to split.
+                          </div>
+                        )}
+                        {brandGroups.size > 1 && (
+                          <div className="mt-3 p-3 bg-green-100 border border-green-300 rounded text-green-800">
+                            <strong>✓ Can split:</strong> This order will be split into {brandGroups.size} separate orders.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center justify-end space-x-3 pt-4 border-t">
+                <button
+                  onClick={() => setShowDebugModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmSplitByVendor}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  disabled={(() => {
+                    const brandGroups = new Set(debugOrder.items.map(item => item.brand || 'Unknown'));
+                    return brandGroups.size <= 1;
+                  })()}
+                >
+                  Proceed with Split
+                </button>
+              </div>
             </div>
           </div>
         </div>
