@@ -32,7 +32,19 @@ export const multiTenantService = {
       .eq('id', id)
       .select()
       .single();
-    
+
+    if (error) throw error;
+    return data;
+  },
+
+  async getOrganizationById(id: string) {
+    const { data, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .eq('id', id)
+      .eq('is_active', true)
+      .maybeSingle();
+
     if (error) throw error;
     return data;
   },
