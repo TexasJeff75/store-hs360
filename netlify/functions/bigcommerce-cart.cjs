@@ -224,7 +224,16 @@ exports.handler = async (event, context) => {
       case 'getCheckout':
       case 'checkoutAction': {
         const { endpoint, method, body } = data;
-        const url = `https://api.bigcommerce.com/stores/${BC_STORE_HASH}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+
+        // Ensure endpoint has proper v3 prefix for checkouts API
+        let apiEndpoint = endpoint;
+        if (endpoint.startsWith('/checkouts')) {
+          apiEndpoint = `/v3${endpoint}`;
+        } else if (!endpoint.startsWith('/v3/')) {
+          apiEndpoint = `/v3${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+        }
+
+        const url = `https://api.bigcommerce.com/stores/${BC_STORE_HASH}${apiEndpoint}`;
 
         console.log('[BigCommerce Cart Function] API Request:', method, url);
 
