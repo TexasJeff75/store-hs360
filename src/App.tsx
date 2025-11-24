@@ -225,6 +225,13 @@ function AppContent() {
     const product = products.find(p => p.id === productId);
     if (!product) return;
 
+    // Require organization selection unless user only has one organization
+    if (!selectedOrganization && userHasMultipleOrgs) {
+      alert('Please select an organization before adding items to cart');
+      setIsOrgSelectorOpen(true);
+      return;
+    }
+
     // Fetch the effective price (contract or regular)
     let effectivePrice = product.price;
     let retailPrice = product.price;
