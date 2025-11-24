@@ -126,6 +126,35 @@ const OrderManagement: React.FC = () => {
 
       if (profile?.role === 'sales_rep' && user) {
         query = query.eq('sales_rep_id', user.id);
+      } else if (profile?.role === 'distributor' && user) {
+        // First get the distributor record for this user
+        const { data: distributorData } = await supabase
+          .from('distributors')
+          .select('id')
+          .eq('profile_id', user.id)
+          .maybeSingle();
+
+        if (distributorData) {
+          // Get all sales reps under this distributor
+          const { data: salesReps } = await supabase
+            .from('distributor_sales_reps')
+            .select('sales_rep_id')
+            .eq('distributor_id', distributorData.id)
+            .eq('is_active', true);
+
+          if (salesReps && salesReps.length > 0) {
+            const salesRepIds = salesReps.map(sr => sr.sales_rep_id);
+            // Include distributor's own ID in case they also have direct orders
+            salesRepIds.push(user.id);
+            query = query.in('sales_rep_id', salesRepIds);
+          } else {
+            // If no sales reps, only show distributor's own orders
+            query = query.eq('sales_rep_id', user.id);
+          }
+        } else {
+          // If distributor record not found, only show their own orders
+          query = query.eq('sales_rep_id', user.id);
+        }
       }
 
       const { data, error } = await query.order('created_at', { ascending: false });
