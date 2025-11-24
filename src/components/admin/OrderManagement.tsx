@@ -74,6 +74,11 @@ const OrderManagement: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [sortBy, setSortBy] = useState<'date' | 'customer' | 'total'>('date');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showAddShipment, setShowAddShipment] = useState(false);
   const [canManageOrders, setCanManageOrders] = useState(false);
   const [locationNames, setLocationNames] = useState<Record<string, string>>({});
@@ -450,16 +455,59 @@ const OrderManagement: React.FC = () => {
     }
   };
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch =
-      order.customer_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.order_number?.toLowerCase().includes(searchTerm.toLowerCase());
+  const filteredOrders = React.useMemo(() => {
+    let filtered = orders.filter(order => {
+      const matchesSearch =
+        order.customer_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.order_number?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+      const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
 
-    return matchesSearch && matchesStatus;
-  });
+      let matchesDate = true;
+      const orderDate = new Date(order.created_at);
+
+      if (dateFilter === 'today') {
+        const today = new Date();
+        matchesDate = orderDate.toDateString() === today.toDateString();
+      } else if (dateFilter === 'yesterday') {
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        matchesDate = orderDate.toDateString() === yesterday.toDateString();
+      } else if (dateFilter === 'last7days') {
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+        matchesDate = orderDate >= sevenDaysAgo;
+      } else if (dateFilter === 'last30days') {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        matchesDate = orderDate >= thirtyDaysAgo;
+      } else if (dateFilter === 'custom' && startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        matchesDate = orderDate >= start && orderDate <= end;
+      }
+
+      return matchesSearch && matchesStatus && matchesDate;
+    });
+
+    filtered.sort((a, b) => {
+      let comparison = 0;
+
+      if (sortBy === 'date') {
+        comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      } else if (sortBy === 'customer') {
+        comparison = a.customer_email.localeCompare(b.customer_email);
+      } else if (sortBy === 'total') {
+        comparison = a.total - b.total;
+      }
+
+      return sortOrder === 'asc' ? comparison : -comparison;
+    });
+
+    return filtered;
+  }, [orders, searchTerm, statusFilter, dateFilter, startDate, endDate, sortBy, sortOrder]);
 
   // Group orders: parent orders with their sub-orders
   const groupedOrders = React.useMemo(() => {
@@ -999,29 +1047,122 @@ const OrderManagement: React.FC = () => {
           </button>
         </div>
 
-        <div className="flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by email, order ID, or order number..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-            />
+        <div className="space-y-4">
+          <div className="flex gap-4 flex-wrap">
+            <div className="flex-1 min-w-[300px] relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by email, order ID, or order number..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value="all">All Status</option>
+              <option value="pending">Pending</option>
+              <option value="processing">Processing</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="refunded">Refunded</option>
+            </select>
+
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            >
+              <option value="all">All Time</option>
+              <option value="today">Today</option>
+              <option value="yesterday">Yesterday</option>
+              <option value="last7days">Last 7 Days</option>
+              <option value="last30days">Last 30 Days</option>
+              <option value="custom">Custom Range</option>
+            </select>
           </div>
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          >
-            <option value="all">All Status</option>
-            <option value="pending">Pending</option>
-            <option value="processing">Processing</option>
-            <option value="completed">Completed</option>
-            <option value="cancelled">Cancelled</option>
-            <option value="refunded">Refunded</option>
-          </select>
+
+          {dateFilter === 'custom' && (
+            <div className="flex gap-4 items-center">
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-gray-500" />
+                <label className="text-sm text-gray-700">From:</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-gray-700">To:</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-4 items-center">
+            <span className="text-sm text-gray-700 font-medium">Sort by:</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSortBy('date')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  sortBy === 'date'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Date
+              </button>
+              <button
+                onClick={() => setSortBy('customer')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  sortBy === 'customer'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Customer
+              </button>
+              <button
+                onClick={() => setSortBy('total')}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  sortBy === 'total'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Total
+              </button>
+            </div>
+            <button
+              onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+              className="px-3 py-1.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-1 text-sm font-medium"
+              title={sortOrder === 'asc' ? 'Ascending' : 'Descending'}
+            >
+              {sortOrder === 'asc' ? (
+                <>
+                  <ChevronUp className="h-4 w-4" />
+                  Ascending
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="h-4 w-4" />
+                  Descending
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
