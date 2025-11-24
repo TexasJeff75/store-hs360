@@ -297,7 +297,8 @@ function AppContent() {
           cost: product.cost,
           quantity: quantity,
           image: product.image,
-          hasMarkup: hasMarkup
+          hasMarkup: hasMarkup,
+          brand: product.brand
         }];
       }
     });

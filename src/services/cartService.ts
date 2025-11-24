@@ -9,6 +9,7 @@ interface CartItem {
   quantity: number;
   image: string;
   hasMarkup?: boolean;
+  brand?: string;
 }
 
 interface ShoppingCart {

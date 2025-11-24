@@ -11,6 +11,7 @@ export interface OrderItem {
   hasMarkup?: boolean;
   backorder?: boolean;
   backorder_reason?: string;
+  brand?: string;
 }
 
 export interface Address {
@@ -72,6 +73,8 @@ interface Order {
   payment_captured_at?: string;
   shipped_at?: string;
   backorder_reason?: string;
+  vendor_brand?: string;
+  is_sub_order?: boolean;
 }
 
 class OrderService {
@@ -659,6 +662,169 @@ class OrderService {
       return {
         orders: [],
         error: error instanceof Error ? error.message : 'Failed to fetch related orders'
+      };
+    }
+  }
+
+  async splitOrderByVendor(
+    orderId: string
+  ): Promise<{ parentOrder: Order | null; subOrders: Order[]; error?: string }> {
+    try {
+      const { order: originalOrder, error: fetchError } = await this.getOrderById(orderId);
+
+      if (fetchError || !originalOrder) {
+        return {
+          parentOrder: null,
+          subOrders: [],
+          error: fetchError || 'Order not found'
+        };
+      }
+
+      const brandMap = new Map<string, OrderItem[]>();
+      const noBrandItems: OrderItem[] = [];
+
+      originalOrder.items.forEach(item => {
+        const brand = item.brand || 'Unknown';
+        if (brand === 'Unknown' || !brand) {
+          noBrandItems.push(item);
+        } else {
+          if (!brandMap.has(brand)) {
+            brandMap.set(brand, []);
+          }
+          brandMap.get(brand)!.push(item);
+        }
+      });
+
+      if (noBrandItems.length > 0) {
+        brandMap.set('Unknown', noBrandItems);
+      }
+
+      if (brandMap.size <= 1) {
+        return {
+          parentOrder: originalOrder,
+          subOrders: [],
+          error: 'Order contains only one brand, no split needed'
+        };
+      }
+
+      const { data: updatedParent, error: updateError } = await supabase
+        .from('orders')
+        .update({
+          is_sub_order: false,
+          order_type: 'split_parent',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+        .select()
+        .single();
+
+      if (updateError) {
+        console.error('Error updating parent order:', updateError);
+        return { parentOrder: null, subOrders: [], error: updateError.message };
+      }
+
+      const subOrders: Order[] = [];
+
+      for (const [brand, items] of brandMap.entries()) {
+        const brandSubtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        const taxRatio = originalOrder.subtotal > 0 ? originalOrder.tax / originalOrder.subtotal : 0;
+        const shippingRatio = originalOrder.subtotal > 0 ? originalOrder.shipping / originalOrder.subtotal : 0;
+        const brandTax = brandSubtotal * taxRatio;
+        const brandShipping = brandSubtotal * shippingRatio;
+
+        const { data: subOrder, error: subOrderError } = await supabase
+          .from('orders')
+          .insert({
+            user_id: originalOrder.user_id,
+            bigcommerce_cart_id: originalOrder.bigcommerce_cart_id,
+            status: originalOrder.status,
+            order_type: 'vendor_sub_order',
+            is_sub_order: true,
+            vendor_brand: brand,
+            subtotal: brandSubtotal,
+            tax: brandTax,
+            shipping: brandShipping,
+            total: brandSubtotal + brandTax + brandShipping,
+            currency: originalOrder.currency,
+            items: items,
+            shipping_address: originalOrder.shipping_address,
+            billing_address: originalOrder.billing_address,
+            customer_email: originalOrder.customer_email,
+            organization_id: originalOrder.organization_id,
+            location_id: originalOrder.location_id,
+            parent_order_id: orderId,
+            payment_status: originalOrder.payment_status,
+            payment_authorization_id: originalOrder.payment_authorization_id,
+            notes: `Vendor sub-order for ${brand} from order ${originalOrder.order_number || orderId}`
+          })
+          .select()
+          .single();
+
+        if (subOrderError) {
+          console.error(`Error creating sub-order for ${brand}:`, subOrderError);
+          continue;
+        }
+
+        if (subOrder) {
+          subOrders.push(subOrder);
+        }
+      }
+
+      return { parentOrder: updatedParent, subOrders };
+    } catch (error) {
+      console.error('Error splitting order by vendor:', error);
+      return {
+        parentOrder: null,
+        subOrders: [],
+        error: error instanceof Error ? error.message : 'Failed to split order by vendor'
+      };
+    }
+  }
+
+  async getSubOrders(parentOrderId: string): Promise<{ subOrders: Order[]; error?: string }> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('parent_order_id', parentOrderId)
+        .eq('is_sub_order', true)
+        .order('vendor_brand', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching sub-orders:', error);
+        return { subOrders: [], error: error.message };
+      }
+
+      return { subOrders: data || [] };
+    } catch (error) {
+      console.error('Error fetching sub-orders:', error);
+      return {
+        subOrders: [],
+        error: error instanceof Error ? error.message : 'Failed to fetch sub-orders'
+      };
+    }
+  }
+
+  async getOrdersByVendor(vendorBrand: string): Promise<{ orders: Order[]; error?: string }> {
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('vendor_brand', vendorBrand)
+        .eq('is_sub_order', true)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching vendor orders:', error);
+        return { orders: [], error: error.message };
+      }
+
+      return { orders: data || [] };
+    } catch (error) {
+      console.error('Error fetching vendor orders:', error);
+      return {
+        orders: [],
+        error: error instanceof Error ? error.message : 'Failed to fetch vendor orders'
       };
     }
   }
