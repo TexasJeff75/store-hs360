@@ -47,7 +47,11 @@ export const ProductTableRow: React.FC<ProductTableRowProps> = ({
         ${product.price.toFixed(2)}
       </td>
       <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900 text-right">
-        {product.cost ? `$${product.cost.toFixed(2)}` : '-'}
+        {product.cost !== undefined && product.cost !== null && product.cost > 0 ? (
+          `$${product.cost.toFixed(2)}`
+        ) : (
+          <span className="text-gray-400 italic">Not set</span>
+        )}
       </td>
       {isCostAdmin && (
         <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900 text-right">
