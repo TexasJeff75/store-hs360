@@ -712,6 +712,12 @@ class OrderService {
       const brandMap = new Map<string, OrderItem[]>();
       const noBrandItems: OrderItem[] = [];
 
+      // Debug: Log all items and their brands
+      console.log('Order items and brands:', originalOrder.items.map(item => ({
+        name: item.name,
+        brand: item.brand
+      })));
+
       originalOrder.items.forEach(item => {
         const brand = item.brand || 'Unknown';
         if (brand === 'Unknown' || !brand) {
@@ -728,11 +734,14 @@ class OrderService {
         brandMap.set('Unknown', noBrandItems);
       }
 
+      console.log('Brand map after grouping:', Array.from(brandMap.keys()));
+      console.log('Brand map size:', brandMap.size);
+
       if (brandMap.size <= 1) {
         return {
           parentOrder: originalOrder,
           subOrders: [],
-          error: 'Order contains only one brand, no split needed'
+          error: 'Order contains only one brand, no split needed. Brands found: ' + Array.from(brandMap.keys()).join(', ')
         };
       }
 
