@@ -252,7 +252,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
       const sessionResult = await restCheckoutService.createCheckoutSession(
         user.id,
-        cartItems
+        cartItems,
+        selectedOrgId,
+        selectedLocationId
       );
 
       if (!sessionResult.success || !sessionResult.sessionId) {

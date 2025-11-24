@@ -6,6 +6,7 @@ interface CheckoutSessionData {
   id: string;
   user_id: string;
   organization_id?: string;
+  location_id?: string;
   cart_id?: string;
   checkout_id?: string;
   status: 'pending' | 'processing' | 'completed' | 'failed' | 'abandoned';
@@ -31,7 +32,12 @@ interface CheckoutFlowResult {
 }
 
 class RestCheckoutService {
-  async createCheckoutSession(userId: string, items: any[]): Promise<CheckoutFlowResult> {
+  async createCheckoutSession(
+    userId: string,
+    items: any[],
+    organizationId?: string,
+    locationId?: string
+  ): Promise<CheckoutFlowResult> {
     try {
       const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       const tax = 0; // Tax will be fetched from BigCommerce after address is added
@@ -42,6 +48,8 @@ class RestCheckoutService {
         .from('checkout_sessions')
         .insert({
           user_id: userId,
+          organization_id: organizationId,
+          location_id: locationId,
           cart_items: items,
           status: 'pending',
           subtotal,
@@ -222,6 +230,7 @@ class RestCheckoutService {
         billingAddress: session.billing_address,
         customerEmail: session.billing_address?.email || '',
         organizationId: session.organization_id,
+        locationId: session.location_id,
         notes: 'Test order - Payment simulated (card ending in ' + paymentData.number.slice(-4) + ')',
       };
 
