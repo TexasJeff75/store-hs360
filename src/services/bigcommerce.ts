@@ -6,16 +6,22 @@ const BC_STORE_HASH = ENV.BC_STORE_HASH;
 const BC_STOREFRONT_TOKEN = ENV.BC_STOREFRONT_TOKEN;
 const API_BASE = ENV.API_BASE;
 const GQL = `${API_BASE}/gql`;
+const BC_GRAPHQL_API = `https://store-${BC_STORE_HASH}.mybigcommerce.com/graphql`;
 
+let useDirectAPI = false;
+let apiModeChecked = false;
 
-// BigCommerce Store Hash for checkout URLs
-export async function gql<T>(query: string, variables?: Record<string, any>): Promise<T> {
+async function gqlDirect<T>(query: string, variables?: Record<string, any>): Promise<T> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 45000);
+
   try {
-    const res = await fetch(GQL, {
+    const res = await fetch(BC_GRAPHQL_API, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${BC_STOREFRONT_TOKEN}`
+      },
       body: JSON.stringify({ query, variables }),
       signal: controller.signal
     });
@@ -23,25 +29,19 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
 
     const txt = await res.text();
 
-    // Check for empty response
     if (!txt || txt.trim() === '') {
-      console.error('Empty response from GraphQL endpoint');
-      throw new Error('Empty response from server. Make sure Netlify dev server is running.');
+      throw new Error('Empty response from BigCommerce API');
     }
 
-    // Try to parse JSON
     let json;
     try {
       json = JSON.parse(txt);
     } catch (parseError) {
       console.error('Failed to parse response:', txt.substring(0, 200));
-      throw new Error(`Invalid JSON response from server: ${txt.substring(0, 100)}`);
+      throw new Error(`Invalid JSON response: ${txt.substring(0, 100)}`);
     }
 
     if (!res.ok) {
-      if (res.status === 500 && json.error === 'MISSING_CREDENTIALS') {
-        throw new Error('MISSING_CREDENTIALS');
-      }
       throw new Error(`HTTP ${res.status}: ${txt.slice(0,200)}`);
     }
 
@@ -60,6 +60,95 @@ export async function gql<T>(query: string, variables?: Record<string, any>): Pr
     return json.data as T;
   } catch (e) {
     clearTimeout(timeoutId);
+    throw e instanceof Error ? e : new Error(String(e));
+  }
+}
+
+export async function gql<T>(query: string, variables?: Record<string, any>): Promise<T> {
+  if (useDirectAPI) {
+    return gqlDirect<T>(query, variables);
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 45000);
+  try {
+    const res = await fetch(GQL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, variables }),
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+
+    const txt = await res.text();
+
+    if (!txt || txt.trim() === '') {
+      if (!apiModeChecked) {
+        console.log('🔄 Netlify Functions not available, switching to direct BigCommerce API...');
+        apiModeChecked = true;
+        useDirectAPI = true;
+        return gqlDirect<T>(query, variables);
+      }
+      throw new Error('Empty response from GraphQL endpoint');
+    }
+
+    let json;
+    try {
+      json = JSON.parse(txt);
+    } catch (parseError) {
+      if (!apiModeChecked) {
+        console.log('🔄 Netlify Functions not available, switching to direct BigCommerce API...');
+        apiModeChecked = true;
+        useDirectAPI = true;
+        return gqlDirect<T>(query, variables);
+      }
+      console.error('Failed to parse response:', txt.substring(0, 200));
+      throw new Error(`Invalid JSON response from server: ${txt.substring(0, 100)}`);
+    }
+
+    if (!res.ok) {
+      if (res.status === 404) {
+        if (!apiModeChecked) {
+          console.log('🔄 Netlify Functions not available, switching to direct BigCommerce API...');
+          apiModeChecked = true;
+          useDirectAPI = true;
+          return gqlDirect<T>(query, variables);
+        }
+      }
+      if (res.status === 500 && json.error === 'MISSING_CREDENTIALS') {
+        throw new Error('MISSING_CREDENTIALS');
+      }
+      throw new Error(`HTTP ${res.status}: ${txt.slice(0,200)}`);
+    }
+
+    if (!apiModeChecked) {
+      console.log('✅ Using Netlify Functions for BigCommerce API');
+      apiModeChecked = true;
+    }
+
+    if (json.errors?.length) {
+      const errorMessages = json.errors.map((e: any) => e.message).join(', ');
+
+      if (errorMessages.toLowerCase().includes('scope')) {
+        console.error('❌ BigCommerce API Scope Error:', errorMessages);
+        console.error('📖 See BIGCOMMERCE_SCOPES.md for help configuring token scopes');
+        throw new Error(`Scope Error: ${errorMessages}. Your Storefront API token may be missing required permissions. Check BIGCOMMERCE_SCOPES.md`);
+      }
+
+      console.warn("GQL errors:", json.errors);
+    }
+
+    return json.data as T;
+  } catch (e) {
+    clearTimeout(timeoutId);
+
+    if (!apiModeChecked && !useDirectAPI) {
+      console.log('🔄 Netlify Functions not available, switching to direct BigCommerce API...');
+      apiModeChecked = true;
+      useDirectAPI = true;
+      return gqlDirect<T>(query, variables);
+    }
+
     console.error("GraphQL request failed:", e);
     throw e instanceof Error ? e : new Error(String(e));
   }
