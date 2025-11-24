@@ -49,6 +49,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
   const [activeTab, setActiveTab] = useState<AdminTab>(getDefaultTab());
   const [adminSettingsTab, setAdminSettingsTab] = useState<AdminSettingsTab>('organizations');
   const [isAdminSettingsOpen, setIsAdminSettingsOpen] = useState(false);
+  const [isAdminSettingsSidebarCollapsed, setIsAdminSettingsSidebarCollapsed] = useState(false);
 
   React.useEffect(() => {
     if (initialTab && isOpen) {
@@ -152,9 +153,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
       return (
         <div className="flex h-full">
           {/* Admin Settings Sidebar */}
-          <div className="w-64 bg-gray-50 border-r border-gray-200">
+          <div className={`${isAdminSettingsSidebarCollapsed ? 'w-16' : 'w-64'} bg-gray-50 border-r border-gray-200 transition-all duration-300 relative`}>
+            {/* Collapse/Expand Button */}
+            <button
+              onClick={() => setIsAdminSettingsSidebarCollapsed(!isAdminSettingsSidebarCollapsed)}
+              className="absolute -right-3 top-6 bg-white border border-gray-300 rounded-full p-1 shadow-md hover:bg-gray-100 z-10"
+              title={isAdminSettingsSidebarCollapsed ? 'Expand submenu' : 'Collapse submenu'}
+            >
+              {isAdminSettingsSidebarCollapsed ? (
+                <ChevronRight className="h-4 w-4 text-gray-600" />
+              ) : (
+                <ChevronLeft className="h-4 w-4 text-gray-600" />
+              )}
+            </button>
+
             <div className="p-4">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">Admin Settings</h2>
+              {!isAdminSettingsSidebarCollapsed && (
+                <h2 className="text-lg font-bold text-gray-900 mb-4">Admin Settings</h2>
+              )}
               <nav className="space-y-2">
                 {adminSettingsTabs.map((tab) => {
                   const Icon = tab.icon;
@@ -162,14 +178,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
                     <button
                       key={tab.id}
                       onClick={() => setAdminSettingsTab(tab.id)}
-                      className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-colors ${
+                      className={`w-full flex items-center ${isAdminSettingsSidebarCollapsed ? 'justify-center' : 'space-x-3'} px-4 py-3 rounded-lg text-left transition-colors ${
                         adminSettingsTab === tab.id
                           ? 'bg-purple-100 text-purple-700 border border-purple-200'
                           : 'text-gray-700 hover:bg-gray-100'
                       }`}
+                      title={isAdminSettingsSidebarCollapsed ? tab.label : undefined}
                     >
                       <Icon className="h-5 w-5 flex-shrink-0" />
-                      <span className="font-medium">{tab.label}</span>
+                      {!isAdminSettingsSidebarCollapsed && <span className="font-medium">{tab.label}</span>}
                     </button>
                   );
                 })}
