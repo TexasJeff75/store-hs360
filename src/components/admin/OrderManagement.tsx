@@ -82,6 +82,7 @@ const OrderManagement: React.FC = () => {
   const [showAddShipment, setShowAddShipment] = useState(false);
   const [canManageOrders, setCanManageOrders] = useState(false);
   const [locationNames, setLocationNames] = useState<Record<string, string>>({});
+  const [organizationNames, setOrganizationNames] = useState<Record<string, string>>({});
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [showBackorderModal, setShowBackorderModal] = useState(false);
   const [selectedBackorderItems, setSelectedBackorderItems] = useState<Set<number>>(new Set());
@@ -202,6 +203,22 @@ const OrderManagement: React.FC = () => {
             names[loc.id] = loc.name;
           });
           setLocationNames(names);
+        }
+      }
+
+      const organizationIds = [...new Set(data?.map(o => o.organization_id).filter(Boolean))];
+      if (organizationIds.length > 0) {
+        const { data: organizations } = await supabase
+          .from('organizations')
+          .select('id, name')
+          .in('id', organizationIds);
+
+        if (organizations) {
+          const names: Record<string, string> = {};
+          organizations.forEach(org => {
+            names[org.id] = org.name;
+          });
+          setOrganizationNames(names);
         }
       }
     } catch (error) {
@@ -643,6 +660,15 @@ const OrderManagement: React.FC = () => {
                       )}
                     </div>
                   </div>
+                  {order.organization_id && (
+                    <div>
+                      <span className="text-gray-600">Organization:</span>
+                      <p className="font-medium flex items-center mt-1">
+                        <Building2 className="h-3 w-3 mr-1 text-green-600" />
+                        {organizationNames[order.organization_id] || 'Unknown Organization'}
+                      </p>
+                    </div>
+                  )}
                   {order.location_id && (
                     <div>
                       <span className="text-gray-600">Shipping Location:</span>
@@ -1234,7 +1260,7 @@ const OrderManagement: React.FC = () => {
                           {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </button>
                       </div>
-                      <div className="flex-1 grid grid-cols-1 md:grid-cols-7 gap-4 items-center">
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-8 gap-4 items-center">
                         <div>
                           <p className="text-xs text-gray-500 mb-1">Order ID</p>
                           <p className="text-sm font-mono font-medium text-gray-900">{parent.id.slice(0, 8)}...</p>
@@ -1242,6 +1268,17 @@ const OrderManagement: React.FC = () => {
                         <div>
                           <p className="text-xs text-gray-500 mb-1">Customer</p>
                           <p className="text-sm text-gray-900">{parent.customer_email}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 mb-1">Organization</p>
+                          {parent.organization_id ? (
+                            <p className="text-sm text-gray-900 flex items-center">
+                              <Building2 className="h-3 w-3 mr-1 text-green-600" />
+                              {organizationNames[parent.organization_id] || 'Unknown'}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-gray-400">—</p>
+                          )}
                         </div>
                         <div>
                           <p className="text-xs text-gray-500 mb-1">Location</p>
