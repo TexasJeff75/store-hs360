@@ -18,6 +18,7 @@ interface CartItem {
   quantity: number;
   image: string;
   hasMarkup?: boolean;
+  brand?: string;
 }
 
 interface CheckoutModalProps {
@@ -244,6 +245,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         price: item.price,
         retailPrice: item.retailPrice || item.price,
         cost: item.cost || 0,
+        brand: item.brand,
         image: item.image,
         hasMarkup: item.hasMarkup || false
       }));

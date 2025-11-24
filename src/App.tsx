@@ -34,6 +34,7 @@ interface CartItem {
   quantity: number;
   image: string;
   hasMarkup?: boolean;
+  brand?: string;
 }
 
 function AppContent() {
