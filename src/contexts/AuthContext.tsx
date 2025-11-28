@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 import type { Profile } from '../services/supabase';
+import { sessionTrackingService } from '../services/sessionTracking';
 
 interface AuthContextType {
   user: User | null;
@@ -24,6 +25,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+
+  useEffect(() => {
+    sessionTrackingService.setupBeforeUnloadHandler();
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -210,36 +215,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password,
     });
 
-
     if (!error && data.user) {
-      // Log audit record asynchronously without blocking login
-      setTimeout(async () => {
-        try {
-          const { error: auditError } = await supabase
-            .from('login_audit')
-            .insert([
-              {
-                user_id: data.user.id,
-                email: data.user.email,
-                age_verified: ageVerified,
-                login_timestamp: new Date().toISOString(),
-              },
-            ]);
-
-          if (auditError) {
-            console.error('Error logging audit record:', auditError);
-          } else {
-          }
-        } catch (auditException) {
-          console.error('Failed to create audit log:', auditException);
-        }
-      }, 100);
+      await sessionTrackingService.recordLogin(
+        data.user.id,
+        data.user.email || email,
+        ageVerified
+      );
     }
 
     return { error };
   };
 
   const signOut = async () => {
+    await sessionTrackingService.recordLogout();
     const { error } = await supabase.auth.signOut();
     return { error };
   };
