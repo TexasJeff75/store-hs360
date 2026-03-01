@@ -10,11 +10,17 @@ const corsHeaders = {
 const QB_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
 const QB_AUTH_BASE_URL = 'https://appcenter.intuit.com/connect/oauth2';
 
-function getSupabaseClient() {
+function getSupabaseAdmin() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-  return createClient(url, serviceKey || anonKey);
+  const key = serviceKey || anonKey;
+
+  if (!url || !key) {
+    throw new Error(`Supabase config missing. URL: ${url ? 'set' : 'MISSING'}, Key: ${serviceKey ? 'service_role' : anonKey ? 'anon' : 'MISSING'}`);
+  }
+
+  return { client: createClient(url, key), keyType: serviceKey ? 'service_role' : 'anon' };
 }
 
 async function authenticateUser(supabase, authHeader) {
@@ -24,7 +30,7 @@ async function authenticateUser(supabase, authHeader) {
   const token = authHeader.replace('Bearer ', '');
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) {
-    throw new Error('Unauthorized');
+    throw new Error(error ? `Auth error: ${error.message}` : 'Unauthorized - no user found');
   }
   return user;
 }
@@ -40,8 +46,6 @@ function getQBConfig() {
   if (!redirectUri) missing.push('QB_REDIRECT_URI');
 
   if (missing.length > 0) {
-    console.error('Missing QB env vars:', missing.join(', '));
-    console.error('Available env keys with QB:', Object.keys(process.env).filter(k => k.includes('QB')).join(', '));
     throw new Error(`QuickBooks credentials not configured. Missing: ${missing.join(', ')}`);
   }
 
@@ -58,7 +62,7 @@ async function handleAuthorize(supabase, user) {
 
   const state = require('crypto').randomUUID();
 
-  await supabase.from('quickbooks_credentials').upsert({
+  const { error: upsertError } = await supabase.from('quickbooks_credentials').upsert({
     realm_id: `pending_${state.substring(0, 8)}`,
     access_token: 'pending',
     refresh_token: 'pending',
@@ -67,6 +71,10 @@ async function handleAuthorize(supabase, user) {
     connected_by: user.id,
     metadata: { state, pending: true }
   });
+
+  if (upsertError) {
+    throw new Error(`Failed to save pending state: ${upsertError.message} (code: ${upsertError.code})`);
+  }
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -236,17 +244,64 @@ async function handleDisconnect(supabase, body) {
   return { success: true };
 }
 
+function handleDiagnostics(keyType) {
+  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+
+  let qbConfig = null;
+  let qbError = null;
+  try {
+    qbConfig = getQBConfig();
+    qbConfig = {
+      clientId: qbConfig.clientId.substring(0, 8) + '...',
+      redirectUri: qbConfig.redirectUri,
+      hasSecret: !!qbConfig.clientSecret
+    };
+  } catch (e) {
+    qbError = e.message;
+  }
+
+  return {
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    supabase: {
+      url: url ? url.substring(0, 30) + '...' : 'MISSING',
+      keyType
+    },
+    quickbooks: qbError ? { error: qbError } : qbConfig,
+    envKeys: Object.keys(process.env)
+      .filter(k => k.includes('QB') || k.includes('SUPABASE'))
+      .map(k => k.replace(/KEY|SECRET|TOKEN/gi, '***'))
+  };
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders, body: '' };
   }
 
-  try {
-    const supabase = getSupabaseClient();
-    const user = await authenticateUser(supabase, event.headers.authorization || event.headers.Authorization);
+  const params = event.queryStringParameters || {};
+  const action = params.action;
 
-    const params = event.queryStringParameters || {};
-    const action = params.action;
+  if (action === 'diagnostics') {
+    try {
+      const { keyType } = getSupabaseAdmin();
+      return {
+        statusCode: 200,
+        headers: corsHeaders,
+        body: JSON.stringify(handleDiagnostics(keyType))
+      };
+    } catch (e) {
+      return {
+        statusCode: 500,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: e.message, step: 'diagnostics_init' })
+      };
+    }
+  }
+
+  try {
+    const { client: supabase, keyType } = getSupabaseAdmin();
+    const user = await authenticateUser(supabase, event.headers.authorization || event.headers.Authorization);
 
     let body = {};
     if (event.body) {
@@ -291,10 +346,15 @@ exports.handler = async (event) => {
     };
   } catch (error) {
     console.error('QuickBooks OAuth error:', error);
+    const statusCode = error.message === 'Unauthorized' || error.message?.includes('Auth error') ? 401 : 500;
     return {
-      statusCode: error.message === 'Unauthorized' ? 401 : 500,
+      statusCode,
       headers: corsHeaders,
-      body: JSON.stringify({ error: error.message })
+      body: JSON.stringify({
+        error: error.message,
+        code: error.code || undefined,
+        step: error.step || undefined
+      })
     };
   }
 };

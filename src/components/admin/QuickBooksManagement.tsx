@@ -91,7 +91,40 @@ function ConnectionDiagnostics() {
       });
     }
 
-    addResult({ name: 'Netlify Function', status: 'running', message: 'Testing authorize endpoint...' });
+    addResult({ name: 'Server-side Config', status: 'running', message: 'Checking Netlify function environment...' });
+    try {
+      const diagResponse = await fetch('/.netlify/functions/quickbooks-oauth?action=diagnostics');
+      if (diagResponse.ok) {
+        const diagData = await diagResponse.json();
+        const hasQBError = diagData.quickbooks?.error;
+        addResult({
+          name: 'Server-side Config',
+          status: hasQBError ? 'fail' : 'pass',
+          message: hasQBError
+            ? `Server QB config error: ${diagData.quickbooks.error}`
+            : `Server config OK (Supabase key: ${diagData.supabase?.keyType})`,
+          details: JSON.stringify(diagData, null, 2)
+        });
+      } else {
+        let errText = '';
+        try { errText = JSON.stringify(await diagResponse.json(), null, 2); } catch { errText = await diagResponse.text(); }
+        addResult({
+          name: 'Server-side Config',
+          status: 'fail',
+          message: `Diagnostics endpoint returned HTTP ${diagResponse.status}`,
+          details: errText
+        });
+      }
+    } catch (err: any) {
+      addResult({
+        name: 'Server-side Config',
+        status: 'fail',
+        message: 'Cannot reach Netlify function at all',
+        details: `${err.message}\n\nThis means the function is either not deployed or not reachable. Check Netlify deployment logs.`
+      });
+    }
+
+    addResult({ name: 'Authorize Endpoint', status: 'running', message: 'Testing authorize flow...' });
     try {
       const response = await fetch('/.netlify/functions/quickbooks-oauth?action=authorize', {
         headers: {
@@ -103,9 +136,9 @@ function ConnectionDiagnostics() {
       if (response.ok) {
         const data = await response.json();
         addResult({
-          name: 'Netlify Function',
+          name: 'Authorize Endpoint',
           status: 'pass',
-          message: 'Function responded successfully',
+          message: 'Authorize flow works',
           details: `Auth URL generated. Redirect to: ${data.url?.substring(0, 80)}...`
         });
       } else {
@@ -117,7 +150,7 @@ function ConnectionDiagnostics() {
           errorBody = await response.text();
         }
         addResult({
-          name: 'Netlify Function',
+          name: 'Authorize Endpoint',
           status: 'fail',
           message: `HTTP ${response.status}: ${response.statusText}`,
           details: errorBody
@@ -125,9 +158,9 @@ function ConnectionDiagnostics() {
       }
     } catch (err: any) {
       addResult({
-        name: 'Netlify Function',
+        name: 'Authorize Endpoint',
         status: 'fail',
-        message: 'Network error calling function',
+        message: 'Network error calling authorize',
         details: err.message
       });
     }
@@ -268,11 +301,18 @@ function ConnectionDiagnostics() {
             <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-4">
               <h4 className="font-medium text-red-800 text-sm">Troubleshooting</h4>
               <ul className="mt-2 text-sm text-red-700 space-y-1 list-disc list-inside">
-                {results.find(r => r.name === 'Netlify Function' && r.status === 'fail') && (
+                {results.find(r => r.name === 'Server-side Config' && r.status === 'fail') && (
                   <>
-                    <li>Check that QB_CLIENT_ID, QB_CLIENT_SECRET, and QB_REDIRECT_URI are set in your <strong>Netlify site environment variables</strong> (not just .env)</li>
-                    <li>Go to Netlify Dashboard {'>'} Site settings {'>'} Environment variables and add them</li>
+                    <li>The Netlify function cannot find required QuickBooks env vars on the server</li>
+                    <li>Ensure QB_CLIENT_ID, QB_CLIENT_SECRET, and QB_REDIRECT_URI are set in <strong>Netlify Dashboard {'>'} Site settings {'>'} Environment variables</strong></li>
+                    <li>If using anon key (not service_role), the function may not have permission to write to quickbooks_credentials. Add SUPABASE_SERVICE_ROLE_KEY to Netlify env vars.</li>
                     <li>Redeploy after adding environment variables</li>
+                  </>
+                )}
+                {results.find(r => r.name === 'Authorize Endpoint' && r.status === 'fail') && (
+                  <>
+                    <li>The authorize endpoint failed. Check the error details above for the exact error message from the server.</li>
+                    <li>Common causes: RLS blocking the upsert (need service_role key), missing QB credentials, or auth token issues.</li>
                   </>
                 )}
                 {results.find(r => r.name === 'Redirect URI' && r.status === 'fail') && (
