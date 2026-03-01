@@ -1,6 +1,6 @@
 import React from 'react';
 import { ShoppingCart, Star } from 'lucide-react';
-import { Product } from '../services/bigcommerce';
+import { Product } from '../services/productService';
 import PriceDisplay from './PriceDisplay';
 
 interface ProductGridProps {

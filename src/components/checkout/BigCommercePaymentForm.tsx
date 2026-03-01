@@ -130,7 +130,7 @@ const BigCommercePaymentForm: React.FC<BigCommercePaymentFormProps> = ({
         </div>
         <p className="text-red-600 text-sm mt-2">{error}</p>
         <button
-          onClick={initializeBigCommerceCheckout}
+          onClick={() => setError(null)}
           className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm"
         >
           Retry
@@ -173,7 +173,7 @@ const BigCommercePaymentForm: React.FC<BigCommercePaymentFormProps> = ({
       <div className="bg-white border border-gray-200 rounded-lg p-6">
         <div className="flex items-center space-x-2 mb-4">
           <Lock className="h-4 w-4 text-green-600" />
-          <span className="text-sm text-green-600 font-medium">Secured by BigCommerce</span>
+          <span className="text-sm text-green-600 font-medium">Secure Payment</span>
         </div>
 
         {/* Credit Card Input Form */}

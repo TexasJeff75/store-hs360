@@ -1,6 +1,6 @@
 import React from 'react';
 import { Eye, DollarSign, CheckCircle2, XCircle, Edit2, Save, X as XIcon } from 'lucide-react';
-import { Product } from '@/services/bigcommerce';
+import { Product } from '@/services/productService';
 import { SecretCostMap } from '@/services/secretCostService';
 
 interface ProductTableRowProps {

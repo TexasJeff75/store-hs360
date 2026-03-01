@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, ShoppingCart, Star, Tag, Plus, Minus, Heart, Repeat } from 'lucide-react';
-import { Product } from '../services/bigcommerce';
+import { Product } from '../services/productService';
 import PriceDisplay from './PriceDisplay';
 import { contractPricingService, ContractPrice } from '../services/contractPricing';
 import { useAuth } from '../contexts/AuthContext';
@@ -128,10 +128,8 @@ const ProductModal: React.FC<ProductModalProps> = ({
       setQuantity(prev => Math.max(1, prev - 1));
     };
 
-    // Mock additional images - in real implementation, these would come from BigCommerce
     const productImages = [
       product.image,
-      // Add more images here when available from BigCommerce
     ];
     return (
       <div className="fixed inset-0 z-50 overflow-y-auto">

@@ -1,6 +1,4 @@
 export const ENV = {
-  BC_STORE_HASH: import.meta.env.VITE_BC_STORE_HASH || '',
-  BC_STOREFRONT_TOKEN: import.meta.env.VITE_BC_STOREFRONT_TOKEN || '',
   API_BASE: import.meta.env.VITE_API_BASE || '/api',
   SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || '',
   SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
@@ -14,8 +12,6 @@ export const ENV = {
 
 function validateEnv(): { isValid: boolean; missing: string[] } {
   const required = {
-    BC_STORE_HASH: ENV.BC_STORE_HASH,
-    BC_STOREFRONT_TOKEN: ENV.BC_STOREFRONT_TOKEN,
     SUPABASE_URL: ENV.SUPABASE_URL,
     SUPABASE_ANON_KEY: ENV.SUPABASE_ANON_KEY,
   };
@@ -33,11 +29,6 @@ function validateEnv(): { isValid: boolean; missing: string[] } {
 if (typeof window !== 'undefined') {
   const validation = validateEnv();
   if (!validation.isValid) {
-    console.warn('⚠️ Missing environment variables:', validation.missing);
+    console.warn('Missing environment variables:', validation.missing);
   }
-
-  console.log('🔧 Environment Configuration:');
-  console.log('  - DEV mode:', import.meta.env.DEV);
-  console.log('  - API_BASE:', ENV.API_BASE);
-  console.log('  - VITE_API_BASE env var:', import.meta.env.VITE_API_BASE || '(not set - using auto-detection)');
 }

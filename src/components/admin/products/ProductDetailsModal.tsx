@@ -1,6 +1,6 @@
 import React from 'react';
-import { Hash, Lock, Edit2, CheckCircle2, XCircle, Building2 } from 'lucide-react';
-import { Product } from '@/services/bigcommerce';
+import { Hash, Lock, Edit2, CheckCircle2, XCircle, Building2, Pencil, Trash2 } from 'lucide-react';
+import { Product } from '@/services/productService';
 import { SecretCostMap } from '@/services/secretCostService';
 import { ContractPricingInfo } from './useContractPricing';
 
@@ -17,6 +17,8 @@ interface ProductDetailsModalProps {
   onClose: () => void;
   onEditSecretCost: (productId: number, currentCost?: number) => void;
   onToggleMarkupAllowance: (productId: number, currentValue: boolean) => void;
+  onEditProduct?: (product: Product) => void;
+  onDeleteProduct?: (product: Product) => void;
 }
 
 export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
@@ -32,6 +34,8 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
   onClose,
   onEditSecretCost,
   onToggleMarkupAllowance,
+  onEditProduct,
+  onDeleteProduct,
 }) => {
   if (!isOpen) return null;
 
@@ -48,15 +52,35 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
                   <h3 className="text-xl leading-6 font-medium text-gray-900">
                     Product Details
                   </h3>
-                  <button
-                    onClick={onClose}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <span className="sr-only">Close</span>
-                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    {isAdmin && onEditProduct && (
+                      <button
+                        onClick={() => { onClose(); onEditProduct(product); }}
+                        className="inline-flex items-center px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium transition-colors"
+                      >
+                        <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                        Edit
+                      </button>
+                    )}
+                    {isAdmin && onDeleteProduct && (
+                      <button
+                        onClick={() => { onClose(); onDeleteProduct(product); }}
+                        className="inline-flex items-center px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-medium transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                        Delete
+                      </button>
+                    )}
+                    <button
+                      onClick={onClose}
+                      className="text-gray-400 hover:text-gray-600"
+                    >
+                      <span className="sr-only">Close</span>
+                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

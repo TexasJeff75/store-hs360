@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart, Shield, ChevronLeft, ChevronRight, DollarSign } from 'lucide-react';
+import { Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart, Shield, ChevronLeft, ChevronRight, DollarSign, FolderTree } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
 import UserManagement from './UserManagement';
@@ -20,6 +20,7 @@ import HelpSection from './HelpSection';
 import ProfitReport from './ProfitReport';
 import CostAdminManagement from './CostAdminManagement';
 import QuickBooksManagement from './QuickBooksManagement';
+import CategoryManagement from './CategoryManagement';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -28,7 +29,7 @@ interface AdminDashboardProps {
 }
 
 type AdminTab = 'users' | 'orders' | 'commissions' | 'help' | 'my-orgs' | 'my-recurring-orders' | 'locations' | 'payments' | 'admin-settings' | 'quickbooks';
-type AdminSettingsTab = 'organizations' | 'pricing' | 'products' | 'recurring-orders' | 'distributors' | 'salesreps' | 'analytics' | 'profit-report' | 'cost-admins';
+type AdminSettingsTab = 'organizations' | 'pricing' | 'products' | 'categories' | 'recurring-orders' | 'distributors' | 'salesreps' | 'analytics' | 'profit-report' | 'cost-admins';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initialTab }) => {
   const { profile, user } = useAuth();
@@ -114,6 +115,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
     { id: 'organizations' as AdminSettingsTab, label: 'Organizations', icon: Building2 },
     { id: 'pricing' as AdminSettingsTab, label: 'Pricing', icon: DollarSign },
     { id: 'products' as AdminSettingsTab, label: 'Products', icon: Package },
+    { id: 'categories' as AdminSettingsTab, label: 'Categories', icon: FolderTree },
     { id: 'recurring-orders' as AdminSettingsTab, label: 'Recurring Orders', icon: Repeat },
     { id: 'distributors' as AdminSettingsTab, label: 'Distributors', icon: Building },
     { id: 'salesreps' as AdminSettingsTab, label: 'Sales Reps', icon: UserCheck },
@@ -137,6 +139,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
         return <PricingManagement />;
       case 'products':
         return <ProductsManagement />;
+      case 'categories':
+        return <CategoryManagement />;
       case 'recurring-orders':
         return <RecurringOrderManagement />;
       case 'distributors':

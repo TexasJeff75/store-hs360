@@ -1,6 +1,25 @@
 import { supabase } from './supabase';
-import { bcRestAPI, CartLineItem, AddressData } from './bigcommerceRestAPI';
 import { orderService, CreateOrderData, OrderItem, Address } from './orderService';
+
+export interface CartLineItem {
+  product_id: number;
+  quantity: number;
+  variant_id?: number;
+}
+
+export interface AddressData {
+  first_name: string;
+  last_name: string;
+  email: string;
+  company?: string;
+  address1: string;
+  address2?: string;
+  city: string;
+  state_or_province: string;
+  postal_code: string;
+  country_code: string;
+  phone?: string;
+}
 
 interface CheckoutSessionData {
   id: string;
@@ -40,7 +59,7 @@ class RestCheckoutService {
   ): Promise<CheckoutFlowResult> {
     try {
       const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-      const tax = 0; // Tax will be fetched from BigCommerce after address is added
+      const tax = 0;
       const shipping = 0;
       const total = subtotal + tax + shipping;
 
@@ -83,12 +102,12 @@ class RestCheckoutService {
 
   async createCart(sessionId: string, items: CartLineItem[]): Promise<CheckoutFlowResult> {
     try {
-      const cartResult = await bcRestAPI.createCart(items);
+      const cartId = `cart_${sessionId}`;
 
       const { error } = await supabase
         .from('checkout_sessions')
         .update({
-          cart_id: cartResult.cartId,
+          cart_id: cartId,
           updated_at: new Date().toISOString(),
         })
         .eq('id', sessionId);
@@ -100,7 +119,7 @@ class RestCheckoutService {
       return {
         success: true,
         sessionId,
-        cartId: cartResult.cartId,
+        cartId,
       };
     } catch (error) {
       console.error('Error creating cart:', error);
@@ -127,12 +146,12 @@ class RestCheckoutService {
     shippingAddress: AddressData
   ): Promise<CheckoutFlowResult> {
     try {
-      const checkoutResult = await bcRestAPI.createCheckout(cartId, billingAddress, shippingAddress);
+      const checkoutId = `checkout_${sessionId}`;
 
       const { error } = await supabase
         .from('checkout_sessions')
         .update({
-          checkout_id: checkoutResult.checkoutId,
+          checkout_id: checkoutId,
           billing_address: billingAddress,
           shipping_address: shippingAddress,
           status: 'processing',
@@ -148,7 +167,7 @@ class RestCheckoutService {
         success: true,
         sessionId,
         cartId,
-        checkoutId: checkoutResult.checkoutId,
+        checkoutId,
       };
     } catch (error) {
       console.error('Error adding addresses:', error);
@@ -199,14 +218,6 @@ class RestCheckoutService {
         throw new Error('Checkout session not found');
       }
 
-
-      // NOTE: This creates the order in the local Supabase database only.
-      // To sync orders to BigCommerce, you would need to:
-      // 1. Use BigCommerce Orders V2/V3 API to create the order
-      // 2. Handle inventory management
-      // 3. Process payment through BigCommerce Payments API or external gateway
-      // 4. Store the BigCommerce order ID in the database
-      // For development/testing, orders are stored locally with simulated payment.
 
       const orderData: CreateOrderData = {
         userId: session.user_id,

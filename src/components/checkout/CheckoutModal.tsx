@@ -5,7 +5,7 @@ import PriceDisplay from '../PriceDisplay';
 import { restCheckoutService } from '@/services/restCheckout';
 import CustomerSelector from './CustomerSelector';
 import AddressSelector from './AddressSelector';
-import BigCommercePaymentForm from './BigCommercePaymentForm';
+import PaymentForm from './BigCommercePaymentForm';
 import { CustomerAddress, customerAddressService } from '@/services/customerAddresses';
 import { supabase } from '@/services/supabase';
 
@@ -106,7 +106,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [sameAsShipping, setSameAsShipping] = useState(true);
   const [selectedShippingMethod, setSelectedShippingMethod] = useState('standard');
 
-  // Mock shipping methods - in real implementation, fetch from BigCommerce
   const shippingMethods = [
     { id: 'standard', name: 'Standard Shipping', price: 9.99, days: '5-7 business days' },
     { id: 'express', name: 'Express Shipping', price: 19.99, days: '2-3 business days' },
@@ -115,7 +114,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shippingCost = shippingMethods.find(m => m.id === selectedShippingMethod)?.price || 0;
-  const tax = 0; // Tax will be calculated by BigCommerce
+  const tax = 0;
   const total = subtotal + shippingCost + tax;
 
   useEffect(() => {
@@ -864,7 +863,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         <h3 className="text-lg font-semibold">Payment Information</h3>
       </div>
 
-      <BigCommercePaymentForm
+      <PaymentForm
         onPaymentReady={(ready) => console.log('Payment ready:', ready)}
         onPaymentSubmit={(paymentData) => {
           setCurrentStep('review');

@@ -17,7 +17,7 @@ import FirstTimeSetup from '@/components/FirstTimeSetup';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
 import Toast from '@/components/Toast';
 import QuickBooksCallback from '@/components/QuickBooksCallback';
-import { bigCommerceService, Product } from '@/services/bigcommerce';
+import { productService, Product } from '@/services/productService';
 import { useErrorLogger } from '@/hooks/useErrorLogger';
 import { cacheService } from '@/services/cache';
 import { useAuth } from '@/contexts/AuthContext';
@@ -76,33 +76,13 @@ function AppContent() {
         setError(null);
         
         
-        // Add timeout to the entire fetch operation
-        const fetchPromise = Promise.all([
-          bigCommerceService.getProducts((err: unknown, ctx?: string) => logError(err, ctx)),
-          bigCommerceService.getCategories((err: unknown, ctx?: string) => logError(err, ctx))
-        ]);
-        
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Request timeout')), 60000)
-        );
-        
-        const [productsData, categoriesData] = await Promise.race([
-          fetchPromise,
-          timeoutPromise
-        ]) as [{products: Product[]; errorMessage?: string}, {categories: string[]; errorMessage?: string}];
-        
-        setProducts(productsData.products);
-        
-        // Set error message if either API call failed
-        if (productsData.errorMessage || categoriesData.errorMessage) {
-          const errorMsg = productsData.errorMessage || categoriesData.errorMessage;
-          setError(errorMsg);
-        }
+        const fetchedProducts = await productService.getProducts();
+        setProducts(fetchedProducts);
         
       } catch (err) {
         const errorMessage = err instanceof Error && err.message === 'Request timeout' 
           ? 'Request timed out. Please check your connection and try again.'
-          : 'Failed to load data from BigCommerce. Please check your API configuration.';
+          : 'Failed to load product data. Please try again later.';
         setError(errorMessage);
         logError(err, 'fetchData');
       } finally {
@@ -361,7 +341,7 @@ function AppContent() {
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
-  // Group products by their actual BigCommerce categories
+  // Group products by category
   const productsByCategory = products.reduce((acc, product) => {
     const category = product.category;
     if (!acc[category]) {
@@ -636,24 +616,9 @@ function AppContent() {
                     <h3 className="text-lg font-semibold text-red-800">Configuration Required</h3>
                   </div>
                   <p className="text-red-700 mb-4">{error}</p>
-                  {error.includes('credentials not configured') && (
-                    <div className="bg-white rounded border border-red-200 p-4">
-                      <p className="text-sm text-gray-700 mb-3">
-                        <strong>To connect to BigCommerce:</strong>
-                      </p>
-                      <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
-                        <li>Get your store hash from BigCommerce admin (found in the URL: store-<strong>HASH</strong>.mybigcommerce.com)</li>
-                        <li>Create a Storefront API token in BigCommerce Settings → API → Storefront API</li>
-                        <li>Add these to your <code className="bg-gray-100 px-1 rounded">.env</code> file (with VITE_ prefix):
-                          <div className="mt-2 bg-gray-50 p-2 rounded text-xs font-mono">
-                            VITE_BC_STORE_HASH=your_store_hash<br/>
-                            VITE_BC_STOREFRONT_TOKEN=your_jwt_token
-                          </div>
-                        </li>
-                        <li>Restart the development server</li>
-                      </ol>
-                    </div>
-                  )}
+                  <p className="text-sm text-gray-600 mt-2">
+                    If this problem persists, please contact your administrator.
+                  </p>
                 </div>
               </div>
             </div>

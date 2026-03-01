@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Package, Search, RefreshCw, ChevronUp, ChevronDown } from 'lucide-react';
-import { Product } from '@/services/bigcommerce';
+import { Package, Search, RefreshCw, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { Product, productService } from '@/services/productService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProductData } from './useProductData';
 import { useContractPricing } from './useContractPricing';
@@ -8,6 +8,7 @@ import { useSecretCosts } from './useSecretCosts';
 import { useProductSettings } from './useProductSettings';
 import { ProductTableRow } from './ProductTableRow';
 import { ProductDetailsModal } from './ProductDetailsModal';
+import ProductForm from './ProductForm';
 
 const ProductsManagement: React.FC = () => {
   const { profile } = useAuth();
@@ -17,6 +18,8 @@ const ProductsManagement: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [sortField, setSortField] = useState<keyof Product | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const { products, loading, loadingCosts, error, refetchProducts } = useProductData();
   const {
@@ -91,7 +94,27 @@ const ProductsManagement: React.FC = () => {
   };
 
   const handleRefreshProducts = async () => {
-    await refetchProducts(true);
+    await refetchProducts();
+  };
+
+  const handleCreateProduct = () => {
+    setEditingProduct(null);
+    setIsFormOpen(true);
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setIsFormOpen(true);
+  };
+
+  const handleDeleteProduct = async (product: Product) => {
+    if (!confirm(`Delete "${product.name}"? This cannot be undone.`)) return;
+    const success = await productService.deleteProduct(product.id);
+    if (success) refetchProducts();
+  };
+
+  const handleProductSaved = () => {
+    refetchProducts();
   };
 
   const handleToggleMarkup = (productId: number, currentValue: boolean) => {
@@ -132,13 +155,22 @@ const ProductsManagement: React.FC = () => {
             </p>
           </div>
         </div>
-        <button
-          onClick={handleRefreshProducts}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-        >
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={handleRefreshProducts}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </button>
+          <button
+            onClick={handleCreateProduct}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md shadow-sm text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Product
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">
@@ -276,7 +308,7 @@ const ProductsManagement: React.FC = () => {
             <p className="mt-1 text-sm text-gray-500">
               {searchTerm || categoryFilter !== 'all'
                 ? 'Try adjusting your search or filter criteria.'
-                : 'No products are available from BigCommerce.'
+                : 'No products yet. Click "New Product" to add your first product.'
               }
             </p>
           </div>
@@ -297,8 +329,17 @@ const ProductsManagement: React.FC = () => {
           onClose={() => setIsModalOpen(false)}
           onEditSecretCost={handleEditSecretCost}
           onToggleMarkupAllowance={handleToggleMarkup}
+          onEditProduct={handleEditProduct}
+          onDeleteProduct={handleDeleteProduct}
         />
       )}
+
+      <ProductForm
+        product={editingProduct}
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        onSave={handleProductSaved}
+      />
     </div>
   );
 };

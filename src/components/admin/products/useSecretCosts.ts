@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { secretCostService, SecretCostMap } from '@/services/secretCostService';
-import { Product } from '@/services/bigcommerce';
+import { Product } from '@/services/productService';
 
 export function useSecretCosts(products: Product[]) {
   const [isCostAdmin, setIsCostAdmin] = useState(false);

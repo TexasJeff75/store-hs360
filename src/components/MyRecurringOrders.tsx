@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Package, Calendar, Play, Pause, X, Clock, CheckCircle, AlertCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { recurringOrderService, RecurringOrder, RecurringOrderHistory } from '../services/recurringOrderService';
-import { bigCommerceService } from '../services/bigcommerce';
+import { productService } from '../services/productService';
 
 const MyRecurringOrders: React.FC = () => {
   const { user } = useAuth();
@@ -29,7 +29,7 @@ const MyRecurringOrders: React.FC = () => {
     const names: { [key: number]: string } = {};
 
     for (const productId of productIds) {
-      const product = await bigCommerceService.getProductById(productId);
+      const product = await productService.getProductById(productId);
       if (product) {
         names[productId] = product.name;
       }

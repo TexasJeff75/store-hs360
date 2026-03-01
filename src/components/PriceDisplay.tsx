@@ -24,8 +24,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   const { user, profile } = useAuth();
   const { price, source, savings } = useContractPricing(productId, regularPrice, quantity, organizationId);
 
-  // regularPrice is the wholesale/cost price from BigCommerce
-  // price is the retail selling price (either contract or default markup)
+  // price is the effective selling price (either contract or default)
 
   // Don't show loading state - just show the current price to prevent flickering
   // The price will update when loaded

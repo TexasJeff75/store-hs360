@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/services/supabase';
-import { Product } from '@/services/bigcommerce';
+import { Product } from '@/services/productService';
 
 export function useProductSettings() {
   const [productSettings, setProductSettings] = useState<Map<number, { allowMarkup: boolean }>>(new Map());

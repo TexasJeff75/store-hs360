@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Package, Calendar, Users, Filter, Search, TrendingUp, AlertCircle } from 'lucide-react';
 import { recurringOrderService, RecurringOrder } from '../../services/recurringOrderService';
-import { bigCommerceService } from '../../services/bigcommerce';
+import { productService } from '../../services/productService';
 
 const RecurringOrderManagement: React.FC = () => {
   const [recurringOrders, setRecurringOrders] = useState<RecurringOrder[]>([]);
@@ -35,7 +35,7 @@ const RecurringOrderManagement: React.FC = () => {
     const names: { [key: number]: string } = {};
 
     for (const productId of productIds) {
-      const product = await bigCommerceService.getProductById(productId);
+      const product = await productService.getProductById(productId);
       if (product) {
         names[productId] = product.name;
       }
