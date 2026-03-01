@@ -66,7 +66,8 @@ function AppContent() {
   const [needsOrganizationSetup, setNeedsOrganizationSetup] = useState(false);
   const [checkingOrganization, setCheckingOrganization] = useState(true);
 
-  const isQuickBooksCallback = window.location.pathname.includes('/quickbooks/callback');
+  const isQuickBooksCallback = window.location.pathname.includes('/quickbooks/callback') ||
+    window.location.search.includes('realmId=');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -383,6 +384,10 @@ function AppContent() {
     })
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
 
+  if (isQuickBooksCallback) {
+    return <QuickBooksCallback />;
+  }
+
   // Show loading or auth gate
   if (authLoading) {
     return (
@@ -410,7 +415,7 @@ function AppContent() {
           onSalesRepClick={() => {}}
           onOrderHistoryClick={() => setIsAdminOpen(true)}
         />
-        
+
         <div className="min-h-screen flex items-center justify-center px-4">
           <div className="max-w-md w-full text-center">
             <div className="bg-white rounded-lg shadow-lg p-8">
@@ -425,14 +430,14 @@ function AppContent() {
                   Please sign in to access our premium health products and personalized pricing.
                 </p>
               </div>
-              
+
               <button
                 onClick={() => setIsAuthModalOpen(true)}
                 className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-3 px-6 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 font-semibold"
               >
                 Sign In to Continue
               </button>
-              
+
               <p className="text-sm text-gray-500 mt-4">
                 New to HealthSpan360? Create an account to get started.
               </p>
@@ -446,10 +451,6 @@ function AppContent() {
         />
       </div>
     );
-  }
-
-  if (isQuickBooksCallback) {
-    return <QuickBooksCallback />;
   }
 
   if (isPasswordRecovery) {

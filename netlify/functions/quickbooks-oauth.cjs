@@ -34,8 +34,15 @@ function getQBConfig() {
   const clientSecret = process.env.QB_CLIENT_SECRET || process.env.VITE_QB_CLIENT_SECRET;
   const redirectUri = process.env.QB_REDIRECT_URI || process.env.VITE_QB_REDIRECT_URI;
 
-  if (!clientId || !clientSecret || !redirectUri) {
-    throw new Error('QuickBooks credentials not configured. Ensure QB_CLIENT_ID, QB_CLIENT_SECRET, and QB_REDIRECT_URI are set.');
+  const missing = [];
+  if (!clientId) missing.push('QB_CLIENT_ID');
+  if (!clientSecret) missing.push('QB_CLIENT_SECRET');
+  if (!redirectUri) missing.push('QB_REDIRECT_URI');
+
+  if (missing.length > 0) {
+    console.error('Missing QB env vars:', missing.join(', '));
+    console.error('Available env keys with QB:', Object.keys(process.env).filter(k => k.includes('QB')).join(', '));
+    throw new Error(`QuickBooks credentials not configured. Missing: ${missing.join(', ')}`);
   }
 
   return { clientId, clientSecret, redirectUri };

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 import { quickbooksOAuth } from '../services/quickbooks';
+import { supabase } from '../services/supabase';
 
 export function QuickBooksCallback() {
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
@@ -30,13 +31,34 @@ export function QuickBooksCallback() {
         throw new Error('Missing state parameter');
       }
 
+      setMessage('Verifying your session...');
+
+      let session = (await supabase.auth.getSession()).data.session;
+      if (!session) {
+        let attempts = 0;
+        while (!session && attempts < 10) {
+          await new Promise(r => setTimeout(r, 500));
+          session = (await supabase.auth.getSession()).data.session;
+          attempts++;
+        }
+      }
+
+      if (!session) {
+        throw new Error('Your session has expired. Please sign in and try connecting QuickBooks again.');
+      }
+
+      setMessage('Exchanging authorization code...');
       await quickbooksOAuth.exchangeCodeForTokens(code, realmId, state);
 
       setStatus('success');
       setMessage('Successfully connected to QuickBooks!');
 
       setTimeout(() => {
-        window.location.href = '/admin?tab=quickbooks';
+        window.location.href = '/';
+        setTimeout(() => {
+          window.location.search = '';
+          window.location.hash = '';
+        }, 100);
       }, 2000);
     } catch (error: any) {
       console.error('OAuth callback error:', error);
@@ -71,12 +93,14 @@ export function QuickBooksCallback() {
               <XCircle className="h-16 w-16 text-red-600 mx-auto" />
               <h2 className="text-2xl font-bold text-gray-900">Connection Failed</h2>
               <p className="text-gray-600">{message}</p>
-              <button
-                onClick={() => window.location.href = '/admin?tab=quickbooks'}
-                className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Return to Admin Panel
-              </button>
+              <div className="space-y-2 mt-4">
+                <button
+                  onClick={() => window.location.href = '/'}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  Return to Dashboard
+                </button>
+              </div>
             </div>
           )}
         </div>
