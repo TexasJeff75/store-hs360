@@ -426,3 +426,5 @@ export function QuickBooksManagement() {
     </div>
   );
 }
+
+export default QuickBooksManagement;

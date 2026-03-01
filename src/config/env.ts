@@ -7,6 +7,7 @@ export const ENV = {
   QB_CLIENT_ID: import.meta.env.VITE_QB_CLIENT_ID || '',
   QB_CLIENT_SECRET: import.meta.env.VITE_QB_CLIENT_SECRET || '',
   QB_ENVIRONMENT: import.meta.env.VITE_QB_ENVIRONMENT || 'sandbox',
+  QB_REALM_ID: import.meta.env.VITE_QB_REALM_ID || '',
   QB_REDIRECT_URI: import.meta.env.VITE_QB_REDIRECT_URI || '',
   QB_REDIRECT_URI_PROD: import.meta.env.VITE_QB_REDIRECT_URI_PROD || '',
 } as const;

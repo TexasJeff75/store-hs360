@@ -16,6 +16,7 @@ import OrganizationSelector from '@/components/OrganizationSelector';
 import FirstTimeSetup from '@/components/FirstTimeSetup';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
 import Toast from '@/components/Toast';
+import QuickBooksCallback from '@/components/QuickBooksCallback';
 import { bigCommerceService, Product } from '@/services/bigcommerce';
 import { useErrorLogger } from '@/hooks/useErrorLogger';
 import { cacheService } from '@/services/cache';
@@ -64,6 +65,8 @@ function AppContent() {
   const [productsWithContractPricing, setProductsWithContractPricing] = useState<number[]>([]);
   const [needsOrganizationSetup, setNeedsOrganizationSetup] = useState(false);
   const [checkingOrganization, setCheckingOrganization] = useState(true);
+
+  const isQuickBooksCallback = window.location.pathname.includes('/quickbooks/callback');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -443,6 +446,10 @@ function AppContent() {
         />
       </div>
     );
+  }
+
+  if (isQuickBooksCallback) {
+    return <QuickBooksCallback />;
   }
 
   if (isPasswordRecovery) {

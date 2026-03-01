@@ -87,3 +87,5 @@ export function QuickBooksCallback() {
     </div>
   );
 }
+
+export default QuickBooksCallback;
