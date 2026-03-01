@@ -1,7 +1,9 @@
 import { supabase } from '../supabase';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/quickbooks-oauth`;
+const API_BASE = import.meta.env.DEV
+  ? 'http://localhost:8888/.netlify/functions'
+  : '/.netlify/functions';
+const FUNCTION_URL = `${API_BASE}/quickbooks-oauth`;
 
 interface QuickBooksCredentials {
   id: string;
@@ -32,7 +34,7 @@ export const quickbooksOAuth = {
       throw new Error('User not authenticated');
     }
 
-    const response = await fetch(`${EDGE_FUNCTION_URL}?action=authorize`, {
+    const response = await fetch(`${FUNCTION_URL}?action=authorize`, {
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json'
@@ -54,7 +56,7 @@ export const quickbooksOAuth = {
       throw new Error('User not authenticated');
     }
 
-    const response = await fetch(`${EDGE_FUNCTION_URL}?action=exchange`, {
+    const response = await fetch(`${FUNCTION_URL}?action=exchange`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
@@ -78,7 +80,7 @@ export const quickbooksOAuth = {
       throw new Error('User not authenticated');
     }
 
-    const response = await fetch(`${EDGE_FUNCTION_URL}?action=refresh`, {
+    const response = await fetch(`${FUNCTION_URL}?action=refresh`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
@@ -125,7 +127,7 @@ export const quickbooksOAuth = {
       throw new Error('User not authenticated');
     }
 
-    const response = await fetch(`${EDGE_FUNCTION_URL}?action=disconnect`, {
+    const response = await fetch(`${FUNCTION_URL}?action=disconnect`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,

@@ -31,6 +31,11 @@
   to = "/.netlify/functions/bigcommerce-cart"
   status = 200
 
+[[redirects]]
+  from = "/api/quickbooks-oauth"
+  to = "/.netlify/functions/quickbooks-oauth"
+  status = 200
+
 # SPA fallback - must be last
 # IMPORTANT: Do not use force = true, as it would override function routes
 [[redirects]]
