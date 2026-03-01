@@ -4,6 +4,11 @@ export const ENV = {
   API_BASE: import.meta.env.VITE_API_BASE || '/api',
   SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL || '',
   SUPABASE_ANON_KEY: import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+  QB_CLIENT_ID: import.meta.env.VITE_QB_CLIENT_ID || '',
+  QB_CLIENT_SECRET: import.meta.env.VITE_QB_CLIENT_SECRET || '',
+  QB_ENVIRONMENT: import.meta.env.VITE_QB_ENVIRONMENT || 'sandbox',
+  QB_REDIRECT_URI: import.meta.env.VITE_QB_REDIRECT_URI || '',
+  QB_REDIRECT_URI_PROD: import.meta.env.VITE_QB_REDIRECT_URI_PROD || '',
 } as const;
 
 function validateEnv(): { isValid: boolean; missing: string[] } {
