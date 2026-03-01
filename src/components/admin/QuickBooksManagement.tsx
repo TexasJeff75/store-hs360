@@ -62,9 +62,13 @@ export function QuickBooksManagement() {
     }
   };
 
-  const handleConnect = () => {
-    const authUrl = quickbooksOAuth.getAuthorizationUrl();
-    window.location.href = authUrl;
+  const handleConnect = async () => {
+    try {
+      const authUrl = await quickbooksOAuth.getAuthorizationUrl();
+      window.location.href = authUrl;
+    } catch (error: any) {
+      alert(`Failed to connect: ${error.message}`);
+    }
   };
 
   const handleDisconnect = async () => {

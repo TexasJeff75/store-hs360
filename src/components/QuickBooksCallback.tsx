@@ -26,14 +26,11 @@ export function QuickBooksCallback() {
         throw new Error('Missing authorization code or realm ID');
       }
 
-      const savedState = sessionStorage.getItem('qb_oauth_state');
-      if (state !== savedState) {
-        throw new Error('Invalid state parameter - possible CSRF attack');
+      if (!state) {
+        throw new Error('Missing state parameter');
       }
 
-      sessionStorage.removeItem('qb_oauth_state');
-
-      await quickbooksOAuth.exchangeCodeForTokens(code, realmId);
+      await quickbooksOAuth.exchangeCodeForTokens(code, realmId, state);
 
       setStatus('success');
       setMessage('Successfully connected to QuickBooks!');
