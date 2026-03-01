@@ -1,4 +1,4 @@
-const { getStore } = require('@netlify/blobs');
+const { createClient } = require('@supabase/supabase-js');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,10 +18,15 @@ const QB_PAYMENTS_BASE_URL = QB_ENVIRONMENT === 'production'
   ? 'https://api.intuit.com/quickbooks/v4'
   : 'https://sandbox.api.intuit.com/quickbooks/v4';
 
-const CREDENTIALS_KEY = 'active_credentials';
+function getSupabaseAdmin() {
+  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-function getTokenStore() {
-  return getStore({ name: 'quickbooks-tokens', consistency: 'strong' });
+  if (!url || !key) {
+    throw new Error('Supabase config missing. SUPABASE_SERVICE_ROLE_KEY is required.');
+  }
+
+  return createClient(url, key);
 }
 
 async function authenticateUser(authHeader) {
@@ -29,15 +34,7 @@ async function authenticateUser(authHeader) {
     throw new Error('Missing or invalid authorization header');
   }
 
-  const { createClient } = require('@supabase/supabase-js');
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error('Supabase config missing for auth verification');
-  }
-
-  const supabase = createClient(url, key);
+  const supabase = getSupabaseAdmin();
   const token = authHeader.replace('Bearer ', '');
   const { data: { user }, error } = await supabase.auth.getUser(token);
 
@@ -49,10 +46,15 @@ async function authenticateUser(authHeader) {
 }
 
 async function getCredentials() {
-  const store = getTokenStore();
-  const creds = await store.get(CREDENTIALS_KEY, { type: 'json' });
+  const supabase = getSupabaseAdmin();
 
-  if (!creds || !creds.is_active) {
+  const { data: creds } = await supabase
+    .from('quickbooks_credentials')
+    .select('*')
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (!creds) {
     throw new Error('No active QuickBooks connection. Please connect QuickBooks first.');
   }
 
@@ -61,13 +63,13 @@ async function getCredentials() {
   const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
 
   if (expiresAt <= fiveMinutesFromNow) {
-    return await refreshTokens(creds, store);
+    return await refreshTokens(creds, supabase);
   }
 
   return creds;
 }
 
-async function refreshTokens(creds, store) {
+async function refreshTokens(creds, supabase) {
   const clientId = process.env.QB_CLIENT_ID || process.env.VITE_QB_CLIENT_ID;
   const clientSecret = process.env.QB_CLIENT_SECRET || process.env.VITE_QB_CLIENT_SECRET;
 
@@ -103,18 +105,24 @@ async function refreshTokens(creds, store) {
   const refreshExpiresAt = new Date();
   refreshExpiresAt.setSeconds(refreshExpiresAt.getSeconds() + (tokenData.x_refresh_token_expires_in || 8726400));
 
-  const updatedCreds = {
-    ...creds,
-    access_token: tokenData.access_token,
-    refresh_token: tokenData.refresh_token,
-    expires_at: expiresAt.toISOString(),
-    refresh_token_expires_at: refreshExpiresAt.toISOString(),
-    updated_at: new Date().toISOString()
-  };
+  const { data: updated, error: updateError } = await supabase
+    .from('quickbooks_credentials')
+    .update({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      expires_at: expiresAt.toISOString(),
+      refresh_token_expires_at: refreshExpiresAt.toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', creds.id)
+    .select('*')
+    .single();
 
-  await store.setJSON(CREDENTIALS_KEY, updatedCreds);
+  if (updateError) {
+    throw new Error(`Failed to update credentials: ${updateError.message}`);
+  }
 
-  return updatedCreds;
+  return updated;
 }
 
 exports.handler = async (event) => {

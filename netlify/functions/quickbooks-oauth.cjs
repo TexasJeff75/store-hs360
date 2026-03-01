@@ -1,4 +1,4 @@
-const { getStore } = require('@netlify/blobs');
+const { createClient } = require('@supabase/supabase-js');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,11 +9,16 @@ const corsHeaders = {
 
 const QB_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
 const QB_AUTH_BASE_URL = 'https://appcenter.intuit.com/connect/oauth2';
-const CREDENTIALS_KEY = 'active_credentials';
-const PENDING_PREFIX = 'pending_';
 
-function getTokenStore() {
-  return getStore({ name: 'quickbooks-tokens', consistency: 'strong' });
+function getSupabaseAdmin() {
+  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !key) {
+    throw new Error('Supabase config missing. SUPABASE_SERVICE_ROLE_KEY is required for server-side token storage.');
+  }
+
+  return createClient(url, key);
 }
 
 function getQBConfig() {
@@ -38,15 +43,7 @@ async function authenticateUser(authHeader) {
     throw new Error('Missing or invalid authorization header');
   }
 
-  const { createClient } = require('@supabase/supabase-js');
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error('Supabase config missing for auth verification');
-  }
-
-  const supabase = createClient(url, key);
+  const supabase = getSupabaseAdmin();
   const token = authHeader.replace('Bearer ', '');
   const { data: { user }, error } = await supabase.auth.getUser(token);
 
@@ -69,7 +66,7 @@ async function authenticateUser(authHeader) {
 
 async function handleAuthorize() {
   const { clientId, redirectUri } = getQBConfig();
-  const store = getTokenStore();
+  const supabase = getSupabaseAdmin();
 
   const scope = [
     'com.intuit.quickbooks.accounting',
@@ -78,10 +75,21 @@ async function handleAuthorize() {
 
   const state = require('crypto').randomUUID();
 
-  await store.setJSON(`${PENDING_PREFIX}${state}`, {
-    state,
-    created_at: new Date().toISOString()
-  });
+  const { error } = await supabase
+    .from('quickbooks_credentials')
+    .insert({
+      realm_id: `pending_state_${state}`,
+      access_token: 'pending',
+      refresh_token: 'pending',
+      token_type: 'bearer',
+      expires_at: new Date().toISOString(),
+      refresh_token_expires_at: new Date().toISOString(),
+      is_active: false
+    });
+
+  if (error) {
+    throw new Error(`Failed to store pending state: ${error.message}`);
+  }
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -97,18 +105,24 @@ async function handleAuthorize() {
 async function handleExchange(body) {
   const { clientId, clientSecret, redirectUri } = getQBConfig();
   const { code, realmId, state } = body;
-  const store = getTokenStore();
+  const supabase = getSupabaseAdmin();
 
   if (!code || !realmId || !state) {
     throw new Error('Missing required parameters: code, realmId, state');
   }
 
-  const pendingData = await store.get(`${PENDING_PREFIX}${state}`, { type: 'json' });
-  if (!pendingData) {
+  const { data: pendingRow } = await supabase
+    .from('quickbooks_credentials')
+    .select('id')
+    .eq('realm_id', `pending_state_${state}`)
+    .eq('is_active', false)
+    .maybeSingle();
+
+  if (!pendingRow) {
     throw new Error('Invalid state parameter - possible CSRF attack');
   }
 
-  await store.delete(`${PENDING_PREFIX}${state}`);
+  await supabase.from('quickbooks_credentials').delete().eq('id', pendingRow.id);
 
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
@@ -139,19 +153,28 @@ async function handleExchange(body) {
   const refreshExpiresAt = new Date();
   refreshExpiresAt.setSeconds(refreshExpiresAt.getSeconds() + (tokenData.x_refresh_token_expires_in || 8726400));
 
-  const credentials = {
-    realm_id: realmId,
-    access_token: tokenData.access_token,
-    refresh_token: tokenData.refresh_token,
-    token_type: tokenData.token_type || 'bearer',
-    expires_at: expiresAt.toISOString(),
-    refresh_token_expires_at: refreshExpiresAt.toISOString(),
-    is_active: true,
-    connected_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
+  await supabase
+    .from('quickbooks_credentials')
+    .update({ is_active: false })
+    .eq('is_active', true);
 
-  await store.setJSON(CREDENTIALS_KEY, credentials);
+  const { data: credentials, error: insertError } = await supabase
+    .from('quickbooks_credentials')
+    .insert({
+      realm_id: realmId,
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      token_type: tokenData.token_type || 'bearer',
+      expires_at: expiresAt.toISOString(),
+      refresh_token_expires_at: refreshExpiresAt.toISOString(),
+      is_active: true
+    })
+    .select('id, realm_id, is_active, expires_at, created_at, updated_at')
+    .single();
+
+  if (insertError) {
+    throw new Error(`Failed to store credentials: ${insertError.message}`);
+  }
 
   return {
     success: true,
@@ -159,7 +182,7 @@ async function handleExchange(body) {
       realm_id: credentials.realm_id,
       is_active: credentials.is_active,
       expires_at: credentials.expires_at,
-      connected_at: credentials.connected_at,
+      connected_at: credentials.created_at,
       updated_at: credentials.updated_at
     }
   };
@@ -167,9 +190,14 @@ async function handleExchange(body) {
 
 async function handleRefresh() {
   const { clientId, clientSecret } = getQBConfig();
-  const store = getTokenStore();
+  const supabase = getSupabaseAdmin();
 
-  const creds = await store.get(CREDENTIALS_KEY, { type: 'json' });
+  const { data: creds } = await supabase
+    .from('quickbooks_credentials')
+    .select('*')
+    .eq('is_active', true)
+    .maybeSingle();
+
   if (!creds) {
     throw new Error('No active QuickBooks credentials found');
   }
@@ -202,38 +230,54 @@ async function handleRefresh() {
   const refreshExpiresAt = new Date();
   refreshExpiresAt.setSeconds(refreshExpiresAt.getSeconds() + (tokenData.x_refresh_token_expires_in || 8726400));
 
-  const updatedCreds = {
-    ...creds,
-    access_token: tokenData.access_token,
-    refresh_token: tokenData.refresh_token,
-    expires_at: expiresAt.toISOString(),
-    refresh_token_expires_at: refreshExpiresAt.toISOString(),
-    updated_at: new Date().toISOString()
-  };
+  const { data: updated, error: updateError } = await supabase
+    .from('quickbooks_credentials')
+    .update({
+      access_token: tokenData.access_token,
+      refresh_token: tokenData.refresh_token,
+      expires_at: expiresAt.toISOString(),
+      refresh_token_expires_at: refreshExpiresAt.toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', creds.id)
+    .select('id, realm_id, is_active, expires_at, created_at, updated_at')
+    .single();
 
-  await store.setJSON(CREDENTIALS_KEY, updatedCreds);
+  if (updateError) {
+    throw new Error(`Failed to update credentials: ${updateError.message}`);
+  }
 
   return {
     success: true,
     credentials: {
-      realm_id: updatedCreds.realm_id,
-      is_active: updatedCreds.is_active,
-      expires_at: updatedCreds.expires_at,
-      connected_at: updatedCreds.connected_at,
-      updated_at: updatedCreds.updated_at
+      realm_id: updated.realm_id,
+      is_active: updated.is_active,
+      expires_at: updated.expires_at,
+      connected_at: updated.created_at,
+      updated_at: updated.updated_at
     }
   };
 }
 
 async function handleDisconnect() {
-  const store = getTokenStore();
-  await store.delete(CREDENTIALS_KEY);
+  const supabase = getSupabaseAdmin();
+
+  await supabase
+    .from('quickbooks_credentials')
+    .update({ is_active: false })
+    .eq('is_active', true);
+
   return { success: true };
 }
 
 async function handleStatus() {
-  const store = getTokenStore();
-  const creds = await store.get(CREDENTIALS_KEY, { type: 'json' });
+  const supabase = getSupabaseAdmin();
+
+  const { data: creds } = await supabase
+    .from('quickbooks_credentials')
+    .select('id, realm_id, is_active, expires_at, created_at, updated_at')
+    .eq('is_active', true)
+    .maybeSingle();
 
   if (!creds) {
     return { connected: false };
@@ -251,13 +295,14 @@ async function handleStatus() {
     expires_at: creds.expires_at,
     is_expired: isExpired,
     expires_in_minutes: expiresInMinutes,
-    connected_at: creds.connected_at,
+    connected_at: creds.created_at,
     updated_at: creds.updated_at
   };
 }
 
 function handleDiagnostics() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 
   let qbConfig = null;
   let qbError = null;
@@ -275,10 +320,11 @@ function handleDiagnostics() {
   return {
     status: 'ok',
     timestamp: new Date().toISOString(),
-    storage: 'netlify-blobs',
+    storage: 'supabase-server-side',
     supabase: {
       url: url ? url.substring(0, 30) + '...' : 'MISSING',
-      usage: 'auth-verification-only'
+      hasServiceRoleKey: hasServiceKey,
+      usage: 'auth-verification-and-token-storage'
     },
     quickbooks: qbError ? { error: qbError } : qbConfig
   };
@@ -310,10 +356,7 @@ exports.handler = async (event) => {
 
   try {
     const authHeader = event.headers.authorization || event.headers.Authorization;
-
-    if (action !== 'status') {
-      await authenticateUser(authHeader);
-    }
+    await authenticateUser(authHeader);
 
     let body = {};
     if (event.body) {
@@ -344,7 +387,6 @@ exports.handler = async (event) => {
         result = await handleDisconnect();
         break;
       case 'status':
-        await authenticateUser(authHeader);
         result = await handleStatus();
         break;
       default:
