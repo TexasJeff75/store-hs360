@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS quickbooks_credentials (
   refresh_token_expires_at timestamptz NOT NULL,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id),
+  created_by uuid REFERENCES profiles(id),
   is_active boolean DEFAULT true
 );
 
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS quickbooks_sync_log (
   request_payload jsonb,
   response_payload jsonb,
   created_at timestamptz DEFAULT now(),
-  created_by uuid REFERENCES auth.users(id)
+  created_by uuid REFERENCES profiles(id)
 );
 
 -- Add QuickBooks fields to organizations table
