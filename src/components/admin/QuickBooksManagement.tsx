@@ -7,9 +7,9 @@ interface QBCredentials {
   id: string;
   realm_id: string;
   is_active: boolean;
-  connected_by: string | null;
-  last_refresh_at: string | null;
-  token_expires_at: string;
+  created_by: string | null;
+  updated_at: string;
+  expires_at: string;
   created_at: string;
 }
 
@@ -169,7 +169,7 @@ function ConnectionDiagnostics() {
     try {
       const { data, error } = await supabase
         .from('quickbooks_credentials')
-        .select('id, realm_id, is_active, created_at, token_expires_at, metadata')
+        .select('id, realm_id, is_active, created_at, expires_at')
         .order('created_at', { ascending: false })
         .limit(5);
 
@@ -182,14 +182,14 @@ function ConnectionDiagnostics() {
         });
       } else {
         const active = data?.find(c => c.is_active);
-        const pending = data?.filter(c => c.metadata?.pending);
+        const pending = data?.filter(c => c.realm_id?.startsWith('pending_state_'));
         addResult({
           name: 'QB Credentials Table',
           status: active ? 'pass' : data && data.length > 0 ? 'warn' : 'warn',
           message: active
             ? `Active connection found (realm: ${active.realm_id})`
             : `No active connection. ${data?.length || 0} total records, ${pending?.length || 0} pending.`,
-          details: data?.map(c => `ID: ${c.id.substring(0, 8)}... | realm: ${c.realm_id} | active: ${c.is_active} | pending: ${c.metadata?.pending || false}`).join('\n')
+          details: data?.map(c => `ID: ${c.id.substring(0, 8)}... | realm: ${c.realm_id} | active: ${c.is_active}`).join('\n')
         });
       }
     } catch (err: any) {
@@ -528,15 +528,15 @@ export function QuickBooksManagement() {
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Last Token Refresh</dt>
                         <dd className="mt-1 text-sm text-gray-900">
-                          {credentials.last_refresh_at
-                            ? new Date(credentials.last_refresh_at).toLocaleString()
+                          {credentials.updated_at
+                            ? new Date(credentials.updated_at).toLocaleString()
                             : 'Never'}
                         </dd>
                       </div>
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Token Expires</dt>
                         <dd className="mt-1 text-sm text-gray-900">
-                          {new Date(credentials.token_expires_at).toLocaleString()}
+                          {new Date(credentials.expires_at).toLocaleString()}
                         </dd>
                       </div>
                       <div>

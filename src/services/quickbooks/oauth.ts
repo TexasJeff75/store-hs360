@@ -7,11 +7,11 @@ interface QuickBooksCredentials {
   realm_id: string;
   access_token: string;
   refresh_token: string;
-  token_expires_at: string;
+  token_type: string;
+  expires_at: string;
+  refresh_token_expires_at: string;
   is_active: boolean;
-  connected_by: string | null;
-  last_refresh_at: string | null;
-  metadata: Record<string, any>;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -107,7 +107,7 @@ export const quickbooksOAuth = {
 
     if (!data) return null;
 
-    const expiresAt = new Date(data.token_expires_at);
+    const expiresAt = new Date(data.expires_at);
     const now = new Date();
     const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
 

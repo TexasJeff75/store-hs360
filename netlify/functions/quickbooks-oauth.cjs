@@ -61,19 +61,20 @@ async function handleAuthorize(supabase, user) {
   ].join(' ');
 
   const state = require('crypto').randomUUID();
+  const pendingRealmId = `pending_state_${state}`;
 
-  const { error: upsertError } = await supabase.from('quickbooks_credentials').upsert({
-    realm_id: `pending_${state.substring(0, 8)}`,
+  const { error: insertError } = await supabase.from('quickbooks_credentials').insert({
+    realm_id: pendingRealmId,
     access_token: 'pending',
     refresh_token: 'pending',
-    token_expires_at: new Date().toISOString(),
+    expires_at: new Date().toISOString(),
+    refresh_token_expires_at: new Date().toISOString(),
     is_active: false,
-    connected_by: user.id,
-    metadata: { state, pending: true }
+    created_by: user.id
   });
 
-  if (upsertError) {
-    throw new Error(`Failed to save pending state: ${upsertError.message} (code: ${upsertError.code})`);
+  if (insertError) {
+    throw new Error(`Failed to save pending state: ${insertError.message} (code: ${insertError.code})`);
   }
 
   const params = new URLSearchParams({
@@ -95,15 +96,16 @@ async function handleExchange(supabase, user, body) {
     throw new Error('Missing required parameters: code, realmId, state');
   }
 
-  const { data: pendingCreds } = await supabase
+  const pendingRealmId = `pending_state_${state}`;
+
+  const { data: matchingCred } = await supabase
     .from('quickbooks_credentials')
     .select('*')
-    .eq('connected_by', user.id)
+    .eq('created_by', user.id)
+    .eq('realm_id', pendingRealmId)
     .eq('is_active', false)
-    .order('created_at', { ascending: false })
-    .limit(10);
+    .maybeSingle();
 
-  const matchingCred = pendingCreds?.find(c => c.metadata?.state === state && c.metadata?.pending === true);
   if (!matchingCred) {
     throw new Error('Invalid state parameter - possible CSRF attack');
   }
@@ -134,6 +136,9 @@ async function handleExchange(supabase, user, body) {
   const expiresAt = new Date();
   expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
 
+  const refreshExpiresAt = new Date();
+  refreshExpiresAt.setSeconds(refreshExpiresAt.getSeconds() + (tokenData.x_refresh_token_expires_in || 8726400));
+
   await supabase
     .from('quickbooks_credentials')
     .update({ is_active: false })
@@ -150,14 +155,11 @@ async function handleExchange(supabase, user, body) {
       realm_id: realmId,
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
-      token_expires_at: expiresAt.toISOString(),
+      token_type: tokenData.token_type || 'bearer',
+      expires_at: expiresAt.toISOString(),
+      refresh_token_expires_at: refreshExpiresAt.toISOString(),
       is_active: true,
-      connected_by: user.id,
-      last_refresh_at: new Date().toISOString(),
-      metadata: {
-        token_type: tokenData.token_type,
-        refresh_token_expires_in: tokenData.x_refresh_token_expires_in
-      }
+      created_by: user.id
     })
     .select()
     .single();
@@ -210,13 +212,16 @@ async function handleRefresh(supabase, body) {
   const expiresAt = new Date();
   expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
 
+  const refreshExpiresAt = new Date();
+  refreshExpiresAt.setSeconds(refreshExpiresAt.getSeconds() + (tokenData.x_refresh_token_expires_in || 8726400));
+
   const { data: updated, error: updateError } = await supabase
     .from('quickbooks_credentials')
     .update({
       access_token: tokenData.access_token,
       refresh_token: tokenData.refresh_token,
-      token_expires_at: expiresAt.toISOString(),
-      last_refresh_at: new Date().toISOString()
+      expires_at: expiresAt.toISOString(),
+      refresh_token_expires_at: refreshExpiresAt.toISOString()
     })
     .eq('id', credentialsId)
     .select()
@@ -300,7 +305,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { client: supabase, keyType } = getSupabaseAdmin();
+    const { client: supabase } = getSupabaseAdmin();
     const user = await authenticateUser(supabase, event.headers.authorization || event.headers.Authorization);
 
     let body = {};
@@ -352,8 +357,7 @@ exports.handler = async (event) => {
       headers: corsHeaders,
       body: JSON.stringify({
         error: error.message,
-        code: error.code || undefined,
-        step: error.step || undefined
+        code: error.code || undefined
       })
     };
   }
