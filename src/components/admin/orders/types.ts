@@ -53,10 +53,16 @@ export interface Order {
   shipments?: Shipment[];
   created_at: string;
   updated_at: string;
+  completed_at?: string;
   order_type?: string;
   is_sub_order?: boolean;
   vendor_brand?: string;
   parent_order_id?: string;
   split_from_order_id?: string;
   viewed_by_admin?: boolean;
+  payment_status?: string;
+  payment_authorization_id?: string;
+  payment_captured_at?: string;
+  sales_rep_id?: string;
+  backorder_reason?: string;
 }

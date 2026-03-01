@@ -219,6 +219,22 @@ class RestCheckoutService {
       }
 
 
+      const mapAddress = (addr: AddressData | null | undefined): Address | undefined => {
+        if (!addr) return undefined;
+        return {
+          firstName: addr.first_name,
+          lastName: addr.last_name,
+          company: addr.company,
+          address1: addr.address1,
+          address2: addr.address2,
+          city: addr.city,
+          state: addr.state_or_province,
+          postalCode: addr.postal_code,
+          country: addr.country_code,
+          phone: addr.phone,
+        };
+      };
+
       const orderData: CreateOrderData = {
         userId: session.user_id,
         bigcommerceCartId: session.cart_id || '',
@@ -237,12 +253,12 @@ class RestCheckoutService {
         tax: session.tax,
         shipping: session.shipping,
         total: session.total,
-        shippingAddress: session.shipping_address,
-        billingAddress: session.billing_address,
+        shippingAddress: mapAddress(session.shipping_address),
+        billingAddress: mapAddress(session.billing_address),
         customerEmail: session.billing_address?.email || '',
         organizationId: session.organization_id,
         locationId: session.location_id,
-        notes: 'Test order - Payment simulated (card ending in ' + paymentData.number.slice(-4) + ')',
+        notes: 'Order placed (card ending in ' + paymentData.number.slice(-4) + ')',
       };
 
       const result = await orderService.createOrder(orderData);
