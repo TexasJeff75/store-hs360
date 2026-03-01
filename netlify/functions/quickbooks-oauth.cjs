@@ -88,7 +88,8 @@ async function handleAuthorize() {
     });
 
   if (error) {
-    throw new Error(`Failed to store pending state: ${error.message}`);
+    console.error('Failed to store pending state:', JSON.stringify(error));
+    throw new Error(`Failed to store pending state: ${error.message} (code: ${error.code}, details: ${error.details || 'none'})`);
   }
 
   const params = new URLSearchParams({
@@ -300,7 +301,7 @@ async function handleStatus() {
   };
 }
 
-function handleDiagnostics() {
+async function handleDiagnostics() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
   const hasServiceKey = !!process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -317,6 +318,18 @@ function handleDiagnostics() {
     qbError = e.message;
   }
 
+  let dbStatus = 'unknown';
+  try {
+    const supabase = getSupabaseAdmin();
+    const { error } = await supabase
+      .from('quickbooks_credentials')
+      .select('id')
+      .limit(1);
+    dbStatus = error ? `error: ${error.message}` : 'table exists';
+  } catch (e) {
+    dbStatus = `connection failed: ${e.message}`;
+  }
+
   return {
     status: 'ok',
     timestamp: new Date().toISOString(),
@@ -326,6 +339,7 @@ function handleDiagnostics() {
       hasServiceRoleKey: hasServiceKey,
       usage: 'auth-verification-and-token-storage'
     },
+    database: { quickbooks_credentials: dbStatus },
     quickbooks: qbError ? { error: qbError } : qbConfig
   };
 }
@@ -343,7 +357,7 @@ exports.handler = async (event) => {
       return {
         statusCode: 200,
         headers: corsHeaders,
-        body: JSON.stringify(handleDiagnostics())
+        body: JSON.stringify(await handleDiagnostics())
       };
     } catch (e) {
       return {
@@ -403,13 +417,14 @@ exports.handler = async (event) => {
       body: JSON.stringify(result)
     };
   } catch (error) {
-    console.error('QuickBooks OAuth error:', error);
+    console.error('QuickBooks OAuth error:', error.message, error.stack);
     const statusCode = error.message === 'Unauthorized' || error.message?.includes('Auth error') || error.message?.includes('Only admins') ? 401 : 500;
     return {
       statusCode,
       headers: corsHeaders,
       body: JSON.stringify({
         error: error.message,
+        action: action || 'unknown',
         code: error.code || undefined
       })
     };
