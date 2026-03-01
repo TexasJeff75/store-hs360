@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Package, Search, RefreshCw, ChevronUp, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { Package, Search, RefreshCw, ChevronUp, ChevronDown, Plus, Trash2, Upload } from 'lucide-react';
 import { Product, productService } from '@/services/productService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProductData } from './useProductData';
@@ -9,6 +9,7 @@ import { useProductSettings } from './useProductSettings';
 import { ProductTableRow } from './ProductTableRow';
 import { ProductDetailsModal } from './ProductDetailsModal';
 import ProductForm from './ProductForm';
+import ProductImport from './ProductImport';
 
 const ProductsManagement: React.FC = () => {
   const { profile } = useAuth();
@@ -20,6 +21,7 @@ const ProductsManagement: React.FC = () => {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
 
   const { products, loading, loadingCosts, error, refetchProducts } = useProductData();
   const {
@@ -162,6 +164,13 @@ const ProductsManagement: React.FC = () => {
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
+          </button>
+          <button
+            onClick={() => setIsImportOpen(true)}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Import
           </button>
           <button
             onClick={handleCreateProduct}
@@ -339,6 +348,13 @@ const ProductsManagement: React.FC = () => {
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSave={handleProductSaved}
+      />
+
+      <ProductImport
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImportComplete={handleProductSaved}
+        products={products}
       />
     </div>
   );
