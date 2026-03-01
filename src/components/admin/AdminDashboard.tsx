@@ -6,6 +6,7 @@ import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
 import LocationManagement from './LocationManagement';
 import ProductsManagement from './products/ProductsManagement';
+import PricingManagement from './PricingManagement';
 import OrderManagement from './OrderManagement';
 import CommissionManagement from './CommissionManagement';
 import SalesRepAssignment from './SalesRepAssignment';
@@ -111,6 +112,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
 
   const adminSettingsTabs = [
     { id: 'organizations' as AdminSettingsTab, label: 'Organizations', icon: Building2 },
+    { id: 'pricing' as AdminSettingsTab, label: 'Pricing', icon: DollarSign },
     { id: 'products' as AdminSettingsTab, label: 'Products', icon: Package },
     { id: 'recurring-orders' as AdminSettingsTab, label: 'Recurring Orders', icon: Repeat },
     { id: 'distributors' as AdminSettingsTab, label: 'Distributors', icon: Building },
@@ -131,6 +133,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
     switch (adminSettingsTab) {
       case 'organizations':
         return <OrganizationManagement />;
+      case 'pricing':
+        return <PricingManagement />;
       case 'products':
         return <ProductsManagement />;
       case 'recurring-orders':

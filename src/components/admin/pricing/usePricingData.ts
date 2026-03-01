@@ -1,0 +1,177 @@
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/services/supabase';
+import { contractPricingService, ContractPrice } from '@/services/contractPricing';
+
+export interface EnrichedPricingEntry extends ContractPrice {
+  entity_name: string;
+  entity_detail?: string;
+  product_name?: string;
+}
+
+interface OrganizationOption {
+  id: string;
+  name: string;
+  code: string;
+}
+
+interface LocationOption {
+  id: string;
+  name: string;
+  code: string;
+  organization_id: string;
+  organization_name?: string;
+}
+
+interface UserOption {
+  id: string;
+  email: string;
+  full_name?: string;
+}
+
+export function usePricingData() {
+  const [entries, setEntries] = useState<EnrichedPricingEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
+  const [users, setUsers] = useState<UserOption[]>([]);
+  const [saving, setSaving] = useState(false);
+
+  const fetchPricingData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await contractPricingService.getAllPricingEntries();
+
+      const enriched: EnrichedPricingEntry[] = data.map((entry: any) => {
+        let entity_name = 'Unknown';
+        let entity_detail: string | undefined;
+
+        if (entry.pricing_type === 'individual' && entry.profiles) {
+          entity_name = entry.profiles.email || 'Unknown User';
+        } else if (entry.pricing_type === 'organization' && entry.organizations) {
+          entity_name = entry.organizations.name || 'Unknown Org';
+          entity_detail = entry.organizations.code;
+        } else if (entry.pricing_type === 'location' && entry.locations) {
+          entity_name = entry.locations.name || 'Unknown Location';
+          entity_detail = entry.locations.code;
+        }
+
+        return {
+          ...entry,
+          entity_name,
+          entity_detail,
+        };
+      });
+
+      setEntries(enriched);
+    } catch (err) {
+      console.error('Error fetching pricing data:', err);
+      setError('Failed to load pricing data');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const fetchEntityOptions = useCallback(async () => {
+    try {
+      const [orgsRes, locsRes, usersRes] = await Promise.all([
+        supabase
+          .from('organizations')
+          .select('id, name, code')
+          .eq('is_active', true)
+          .order('name'),
+        supabase
+          .from('locations')
+          .select('id, name, code, organization_id, organizations!inner(name)')
+          .eq('is_active', true)
+          .order('name'),
+        supabase
+          .from('profiles')
+          .select('id, email, full_name')
+          .eq('approval_status', 'approved')
+          .order('email'),
+      ]);
+
+      if (orgsRes.data) setOrganizations(orgsRes.data);
+      if (locsRes.data) {
+        setLocations(
+          locsRes.data.map((l: any) => ({
+            ...l,
+            organization_name: l.organizations?.name,
+          }))
+        );
+      }
+      if (usersRes.data) setUsers(usersRes.data);
+    } catch (err) {
+      console.error('Error fetching entity options:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchPricingData();
+    fetchEntityOptions();
+  }, [fetchPricingData, fetchEntityOptions]);
+
+  const savePricing = async (params: {
+    id?: string;
+    entityId: string;
+    productId: number;
+    pricingType: 'individual' | 'organization' | 'location';
+    contractPrice?: number;
+    markupPrice?: number;
+    minQuantity: number;
+    maxQuantity?: number;
+    effectiveDate?: string;
+    expiryDate?: string;
+  }) => {
+    setSaving(true);
+    try {
+      const result = await contractPricingService.setContractPrice(
+        params.entityId,
+        params.productId,
+        params.contractPrice,
+        params.pricingType,
+        params.minQuantity,
+        params.maxQuantity,
+        params.effectiveDate,
+        params.expiryDate,
+        params.markupPrice,
+        params.id
+      );
+
+      if (result.success) {
+        await fetchPricingData();
+      }
+      return result;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deletePricing = async (id: string) => {
+    setSaving(true);
+    try {
+      const result = await contractPricingService.removeContractPriceById(id);
+      if (result.success) {
+        await fetchPricingData();
+      }
+      return result;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return {
+    entries,
+    loading,
+    error,
+    saving,
+    organizations,
+    locations,
+    users,
+    fetchPricingData,
+    savePricing,
+    deletePricing,
+  };
+}
