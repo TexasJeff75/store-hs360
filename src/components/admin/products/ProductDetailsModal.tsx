@@ -3,6 +3,7 @@ import { Hash, Lock, Edit2, CheckCircle2, XCircle, Building2, Pencil, Trash2 } f
 import { Product } from '@/services/productService';
 import { SecretCostMap } from '@/services/secretCostService';
 import { ContractPricingInfo } from './useContractPricing';
+import AIDescriptionSection from '@/components/AIDescriptionSection';
 
 interface ProductDetailsModalProps {
   product: Product;
@@ -19,6 +20,7 @@ interface ProductDetailsModalProps {
   onToggleMarkupAllowance: (productId: number, currentValue: boolean) => void;
   onEditProduct?: (product: Product) => void;
   onDeleteProduct?: (product: Product) => void;
+  onProductRefresh?: () => void;
 }
 
 export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
@@ -36,6 +38,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
   onToggleMarkupAllowance,
   onEditProduct,
   onDeleteProduct,
+  onProductRefresh,
 }) => {
   if (!isOpen) return null;
 
@@ -360,6 +363,14 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
                       dangerouslySetInnerHTML={{ __html: product.description }}
                     />
                   </div>
+                )}
+
+                {isAdmin && (
+                  <AIDescriptionSection
+                    product={product}
+                    isAdmin={true}
+                    onDescriptionSaved={onProductRefresh}
+                  />
                 )}
               </div>
             </div>

@@ -340,6 +340,7 @@ const ProductsManagement: React.FC = () => {
           onToggleMarkupAllowance={handleToggleMarkup}
           onEditProduct={handleEditProduct}
           onDeleteProduct={handleDeleteProduct}
+          onProductRefresh={handleProductSaved}
         />
       )}
 

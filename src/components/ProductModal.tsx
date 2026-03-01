@@ -6,6 +6,7 @@ import { contractPricingService, ContractPrice } from '../services/contractPrici
 import { useAuth } from '../contexts/AuthContext';
 import { useFavorites } from '../contexts/FavoritesContext';
 import RecurringOrderModal from './RecurringOrderModal';
+import AIDescriptionSection from './AIDescriptionSection';
 
 interface ProductModalProps {
   product: Product | null;
@@ -327,6 +328,8 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     </div>
                   </div>
                 )}
+
+                <AIDescriptionSection product={product} />
 
                 {/* Quantity and Add to Cart */}
                 <div className="space-y-4">
