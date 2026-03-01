@@ -9,17 +9,51 @@ export interface OrderItem {
 }
 
 export interface Address {
+  firstName?: string;
+  lastName?: string;
+  first_name?: string;
+  last_name?: string;
+  company?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  state_or_province?: string;
+  postalCode?: string;
+  postal_code?: string;
+  country?: string;
+  country_code?: string;
+  phone?: string;
+  email?: string;
+}
+
+export function normalizeAddress(addr?: Address | null): {
   firstName: string;
   lastName: string;
-  company?: string;
+  company: string;
   address1: string;
-  address2?: string;
+  address2: string;
   city: string;
   state: string;
   postalCode: string;
   country: string;
-  phone?: string;
-  email?: string;
+  phone: string;
+  email: string;
+} | null {
+  if (!addr) return null;
+  return {
+    firstName: addr.firstName || addr.first_name || '',
+    lastName: addr.lastName || addr.last_name || '',
+    company: addr.company || '',
+    address1: addr.address1 || '',
+    address2: addr.address2 || '',
+    city: addr.city || '',
+    state: addr.state || addr.state_or_province || '',
+    postalCode: addr.postalCode || addr.postal_code || '',
+    country: addr.country || addr.country_code || '',
+    phone: addr.phone || '',
+    email: addr.email || '',
+  };
 }
 
 export interface Shipment {

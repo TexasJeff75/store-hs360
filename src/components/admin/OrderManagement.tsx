@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { orderService } from '../../services/orderService';
 import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle } from 'lucide-react';
 import type { Order, OrderItem, Shipment } from './orders/types';
+import { normalizeAddress } from './orders/types';
 
 const OrderManagement: React.FC = () => {
   const { user, profile } = useAuth();
@@ -853,41 +854,49 @@ const OrderManagement: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {order.shipping_address && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Shipping Address
-                  </h4>
-                  <div className="text-sm text-gray-700">
-                    <p className="font-medium">{order.shipping_address.firstName} {order.shipping_address.lastName}</p>
-                    {order.shipping_address.company && <p>{order.shipping_address.company}</p>}
-                    <p>{order.shipping_address.address1}</p>
-                    {order.shipping_address.address2 && <p>{order.shipping_address.address2}</p>}
-                    <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postalCode}</p>
-                    <p>{order.shipping_address.country}</p>
-                    {order.shipping_address.phone && <p className="mt-2">Phone: {order.shipping_address.phone}</p>}
+              {order.shipping_address && (() => {
+                const addr = normalizeAddress(order.shipping_address);
+                if (!addr) return null;
+                return (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Shipping Address
+                    </h4>
+                    <div className="text-sm text-gray-700">
+                      <p className="font-medium">{addr.firstName} {addr.lastName}</p>
+                      {addr.company && <p>{addr.company}</p>}
+                      <p>{addr.address1}</p>
+                      {addr.address2 && <p>{addr.address2}</p>}
+                      <p>{addr.city}, {addr.state} {addr.postalCode}</p>
+                      <p>{addr.country}</p>
+                      {addr.phone && <p className="mt-2">Phone: {addr.phone}</p>}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
-              {order.billing_address && (
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Billing Address
-                  </h4>
-                  <div className="text-sm text-gray-700">
-                    <p className="font-medium">{order.billing_address.firstName} {order.billing_address.lastName}</p>
-                    {order.billing_address.company && <p>{order.billing_address.company}</p>}
-                    <p>{order.billing_address.address1}</p>
-                    {order.billing_address.address2 && <p>{order.billing_address.address2}</p>}
-                    <p>{order.billing_address.city}, {order.billing_address.state} {order.billing_address.postalCode}</p>
-                    <p>{order.billing_address.country}</p>
-                    {order.billing_address.phone && <p className="mt-2">Phone: {order.billing_address.phone}</p>}
+              {order.billing_address && (() => {
+                const addr = normalizeAddress(order.billing_address);
+                if (!addr) return null;
+                return (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                      <MapPin className="h-4 w-4 mr-2" />
+                      Billing Address
+                    </h4>
+                    <div className="text-sm text-gray-700">
+                      <p className="font-medium">{addr.firstName} {addr.lastName}</p>
+                      {addr.company && <p>{addr.company}</p>}
+                      <p>{addr.address1}</p>
+                      {addr.address2 && <p>{addr.address2}</p>}
+                      <p>{addr.city}, {addr.state} {addr.postalCode}</p>
+                      <p>{addr.country}</p>
+                      {addr.phone && <p className="mt-2">Phone: {addr.phone}</p>}
+                    </div>
                   </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
 
             <div>
@@ -1441,22 +1450,26 @@ const OrderManagement: React.FC = () => {
                         </div>
                       )}
 
-                      {parent.shipping_address && (
-                        <div>
-                          <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
-                            <MapPin className="h-4 w-4 mr-2 text-gray-600" />
-                            Shipping Address
-                          </h4>
-                          <div className="bg-white rounded-lg p-3 border border-gray-200 text-xs text-gray-700">
-                            <p className="font-medium">{parent.shipping_address.firstName} {parent.shipping_address.lastName}</p>
-                            {parent.shipping_address.company && <p>{parent.shipping_address.company}</p>}
-                            <p>{parent.shipping_address.address1}</p>
-                            {parent.shipping_address.address2 && <p>{parent.shipping_address.address2}</p>}
-                            <p>{parent.shipping_address.city}, {parent.shipping_address.state} {parent.shipping_address.postalCode}</p>
-                            {parent.shipping_address.phone && <p className="mt-1">Phone: {parent.shipping_address.phone}</p>}
+                      {parent.shipping_address && (() => {
+                        const addr = normalizeAddress(parent.shipping_address);
+                        if (!addr) return null;
+                        return (
+                          <div>
+                            <h4 className="text-sm font-semibold text-gray-900 mb-2 flex items-center">
+                              <MapPin className="h-4 w-4 mr-2 text-gray-600" />
+                              Shipping Address
+                            </h4>
+                            <div className="bg-white rounded-lg p-3 border border-gray-200 text-xs text-gray-700">
+                              <p className="font-medium">{addr.firstName} {addr.lastName}</p>
+                              {addr.company && <p>{addr.company}</p>}
+                              <p>{addr.address1}</p>
+                              {addr.address2 && <p>{addr.address2}</p>}
+                              <p>{addr.city}, {addr.state} {addr.postalCode}</p>
+                              {addr.phone && <p className="mt-1">Phone: {addr.phone}</p>}
+                            </div>
                           </div>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </div>
                   </div>
                 )}
