@@ -4,4 +4,4 @@ export { quickbooksCustomers } from './customers';
 export { quickbooksInvoices } from './invoices';
 export { quickbooksPayments } from './payments';
 
-export type { TokenResponse } from './oauth';
+export type { TokenResponse, QBConnectionStatus } from './oauth';

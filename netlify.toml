@@ -36,6 +36,11 @@
   to = "/.netlify/functions/quickbooks-oauth"
   status = 200
 
+[[redirects]]
+  from = "/api/quickbooks-api"
+  to = "/.netlify/functions/quickbooks-api"
+  status = 200
+
 # SPA fallback - must be last
 # IMPORTANT: Do not use force = true, as it would override function routes
 [[redirects]]

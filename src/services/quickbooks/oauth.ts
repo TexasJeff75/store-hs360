@@ -2,18 +2,15 @@ import { supabase } from '../supabase';
 
 const FUNCTION_URL = '/.netlify/functions/quickbooks-oauth';
 
-interface QuickBooksCredentials {
-  id: string;
-  realm_id: string;
-  access_token: string;
-  refresh_token: string;
-  token_type: string;
-  expires_at: string;
-  refresh_token_expires_at: string;
-  is_active: boolean;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
+export interface QBConnectionStatus {
+  connected: boolean;
+  realm_id?: string;
+  is_active?: boolean;
+  expires_at?: string;
+  is_expired?: boolean;
+  expires_in_minutes?: number;
+  connected_at?: string;
+  updated_at?: string;
 }
 
 export interface TokenResponse {
@@ -24,19 +21,22 @@ export interface TokenResponse {
   token_type: string;
 }
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+  return {
+    'Authorization': `Bearer ${session.access_token}`,
+    'Content-Type': 'application/json'
+  };
+}
+
 export const quickbooksOAuth = {
   async getAuthorizationUrl(): Promise<string> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw new Error('User not authenticated');
-    }
+    const headers = await getAuthHeaders();
 
-    const response = await fetch(`${FUNCTION_URL}?action=authorize`, {
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      }
-    });
+    const response = await fetch(`${FUNCTION_URL}?action=authorize`, { headers });
 
     if (!response.ok) {
       const error = await response.json();
@@ -47,18 +47,12 @@ export const quickbooksOAuth = {
     return url;
   },
 
-  async exchangeCodeForTokens(code: string, realmId: string, state: string): Promise<QuickBooksCredentials> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw new Error('User not authenticated');
-    }
+  async exchangeCodeForTokens(code: string, realmId: string, state: string): Promise<QBConnectionStatus> {
+    const headers = await getAuthHeaders();
 
     const response = await fetch(`${FUNCTION_URL}?action=exchange`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify({ code, realmId, state })
     });
 
@@ -71,19 +65,12 @@ export const quickbooksOAuth = {
     return credentials;
   },
 
-  async refreshAccessToken(credentialsId: string): Promise<QuickBooksCredentials> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw new Error('User not authenticated');
-    }
+  async refreshTokens(): Promise<QBConnectionStatus> {
+    const headers = await getAuthHeaders();
 
     const response = await fetch(`${FUNCTION_URL}?action=refresh`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ credentialsId })
+      headers
     });
 
     if (!response.ok) {
@@ -95,42 +82,25 @@ export const quickbooksOAuth = {
     return credentials;
   },
 
-  async getActiveCredentials(): Promise<QuickBooksCredentials | null> {
-    const { data, error } = await supabase
-      .from('quickbooks_credentials')
-      .select('*')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false })
-      .maybeSingle();
+  async getConnectionStatus(): Promise<QBConnectionStatus> {
+    const headers = await getAuthHeaders();
 
-    if (error) throw error;
+    const response = await fetch(`${FUNCTION_URL}?action=status`, { headers });
 
-    if (!data) return null;
-
-    const expiresAt = new Date(data.expires_at);
-    const now = new Date();
-    const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000);
-
-    if (expiresAt <= fiveMinutesFromNow) {
-      return await this.refreshAccessToken(data.id);
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to get connection status');
     }
 
-    return data;
+    return await response.json();
   },
 
-  async disconnect(credentialsId: string): Promise<void> {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      throw new Error('User not authenticated');
-    }
+  async disconnect(): Promise<void> {
+    const headers = await getAuthHeaders();
 
     const response = await fetch(`${FUNCTION_URL}?action=disconnect`, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ credentialsId })
+      headers
     });
 
     if (!response.ok) {

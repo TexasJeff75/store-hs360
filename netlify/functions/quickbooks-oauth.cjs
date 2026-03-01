@@ -1,4 +1,4 @@
-const { createClient } = require('@supabase/supabase-js');
+const { getStore } = require('@netlify/blobs');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,30 +9,11 @@ const corsHeaders = {
 
 const QB_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
 const QB_AUTH_BASE_URL = 'https://appcenter.intuit.com/connect/oauth2';
+const CREDENTIALS_KEY = 'active_credentials';
+const PENDING_PREFIX = 'pending_';
 
-function getSupabaseAdmin() {
-  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const anonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-  const key = serviceKey || anonKey;
-
-  if (!url || !key) {
-    throw new Error(`Supabase config missing. URL: ${url ? 'set' : 'MISSING'}, Key: ${serviceKey ? 'service_role' : anonKey ? 'anon' : 'MISSING'}`);
-  }
-
-  return { client: createClient(url, key), keyType: serviceKey ? 'service_role' : 'anon' };
-}
-
-async function authenticateUser(supabase, authHeader) {
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new Error('Missing or invalid authorization header');
-  }
-  const token = authHeader.replace('Bearer ', '');
-  const { data: { user }, error } = await supabase.auth.getUser(token);
-  if (error || !user) {
-    throw new Error(error ? `Auth error: ${error.message}` : 'Unauthorized - no user found');
-  }
-  return user;
+function getTokenStore() {
+  return getStore({ name: 'quickbooks-tokens', consistency: 'strong' });
 }
 
 function getQBConfig() {
@@ -52,8 +33,43 @@ function getQBConfig() {
   return { clientId, clientSecret, redirectUri };
 }
 
-async function handleAuthorize(supabase, user) {
+async function authenticateUser(authHeader) {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new Error('Missing or invalid authorization header');
+  }
+
+  const { createClient } = require('@supabase/supabase-js');
+  const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+
+  if (!url || !key) {
+    throw new Error('Supabase config missing for auth verification');
+  }
+
+  const supabase = createClient(url, key);
+  const token = authHeader.replace('Bearer ', '');
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+
+  if (error || !user) {
+    throw new Error(error ? `Auth error: ${error.message}` : 'Unauthorized');
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (!profile || profile.role !== 'admin') {
+    throw new Error('Only admins can manage QuickBooks connection');
+  }
+
+  return user;
+}
+
+async function handleAuthorize() {
   const { clientId, redirectUri } = getQBConfig();
+  const store = getTokenStore();
 
   const scope = [
     'com.intuit.quickbooks.accounting',
@@ -61,21 +77,11 @@ async function handleAuthorize(supabase, user) {
   ].join(' ');
 
   const state = require('crypto').randomUUID();
-  const pendingRealmId = `pending_state_${state}`;
 
-  const { error: insertError } = await supabase.from('quickbooks_credentials').insert({
-    realm_id: pendingRealmId,
-    access_token: 'pending',
-    refresh_token: 'pending',
-    expires_at: new Date().toISOString(),
-    refresh_token_expires_at: new Date().toISOString(),
-    is_active: false,
-    created_by: user.id
+  await store.setJSON(`${PENDING_PREFIX}${state}`, {
+    state,
+    created_at: new Date().toISOString()
   });
-
-  if (insertError) {
-    throw new Error(`Failed to save pending state: ${insertError.message} (code: ${insertError.code})`);
-  }
 
   const params = new URLSearchParams({
     client_id: clientId,
@@ -88,27 +94,21 @@ async function handleAuthorize(supabase, user) {
   return { url: `${QB_AUTH_BASE_URL}?${params.toString()}` };
 }
 
-async function handleExchange(supabase, user, body) {
+async function handleExchange(body) {
   const { clientId, clientSecret, redirectUri } = getQBConfig();
   const { code, realmId, state } = body;
+  const store = getTokenStore();
 
   if (!code || !realmId || !state) {
     throw new Error('Missing required parameters: code, realmId, state');
   }
 
-  const pendingRealmId = `pending_state_${state}`;
-
-  const { data: matchingCred } = await supabase
-    .from('quickbooks_credentials')
-    .select('*')
-    .eq('created_by', user.id)
-    .eq('realm_id', pendingRealmId)
-    .eq('is_active', false)
-    .maybeSingle();
-
-  if (!matchingCred) {
+  const pendingData = await store.get(`${PENDING_PREFIX}${state}`, { type: 'json' });
+  if (!pendingData) {
     throw new Error('Invalid state parameter - possible CSRF attack');
   }
+
+  await store.delete(`${PENDING_PREFIX}${state}`);
 
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
@@ -139,52 +139,39 @@ async function handleExchange(supabase, user, body) {
   const refreshExpiresAt = new Date();
   refreshExpiresAt.setSeconds(refreshExpiresAt.getSeconds() + (tokenData.x_refresh_token_expires_in || 8726400));
 
-  await supabase
-    .from('quickbooks_credentials')
-    .update({ is_active: false })
-    .eq('is_active', true);
+  const credentials = {
+    realm_id: realmId,
+    access_token: tokenData.access_token,
+    refresh_token: tokenData.refresh_token,
+    token_type: tokenData.token_type || 'bearer',
+    expires_at: expiresAt.toISOString(),
+    refresh_token_expires_at: refreshExpiresAt.toISOString(),
+    is_active: true,
+    connected_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
 
-  await supabase
-    .from('quickbooks_credentials')
-    .delete()
-    .eq('id', matchingCred.id);
+  await store.setJSON(CREDENTIALS_KEY, credentials);
 
-  const { data: credentials, error: insertError } = await supabase
-    .from('quickbooks_credentials')
-    .insert({
-      realm_id: realmId,
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      token_type: tokenData.token_type || 'bearer',
-      expires_at: expiresAt.toISOString(),
-      refresh_token_expires_at: refreshExpiresAt.toISOString(),
-      is_active: true,
-      created_by: user.id
-    })
-    .select()
-    .single();
-
-  if (insertError) throw insertError;
-
-  return { success: true, credentials };
+  return {
+    success: true,
+    credentials: {
+      realm_id: credentials.realm_id,
+      is_active: credentials.is_active,
+      expires_at: credentials.expires_at,
+      connected_at: credentials.connected_at,
+      updated_at: credentials.updated_at
+    }
+  };
 }
 
-async function handleRefresh(supabase, body) {
+async function handleRefresh() {
   const { clientId, clientSecret } = getQBConfig();
-  const { credentialsId } = body;
+  const store = getTokenStore();
 
-  if (!credentialsId) {
-    throw new Error('Missing credentialsId');
-  }
-
-  const { data: creds, error: fetchError } = await supabase
-    .from('quickbooks_credentials')
-    .select('*')
-    .eq('id', credentialsId)
-    .single();
-
-  if (fetchError || !creds) {
-    throw new Error('Credentials not found');
+  const creds = await store.get(CREDENTIALS_KEY, { type: 'json' });
+  if (!creds) {
+    throw new Error('No active QuickBooks credentials found');
   }
 
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
@@ -215,41 +202,61 @@ async function handleRefresh(supabase, body) {
   const refreshExpiresAt = new Date();
   refreshExpiresAt.setSeconds(refreshExpiresAt.getSeconds() + (tokenData.x_refresh_token_expires_in || 8726400));
 
-  const { data: updated, error: updateError } = await supabase
-    .from('quickbooks_credentials')
-    .update({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
-      expires_at: expiresAt.toISOString(),
-      refresh_token_expires_at: refreshExpiresAt.toISOString()
-    })
-    .eq('id', credentialsId)
-    .select()
-    .single();
+  const updatedCreds = {
+    ...creds,
+    access_token: tokenData.access_token,
+    refresh_token: tokenData.refresh_token,
+    expires_at: expiresAt.toISOString(),
+    refresh_token_expires_at: refreshExpiresAt.toISOString(),
+    updated_at: new Date().toISOString()
+  };
 
-  if (updateError) throw updateError;
+  await store.setJSON(CREDENTIALS_KEY, updatedCreds);
 
-  return { success: true, credentials: updated };
+  return {
+    success: true,
+    credentials: {
+      realm_id: updatedCreds.realm_id,
+      is_active: updatedCreds.is_active,
+      expires_at: updatedCreds.expires_at,
+      connected_at: updatedCreds.connected_at,
+      updated_at: updatedCreds.updated_at
+    }
+  };
 }
 
-async function handleDisconnect(supabase, body) {
-  const { credentialsId } = body;
-
-  if (!credentialsId) {
-    throw new Error('Missing credentialsId');
-  }
-
-  const { error } = await supabase
-    .from('quickbooks_credentials')
-    .update({ is_active: false })
-    .eq('id', credentialsId);
-
-  if (error) throw error;
-
+async function handleDisconnect() {
+  const store = getTokenStore();
+  await store.delete(CREDENTIALS_KEY);
   return { success: true };
 }
 
-function handleDiagnostics(keyType) {
+async function handleStatus() {
+  const store = getTokenStore();
+  const creds = await store.get(CREDENTIALS_KEY, { type: 'json' });
+
+  if (!creds) {
+    return { connected: false };
+  }
+
+  const expiresAt = new Date(creds.expires_at);
+  const now = new Date();
+  const isExpired = expiresAt <= now;
+  const expiresInMinutes = Math.round((expiresAt.getTime() - now.getTime()) / 60000);
+
+  return {
+    connected: true,
+    realm_id: creds.realm_id,
+    is_active: creds.is_active,
+    expires_at: creds.expires_at,
+    is_expired: isExpired,
+    expires_in_minutes: expiresInMinutes,
+    connected_at: creds.connected_at,
+    updated_at: creds.updated_at
+  };
+}
+
+function handleDiagnostics() {
   const url = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
 
   let qbConfig = null;
@@ -268,14 +275,12 @@ function handleDiagnostics(keyType) {
   return {
     status: 'ok',
     timestamp: new Date().toISOString(),
+    storage: 'netlify-blobs',
     supabase: {
       url: url ? url.substring(0, 30) + '...' : 'MISSING',
-      keyType
+      usage: 'auth-verification-only'
     },
-    quickbooks: qbError ? { error: qbError } : qbConfig,
-    envKeys: Object.keys(process.env)
-      .filter(k => k.includes('QB') || k.includes('SUPABASE'))
-      .map(k => k.replace(/KEY|SECRET|TOKEN/gi, '***'))
+    quickbooks: qbError ? { error: qbError } : qbConfig
   };
 }
 
@@ -289,24 +294,26 @@ exports.handler = async (event) => {
 
   if (action === 'diagnostics') {
     try {
-      const { keyType } = getSupabaseAdmin();
       return {
         statusCode: 200,
         headers: corsHeaders,
-        body: JSON.stringify(handleDiagnostics(keyType))
+        body: JSON.stringify(handleDiagnostics())
       };
     } catch (e) {
       return {
         statusCode: 500,
         headers: corsHeaders,
-        body: JSON.stringify({ error: e.message, step: 'diagnostics_init' })
+        body: JSON.stringify({ error: e.message })
       };
     }
   }
 
   try {
-    const { client: supabase } = getSupabaseAdmin();
-    const user = await authenticateUser(supabase, event.headers.authorization || event.headers.Authorization);
+    const authHeader = event.headers.authorization || event.headers.Authorization;
+
+    if (action !== 'status') {
+      await authenticateUser(authHeader);
+    }
 
     let body = {};
     if (event.body) {
@@ -325,16 +332,20 @@ exports.handler = async (event) => {
 
     switch (action) {
       case 'authorize':
-        result = await handleAuthorize(supabase, user);
+        result = await handleAuthorize();
         break;
       case 'exchange':
-        result = await handleExchange(supabase, user, body);
+        result = await handleExchange(body);
         break;
       case 'refresh':
-        result = await handleRefresh(supabase, body);
+        result = await handleRefresh();
         break;
       case 'disconnect':
-        result = await handleDisconnect(supabase, body);
+        result = await handleDisconnect();
+        break;
+      case 'status':
+        await authenticateUser(authHeader);
+        result = await handleStatus();
         break;
       default:
         return {
@@ -351,7 +362,7 @@ exports.handler = async (event) => {
     };
   } catch (error) {
     console.error('QuickBooks OAuth error:', error);
-    const statusCode = error.message === 'Unauthorized' || error.message?.includes('Auth error') ? 401 : 500;
+    const statusCode = error.message === 'Unauthorized' || error.message?.includes('Auth error') || error.message?.includes('Only admins') ? 401 : 500;
     return {
       statusCode,
       headers: corsHeaders,

@@ -1,17 +1,8 @@
 import { useState, useEffect } from 'react';
 import { RefreshCw, CheckCircle, XCircle, AlertCircle, ExternalLink, Download, Activity } from 'lucide-react';
 import { quickbooksOAuth, quickbooksCustomers, quickbooksInvoices } from '../../services/quickbooks';
+import type { QBConnectionStatus } from '../../services/quickbooks/oauth';
 import { supabase } from '../../services/supabase';
-
-interface QBCredentials {
-  id: string;
-  realm_id: string;
-  is_active: boolean;
-  created_by: string | null;
-  updated_at: string;
-  expires_at: string;
-  created_at: string;
-}
 
 interface SyncLog {
   id: string;
@@ -102,7 +93,7 @@ function ConnectionDiagnostics() {
           status: hasQBError ? 'fail' : 'pass',
           message: hasQBError
             ? `Server QB config error: ${diagData.quickbooks.error}`
-            : `Server config OK (Supabase key: ${diagData.supabase?.keyType})`,
+            : `Server config OK (storage: ${diagData.storage})`,
           details: JSON.stringify(diagData, null, 2)
         });
       } else {
@@ -165,38 +156,31 @@ function ConnectionDiagnostics() {
       });
     }
 
-    addResult({ name: 'QB Credentials Table', status: 'running', message: 'Checking database...' });
+    addResult({ name: 'Connection Status', status: 'running', message: 'Checking QB connection...' });
     try {
-      const { data, error } = await supabase
-        .from('quickbooks_credentials')
-        .select('id, realm_id, is_active, created_at, expires_at')
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (error) {
+      const connStatus = await quickbooksOAuth.getConnectionStatus();
+      if (connStatus.connected) {
         addResult({
-          name: 'QB Credentials Table',
-          status: 'fail',
-          message: 'Cannot query quickbooks_credentials',
-          details: error.message
+          name: 'Connection Status',
+          status: connStatus.is_expired ? 'warn' : 'pass',
+          message: connStatus.is_expired
+            ? `Connected but token expired (realm: ${connStatus.realm_id})`
+            : `Active connection (realm: ${connStatus.realm_id})`,
+          details: `Expires: ${connStatus.expires_at}\nExpires in: ${connStatus.expires_in_minutes} minutes\nConnected: ${connStatus.connected_at}`
         });
       } else {
-        const active = data?.find(c => c.is_active);
-        const pending = data?.filter(c => c.realm_id?.startsWith('pending_state_'));
         addResult({
-          name: 'QB Credentials Table',
-          status: active ? 'pass' : data && data.length > 0 ? 'warn' : 'warn',
-          message: active
-            ? `Active connection found (realm: ${active.realm_id})`
-            : `No active connection. ${data?.length || 0} total records, ${pending?.length || 0} pending.`,
-          details: data?.map(c => `ID: ${c.id.substring(0, 8)}... | realm: ${c.realm_id} | active: ${c.is_active}`).join('\n')
+          name: 'Connection Status',
+          status: 'warn',
+          message: 'No active QuickBooks connection',
+          details: 'Use the Connection tab to connect your QuickBooks account.'
         });
       }
     } catch (err: any) {
       addResult({
-        name: 'QB Credentials Table',
+        name: 'Connection Status',
         status: 'fail',
-        message: 'Error checking credentials table',
+        message: 'Error checking connection status',
         details: err.message
       });
     }
@@ -305,14 +289,13 @@ function ConnectionDiagnostics() {
                   <>
                     <li>The Netlify function cannot find required QuickBooks env vars on the server</li>
                     <li>Ensure QB_CLIENT_ID, QB_CLIENT_SECRET, and QB_REDIRECT_URI are set in <strong>Netlify Dashboard {'>'} Site settings {'>'} Environment variables</strong></li>
-                    <li>If using anon key (not service_role), the function may not have permission to write to quickbooks_credentials. Add SUPABASE_SERVICE_ROLE_KEY to Netlify env vars.</li>
                     <li>Redeploy after adding environment variables</li>
                   </>
                 )}
                 {results.find(r => r.name === 'Authorize Endpoint' && r.status === 'fail') && (
                   <>
                     <li>The authorize endpoint failed. Check the error details above for the exact error message from the server.</li>
-                    <li>Common causes: RLS blocking the upsert (need service_role key), missing QB credentials, or auth token issues.</li>
+                    <li>Common causes: missing QB credentials or auth token issues.</li>
                   </>
                 )}
                 {results.find(r => r.name === 'Redirect URI' && r.status === 'fail') && (
@@ -331,23 +314,23 @@ function ConnectionDiagnostics() {
 }
 
 export function QuickBooksManagement() {
-  const [credentials, setCredentials] = useState<QBCredentials | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<QBConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [activeTab, setActiveTab] = useState<'connection' | 'diagnostics' | 'sync' | 'logs'>('connection');
 
   useEffect(() => {
-    loadCredentials();
+    loadConnectionStatus();
     loadSyncLogs();
   }, []);
 
-  const loadCredentials = async () => {
+  const loadConnectionStatus = async () => {
     try {
-      const creds = await quickbooksOAuth.getActiveCredentials();
-      setCredentials(creds);
+      const status = await quickbooksOAuth.getConnectionStatus();
+      setConnectionStatus(status);
     } catch (error) {
-      console.error('Failed to load credentials:', error);
+      console.error('Failed to load connection status:', error);
     } finally {
       setLoading(false);
     }
@@ -378,17 +361,26 @@ export function QuickBooksManagement() {
   };
 
   const handleDisconnect = async () => {
-    if (!credentials) return;
+    if (!connectionStatus?.connected) return;
 
     if (!confirm('Are you sure you want to disconnect from QuickBooks? This will stop all syncing.')) {
       return;
     }
 
     try {
-      await quickbooksOAuth.disconnect(credentials.id);
-      setCredentials(null);
+      await quickbooksOAuth.disconnect();
+      setConnectionStatus({ connected: false });
     } catch (error: any) {
       alert(`Failed to disconnect: ${error.message}`);
+    }
+  };
+
+  const handleRefreshTokens = async () => {
+    try {
+      const updated = await quickbooksOAuth.refreshTokens();
+      setConnectionStatus({ connected: true, ...updated });
+    } catch (error: any) {
+      alert(`Failed to refresh: ${error.message}`);
     }
   };
 
@@ -500,58 +492,80 @@ export function QuickBooksManagement() {
           <div className="px-4 py-5 sm:p-6">
             <h3 className="text-lg font-medium text-gray-900">QuickBooks Connection Status</h3>
             <div className="mt-4">
-              {credentials ? (
+              {connectionStatus?.connected ? (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <CheckCircle className="h-6 w-6 text-green-600" />
                       <div>
                         <p className="text-sm font-medium text-gray-900">Connected</p>
-                        <p className="text-sm text-gray-500">Realm ID: {credentials.realm_id}</p>
+                        <p className="text-sm text-gray-500">Realm ID: {connectionStatus.realm_id}</p>
                       </div>
                     </div>
-                    <button
-                      onClick={handleDisconnect}
-                      className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700"
-                    >
-                      Disconnect
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleRefreshTokens}
+                        className="px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700"
+                      >
+                        Refresh Token
+                      </button>
+                      <button
+                        onClick={handleDisconnect}
+                        className="px-4 py-2 text-sm font-medium text-red-600 hover:text-red-700"
+                      >
+                        Disconnect
+                      </button>
+                    </div>
                   </div>
                   <div className="border-t border-gray-200 pt-4">
                     <dl className="grid grid-cols-2 gap-4">
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Connected At</dt>
                         <dd className="mt-1 text-sm text-gray-900">
-                          {new Date(credentials.created_at).toLocaleString()}
+                          {connectionStatus.connected_at
+                            ? new Date(connectionStatus.connected_at).toLocaleString()
+                            : 'Unknown'}
                         </dd>
                       </div>
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Last Token Refresh</dt>
                         <dd className="mt-1 text-sm text-gray-900">
-                          {credentials.updated_at
-                            ? new Date(credentials.updated_at).toLocaleString()
+                          {connectionStatus.updated_at
+                            ? new Date(connectionStatus.updated_at).toLocaleString()
                             : 'Never'}
                         </dd>
                       </div>
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Token Expires</dt>
                         <dd className="mt-1 text-sm text-gray-900">
-                          {new Date(credentials.expires_at).toLocaleString()}
+                          {connectionStatus.expires_at
+                            ? new Date(connectionStatus.expires_at).toLocaleString()
+                            : 'Unknown'}
                         </dd>
                       </div>
                       <div>
                         <dt className="text-sm font-medium text-gray-500">Status</dt>
                         <dd className="mt-1">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            credentials.is_active
-                              ? 'bg-green-100 text-green-800'
-                              : 'bg-red-100 text-red-800'
+                            connectionStatus.is_expired
+                              ? 'bg-red-100 text-red-800'
+                              : 'bg-green-100 text-green-800'
                           }`}>
-                            {credentials.is_active ? 'Active' : 'Inactive'}
+                            {connectionStatus.is_expired ? 'Expired' : 'Active'}
                           </span>
+                          {connectionStatus.expires_in_minutes != null && !connectionStatus.is_expired && (
+                            <span className="ml-2 text-xs text-gray-500">
+                              ({connectionStatus.expires_in_minutes}m remaining)
+                            </span>
+                          )}
                         </dd>
                       </div>
                     </dl>
+                  </div>
+                  <div className="border-t border-gray-200 pt-4">
+                    <p className="text-xs text-gray-500">
+                      Credentials are stored securely on the server (Netlify Blobs). They never pass through the browser or the database.
+                    </p>
                   </div>
                 </div>
               ) : (
@@ -599,7 +613,7 @@ export function QuickBooksManagement() {
                 </div>
                 <button
                   onClick={handleSyncOrganizations}
-                  disabled={syncing || !credentials}
+                  disabled={syncing || !connectionStatus?.connected}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {syncing ? (
@@ -620,7 +634,7 @@ export function QuickBooksManagement() {
                 </div>
                 <button
                   onClick={handleSyncOrders}
-                  disabled={syncing || !credentials}
+                  disabled={syncing || !connectionStatus?.connected}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {syncing ? (

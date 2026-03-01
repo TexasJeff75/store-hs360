@@ -1,15 +1,6 @@
-import { quickbooksOAuth } from './oauth';
 import { supabase } from '../supabase';
 
-const QB_ENVIRONMENT = import.meta.env.VITE_QB_ENVIRONMENT || 'sandbox';
-
-const QB_API_BASE_URL = QB_ENVIRONMENT === 'production'
-  ? 'https://quickbooks.api.intuit.com'
-  : 'https://sandbox-quickbooks.api.intuit.com';
-
-const QB_PAYMENTS_BASE_URL = QB_ENVIRONMENT === 'production'
-  ? 'https://api.intuit.com/quickbooks/v4'
-  : 'https://sandbox.api.intuit.com/quickbooks/v4';
+const API_PROXY_URL = '/.netlify/functions/quickbooks-api';
 
 export interface QuickBooksAPIError {
   message: string;
@@ -17,93 +8,79 @@ export interface QuickBooksAPIError {
   detail?: string;
 }
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    throw new Error('User not authenticated');
+  }
+  return {
+    'Authorization': `Bearer ${session.access_token}`,
+    'Content-Type': 'application/json'
+  };
+}
+
 export class QuickBooksClient {
   private realmId: string | null = null;
-  private accessToken: string | null = null;
 
-  async initialize(): Promise<void> {
-    const credentials = await quickbooksOAuth.getActiveCredentials();
-    if (!credentials) {
-      throw new Error('No active QuickBooks connection found. Please connect your QuickBooks account.');
-    }
-
-    this.realmId = credentials.realm_id;
-    this.accessToken = credentials.access_token;
-  }
-
-  private async ensureInitialized(): Promise<void> {
-    if (!this.accessToken || !this.realmId) {
-      await this.initialize();
-    }
-  }
-
-  private async request<T>(
+  private async proxyRequest<T>(
     endpoint: string,
-    options: RequestInit = {},
-    usePaymentsAPI = false
+    method: string = 'GET',
+    data?: any,
+    usePaymentsAPI = false,
+    isQuery = false
   ): Promise<T> {
-    await this.ensureInitialized();
+    const headers = await getAuthHeaders();
 
-    const baseUrl = usePaymentsAPI ? QB_PAYMENTS_BASE_URL : `${QB_API_BASE_URL}/v3/company/${this.realmId}`;
-    const url = usePaymentsAPI ? `${baseUrl}/${endpoint}` : `${baseUrl}/${endpoint}`;
-
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Authorization': `Bearer ${this.accessToken}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json',
-        ...options.headers
-      }
+    const response = await fetch(API_PROXY_URL, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        endpoint,
+        method,
+        data,
+        usePaymentsAPI,
+        isQuery
+      })
     });
 
     if (!response.ok) {
-      let errorMessage = `QuickBooks API error: ${response.status} ${response.statusText}`;
+      let errorMessage = `QuickBooks API error: ${response.status}`;
       try {
         const errorData = await response.json();
-        errorMessage = errorData.Fault?.Error?.[0]?.Message || errorData.message || errorMessage;
+        errorMessage = errorData.error || errorMessage;
       } catch {
       }
       throw new Error(errorMessage);
     }
 
-    return response.json();
+    const result = await response.json();
+    this.realmId = result.realm_id || this.realmId;
+    return result.data;
   }
 
   async get<T>(endpoint: string, usePaymentsAPI = false): Promise<T> {
-    return this.request<T>(endpoint, { method: 'GET' }, usePaymentsAPI);
+    return this.proxyRequest<T>(endpoint, 'GET', undefined, usePaymentsAPI);
   }
 
   async post<T>(endpoint: string, body: any, usePaymentsAPI = false): Promise<T> {
-    return this.request<T>(
-      endpoint,
-      {
-        method: 'POST',
-        body: JSON.stringify(body)
-      },
-      usePaymentsAPI
-    );
+    return this.proxyRequest<T>(endpoint, 'POST', body, usePaymentsAPI);
   }
 
   async put<T>(endpoint: string, body: any, usePaymentsAPI = false): Promise<T> {
-    return this.request<T>(
-      endpoint,
-      {
-        method: 'POST',
-        body: JSON.stringify(body)
-      },
-      usePaymentsAPI
-    );
+    return this.proxyRequest<T>(endpoint, 'POST', body, usePaymentsAPI);
   }
 
   async delete(endpoint: string, usePaymentsAPI = false): Promise<void> {
-    await this.request(endpoint, { method: 'DELETE' }, usePaymentsAPI);
+    await this.proxyRequest(endpoint, 'DELETE', undefined, usePaymentsAPI);
   }
 
   async query<T>(queryString: string): Promise<T[]> {
-    const encodedQuery = encodeURIComponent(queryString);
-    const response = await this.get<{ QueryResponse: { [key: string]: T[] } }>(
-      `query?query=${encodedQuery}`
+    const response = await this.proxyRequest<{ QueryResponse: { [key: string]: T[] } }>(
+      queryString,
+      'GET',
+      undefined,
+      false,
+      true
     );
 
     const resultKey = Object.keys(response.QueryResponse)[0];
