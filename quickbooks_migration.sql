@@ -37,9 +37,13 @@ CREATE TABLE IF NOT EXISTS quickbooks_credentials (
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now(),
   created_by uuid REFERENCES auth.users(id),
-  is_active boolean DEFAULT true,
-  CONSTRAINT single_active_connection UNIQUE (is_active) WHERE is_active = true
+  is_active boolean DEFAULT true
 );
+
+-- Create unique partial index for single active connection
+CREATE UNIQUE INDEX IF NOT EXISTS idx_single_active_qb_connection
+  ON quickbooks_credentials(is_active)
+  WHERE is_active = true;
 
 -- QuickBooks Sync Log Table
 CREATE TABLE IF NOT EXISTS quickbooks_sync_log (
