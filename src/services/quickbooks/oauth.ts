@@ -1,9 +1,6 @@
 import { supabase } from '../supabase';
 
-const API_BASE = import.meta.env.DEV
-  ? 'http://localhost:8888/.netlify/functions'
-  : '/.netlify/functions';
-const FUNCTION_URL = `${API_BASE}/quickbooks-oauth`;
+const FUNCTION_URL = '/.netlify/functions/quickbooks-oauth';
 
 interface QuickBooksCredentials {
   id: string;
