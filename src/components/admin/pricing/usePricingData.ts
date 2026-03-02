@@ -89,7 +89,7 @@ export function usePricingData() {
         supabase
           .from('profiles')
           .select('id, email, full_name')
-          .eq('approval_status', 'approved')
+          .eq('approved', true)
           .order('email'),
       ]);
 

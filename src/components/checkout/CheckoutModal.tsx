@@ -314,6 +314,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return false;
     }
 
+    const isOrderingForOtherUser = user?.id && selectedCustomerId !== user.id;
+    if (isOrderingForOtherUser) {
+      return true;
+    }
+
     const addressToSave = {
       user_id: selectedCustomerId,
       organization_id: selectedOrgId,
