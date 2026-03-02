@@ -120,7 +120,8 @@ class ImageLibraryService {
     }
 
     const cleaned = value.replace(/\s+/g, '-');
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(cleaned);
+    const path = `${LIBRARY_PREFIX}/${cleaned}`;
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
     return data.publicUrl;
   }
 }
