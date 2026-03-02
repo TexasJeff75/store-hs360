@@ -38,7 +38,7 @@ export function clearTemplateCache(): void {
   cachedTemplate = undefined;
 }
 
-export async function generateProductDescription(product: Product): Promise<string> {
+export async function generateProductDescription(product: Product, templateId?: string): Promise<string> {
   const payload: GenerateDescriptionPayload = {
     name: product.name,
     category: product.category !== 'Uncategorized' ? product.category : undefined,
@@ -52,7 +52,12 @@ export async function generateProductDescription(product: Product): Promise<stri
     existingDescription: product.plainTextDescription || undefined,
   };
 
-  const template = await getDefaultTemplate();
+  let template: DescriptionTemplate | null = null;
+  if (templateId) {
+    template = await descriptionTemplateService.getById(templateId);
+  } else {
+    template = await getDefaultTemplate();
+  }
 
   try {
     const description = await fetchFromEdgeFunction(payload, template);

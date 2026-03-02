@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Loader, Save, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Sparkles, Loader, Save, RefreshCw, AlertTriangle, FileText, ChevronDown } from 'lucide-react';
 import { Product } from '../services/productService';
 import { generateProductDescription, saveGeneratedDescription } from '../services/aiDescriptionService';
+import { descriptionTemplateService, DescriptionTemplate } from '../services/descriptionTemplateService';
 
 interface AIDescriptionSectionProps {
   product: Product;
@@ -19,20 +20,48 @@ const AIDescriptionSection: React.FC<AIDescriptionSectionProps> = ({
   const [generatedHtml, setGeneratedHtml] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [templates, setTemplates] = useState<DescriptionTemplate[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+  const [loadingTemplates, setLoadingTemplates] = useState(true);
   const hasTriggered = useRef(false);
 
   useEffect(() => {
-    if (hasTriggered.current) return;
+    loadTemplates();
+  }, []);
+
+  const loadTemplates = async () => {
+    setLoadingTemplates(true);
+    try {
+      const all = await descriptionTemplateService.getAll();
+      setTemplates(all);
+      const defaultTpl = all.find(t => t.is_default);
+      if (defaultTpl) {
+        setSelectedTemplateId(defaultTpl.id);
+      } else if (all.length > 0) {
+        setSelectedTemplateId(all[0].id);
+      }
+    } catch {
+      // Templates unavailable, will use hardcoded default
+    } finally {
+      setLoadingTemplates(false);
+    }
+  };
+
+  useEffect(() => {
+    if (loadingTemplates || hasTriggered.current) return;
     hasTriggered.current = true;
     handleGenerate();
-  }, []);
+  }, [loadingTemplates]);
 
   const handleGenerate = async () => {
     setGenerating(true);
     setError(null);
     setSaved(false);
     try {
-      const description = await generateProductDescription(product);
+      const description = await generateProductDescription(
+        product,
+        selectedTemplateId || undefined
+      );
       setGeneratedHtml(description);
     } catch (err: any) {
       setError(err.message || 'Failed to generate description');
@@ -60,6 +89,30 @@ const AIDescriptionSection: React.FC<AIDescriptionSectionProps> = ({
     }
   };
 
+  const templateSelector = (
+    <div className="flex items-center space-x-2">
+      <FileText className="h-4 w-4 text-gray-400 flex-shrink-0" />
+      <div className="relative">
+        <select
+          value={selectedTemplateId}
+          onChange={(e) => setSelectedTemplateId(e.target.value)}
+          disabled={generating || loadingTemplates}
+          className="appearance-none bg-white border border-gray-300 rounded-lg pl-3 pr-8 py-1.5 text-xs font-medium text-gray-700 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:opacity-50 cursor-pointer"
+        >
+          {templates.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}{t.is_default ? ' (Default)' : ''}
+            </option>
+          ))}
+          {templates.length === 0 && (
+            <option value="">Default Template</option>
+          )}
+        </select>
+        <ChevronDown className="h-3 w-3 text-gray-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+      </div>
+    </div>
+  );
+
   if (generatedHtml) {
     return (
       <div className="border-t border-gray-200 pt-5 mt-5">
@@ -69,6 +122,7 @@ const AIDescriptionSection: React.FC<AIDescriptionSectionProps> = ({
             AI-Generated Description
           </h5>
           <div className="flex items-center space-x-2">
+            {templateSelector}
             <button
               onClick={handleGenerate}
               disabled={generating}

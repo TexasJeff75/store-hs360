@@ -47,6 +47,21 @@ export const descriptionTemplateService = {
     return (data || []).map(this.mapRow);
   },
 
+  async getById(id: string): Promise<DescriptionTemplate | null> {
+    const { data, error } = await supabase
+      .from('description_templates')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error fetching template by ID:', error);
+      return null;
+    }
+
+    return data ? this.mapRow(data) : null;
+  },
+
   async getDefault(): Promise<DescriptionTemplate | null> {
     const { data, error } = await supabase
       .from('description_templates')
