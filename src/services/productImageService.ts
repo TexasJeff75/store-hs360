@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { imageLibraryService } from './imageLibraryService';
 
-const BUCKET = 'product-images';
+const BUCKET = 'product-images-library';
 
 export interface ProductImage {
   id: string;
