@@ -148,21 +148,21 @@ export function validateImportData(
       return;
     }
 
-    const priceStr = getValue('price');
+    const priceStr = getValue('price').replace(/[$,]/g, '');
     const price = parseFloat(priceStr);
     if (isNaN(price) || price < 0) {
       errors.push({ row: rowNum, field: 'price', message: `Invalid price: "${priceStr}"` });
       return;
     }
 
-    const costStr = getValue('cost');
+    const costStr = getValue('cost').replace(/[$,]/g, '');
     const cost = costStr ? parseFloat(costStr) : undefined;
     if (costStr && (isNaN(cost!) || cost! < 0)) {
       errors.push({ row: rowNum, field: 'cost', message: `Invalid cost: "${costStr}"` });
       return;
     }
 
-    const originalPriceStr = getValue('original_price');
+    const originalPriceStr = getValue('original_price').replace(/[$,]/g, '');
     const originalPrice = originalPriceStr ? parseFloat(originalPriceStr) : undefined;
 
     const weightStr = getValue('weight');
@@ -174,14 +174,14 @@ export function validateImportData(
     const isActiveStr = getValue('is_active').toLowerCase();
     const isActive = isActiveStr === '' ? true : isActiveStr !== 'false' && isActiveStr !== '0';
 
-    const secretCostStr = getValue('secret_cost');
+    const secretCostStr = getValue('secret_cost').replace(/[$,]/g, '');
     const secretCost = secretCostStr ? parseFloat(secretCostStr) : undefined;
     if (secretCostStr && (isNaN(secretCost!) || secretCost! < 0)) {
       errors.push({ row: rowNum, field: 'secret_cost', message: `Invalid secret cost: "${secretCostStr}"` });
       return;
     }
 
-    const contractPriceStr = getValue('contract_price');
+    const contractPriceStr = getValue('contract_price').replace(/[$,]/g, '');
     const contractPrice = contractPriceStr ? parseFloat(contractPriceStr) : undefined;
     if (contractPriceStr && isNaN(contractPrice!)) {
       errors.push({ row: rowNum, field: 'contract_price', message: `Invalid contract price: "${contractPriceStr}"` });
@@ -340,10 +340,13 @@ export async function importProducts(
         }
       }
 
+      const baseSlug = slugify(row.name);
+      const slug = row.sku ? `${baseSlug}-${slugify(row.sku)}` : baseSlug;
+
       const productPayload: Record<string, unknown> = {
         name: row.name,
         price: row.price,
-        slug: slugify(row.name),
+        slug,
         is_in_stock: row.is_in_stock ?? true,
         is_active: row.is_active ?? true,
       };
@@ -361,7 +364,7 @@ export async function importProducts(
       let existingId: number | undefined;
       if (row.sku && skuMap.has(row.sku.toLowerCase())) {
         existingId = skuMap.get(row.sku.toLowerCase());
-      } else if (nameMap.has(row.name.toLowerCase())) {
+      } else if (!row.sku && nameMap.has(row.name.toLowerCase())) {
         existingId = nameMap.get(row.name.toLowerCase());
       }
 
