@@ -162,6 +162,11 @@ const ProductImport: React.FC<ProductImportProps> = ({ isOpen, onClose, onImport
                   <p className="mt-1">
                     Existing products are matched by SKU first, then by name. Matched products will be updated.
                   </p>
+                  <p className="mt-1">
+                    <span className="font-medium">Images:</span> For image_url, use a full URL or just a filename
+                    (e.g. <code className="bg-blue-100 px-1 py-0.5 rounded text-xs font-mono">my-product.jpg</code>)
+                    from the Image Library.
+                  </p>
                 </div>
               </div>
 

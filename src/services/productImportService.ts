@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { imageLibraryService } from './imageLibraryService';
 
 export interface ImportRow {
   name: string;
@@ -49,7 +50,7 @@ export function generateTemplate(): string {
   const example = [
     '"Example Product"', '"SKU-001"', '99.99', '50.00', '129.99',
     '"Peptides"', '"ABM"', '"A sample product description"', '"New"',
-    '0.5', '"lb"', 'true', 'true', '""', '25.00', '""', '""', '""',
+    '0.5', '"lb"', 'true', 'true', '"my-product.jpg"', '25.00', '""', '""', '""',
   ].join(',');
   return `${headers}\n${example}`;
 }
@@ -359,7 +360,9 @@ export async function importProducts(
       if (row.condition) productPayload.condition = row.condition;
       if (row.weight !== undefined) productPayload.weight = row.weight;
       if (row.weight_unit) productPayload.weight_unit = row.weight_unit;
-      if (row.image_url) productPayload.image_url = row.image_url;
+      if (row.image_url) {
+        productPayload.image_url = imageLibraryService.resolveImageUrl(row.image_url);
+      }
 
       let existingId: number | undefined;
       if (row.sku && skuMap.has(row.sku.toLowerCase())) {
