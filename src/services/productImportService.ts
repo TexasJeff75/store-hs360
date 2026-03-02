@@ -55,36 +55,63 @@ export function generateTemplate(): string {
 }
 
 export function parseCSV(text: string): { headers: string[]; rows: string[][] } {
-  const lines = text.split(/\r?\n/).filter(line => line.trim());
-  if (lines.length === 0) return { headers: [], rows: [] };
+  if (!text.trim()) return { headers: [], rows: [] };
 
-  const parseLine = (line: string): string[] => {
-    const result: string[] = [];
-    let current = '';
-    let inQuotes = false;
+  const records: string[][] = [];
+  let current: string[] = [];
+  let field = '';
+  let inQuotes = false;
 
-    for (let i = 0; i < line.length; i++) {
-      const char = line[i];
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+
+    if (inQuotes) {
       if (char === '"') {
-        if (inQuotes && line[i + 1] === '"') {
-          current += '"';
+        if (i + 1 < text.length && text[i + 1] === '"') {
+          field += '"';
           i++;
         } else {
-          inQuotes = !inQuotes;
+          inQuotes = false;
         }
-      } else if (char === ',' && !inQuotes) {
-        result.push(current.trim());
-        current = '';
       } else {
-        current += char;
+        field += char;
+      }
+    } else {
+      if (char === '"') {
+        inQuotes = true;
+      } else if (char === ',') {
+        current.push(field.trim());
+        field = '';
+      } else if (char === '\n' || (char === '\r' && text[i + 1] === '\n')) {
+        if (char === '\r') i++;
+        current.push(field.trim());
+        field = '';
+        if (current.some(c => c !== '')) {
+          records.push(current);
+        }
+        current = [];
+      } else if (char === '\r') {
+        current.push(field.trim());
+        field = '';
+        if (current.some(c => c !== '')) {
+          records.push(current);
+        }
+        current = [];
+      } else {
+        field += char;
       }
     }
-    result.push(current.trim());
-    return result;
-  };
+  }
 
-  const headers = parseLine(lines[0]).map(h => h.toLowerCase().replace(/\s+/g, '_'));
-  const rows = lines.slice(1).map(parseLine);
+  current.push(field.trim());
+  if (current.some(c => c !== '')) {
+    records.push(current);
+  }
+
+  if (records.length === 0) return { headers: [], rows: [] };
+
+  const headers = records[0].map(h => h.toLowerCase().replace(/\s+/g, '_'));
+  const rows = records.slice(1);
 
   return { headers, rows };
 }
@@ -255,16 +282,28 @@ export async function importProducts(
         if (categoryMap.has(key)) {
           categoryId = categoryMap.get(key);
         } else {
-          const { data: newCat, error: catError } = await supabase
+          const slug = slugify(row.category);
+          const { data: existingBySlug } = await supabase
             .from('categories')
-            .insert({ name: row.category, slug: slugify(row.category), is_active: true })
-            .select('id')
-            .single();
-          if (catError) {
-            result.errors.push({ row: rowNum, field: 'category', message: catError.message });
+            .select('id, name')
+            .eq('slug', slug)
+            .maybeSingle();
+
+          if (existingBySlug) {
+            categoryId = existingBySlug.id;
+            categoryMap.set(key, existingBySlug.id);
           } else {
-            categoryId = newCat.id;
-            categoryMap.set(key, newCat.id);
+            const { data: newCat, error: catError } = await supabase
+              .from('categories')
+              .insert({ name: row.category, slug, is_active: true })
+              .select('id')
+              .single();
+            if (catError) {
+              result.errors.push({ row: rowNum, field: 'category', message: catError.message });
+            } else {
+              categoryId = newCat.id;
+              categoryMap.set(key, newCat.id);
+            }
           }
         }
       }
@@ -275,16 +314,28 @@ export async function importProducts(
         if (brandMap.has(key)) {
           brandId = brandMap.get(key);
         } else {
-          const { data: newBrand, error: brandError } = await supabase
+          const slug = slugify(row.brand);
+          const { data: existingBySlug } = await supabase
             .from('brands')
-            .insert({ name: row.brand, slug: slugify(row.brand), is_active: true })
-            .select('id')
-            .single();
-          if (brandError) {
-            result.errors.push({ row: rowNum, field: 'brand', message: brandError.message });
+            .select('id, name')
+            .eq('slug', slug)
+            .maybeSingle();
+
+          if (existingBySlug) {
+            brandId = existingBySlug.id;
+            brandMap.set(key, existingBySlug.id);
           } else {
-            brandId = newBrand.id;
-            brandMap.set(key, newBrand.id);
+            const { data: newBrand, error: brandError } = await supabase
+              .from('brands')
+              .insert({ name: row.brand, slug, is_active: true })
+              .select('id')
+              .single();
+            if (brandError) {
+              result.errors.push({ row: rowNum, field: 'brand', message: brandError.message });
+            } else {
+              brandId = newBrand.id;
+              brandMap.set(key, newBrand.id);
+            }
           }
         }
       }
