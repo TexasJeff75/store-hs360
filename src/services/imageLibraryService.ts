@@ -119,8 +119,9 @@ class ImageLibraryService {
       return value;
     }
 
-    const cleaned = value.replace(/\s+/g, '-').toLowerCase();
-    return this.getPublicUrl(cleaned);
+    const cleaned = value.replace(/\s+/g, '-');
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(cleaned);
+    return data.publicUrl;
   }
 }
 
