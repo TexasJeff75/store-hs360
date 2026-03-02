@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, Check, Search, X } from 'lucide-react';
 import { multiTenantService } from '@/services/multiTenant';
+import { supabase } from '@/services/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import type { Organization } from '@/services/supabase';
 
 interface OrganizationSelectorProps {
@@ -16,6 +18,7 @@ const OrganizationSelector: React.FC<OrganizationSelectorProps> = ({
   onSelectOrganization,
   selectedOrganization
 }) => {
+  const { isImpersonating, effectiveUserId } = useAuth();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,13 +28,26 @@ const OrganizationSelector: React.FC<OrganizationSelectorProps> = ({
     if (isOpen) {
       fetchOrganizations();
     }
-  }, [isOpen]);
+  }, [isOpen, isImpersonating, effectiveUserId]);
 
   const fetchOrganizations = async () => {
     try {
       setLoading(true);
-      const data = await multiTenantService.getOrganizations();
-      setOrganizations(data.filter(org => org.is_active));
+
+      if (isImpersonating && effectiveUserId) {
+        const { data, error: fetchError } = await supabase
+          .from('user_organization_roles')
+          .select('organizations!inner(id, name, code, description, billing_address, contact_email, contact_phone, is_active, created_at, updated_at)')
+          .eq('user_id', effectiveUserId)
+          .eq('organizations.is_active', true);
+
+        if (fetchError) throw fetchError;
+        const orgs = (data || []).map((row: any) => row.organizations);
+        setOrganizations(orgs);
+      } else {
+        const data = await multiTenantService.getOrganizations();
+        setOrganizations(data.filter(org => org.is_active));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load organizations');
     } finally {
