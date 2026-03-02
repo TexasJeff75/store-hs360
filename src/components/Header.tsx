@@ -30,37 +30,39 @@ const Header: React.FC<HeaderProps> = ({
   const [newOrderCount, setNewOrderCount] = useState(0);
   const [pendingUserCount, setPendingUserCount] = useState(0);
 
-  // Fetch new order count for admin/sales_rep/distributor users
+  const displayRole = isImpersonating ? effectiveProfile?.role : profile?.role;
+
   useEffect(() => {
     const fetchNewOrderCount = async () => {
-      if (user && profile && ['admin', 'sales_rep', 'distributor'].includes(profile.role)) {
+      if (user && profile && !isImpersonating && ['admin', 'sales_rep', 'distributor'].includes(profile.role)) {
         const { count } = await orderService.getNewOrderCount(user.id, profile.role);
         setNewOrderCount(count);
+      } else {
+        setNewOrderCount(0);
       }
     };
 
     fetchNewOrderCount();
 
-    // Refresh count every 30 seconds
     const interval = setInterval(fetchNewOrderCount, 30000);
     return () => clearInterval(interval);
-  }, [user, profile]);
+  }, [user, profile, isImpersonating]);
 
-  // Fetch pending user count for admin users only
   useEffect(() => {
     const fetchPendingUserCount = async () => {
-      if (user && profile && profile.role === 'admin') {
+      if (user && profile && !isImpersonating && profile.role === 'admin') {
         const { count } = await orderService.getPendingUserCount();
         setPendingUserCount(count);
+      } else {
+        setPendingUserCount(0);
       }
     };
 
     fetchPendingUserCount();
 
-    // Refresh count every 30 seconds
     const interval = setInterval(fetchPendingUserCount, 30000);
     return () => clearInterval(interval);
-  }, [user, profile]);
+  }, [user, profile, isImpersonating]);
 
   return (
     <header className="bg-white shadow-sm border-b border-gray-100 sticky top-0 z-50">
@@ -103,7 +105,7 @@ const Header: React.FC<HeaderProps> = ({
               </div>
             ) : user ? (
               <div className="flex items-center space-x-4">
-                {profile?.role === 'admin' && (
+                {displayRole === 'admin' && (
                   <button
                     onClick={onSalesRepClick}
                     className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
@@ -113,7 +115,7 @@ const Header: React.FC<HeaderProps> = ({
                   </button>
                 )}
 
-                {(profile?.role === 'admin' || profile?.role === 'sales_rep' || profile?.role === 'distributor') && (
+                {(displayRole === 'admin' || displayRole === 'sales_rep' || displayRole === 'distributor') && (
                   <>
                     <button
                       onClick={onOrdersClick}
@@ -128,7 +130,7 @@ const Header: React.FC<HeaderProps> = ({
                       )}
                     </button>
 
-                    {profile?.role === 'admin' && (
+                    {displayRole === 'admin' && (
                       <button
                         onClick={onUsersClick}
                         className="relative flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
@@ -153,7 +155,7 @@ const Header: React.FC<HeaderProps> = ({
                   </>
                 )}
 
-                {profile?.role === 'customer' && (
+                {displayRole === 'customer' && (
                   <button
                     onClick={onOrderHistoryClick}
                     className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"

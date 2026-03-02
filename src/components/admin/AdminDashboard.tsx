@@ -33,11 +33,12 @@ type AdminTab = 'users' | 'orders' | 'commissions' | 'help' | 'my-orgs' | 'my-re
 type AdminSettingsTab = 'organizations' | 'pricing' | 'products' | 'categories' | 'description-templates' | 'recurring-orders' | 'distributors' | 'salesreps' | 'analytics' | 'profit-report' | 'cost-admins';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initialTab }) => {
-  const { profile, user } = useAuth();
-  const isAdmin = profile?.role === 'admin';
-  const isSalesRep = profile?.role === 'sales_rep';
-  const isDistributor = profile?.role === 'distributor';
-  const isCustomer = profile?.role === 'customer';
+  const { profile, user, isImpersonating, effectiveProfile } = useAuth();
+  const displayRole = isImpersonating ? effectiveProfile?.role : profile?.role;
+  const isAdmin = displayRole === 'admin';
+  const isSalesRep = displayRole === 'sales_rep';
+  const isDistributor = displayRole === 'distributor';
+  const isCustomer = displayRole === 'customer';
   const [userOrgId, setUserOrgId] = React.useState<string | undefined>();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [pendingUsersCount, setPendingUsersCount] = useState(0);
