@@ -73,7 +73,7 @@ async function fetchFromEdgeFunction(
   payload: GenerateDescriptionPayload,
   template: DescriptionTemplate | null
 ): Promise<string> {
-  const apiUrl = `${ENV.SUPABASE_URL}/functions/v1/generate-product-description`;
+  const apiUrl = `${ENV.SUPABASE_URL}/functions/v1/super-responder`;
 
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token || ENV.SUPABASE_ANON_KEY;
@@ -139,15 +139,14 @@ function buildFromTemplate(sections: TemplateSection[], ctx: DescContext): strin
       return `  <h3>${escapeHtml(heading)}</h3>\n  <ul>\n${items}\n  </ul>`;
     }
 
-    const content = getSectionContent(heading, ctx);
+    const content = getSectionContent(heading, section.placeholder, ctx);
     return `  <h3>${escapeHtml(heading)}</h3>\n  <p>${content}</p>`;
   });
 
   return `<div>\n${parts.join('\n\n')}\n</div>`;
 }
 
-function getSectionContent(heading: string, ctx: DescContext): string {
-  const h = heading.toLowerCase();
+function getSectionContent(heading: string, placeholder: string, ctx: DescContext): string {
   const brandLine = ctx.brand ? ` by ${escapeHtml(ctx.brand)}` : '';
   const weightLine = ctx.product.weight && ctx.product.weightUnit
     ? ` Available in ${ctx.product.weight} ${ctx.product.weightUnit} size.`
@@ -156,19 +155,13 @@ function getSectionContent(heading: string, ctx: DescContext): string {
     ? ` ${escapeHtml(ctx.product.existingDescription)}`
     : '';
 
-  if (h.includes('overview') || h.includes('summary') || h.includes('about')) {
-    return `${escapeHtml(ctx.name)} is a professional-grade ${escapeHtml(ctx.category.toLowerCase())} product${brandLine} designed for healthcare practitioners and their patients. This formulation is crafted to meet the highest standards of quality and efficacy.${weightLine}${existingContext}`;
+  const productIntro = `${escapeHtml(ctx.name)} is a professional-grade ${escapeHtml(ctx.category.toLowerCase())} product${brandLine}`;
+
+  if (placeholder && placeholder.trim().length > 0) {
+    return `${productIntro}. ${escapeHtml(placeholder)}${weightLine}${existingContext}`;
   }
-  if (h.includes('how it works') || h.includes('mechanism')) {
-    return 'This product utilizes carefully selected ingredients to support optimal health outcomes. The formulation is designed to deliver targeted support through clinically relevant pathways, helping practitioners provide effective care for their patients.';
-  }
-  if (h.includes('suggested use') || h.includes('usage') || h.includes('dosage') || h.includes('directions')) {
-    return 'Use as directed by your healthcare practitioner. Refer to the product label for specific dosage and administration guidelines. For best results, follow the recommended protocol consistently.';
-  }
-  if (h.includes('quality') || h.includes('assurance') || h.includes('testing')) {
-    return 'Manufactured in a GMP-certified facility with rigorous third-party testing to ensure purity, potency, and safety. Each batch undergoes comprehensive quality control to meet the highest industry standards.';
-  }
-  return `${escapeHtml(ctx.name)} -- ${escapeHtml(heading)}.`;
+
+  return `${productIntro} designed for healthcare practitioners and their patients.${weightLine}${existingContext}`;
 }
 
 function buildDefaultHtml(ctx: DescContext): string {
