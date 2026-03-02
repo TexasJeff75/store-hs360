@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Loader, Save, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Product } from '../services/productService';
 import { generateProductDescription, saveGeneratedDescription } from '../services/aiDescriptionService';
@@ -19,6 +19,13 @@ const AIDescriptionSection: React.FC<AIDescriptionSectionProps> = ({
   const [generatedHtml, setGeneratedHtml] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const hasTriggered = useRef(false);
+
+  useEffect(() => {
+    if (hasTriggered.current) return;
+    hasTriggered.current = true;
+    handleGenerate();
+  }, []);
 
   const handleGenerate = async () => {
     setGenerating(true);
@@ -28,7 +35,12 @@ const AIDescriptionSection: React.FC<AIDescriptionSectionProps> = ({
       const description = await generateProductDescription(product);
       setGeneratedHtml(description);
     } catch (err: any) {
-      setError(err.message || 'Failed to generate description');
+      const message = err.message || 'Failed to generate description';
+      if (message.toLowerCase().includes('failed to fetch') || message.toLowerCase().includes('networkerror')) {
+        setError('Unable to reach the AI service. Please check your connection and try again.');
+      } else {
+        setError(message);
+      }
     } finally {
       setGenerating(false);
     }
@@ -111,51 +123,57 @@ const AIDescriptionSection: React.FC<AIDescriptionSectionProps> = ({
     );
   }
 
-  return (
-    <div className="border-t border-gray-200 pt-5 mt-5">
-      <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-5">
-        <div className="flex items-start space-x-3">
-          <div className="p-2 bg-amber-100 rounded-lg">
-            <Sparkles className="h-5 w-5 text-amber-600" />
-          </div>
-          <div className="flex-1">
-            <h5 className="text-sm font-semibold text-gray-900 mb-1">
-              AI Product Description
-            </h5>
-            <p className="text-xs text-gray-600 mb-3">
-              Generate a detailed, professional product description including overview, benefits,
-              usage instructions, and quality information.
-            </p>
-
-            {error && (
-              <div className="flex items-center space-x-2 mb-3 text-sm text-red-600 bg-red-50 rounded-lg p-3">
-                <AlertTriangle className="h-4 w-4 flex-shrink-0" />
-                <span>{error}</span>
-              </div>
-            )}
-
-            <button
-              onClick={handleGenerate}
-              disabled={generating}
-              className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all disabled:opacity-60 shadow-sm"
-            >
-              {generating ? (
-                <>
-                  <Loader className="h-4 w-4 mr-2 animate-spin" />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <Sparkles className="h-4 w-4 mr-2" />
-                  Generate Description
-                </>
-              )}
-            </button>
+  if (generating) {
+    return (
+      <div className="border-t border-gray-200 pt-5 mt-5">
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-5">
+          <div className="flex items-center space-x-3">
+            <div className="p-2 bg-amber-100 rounded-lg">
+              <Loader className="h-5 w-5 text-amber-600 animate-spin" />
+            </div>
+            <div>
+              <h5 className="text-sm font-semibold text-gray-900">
+                Generating AI Description...
+              </h5>
+              <p className="text-xs text-gray-600 mt-0.5">
+                Creating a professional product description
+              </p>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="border-t border-gray-200 pt-5 mt-5">
+        <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-xl p-5">
+          <div className="flex items-start space-x-3">
+            <div className="p-2 bg-red-100 rounded-lg">
+              <AlertTriangle className="h-5 w-5 text-red-600" />
+            </div>
+            <div className="flex-1">
+              <h5 className="text-sm font-semibold text-gray-900 mb-1">
+                AI Description Unavailable
+              </h5>
+              <p className="text-xs text-red-600 mb-3">{error}</p>
+              <button
+                onClick={handleGenerate}
+                disabled={generating}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg hover:from-amber-600 hover:to-orange-600 transition-all disabled:opacity-60 shadow-sm"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
 };
 
 export default AIDescriptionSection;

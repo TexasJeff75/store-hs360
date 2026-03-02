@@ -34,15 +34,20 @@ export async function generateProductDescription(product: Product): Promise<stri
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token || ENV.SUPABASE_ANON_KEY;
 
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      'apikey': ENV.SUPABASE_ANON_KEY,
-    },
-    body: JSON.stringify(payload),
-  });
+  let response: Response;
+  try {
+    response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+        'apikey': ENV.SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (networkErr) {
+    throw new Error('Unable to reach the AI service. Please check your connection and try again.');
+  }
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
