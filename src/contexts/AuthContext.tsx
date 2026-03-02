@@ -4,12 +4,23 @@ import { supabase } from '../services/supabase';
 import type { Profile } from '../services/supabase';
 import { sessionTrackingService } from '../services/sessionTracking';
 
+interface ImpersonationState {
+  userId: string;
+  profile: Profile;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
   loading: boolean;
   isPasswordRecovery: boolean;
+  impersonation: ImpersonationState | null;
+  isImpersonating: boolean;
+  effectiveUserId: string | null;
+  effectiveProfile: Profile | null;
+  startImpersonation: (userId: string) => Promise<void>;
+  stopImpersonation: () => void;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string, ageVerified: boolean) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -25,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const [impersonation, setImpersonation] = useState<ImpersonationState | null>(null);
 
   useEffect(() => {
     sessionTrackingService.setupBeforeUnloadHandler();
@@ -261,12 +273,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
+  const startImpersonation = async (userId: string) => {
+    if (profile?.role !== 'admin') return;
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
+
+    if (error || !data) {
+      console.error('Failed to load impersonated user profile:', error);
+      return;
+    }
+
+    setImpersonation({ userId, profile: data });
+  };
+
+  const stopImpersonation = () => {
+    setImpersonation(null);
+  };
+
+  const isImpersonating = impersonation !== null;
+  const effectiveUserId = impersonation?.userId ?? user?.id ?? null;
+  const effectiveProfile = impersonation?.profile ?? profile;
+
   const value = {
     user,
     session,
     profile,
     loading,
     isPasswordRecovery,
+    impersonation,
+    isImpersonating,
+    effectiveUserId,
+    effectiveProfile,
+    startImpersonation,
+    stopImpersonation,
     signUp,
     signIn,
     signOut,

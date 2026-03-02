@@ -216,7 +216,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
       case 'my-orgs':
         return <SalesRepDashboard />;
       case 'users':
-        return <UserManagement onUserApproved={fetchPendingUsersCount} />;
+        return <UserManagement onUserApproved={fetchPendingUsersCount} onClose={onClose} />;
       case 'orders':
         return <OrderManagement />;
       case 'commissions':

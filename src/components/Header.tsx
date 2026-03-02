@@ -26,7 +26,7 @@ const Header: React.FC<HeaderProps> = ({
   onSalesRepClick,
   onOrderHistoryClick
 }) => {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, isImpersonating, effectiveProfile } = useAuth();
   const [newOrderCount, setNewOrderCount] = useState(0);
   const [pendingUserCount, setPendingUserCount] = useState(0);
 
@@ -166,11 +166,14 @@ const Header: React.FC<HeaderProps> = ({
 
                 <button
                   onClick={onProfileClick}
-                  className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
+                  className={`flex items-center space-x-2 transition-colors ${isImpersonating ? 'text-amber-600 hover:text-amber-700' : 'text-gray-700 hover:text-pink-600'}`}
                 >
                   <User className="w-5 h-5" />
                   <span className="hidden sm:inline">
-                    {profile?.email?.split('@')[0] || user.email?.split('@')[0] || 'Profile'}
+                    {isImpersonating
+                      ? effectiveProfile?.email?.split('@')[0]
+                      : (profile?.email?.split('@')[0] || user.email?.split('@')[0] || 'Profile')
+                    }
                   </span>
                 </button>
               </div>

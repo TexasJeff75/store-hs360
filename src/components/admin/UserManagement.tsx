@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Shield, Clock, CheckCircle, CreditCard as Edit, Trash2, Search, Filter, Key, AlertCircle, Save, RotateCcw, Plus, XCircle } from 'lucide-react';
+import { User, Mail, Shield, Clock, CheckCircle, CreditCard as Edit, Trash2, Search, Filter, Key, AlertCircle, Save, RotateCcw, Plus, XCircle, Eye } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import type { Profile } from '@/services/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface UserManagementProps {
   onUserApproved?: () => void;
+  onClose?: () => void;
 }
 
-const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved }) => {
+const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose }) => {
+  const { user: currentUser, startImpersonation } = useAuth();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -697,6 +700,18 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved }) => {
                   <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
+                        {user.id !== currentUser?.id && user.approval_status === 'approved' && (
+                          <button
+                            onClick={async () => {
+                              await startImpersonation(user.id);
+                              onClose?.();
+                            }}
+                            className="p-2 text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-lg transition-colors"
+                            title={`View as ${user.email}`}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => {
                             setSelectedUser(user);

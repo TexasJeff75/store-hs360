@@ -16,6 +16,7 @@ import OrganizationSelector from '@/components/OrganizationSelector';
 import FirstTimeSetup from '@/components/FirstTimeSetup';
 import ErrorDebugPanel from '@/components/ErrorDebugPanel';
 import Toast from '@/components/Toast';
+import ImpersonationBanner from '@/components/ImpersonationBanner';
 import QuickBooksCallback from '@/components/QuickBooksCallback';
 import { productService, Product } from '@/services/productService';
 import { useErrorLogger } from '@/hooks/useErrorLogger';
@@ -55,7 +56,7 @@ function AppContent() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { errors, logError, clearErrors } = useErrorLogger();
-  const { user, profile, loading: authLoading, isPasswordRecovery } = useAuth();
+  const { user, profile, loading: authLoading, isPasswordRecovery, isImpersonating, effectiveUserId, effectiveProfile, stopImpersonation } = useAuth();
   const { toastMessage, toastType, clearToast } = useFavorites();
 
   const [isOrgSelectorOpen, setIsOrgSelectorOpen] = useState(false);
@@ -97,15 +98,21 @@ function AppContent() {
   useEffect(() => {
   }, [user, profile, authLoading]);
 
+  // Reset org selection when impersonation changes
+  useEffect(() => {
+    setSelectedOrganization(null);
+    setCartItems([]);
+  }, [isImpersonating, effectiveUserId]);
+
   // Auto-load user's organization and check if setup is needed
   useEffect(() => {
     const loadUserOrganization = async () => {
-      if (!user?.id) {
+      if (!effectiveUserId) {
         setCheckingOrganization(false);
         return;
       }
 
-      if (selectedOrganization) {
+      if (selectedOrganization && !isImpersonating) {
         setCheckingOrganization(false);
         return;
       }
@@ -118,20 +125,23 @@ function AppContent() {
             organization_id,
             organizations!inner(id, name, code, is_active)
           `)
-          .eq('user_id', user.id)
+          .eq('user_id', effectiveUserId)
           .eq('organizations.is_active', true);
 
         if (!error && data && data.length > 0) {
           setUserHasMultipleOrgs(data.length > 1);
           setNeedsOrganizationSetup(false);
 
-          // Auto-select if only one organization
           if (data.length === 1) {
+            setSelectedOrganization(data[0].organizations);
+          } else if (isImpersonating) {
             setSelectedOrganization(data[0].organizations);
           }
         } else {
-          // User has no organization - needs first-time setup
           setNeedsOrganizationSetup(true);
+          if (isImpersonating) {
+            setSelectedOrganization(null);
+          }
         }
       } catch (error) {
         console.error('Error loading user organization:', error);
@@ -141,12 +151,12 @@ function AppContent() {
     };
 
     loadUserOrganization();
-  }, [user?.id, selectedOrganization]);
+  }, [effectiveUserId, isImpersonating]);
 
   // Load cart from database when user or organization changes
   useEffect(() => {
     const loadCart = async () => {
-      if (!user?.id) {
+      if (!user?.id || isImpersonating) {
         setCartItems([]);
         return;
       }
@@ -160,12 +170,12 @@ function AppContent() {
     };
 
     loadCart();
-  }, [user?.id, selectedOrganization?.id]);
+  }, [user?.id, selectedOrganization?.id, isImpersonating]);
 
   // Save cart to database whenever it changes
   useEffect(() => {
     const saveCart = async () => {
-      if (!user?.id) return;
+      if (!user?.id || isImpersonating) return;
 
       try {
         await cartService.saveCart(user.id, cartItems, selectedOrganization?.id);
@@ -174,22 +184,21 @@ function AppContent() {
       }
     };
 
-    // Debounce the save operation
     const timeoutId = setTimeout(saveCart, 500);
     return () => clearTimeout(timeoutId);
-  }, [cartItems, user?.id, selectedOrganization?.id]);
+  }, [cartItems, user?.id, selectedOrganization?.id, isImpersonating]);
 
   // Fetch products with contract pricing when organization or user changes
   useEffect(() => {
     const fetchContractPricingProducts = async () => {
-      if (!user) {
+      if (!effectiveUserId) {
         setProductsWithContractPricing([]);
         return;
       }
 
       try {
         const productIds = await contractPricingService.getProductsWithContractPricing(
-          selectedOrganization ? undefined : user.id,
+          selectedOrganization ? undefined : effectiveUserId,
           selectedOrganization?.id
         );
         setProductsWithContractPricing(productIds);
@@ -201,11 +210,10 @@ function AppContent() {
 
     fetchContractPricingProducts();
 
-    // Clear the contract pricing filter if no organization is selected
     if (!selectedOrganization) {
       setShowOnlyContractPricing(false);
     }
-  }, [user, selectedOrganization]);
+  }, [effectiveUserId, selectedOrganization]);
   const addToCart = async (productId: number, quantity: number = 1) => {
     const product = products.find(p => p.id === productId);
     if (!product) return;
@@ -222,12 +230,11 @@ function AppContent() {
     let retailPrice = product.price;
     let hasMarkup = false;
 
-    if (user && (profile || selectedOrganization)) {
+    if (effectiveUserId && (effectiveProfile || selectedOrganization)) {
       try {
         let priceResult;
 
         if (selectedOrganization) {
-          // Sales rep mode - get organization pricing
           const orgPricing = await contractPricingService.getOrganizationPricing(selectedOrganization.id);
           const productPricing = orgPricing.find(p => p.product_id === productId);
 
@@ -235,7 +242,6 @@ function AppContent() {
               quantity >= (productPricing.min_quantity || 1) &&
               (!productPricing.max_quantity || quantity <= productPricing.max_quantity)) {
 
-            // Check if markup_price is being used
             if (productPricing.markup_price !== null && productPricing.markup_price !== undefined) {
               effectivePrice = productPricing.markup_price;
               retailPrice = productPricing.contract_price || product.price;
@@ -251,12 +257,11 @@ function AppContent() {
               source: 'organization' as const
             };
           }
-        } else if (profile) {
-          // Regular user mode
+        } else if (effectiveProfile) {
           priceResult = await contractPricingService.getEffectivePrice(
-            user.id,
+            effectiveUserId,
             productId,
-            profile.role,
+            effectiveProfile.role,
             quantity
           );
 
@@ -268,7 +273,6 @@ function AppContent() {
         }
       } catch (error) {
         console.error('Error fetching contract price for cart:', error);
-        // Fall back to regular price
       }
     }
 
@@ -437,8 +441,11 @@ function AppContent() {
     return <ResetPassword onComplete={() => window.location.reload()} />;
   }
 
+  // When impersonating, skip all approval/setup gates for the impersonated user
+  // The admin is already authenticated and authorized
+
   // Check if user is denied
-  if (user && profile && profile.approval_status === 'denied') {
+  if (!isImpersonating && user && profile && profile.approval_status === 'denied') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
@@ -470,7 +477,7 @@ function AppContent() {
   }
 
   // Check if user is pending approval
-  if (user && profile && profile.approval_status === 'pending') {
+  if (!isImpersonating && user && profile && profile.approval_status === 'pending') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
@@ -504,9 +511,7 @@ function AppContent() {
     );
   }
 
-  // Show first-time setup ONLY for customer users who need to join an organization
-  // Admins, sales reps, and distributors don't need organization setup
-  if (user && profile && profile.approval_status === 'approved' && needsOrganizationSetup && !checkingOrganization) {
+  if (!isImpersonating && user && profile && profile.approval_status === 'approved' && needsOrganizationSetup && !checkingOrganization) {
     const skipSetupRoles = ['admin', 'sales_rep', 'distributor'];
 
     if (!skipSetupRoles.includes(profile.role)) {
@@ -521,8 +526,7 @@ function AppContent() {
     }
   }
 
-  // Show loading while checking organization status for customer users only
-  if (user && profile && profile.approval_status === 'approved' && checkingOrganization) {
+  if (!isImpersonating && user && profile && profile.approval_status === 'approved' && checkingOrganization) {
     const skipSetupRoles = ['admin', 'sales_rep', 'distributor'];
 
     if (!skipSetupRoles.includes(profile.role)) {
@@ -539,6 +543,7 @@ function AppContent() {
 
   return (
       <div className="min-h-screen bg-gray-50">
+        <ImpersonationBanner />
         <Header
           cartCount={cartCount}
           onCartClick={() => setIsCartOpen(true)}
