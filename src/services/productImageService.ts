@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { imageLibraryService } from './imageLibraryService';
 
 const BUCKET = 'product-images';
 
@@ -17,6 +18,11 @@ class ProductImageService {
     productId: number,
     options?: { altText?: string; isPrimary?: boolean }
   ): Promise<ProductImage | null> {
+    const bucketCheck = await imageLibraryService.ensureBucket();
+    if (!bucketCheck.ok) {
+      throw new Error(bucketCheck.error || 'Storage bucket not available');
+    }
+
     const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
     const timestamp = Date.now();
     const path = `${productId}/${timestamp}.${ext}`;

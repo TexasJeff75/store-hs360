@@ -11,6 +11,33 @@ export interface LibraryImage {
 }
 
 class ImageLibraryService {
+  private bucketReady = false;
+
+  async ensureBucket(): Promise<{ ok: boolean; error?: string }> {
+    if (this.bucketReady) return { ok: true };
+
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const exists = buckets?.some((b) => b.id === BUCKET);
+
+    if (!exists) {
+      const { error } = await supabase.storage.createBucket(BUCKET, {
+        public: true,
+        fileSizeLimit: 10485760,
+        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+      });
+
+      if (error) {
+        return {
+          ok: false,
+          error: `Storage bucket "${BUCKET}" does not exist. Please create it in your Supabase Dashboard: Storage > New Bucket > name it "product-images" and enable "Public bucket".`,
+        };
+      }
+    }
+
+    this.bucketReady = true;
+    return { ok: true };
+  }
+
   async listImages(): Promise<LibraryImage[]> {
     const { data, error } = await supabase.storage
       .from(BUCKET)
@@ -41,6 +68,12 @@ class ImageLibraryService {
   ): Promise<{ uploaded: string[]; errors: string[] }> {
     const uploaded: string[] = [];
     const errors: string[] = [];
+
+    const bucketCheck = await this.ensureBucket();
+    if (!bucketCheck.ok) {
+      errors.push(bucketCheck.error || 'Storage bucket not available');
+      return { uploaded, errors };
+    }
 
     for (let i = 0; i < files.length; i++) {
       onProgress?.(i + 1, files.length);
