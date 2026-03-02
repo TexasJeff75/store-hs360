@@ -29,7 +29,7 @@ class ImageLibraryService {
       if (error) {
         return {
           ok: false,
-          error: `Storage bucket "${BUCKET}" does not exist. Please create it in your Supabase Dashboard: Storage > New Bucket > name it "product-images" and enable "Public bucket".`,
+          error: `Storage bucket "${BUCKET}" does not exist. Please create it in your Supabase Dashboard: Storage > New Bucket > name it "${BUCKET}" and enable "Public bucket".`,
         };
       }
     }
@@ -41,7 +41,7 @@ class ImageLibraryService {
   async listImages(): Promise<LibraryImage[]> {
     const { data, error } = await supabase.storage
       .from(BUCKET)
-      .list(LIBRARY_PREFIX, { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
+      .list('', { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
 
     if (error) {
       console.error('Error listing library images:', error);
@@ -51,8 +51,7 @@ class ImageLibraryService {
     return (data || [])
       .filter((f) => f.name && !f.name.startsWith('.'))
       .map((f) => {
-        const path = `${LIBRARY_PREFIX}/${f.name}`;
-        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
+        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(f.name);
         return {
           name: f.name,
           url: urlData.publicUrl,
@@ -80,11 +79,10 @@ class ImageLibraryService {
 
       const file = files[i];
       const fileName = file.name.replace(/\s+/g, '-');
-      const path = `${LIBRARY_PREFIX}/${fileName}`;
 
       const { error } = await supabase.storage
         .from(BUCKET)
-        .upload(path, file, { contentType: file.type, upsert: true });
+        .upload(fileName, file, { contentType: file.type, upsert: true });
 
       if (error) {
         errors.push(`${file.name}: ${error.message}`);
@@ -97,8 +95,7 @@ class ImageLibraryService {
   }
 
   async deleteImage(fileName: string): Promise<boolean> {
-    const path = `${LIBRARY_PREFIX}/${fileName}`;
-    const { error } = await supabase.storage.from(BUCKET).remove([path]);
+    const { error } = await supabase.storage.from(BUCKET).remove([fileName]);
     if (error) {
       console.error('Error deleting library image:', error);
       return false;
@@ -107,8 +104,7 @@ class ImageLibraryService {
   }
 
   getPublicUrl(fileName: string): string {
-    const path = `${LIBRARY_PREFIX}/${fileName}`;
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
     return data.publicUrl;
   }
 
@@ -120,8 +116,7 @@ class ImageLibraryService {
     }
 
     const cleaned = value.replace(/\s+/g, '-');
-    const path = `${LIBRARY_PREFIX}/${cleaned}`;
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(cleaned);
     return data.publicUrl;
   }
 }

@@ -165,7 +165,7 @@ const ImageLibrary: React.FC<ImageLibraryProps> = ({ isOpen, onClose }) => {
                 ))}
               </ul>
               <p className="text-xs text-red-600 mt-2">
-                Make sure the "product-images" storage bucket exists in your Supabase project and is set to public.
+                Make sure the "product-images-library" storage bucket exists in your Supabase project and is set to public.
               </p>
             </div>
           )}
