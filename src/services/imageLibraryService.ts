@@ -79,7 +79,7 @@ class ImageLibraryService {
       onProgress?.(i + 1, files.length);
 
       const file = files[i];
-      const fileName = file.name.toLowerCase().replace(/\s+/g, '-');
+      const fileName = file.name.replace(/\s+/g, '-');
       const path = `${LIBRARY_PREFIX}/${fileName}`;
 
       const { error } = await supabase.storage
