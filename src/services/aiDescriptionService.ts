@@ -73,7 +73,7 @@ async function fetchFromEdgeFunction(
   payload: GenerateDescriptionPayload,
   template: DescriptionTemplate | null
 ): Promise<string> {
-  const apiUrl = `${ENV.SUPABASE_URL}/functions/v1/super-responder`;
+  const apiUrl = `${ENV.SUPABASE_URL}/functions/v1/generate-product-description`;
 
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token || ENV.SUPABASE_ANON_KEY;
