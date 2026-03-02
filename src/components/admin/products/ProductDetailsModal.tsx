@@ -3,7 +3,7 @@ import { Hash, Lock, Edit2, CheckCircle2, XCircle, Building2, Pencil, Trash2 } f
 import { Product } from '@/services/productService';
 import { SecretCostMap } from '@/services/secretCostService';
 import { ContractPricingInfo } from './useContractPricing';
-import AIDescriptionSection from '@/components/AIDescriptionSection';
+
 
 interface ProductDetailsModalProps {
   product: Product;
@@ -365,13 +365,6 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
                   </div>
                 )}
 
-                {isAdmin && (
-                  <AIDescriptionSection
-                    product={product}
-                    isAdmin={true}
-                    onDescriptionSaved={onProductRefresh}
-                  />
-                )}
               </div>
             </div>
           </div>
