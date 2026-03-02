@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 
-const BUCKET = 'product-image-library';
+const BUCKET = 'product-images';
+const LIBRARY_PREFIX = 'library';
 
 export interface LibraryImage {
   name: string;
@@ -13,7 +14,7 @@ class ImageLibraryService {
   async listImages(): Promise<LibraryImage[]> {
     const { data, error } = await supabase.storage
       .from(BUCKET)
-      .list('', { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
+      .list(LIBRARY_PREFIX, { limit: 1000, sortBy: { column: 'name', order: 'asc' } });
 
     if (error) {
       console.error('Error listing library images:', error);
@@ -23,7 +24,8 @@ class ImageLibraryService {
     return (data || [])
       .filter((f) => f.name && !f.name.startsWith('.'))
       .map((f) => {
-        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(f.name);
+        const path = `${LIBRARY_PREFIX}/${f.name}`;
+        const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
         return {
           name: f.name,
           url: urlData.publicUrl,
@@ -45,10 +47,11 @@ class ImageLibraryService {
 
       const file = files[i];
       const fileName = file.name.toLowerCase().replace(/\s+/g, '-');
+      const path = `${LIBRARY_PREFIX}/${fileName}`;
 
       const { error } = await supabase.storage
         .from(BUCKET)
-        .upload(fileName, file, { contentType: file.type, upsert: true });
+        .upload(path, file, { contentType: file.type, upsert: true });
 
       if (error) {
         errors.push(`${file.name}: ${error.message}`);
@@ -61,7 +64,8 @@ class ImageLibraryService {
   }
 
   async deleteImage(fileName: string): Promise<boolean> {
-    const { error } = await supabase.storage.from(BUCKET).remove([fileName]);
+    const path = `${LIBRARY_PREFIX}/${fileName}`;
+    const { error } = await supabase.storage.from(BUCKET).remove([path]);
     if (error) {
       console.error('Error deleting library image:', error);
       return false;
@@ -70,7 +74,8 @@ class ImageLibraryService {
   }
 
   getPublicUrl(fileName: string): string {
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(fileName);
+    const path = `${LIBRARY_PREFIX}/${fileName}`;
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
     return data.publicUrl;
   }
 

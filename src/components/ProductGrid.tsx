@@ -1,5 +1,5 @@
-import React from 'react';
-import { ShoppingCart, Star } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShoppingCart, Star, Package } from 'lucide-react';
 import { Product } from '../services/productService';
 import PriceDisplay from './PriceDisplay';
 
@@ -9,6 +9,32 @@ interface ProductGridProps {
   onProductClick: (product: Product) => void;
   organizationId?: string;
 }
+
+const ProductImage: React.FC<{ src: string; alt: string; className?: string; onClick?: () => void }> = ({ src, alt, className, onClick }) => {
+  const [failed, setFailed] = useState(false);
+
+  if (!src || failed) {
+    return (
+      <div className={`w-full h-48 bg-gray-100 flex items-center justify-center cursor-pointer ${className || ''}`} onClick={onClick}>
+        <div className="text-center">
+          <Package className="h-12 w-12 text-gray-300 mx-auto" />
+          <p className="text-xs text-gray-400 mt-1">No image</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className={className}
+      onClick={onClick}
+      onError={() => setFailed(true)}
+      loading="lazy"
+    />
+  );
+};
 
 const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProductClick, organizationId }) => {
   if (products.length === 0) {
@@ -33,7 +59,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
           className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 group"
         >
           <div className="relative overflow-hidden rounded-t-lg">
-            <img
+            <ProductImage
               src={product.image}
               alt={product.name}
               className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300 cursor-pointer"

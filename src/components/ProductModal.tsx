@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShoppingCart, Star, Tag, Plus, Minus, Heart, Repeat } from 'lucide-react';
+import { X, ShoppingCart, Star, Tag, Plus, Minus, Heart, Repeat, Package } from 'lucide-react';
 import { Product } from '../services/productService';
 import PriceDisplay from './PriceDisplay';
 import { contractPricingService, ContractPrice } from '../services/contractPricing';
@@ -162,11 +162,26 @@ const ProductModal: React.FC<ProductModalProps> = ({
               {/* Product Images */}
               <div className="space-y-4">
                 <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center">
-                  <img
-                    src={productImages[selectedImageIndex]}
-                    alt={product.name}
-                    className="w-full h-full object-contain"
-                  />
+                  {productImages[selectedImageIndex] ? (
+                    <img
+                      src={productImages[selectedImageIndex]}
+                      alt={product.name}
+                      className="w-full h-full object-contain"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                        (e.target as HTMLImageElement).parentElement!.classList.add('flex', 'items-center', 'justify-center');
+                        const placeholder = document.createElement('div');
+                        placeholder.className = 'text-center';
+                        placeholder.innerHTML = '<div class="text-gray-300"><svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></div><p class="text-xs text-gray-400 mt-2">No image available</p>';
+                        (e.target as HTMLImageElement).parentElement!.appendChild(placeholder);
+                      }}
+                    />
+                  ) : (
+                    <div className="text-center">
+                      <Package className="h-16 w-16 text-gray-300 mx-auto" />
+                      <p className="text-xs text-gray-400 mt-2">No image available</p>
+                    </div>
+                  )}
                 </div>
                 
                 {/* Thumbnail images (if multiple images available) */}

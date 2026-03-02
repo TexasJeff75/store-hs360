@@ -16,6 +16,7 @@ const ImageLibrary: React.FC<ImageLibraryProps> = ({ isOpen, onClose }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [copiedName, setCopiedName] = useState<string | null>(null);
   const [deletingImage, setDeletingImage] = useState<string | null>(null);
+  const [uploadErrors, setUploadErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchImages = useCallback(async () => {
@@ -41,13 +42,14 @@ const ImageLibrary: React.FC<ImageLibraryProps> = ({ isOpen, onClose }) => {
     if (validFiles.length === 0) return;
 
     setUploading(true);
+    setUploadErrors([]);
     const { uploaded, errors } = await imageLibraryService.uploadImages(
       validFiles,
       (current, total) => setUploadProgress({ current, total })
     );
 
     if (errors.length > 0) {
-      console.error('Upload errors:', errors);
+      setUploadErrors(errors);
     }
 
     if (uploaded.length > 0) {
@@ -153,6 +155,20 @@ const ImageLibrary: React.FC<ImageLibraryProps> = ({ isOpen, onClose }) => {
               </div>
             )}
           </div>
+
+          {uploadErrors.length > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-sm font-semibold text-red-800 mb-1">Upload Errors</p>
+              <ul className="text-sm text-red-700 space-y-1">
+                {uploadErrors.map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
+              <p className="text-xs text-red-600 mt-2">
+                Make sure the "product-images" storage bucket exists in your Supabase project and is set to public.
+              </p>
+            </div>
+          )}
 
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
             <p className="text-sm text-amber-800">
