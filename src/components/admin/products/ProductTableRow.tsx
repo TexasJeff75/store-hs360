@@ -4,6 +4,7 @@ import { Product } from '@/services/productService';
 import { SecretCostMap } from '@/services/secretCostService';
 
 interface ProductTableRowProps {
+  rowNumber: number;
   product: Product;
   isCostAdmin: boolean;
   secretCosts: SecretCostMap;
@@ -19,6 +20,7 @@ interface ProductTableRowProps {
 }
 
 export const ProductTableRow: React.FC<ProductTableRowProps> = ({
+  rowNumber,
   product,
   isCostAdmin,
   secretCosts,
@@ -34,6 +36,9 @@ export const ProductTableRow: React.FC<ProductTableRowProps> = ({
 }) => {
   return (
     <tr className="hover:bg-gray-50">
+      <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-400 text-center tabular-nums">
+        {rowNumber}
+      </td>
       <td className="px-2 py-2 whitespace-nowrap text-xs text-gray-900">
         {product.name}
       </td>

@@ -214,11 +214,23 @@ const ProductsManagement: React.FC = () => {
         </div>
       </div>
 
+      <div className="flex items-center justify-between px-1 pb-1">
+        <p className="text-sm text-gray-600">
+          {filteredProducts.length === products.length
+            ? <span><span className="font-semibold text-gray-900">{products.length}</span> product{products.length !== 1 ? 's' : ''}</span>
+            : <span><span className="font-semibold text-gray-900">{filteredProducts.length}</span> of <span className="font-semibold text-gray-900">{products.length}</span> product{products.length !== 1 ? 's' : ''}</span>
+          }
+        </p>
+      </div>
+
       <div className="bg-white shadow-md rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-2 py-2 text-center text-xs font-medium text-gray-400 uppercase tracking-wider w-10">
+                  #
+                </th>
                 <th
                   onClick={() => handleSort('name')}
                   className="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -289,9 +301,10 @@ const ProductsManagement: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredProducts.map((product) => (
+              {filteredProducts.map((product, index) => (
                 <ProductTableRow
                   key={product.id}
+                  rowNumber={index + 1}
                   product={product}
                   isCostAdmin={isCostAdmin}
                   secretCosts={secretCosts}
