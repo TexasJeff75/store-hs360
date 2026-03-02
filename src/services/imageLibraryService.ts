@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
-const BUCKET = 'product-images';
-const LIBRARY_PREFIX = 'library';
+const BUCKET = 'product-images-library';
+
 
 export interface LibraryImage {
   name: string;
