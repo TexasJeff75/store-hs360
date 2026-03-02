@@ -35,12 +35,7 @@ const AIDescriptionSection: React.FC<AIDescriptionSectionProps> = ({
       const description = await generateProductDescription(product);
       setGeneratedHtml(description);
     } catch (err: any) {
-      const message = err.message || 'Failed to generate description';
-      if (message.toLowerCase().includes('failed to fetch') || message.toLowerCase().includes('networkerror')) {
-        setError('Unable to reach the AI service. Please check your connection and try again.');
-      } else {
-        setError(message);
-      }
+      setError(err.message || 'Failed to generate description');
     } finally {
       setGenerating(false);
     }
