@@ -5,6 +5,12 @@ const corsHeaders = {
     "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+interface TemplateSection {
+  heading: string;
+  placeholder: string;
+  type?: "paragraph" | "list";
+}
+
 interface ProductPayload {
   name: string;
   category?: string;
@@ -16,6 +22,9 @@ interface ProductPayload {
   weightUnit?: string;
   benefits?: string[];
   existingDescription?: string;
+  templateSections?: TemplateSection[];
+  systemPrompt?: string;
+  guidelines?: string;
 }
 
 Deno.serve(async (req: Request) => {
@@ -34,13 +43,15 @@ Deno.serve(async (req: Request) => {
     }
 
     const prompt = buildPrompt(payload);
+    const systemPrompt = payload.systemPrompt ||
+      "You are a professional product copywriter for a health and wellness e-commerce platform that serves healthcare practitioners and clinics. Write detailed, accurate product descriptions.";
 
     const openaiKey = Deno.env.get("OPENAI_API_KEY");
 
     let description: string;
 
     if (openaiKey) {
-      description = await generateWithOpenAI(openaiKey, prompt);
+      description = await generateWithOpenAI(openaiKey, prompt, systemPrompt);
     } else {
       description = await generateWithBuiltIn(prompt);
     }
@@ -60,7 +71,7 @@ Deno.serve(async (req: Request) => {
 
 function buildPrompt(product: ProductPayload): string {
   const parts = [
-    `Generate a professional, detailed product description for an e-commerce health and wellness store.`,
+    `Generate a professional, detailed product description for an e-commerce store.`,
     `\nProduct Name: ${product.name}`,
   ];
 
@@ -79,9 +90,18 @@ function buildPrompt(product: ProductPayload): string {
     parts.push(`Existing Description (expand on this): ${product.existingDescription}`);
   }
 
-  parts.push(`
-Please provide the response in the following HTML format:
-<div>
+  const htmlStructure = buildHtmlStructure(product.templateSections);
+  parts.push(`\nPlease provide the response in the following HTML format:\n${htmlStructure}`);
+
+  const guidelines = product.guidelines || getDefaultGuidelines();
+  parts.push(`\nImportant guidelines:\n${guidelines}`);
+
+  return parts.join("\n");
+}
+
+function buildHtmlStructure(sections?: TemplateSection[]): string {
+  if (!sections || sections.length === 0) {
+    return `<div>
   <h3>Overview</h3>
   <p>[2-3 sentences summarizing what this product is and who it's for]</p>
 
@@ -101,20 +121,34 @@ Please provide the response in the following HTML format:
 
   <h3>Quality Assurance</h3>
   <p>[1-2 sentences about quality, testing, or manufacturing standards]</p>
-</div>
+</div>`;
+  }
 
-Important guidelines:
-- Write in a professional, informative tone suitable for healthcare practitioners
+  const sectionHtml = sections.map(s => {
+    if (s.type === "list") {
+      const items = s.placeholder
+        .split("\n")
+        .filter(Boolean)
+        .map(line => `    <li>[${line}]</li>`)
+        .join("\n");
+      return `  <h3>${s.heading}</h3>\n  <ul>\n${items}\n  </ul>`;
+    }
+    return `  <h3>${s.heading}</h3>\n  <p>[${s.placeholder}]</p>`;
+  }).join("\n\n");
+
+  return `<div>\n${sectionHtml}\n</div>`;
+}
+
+function getDefaultGuidelines(): string {
+  return `- Write in a professional, informative tone suitable for healthcare practitioners
 - Do NOT make specific medical claims or diagnoses
 - Use phrases like "may support", "designed to help", "formulated for"
 - Focus on ingredients, mechanisms, and practical benefits
 - Keep it factual and evidence-informed
-- Do not include any markdown, only return clean HTML`);
-
-  return parts.join("\n");
+- Do not include any markdown, only return clean HTML`;
 }
 
-async function generateWithOpenAI(apiKey: string, prompt: string): Promise<string> {
+async function generateWithOpenAI(apiKey: string, prompt: string, systemPrompt: string): Promise<string> {
   const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
@@ -124,11 +158,7 @@ async function generateWithOpenAI(apiKey: string, prompt: string): Promise<strin
     body: JSON.stringify({
       model: "gpt-4o-mini",
       messages: [
-        {
-          role: "system",
-          content:
-            "You are a professional product copywriter for a health and wellness e-commerce platform that serves healthcare practitioners and clinics. Write detailed, accurate product descriptions.",
-        },
+        { role: "system", content: systemPrompt },
         { role: "user", content: prompt },
       ],
       temperature: 0.7,

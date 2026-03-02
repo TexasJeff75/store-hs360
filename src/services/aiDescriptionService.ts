@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { Product, productService } from './productService';
 import { ENV } from '../config/env';
+import { descriptionTemplateService, DescriptionTemplate, TemplateSection } from './descriptionTemplateService';
 
 interface GenerateDescriptionPayload {
   name: string;
@@ -13,6 +14,28 @@ interface GenerateDescriptionPayload {
   weightUnit?: string;
   benefits?: string[];
   existingDescription?: string;
+}
+
+interface EdgeFunctionPayload extends GenerateDescriptionPayload {
+  templateSections?: TemplateSection[];
+  systemPrompt?: string;
+  guidelines?: string;
+}
+
+let cachedTemplate: DescriptionTemplate | null | undefined = undefined;
+
+async function getDefaultTemplate(): Promise<DescriptionTemplate | null> {
+  if (cachedTemplate !== undefined) return cachedTemplate;
+  try {
+    cachedTemplate = await descriptionTemplateService.getDefault();
+  } catch {
+    cachedTemplate = null;
+  }
+  return cachedTemplate;
+}
+
+export function clearTemplateCache(): void {
+  cachedTemplate = undefined;
 }
 
 export async function generateProductDescription(product: Product): Promise<string> {
@@ -29,21 +52,34 @@ export async function generateProductDescription(product: Product): Promise<stri
     existingDescription: product.plainTextDescription || undefined,
   };
 
+  const template = await getDefaultTemplate();
+
   try {
-    const description = await fetchFromEdgeFunction(payload);
+    const description = await fetchFromEdgeFunction(payload, template);
     if (description) return description;
   } catch {
     // Edge function unavailable, fall through to client-side generation
   }
 
-  return generateClientDescription(payload);
+  return generateClientDescription(payload, template);
 }
 
-async function fetchFromEdgeFunction(payload: GenerateDescriptionPayload): Promise<string> {
+async function fetchFromEdgeFunction(
+  payload: GenerateDescriptionPayload,
+  template: DescriptionTemplate | null
+): Promise<string> {
   const apiUrl = `${ENV.SUPABASE_URL}/functions/v1/generate-product-description`;
 
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token || ENV.SUPABASE_ANON_KEY;
+
+  const edgePayload: EdgeFunctionPayload = { ...payload };
+
+  if (template) {
+    edgePayload.templateSections = template.sections;
+    edgePayload.systemPrompt = template.system_prompt;
+    edgePayload.guidelines = template.guidelines;
+  }
 
   const response = await fetch(apiUrl, {
     method: 'POST',
@@ -52,7 +88,7 @@ async function fetchFromEdgeFunction(payload: GenerateDescriptionPayload): Promi
       'Content-Type': 'application/json',
       'apikey': ENV.SUPABASE_ANON_KEY,
     },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(edgePayload),
   });
 
   if (!response.ok) {
@@ -63,31 +99,92 @@ async function fetchFromEdgeFunction(payload: GenerateDescriptionPayload): Promi
   return data.description;
 }
 
-function generateClientDescription(product: GenerateDescriptionPayload): string {
+function generateClientDescription(
+  product: GenerateDescriptionPayload,
+  template: DescriptionTemplate | null
+): string {
   const name = product.name;
   const category = product.category || 'health and wellness';
   const brand = product.brand || '';
   const benefits = product.benefits || [];
 
-  const benefitItems = benefits.length > 0
-    ? benefits.map(b => `    <li>${escapeHtml(b)}</li>`).join('\n')
+  if (template && template.sections.length > 0) {
+    return buildFromTemplate(template.sections, { name, category, brand, benefits, product });
+  }
+
+  return buildDefaultHtml({ name, category, brand, benefits, product });
+}
+
+interface DescContext {
+  name: string;
+  category: string;
+  brand: string;
+  benefits: string[];
+  product: GenerateDescriptionPayload;
+}
+
+function buildFromTemplate(sections: TemplateSection[], ctx: DescContext): string {
+  const parts = sections.map(section => {
+    const heading = section.heading;
+
+    if (section.type === 'list') {
+      const items = ctx.benefits.length > 0
+        ? ctx.benefits.map(b => `    <li>${escapeHtml(b)}</li>`).join('\n')
+        : section.placeholder.split('\n').filter(Boolean).map(line => `    <li>${escapeHtml(line)}</li>`).join('\n');
+      return `  <h3>${escapeHtml(heading)}</h3>\n  <ul>\n${items}\n  </ul>`;
+    }
+
+    const content = getSectionContent(heading, ctx);
+    return `  <h3>${escapeHtml(heading)}</h3>\n  <p>${content}</p>`;
+  });
+
+  return `<div>\n${parts.join('\n\n')}\n</div>`;
+}
+
+function getSectionContent(heading: string, ctx: DescContext): string {
+  const h = heading.toLowerCase();
+  const brandLine = ctx.brand ? ` by ${escapeHtml(ctx.brand)}` : '';
+  const weightLine = ctx.product.weight && ctx.product.weightUnit
+    ? ` Available in ${ctx.product.weight} ${ctx.product.weightUnit} size.`
+    : '';
+  const existingContext = ctx.product.existingDescription
+    ? ` ${escapeHtml(ctx.product.existingDescription)}`
+    : '';
+
+  if (h.includes('overview') || h.includes('summary') || h.includes('about')) {
+    return `${escapeHtml(ctx.name)} is a professional-grade ${escapeHtml(ctx.category.toLowerCase())} product${brandLine} designed for healthcare practitioners and their patients. This formulation is crafted to meet the highest standards of quality and efficacy.${weightLine}${existingContext}`;
+  }
+  if (h.includes('how it works') || h.includes('mechanism')) {
+    return 'This product utilizes carefully selected ingredients to support optimal health outcomes. The formulation is designed to deliver targeted support through clinically relevant pathways, helping practitioners provide effective care for their patients.';
+  }
+  if (h.includes('suggested use') || h.includes('usage') || h.includes('dosage') || h.includes('directions')) {
+    return 'Use as directed by your healthcare practitioner. Refer to the product label for specific dosage and administration guidelines. For best results, follow the recommended protocol consistently.';
+  }
+  if (h.includes('quality') || h.includes('assurance') || h.includes('testing')) {
+    return 'Manufactured in a GMP-certified facility with rigorous third-party testing to ensure purity, potency, and safety. Each batch undergoes comprehensive quality control to meet the highest industry standards.';
+  }
+  return `${escapeHtml(ctx.name)} -- ${escapeHtml(heading)}.`;
+}
+
+function buildDefaultHtml(ctx: DescContext): string {
+  const brandLine = ctx.brand ? ` by ${escapeHtml(ctx.brand)}` : '';
+  const weightLine = ctx.product.weight && ctx.product.weightUnit
+    ? ` Available in ${ctx.product.weight} ${ctx.product.weightUnit} size.`
+    : '';
+  const existingContext = ctx.product.existingDescription
+    ? ` ${escapeHtml(ctx.product.existingDescription)}`
+    : '';
+
+  const benefitItems = ctx.benefits.length > 0
+    ? ctx.benefits.map(b => `    <li>${escapeHtml(b)}</li>`).join('\n')
     : `    <li>Professional-grade formulation</li>
     <li>Designed for healthcare practitioners</li>
     <li>Quality-tested ingredients</li>
     <li>Manufactured under strict quality controls</li>`;
 
-  const brandLine = brand ? ` by ${escapeHtml(brand)}` : '';
-  const weightLine = product.weight && product.weightUnit
-    ? ` Available in ${product.weight} ${product.weightUnit} size.`
-    : '';
-
-  const existingContext = product.existingDescription
-    ? ` ${escapeHtml(product.existingDescription)}`
-    : '';
-
   return `<div>
   <h3>Overview</h3>
-  <p>${escapeHtml(name)} is a professional-grade ${escapeHtml(category.toLowerCase())} product${brandLine} designed for healthcare practitioners and their patients. This formulation is crafted to meet the highest standards of quality and efficacy.${weightLine}${existingContext}</p>
+  <p>${escapeHtml(ctx.name)} is a professional-grade ${escapeHtml(ctx.category.toLowerCase())} product${brandLine} designed for healthcare practitioners and their patients. This formulation is crafted to meet the highest standards of quality and efficacy.${weightLine}${existingContext}</p>
 
   <h3>Key Benefits</h3>
   <ul>
