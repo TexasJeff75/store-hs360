@@ -57,8 +57,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
   const [isAdminSettingsSidebarCollapsed, setIsAdminSettingsSidebarCollapsed] = useState(false);
 
   React.useEffect(() => {
-    if (initialTab && isOpen) {
-      setActiveTab(initialTab);
+    if (isOpen) {
+      if (initialTab) {
+        setActiveTab(initialTab);
+      } else {
+        setActiveTab(getDefaultTab());
+      }
       setIsAdminSettingsOpen(false);
     }
   }, [initialTab, isOpen]);

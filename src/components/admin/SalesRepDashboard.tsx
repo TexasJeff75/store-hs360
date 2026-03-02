@@ -20,7 +20,7 @@ interface AssignedOrganization {
 type SubTab = 'customers' | 'pricing' | 'locations';
 
 const SalesRepDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { effectiveUserId } = useAuth();
   const [organizations, setOrganizations] = useState<AssignedOrganization[]>([]);
   const [selectedOrg, setSelectedOrg] = useState<AssignedOrganization | null>(null);
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('customers');
@@ -33,11 +33,11 @@ const SalesRepDashboard: React.FC = () => {
   });
 
   useEffect(() => {
-    if (user) {
+    if (effectiveUserId) {
       fetchAssignedOrganizations();
       fetchStats();
     }
-  }, [user]);
+  }, [effectiveUserId]);
 
   const fetchAssignedOrganizations = async () => {
     try {
@@ -57,7 +57,7 @@ const SalesRepDashboard: React.FC = () => {
             is_active
           )
         `)
-        .eq('sales_rep_id', user?.id)
+        .eq('sales_rep_id', effectiveUserId!)
         .eq('is_active', true);
 
       if (error) throw error;
@@ -86,7 +86,7 @@ const SalesRepDashboard: React.FC = () => {
       const { data: orgData } = await supabase
         .from('organization_sales_reps')
         .select('organization_id')
-        .eq('sales_rep_id', user?.id)
+        .eq('sales_rep_id', effectiveUserId!)
         .eq('is_active', true);
 
       const orgIds = orgData?.map(o => o.organization_id) || [];
@@ -99,7 +99,7 @@ const SalesRepDashboard: React.FC = () => {
         supabase
           .from('commissions')
           .select('commission_amount')
-          .eq('sales_rep_id', user?.id)
+          .eq('sales_rep_id', effectiveUserId!)
           .in('status', ['pending', 'approved'])
       ]);
 
