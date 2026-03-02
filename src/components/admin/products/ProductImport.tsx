@@ -11,17 +11,19 @@ import {
   type ImportResult,
 } from '@/services/productImportService';
 import { Product } from '@/services/productService';
+import { SecretCostMap } from '@/services/secretCostService';
 
 interface ProductImportProps {
   isOpen: boolean;
   onClose: () => void;
   onImportComplete: () => void;
   products: Product[];
+  secretCosts?: SecretCostMap;
 }
 
 type Step = 'upload' | 'preview' | 'importing' | 'complete';
 
-const ProductImport: React.FC<ProductImportProps> = ({ isOpen, onClose, onImportComplete, products }) => {
+const ProductImport: React.FC<ProductImportProps> = ({ isOpen, onClose, onImportComplete, products, secretCosts }) => {
   const [step, setStep] = useState<Step>('upload');
   const [fileName, setFileName] = useState('');
   const [parsedRows, setParsedRows] = useState<ImportRow[]>([]);
@@ -116,6 +118,7 @@ const ProductImport: React.FC<ProductImportProps> = ({ isOpen, onClose, onImport
       is_in_stock: p.isInStock,
       is_active: p.isActive,
       image_url: p.image || undefined,
+      secret_cost: secretCosts?.[p.id]?.secret_cost,
     }));
     const csv = exportProductsCSV(exportData);
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -154,7 +157,7 @@ const ProductImport: React.FC<ProductImportProps> = ({ isOpen, onClose, onImport
                   <p>
                     Required columns: <span className="font-medium">name, price</span>.
                     Optional: sku, cost, original_price, category, brand, description, condition, weight, weight_unit,
-                    is_in_stock, is_active, image_url, contract_price, pricing_type, entity_id.
+                    is_in_stock, is_active, image_url, secret_cost, contract_price, pricing_type, entity_id.
                   </p>
                   <p className="mt-1">
                     Existing products are matched by SKU first, then by name. Matched products will be updated.
@@ -254,6 +257,7 @@ const ProductImport: React.FC<ProductImportProps> = ({ isOpen, onClose, onImport
                           <th className="px-3 py-2 text-left font-medium text-gray-600">Category</th>
                           <th className="px-3 py-2 text-left font-medium text-gray-600">Brand</th>
                           <th className="px-3 py-2 text-center font-medium text-gray-600">Active</th>
+                          <th className="px-3 py-2 text-right font-medium text-gray-600">Secret Cost</th>
                           <th className="px-3 py-2 text-right font-medium text-gray-600">Contract $</th>
                         </tr>
                       </thead>
@@ -269,6 +273,9 @@ const ProductImport: React.FC<ProductImportProps> = ({ isOpen, onClose, onImport
                             <td className="px-3 py-2 text-gray-600">{row.brand || '--'}</td>
                             <td className="px-3 py-2 text-center">
                               <span className={`inline-block w-2 h-2 rounded-full ${row.is_active !== false ? 'bg-green-500' : 'bg-gray-300'}`} />
+                            </td>
+                            <td className="px-3 py-2 text-right text-gray-600">
+                              {row.secret_cost !== undefined ? `$${row.secret_cost.toFixed(2)}` : '--'}
                             </td>
                             <td className="px-3 py-2 text-right text-gray-600">
                               {row.contract_price !== undefined ? `$${row.contract_price.toFixed(2)}` : '--'}

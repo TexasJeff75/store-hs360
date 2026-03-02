@@ -356,6 +356,7 @@ const ProductsManagement: React.FC = () => {
         onClose={() => setIsImportOpen(false)}
         onImportComplete={handleProductSaved}
         products={products}
+        secretCosts={secretCosts}
       />
     </div>
   );

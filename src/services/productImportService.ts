@@ -15,6 +15,7 @@ export interface ImportRow {
   is_in_stock?: boolean;
   is_active?: boolean;
   image_url?: string;
+  secret_cost?: number;
   contract_price?: number;
   pricing_type?: string;
   entity_id?: string;
@@ -40,7 +41,7 @@ const REQUIRED_COLUMNS = ['name', 'price'];
 const ALL_COLUMNS = [
   'name', 'sku', 'price', 'cost', 'original_price', 'category', 'brand',
   'description', 'condition', 'weight', 'weight_unit', 'is_in_stock',
-  'is_active', 'image_url', 'contract_price', 'pricing_type', 'entity_id',
+  'is_active', 'image_url', 'secret_cost', 'contract_price', 'pricing_type', 'entity_id',
 ];
 
 export function generateTemplate(): string {
@@ -48,7 +49,7 @@ export function generateTemplate(): string {
   const example = [
     '"Example Product"', '"SKU-001"', '99.99', '50.00', '129.99',
     '"Peptides"', '"ABM"', '"A sample product description"', '"New"',
-    '0.5', '"lb"', 'true', 'true', '""', '""', '""', '""',
+    '0.5', '"lb"', 'true', 'true', '""', '25.00', '""', '""', '""',
   ].join(',');
   return `${headers}\n${example}`;
 }
@@ -146,6 +147,13 @@ export function validateImportData(
     const isActiveStr = getValue('is_active').toLowerCase();
     const isActive = isActiveStr === '' ? true : isActiveStr !== 'false' && isActiveStr !== '0';
 
+    const secretCostStr = getValue('secret_cost');
+    const secretCost = secretCostStr ? parseFloat(secretCostStr) : undefined;
+    if (secretCostStr && (isNaN(secretCost!) || secretCost! < 0)) {
+      errors.push({ row: rowNum, field: 'secret_cost', message: `Invalid secret cost: "${secretCostStr}"` });
+      return;
+    }
+
     const contractPriceStr = getValue('contract_price');
     const contractPrice = contractPriceStr ? parseFloat(contractPriceStr) : undefined;
     if (contractPriceStr && isNaN(contractPrice!)) {
@@ -180,6 +188,7 @@ export function validateImportData(
       is_in_stock: isInStock,
       is_active: isActive,
       image_url: getValue('image_url') || undefined,
+      secret_cost: secretCost,
       contract_price: contractPrice,
       pricing_type: pricingType || undefined,
       entity_id: entityId || undefined,
@@ -338,6 +347,33 @@ export async function importProducts(
         result.created++;
       }
 
+      if (row.secret_cost !== undefined) {
+        const { data: existingSecret } = await supabase
+          .from('product_secret_costs')
+          .select('id')
+          .eq('product_id', productId)
+          .maybeSingle();
+
+        const { data: userData } = await supabase.auth.getUser();
+        const userId = userData.user?.id;
+
+        if (existingSecret) {
+          await supabase
+            .from('product_secret_costs')
+            .update({ secret_cost: row.secret_cost, updated_by: userId })
+            .eq('product_id', productId);
+        } else {
+          await supabase
+            .from('product_secret_costs')
+            .insert({
+              product_id: productId,
+              secret_cost: row.secret_cost,
+              created_by: userId,
+              updated_by: userId,
+            });
+        }
+      }
+
       if (row.contract_price !== undefined && row.pricing_type && row.entity_id) {
         const { error: pricingErr } = await supabase
           .from('contract_pricing')
@@ -383,10 +419,11 @@ export function exportProductsCSV(products: Array<{
   is_in_stock?: boolean;
   is_active?: boolean;
   image_url?: string;
+  secret_cost?: number;
 }>): string {
   const headers = [
     'name', 'sku', 'price', 'cost', 'original_price', 'category', 'brand',
-    'description', 'condition', 'weight', 'weight_unit', 'is_in_stock', 'is_active', 'image_url',
+    'description', 'condition', 'weight', 'weight_unit', 'is_in_stock', 'is_active', 'image_url', 'secret_cost',
   ];
 
   const escapeCSV = (val: string | number | boolean | undefined | null): string => {
