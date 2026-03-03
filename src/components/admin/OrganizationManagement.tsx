@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, Edit, Trash2, Search, MapPin, Users, Mail, Phone, AlertCircle, CheckCircle, Eye, Archive, ArrowLeft, Settings, DollarSign, Save, RotateCcw, UserCheck, Home } from 'lucide-react';
+import { Building2, Plus, CreditCard as Edit, Trash2, Search, MapPin, Users, Mail, Phone, AlertCircle, CheckCircle, Eye, Archive, ArrowLeft, Settings, DollarSign, Save, RotateCcw, UserCheck, Home } from 'lucide-react';
 import { multiTenantService } from '@/services/multiTenant';
 import { supabase } from '@/services/supabase';
 import LocationManagement from './LocationManagement';

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Edit, Trash2, Search, User, Mail, Shield, Clock, CheckCircle, AlertCircle, Key } from 'lucide-react';
+import { Users, Plus, CreditCard as Edit, Trash2, Search, User, Mail, Shield, Clock, CheckCircle, AlertCircle, Key } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import { multiTenantService } from '@/services/multiTenant';
 import type { Profile, UserOrganizationRole } from '@/services/supabase';

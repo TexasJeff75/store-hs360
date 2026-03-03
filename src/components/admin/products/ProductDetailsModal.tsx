@@ -1,5 +1,5 @@
 import React from 'react';
-import { Hash, Lock, Edit2, CheckCircle2, XCircle, Building2, Pencil, Trash2 } from 'lucide-react';
+import { Hash, Lock, CreditCard as Edit2, CheckCircle2, XCircle, Building2, Pencil, Trash2 } from 'lucide-react';
 import { Product } from '@/services/productService';
 import { SecretCostMap } from '@/services/secretCostService';
 import { ContractPricingInfo } from './useContractPricing';

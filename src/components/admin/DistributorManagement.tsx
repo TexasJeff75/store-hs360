@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building, Plus, Edit2, Trash2, X, Save, TrendingUp, DollarSign } from 'lucide-react';
+import { Users, Building, Plus, CreditCard as Edit2, Trash2, X, Save, TrendingUp, DollarSign } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 
 interface Distributor {
