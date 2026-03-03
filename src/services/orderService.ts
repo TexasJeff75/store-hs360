@@ -634,6 +634,38 @@ class OrderService {
     }
   }
 
+  async logPaymentEvent(
+    orderId: string,
+    event: {
+      event: string;
+      status: string;
+      method: string;
+      lastFour: string;
+      transactionId: string;
+      amount: number;
+    }
+  ): Promise<void> {
+    try {
+      const timestamp = new Date().toISOString();
+      const logEntry = `[${timestamp}] ${event.event}: ${event.method} ****${event.lastFour} - $${event.amount.toFixed(2)} - ${event.status} (txn: ${event.transactionId})`;
+
+      const { order } = await this.getOrderById(orderId);
+      if (!order) return;
+
+      const existingNotes = order.notes || '';
+      const updatedNotes = existingNotes
+        ? `${existingNotes}\n${logEntry}`
+        : logEntry;
+
+      await supabase
+        .from('orders')
+        .update({ notes: updatedNotes, updated_at: timestamp })
+        .eq('id', orderId);
+    } catch (error) {
+      console.warn('Failed to log payment event:', error);
+    }
+  }
+
   async getRelatedOrders(orderId: string): Promise<{ orders: Order[]; error?: string }> {
     try {
       const { order, error: fetchError } = await this.getOrderById(orderId);

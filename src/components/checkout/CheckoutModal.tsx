@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, CreditCard, Truck, MapPin, User, Lock, ArrowLeft, ArrowRight, Loader, AlertCircle, RefreshCw } from 'lucide-react';
+import { X, CreditCard, Truck, MapPin, User, Lock, ArrowLeft, ArrowRight, Loader, AlertCircle, RefreshCw, CheckCircle, Clock, FileText, Printer } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import PriceDisplay from '../PriceDisplay';
 import { restCheckoutService } from '@/services/restCheckout';
@@ -10,6 +10,7 @@ import type { PaymentData } from './BigCommercePaymentForm';
 import { CustomerAddress, customerAddressService } from '@/services/customerAddresses';
 import { supabase } from '@/services/supabase';
 import { quickbooksPayments } from '@/services/quickbooks';
+import OrderReceipt from './OrderReceipt';
 
 interface CartItem {
   id: number;
@@ -77,7 +78,14 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [cartId, setCartId] = useState<string | null>(null);
   const [checkoutId, setCheckoutId] = useState<string | null>(null);
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
-  
+  const [paymentResult, setPaymentResult] = useState<{
+    status: string;
+    method: string;
+    lastFour: string;
+    transactionId: string;
+  } | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
+
   // Form data
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
     firstName: '',
@@ -590,6 +598,28 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       if (result.success && result.orderId) {
         const { orderService } = await import('@/services/orderService');
         await orderService.updatePaymentStatus(result.orderId, paymentStatus, paymentAuthId);
+
+        const methodLabel = paymentData.type === 'card' ? 'Credit Card'
+          : paymentData.type === 'ach' ? 'Bank Account'
+          : paymentData.type === 'saved' ? (paymentData.paymentType === 'ach' || paymentData.paymentType === 'bank_account' ? 'Bank Account' : 'Credit Card')
+          : 'Card';
+
+        setPaymentResult({
+          status: paymentStatus,
+          method: methodLabel,
+          lastFour: paymentLastFour,
+          transactionId: paymentAuthId,
+        });
+
+        await orderService.logPaymentEvent(result.orderId, {
+          event: paymentStatus === 'authorized' ? 'authorization' : 'payment_initiated',
+          status: paymentStatus,
+          method: methodLabel,
+          lastFour: paymentLastFour,
+          transactionId: paymentAuthId,
+          amount: total,
+        });
+
         setCompletedOrderId(result.orderId);
         setCurrentStep('confirmation');
       } else {
@@ -1087,59 +1117,137 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     </div>
   );
 
-  const renderConfirmationStep = () => (
-    <div className="space-y-6 text-center py-8">
-      <div className="flex justify-center">
-        <div className="rounded-full bg-green-100 p-6">
-          <svg className="h-16 w-16 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+  const renderConfirmationStep = () => {
+    const statusConfig: Record<string, { icon: React.ReactNode; bg: string; border: string; text: string; label: string; description: string }> = {
+      authorized: {
+        icon: <CheckCircle className="h-5 w-5" />,
+        bg: 'bg-blue-50',
+        border: 'border-blue-200',
+        text: 'text-blue-800',
+        label: 'Card Authorized',
+        description: 'Your card has been authorized. The charge will be captured when your order ships.',
+      },
+      captured: {
+        icon: <CheckCircle className="h-5 w-5" />,
+        bg: 'bg-green-50',
+        border: 'border-green-200',
+        text: 'text-green-800',
+        label: 'Payment Captured',
+        description: 'Your payment has been successfully processed.',
+      },
+      pending: {
+        icon: <Clock className="h-5 w-5" />,
+        bg: 'bg-amber-50',
+        border: 'border-amber-200',
+        text: 'text-amber-800',
+        label: 'Payment Pending',
+        description: 'Your ACH payment is being processed. This typically takes 3-5 business days.',
+      },
+    };
+
+    const paymentInfo = paymentResult ? statusConfig[paymentResult.status] || statusConfig.pending : null;
+
+    return (
+      <div className="space-y-6 py-4">
+        <div className="text-center">
+          <div className="flex justify-center mb-4">
+            <div className="rounded-full bg-green-100 p-5">
+              <CheckCircle className="h-12 w-12 text-green-600" />
+            </div>
+          </div>
+          <h3 className="text-2xl font-bold text-gray-900 mb-1">Order Placed Successfully</h3>
+          <p className="text-gray-500 text-sm">Order #{completedOrderId?.slice(0, 8).toUpperCase()}</p>
         </div>
-      </div>
 
-      <div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-2">Order Placed Successfully!</h3>
-        <p className="text-gray-600">Your order has been received and is being processed.</p>
-      </div>
+        {paymentInfo && paymentResult && (
+          <div className={`${paymentInfo.bg} ${paymentInfo.border} border rounded-xl p-4`}>
+            <div className="flex items-start gap-3">
+              <div className={`${paymentInfo.text} mt-0.5`}>{paymentInfo.icon}</div>
+              <div className="flex-1">
+                <div className="flex items-center justify-between mb-1">
+                  <p className={`font-semibold ${paymentInfo.text}`}>{paymentInfo.label}</p>
+                  <span className={`text-sm font-medium ${paymentInfo.text}`}>
+                    {paymentResult.method} ****{paymentResult.lastFour}
+                  </span>
+                </div>
+                <p className={`text-sm ${paymentInfo.text} opacity-80`}>{paymentInfo.description}</p>
+                {paymentResult.transactionId && (
+                  <div className="mt-2 flex items-center gap-2">
+                    <span className="text-xs text-gray-500">Transaction ID:</span>
+                    <span className="text-xs font-mono bg-white/60 px-2 py-0.5 rounded border border-gray-200">{paymentResult.transactionId}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
-      <div className="bg-gray-50 rounded-lg p-6 max-w-md mx-auto">
-        <div className="space-y-3 text-left">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Order ID:</span>
-            <span className="font-mono font-medium text-gray-900">{completedOrderId?.slice(0, 8)}...</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Order Total:</span>
-            <span className="font-semibold text-gray-900">${total.toFixed(2)}</span>
-          </div>
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Email:</span>
-            <span className="text-gray-900">{billingAddress.email}</span>
+        <div className="bg-gray-50 rounded-xl p-5">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <span className="text-gray-500">Order Total</span>
+              <p className="text-lg font-bold text-gray-900">${total.toFixed(2)}</p>
+            </div>
+            <div>
+              <span className="text-gray-500">Items</span>
+              <p className="text-lg font-bold text-gray-900">{items.length}</p>
+            </div>
+            <div>
+              <span className="text-gray-500">Shipping</span>
+              <p className="font-medium text-gray-900">{shippingMethods.find(m => m.id === selectedShippingMethod)?.name}</p>
+            </div>
+            <div>
+              <span className="text-gray-500">Email</span>
+              <p className="font-medium text-gray-900 truncate">{billingAddress.email}</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
-        <p className="text-sm text-blue-800">
-          A confirmation email will be sent to <strong>{billingAddress.email}</strong>
-        </p>
-      </div>
+        <div className="flex flex-col sm:flex-row gap-3 justify-center pt-2">
+          <button
+            onClick={() => setShowReceipt(true)}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 border-2 border-gray-900 text-gray-900 rounded-lg hover:bg-gray-900 hover:text-white transition-colors font-medium text-sm"
+          >
+            <FileText className="h-4 w-4" />
+            View Receipt
+          </button>
+          <button
+            onClick={() => {
+              if (completedOrderId) {
+                onOrderComplete(completedOrderId);
+              }
+              onClose();
+            }}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors font-medium text-sm"
+          >
+            Done
+          </button>
+        </div>
 
-      <div className="flex justify-center space-x-4">
-        <button
-          onClick={() => {
-            if (completedOrderId) {
-              onOrderComplete(completedOrderId);
-            }
-            onClose();
-          }}
-          className="px-6 py-3 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors font-medium"
-        >
-          Close
-        </button>
+        {showReceipt && (
+          <OrderReceipt
+            orderId={completedOrderId || ''}
+            orderDate={new Date().toISOString()}
+            items={items.map(item => ({ name: item.name, quantity: item.quantity, price: item.price, image: item.image }))}
+            subtotal={subtotal}
+            shipping={shippingCost}
+            shippingMethod={shippingMethods.find(m => m.id === selectedShippingMethod)?.name || 'Standard'}
+            tax={tax}
+            total={total}
+            paymentStatus={paymentResult?.status || 'pending'}
+            paymentMethod={paymentResult?.method || 'Card'}
+            paymentLastFour={paymentResult?.lastFour || '****'}
+            transactionId={paymentResult?.transactionId || ''}
+            customerEmail={billingAddress.email}
+            shippingAddress={shippingAddress}
+            billingAddress={billingAddress}
+            sameAsShipping={sameAsShipping}
+            onClose={() => setShowReceipt(false)}
+          />
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
