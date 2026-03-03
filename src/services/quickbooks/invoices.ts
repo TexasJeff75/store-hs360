@@ -223,12 +223,10 @@ export const quickbooksInvoices = {
 
     const voidData = {
       Id: invoice.Id,
-      SyncToken: invoice.SyncToken,
-      sparse: true,
-      PrivateNote: `${invoice.PrivateNote || ''} | VOIDED`
+      SyncToken: invoice.SyncToken
     };
 
-    await qbClient.post('invoice', voidData);
+    await qbClient.post(`invoice/${invoiceId}?operation=void`, voidData);
   },
 
   calculateDueDate(daysFromNow: number): string {

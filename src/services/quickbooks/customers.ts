@@ -31,6 +31,7 @@ interface QBCustomerResponse {
 
 export const quickbooksCustomers = {
   async syncOrganization(organizationId: string): Promise<string> {
+    let existingQbId: string | null = null;
     try {
       const { data: org, error: orgError } = await supabase
         .from('organizations')
@@ -41,6 +42,8 @@ export const quickbooksCustomers = {
       if (orgError || !org) {
         throw new Error('Organization not found');
       }
+
+      existingQbId = org.quickbooks_customer_id || null;
 
       let qbCustomer: QBCustomer = {
         DisplayName: org.name,
@@ -68,8 +71,8 @@ export const quickbooksCustomers = {
 
       let quickbooksId: string;
 
-      if (org.quickbooks_customer_id) {
-        const existing = await this.getCustomer(org.quickbooks_customer_id);
+      if (existingQbId) {
+        const existing = await this.getCustomer(existingQbId);
         qbCustomer.Id = existing.Id;
         qbCustomer.SyncToken = existing.SyncToken;
 
@@ -78,7 +81,7 @@ export const quickbooksCustomers = {
           organizationId,
           'update',
           'pending',
-          org.quickbooks_customer_id,
+          existingQbId,
           qbCustomer
         );
 
@@ -131,9 +134,9 @@ export const quickbooksCustomers = {
       await qbClient.logSync(
         'customer',
         organizationId,
-        org?.quickbooks_customer_id ? 'update' : 'create',
+        existingQbId ? 'update' : 'create',
         'failed',
-        org?.quickbooks_customer_id,
+        existingQbId || undefined,
         undefined,
         undefined,
         error.message
@@ -143,6 +146,7 @@ export const quickbooksCustomers = {
   },
 
   async syncLocation(locationId: string): Promise<string> {
+    let existingQbId: string | null = null;
     try {
       const { data: location, error: locationError } = await supabase
         .from('locations')
@@ -153,6 +157,8 @@ export const quickbooksCustomers = {
       if (locationError || !location) {
         throw new Error('Location not found');
       }
+
+      existingQbId = location.quickbooks_customer_id || null;
 
       const displayName = `${location.organizations.name} - ${location.name}`;
 
@@ -182,8 +188,8 @@ export const quickbooksCustomers = {
 
       let quickbooksId: string;
 
-      if (location.quickbooks_customer_id) {
-        const existing = await this.getCustomer(location.quickbooks_customer_id);
+      if (existingQbId) {
+        const existing = await this.getCustomer(existingQbId);
         qbCustomer.Id = existing.Id;
         qbCustomer.SyncToken = existing.SyncToken;
 
@@ -192,7 +198,7 @@ export const quickbooksCustomers = {
           locationId,
           'update',
           'pending',
-          location.quickbooks_customer_id,
+          existingQbId,
           qbCustomer
         );
 
@@ -245,9 +251,9 @@ export const quickbooksCustomers = {
       await qbClient.logSync(
         'customer',
         locationId,
-        location?.quickbooks_customer_id ? 'update' : 'create',
+        existingQbId ? 'update' : 'create',
         'failed',
-        location?.quickbooks_customer_id,
+        existingQbId || undefined,
         undefined,
         undefined,
         error.message
@@ -262,8 +268,9 @@ export const quickbooksCustomers = {
   },
 
   async findCustomerByName(name: string): Promise<QBCustomer | null> {
+    const sanitized = name.replace(/'/g, "''").replace(/[\\;]/g, '');
     const customers = await qbClient.query<QBCustomer>(
-      `SELECT * FROM Customer WHERE DisplayName = '${name.replace(/'/g, "\\'")}'`
+      `SELECT * FROM Customer WHERE DisplayName = '${sanitized}'`
     );
     return customers.length > 0 ? customers[0] : null;
   },

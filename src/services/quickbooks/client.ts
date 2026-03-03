@@ -67,7 +67,7 @@ export class QuickBooksClient {
   }
 
   async put<T>(endpoint: string, body: any, usePaymentsAPI = false): Promise<T> {
-    return this.proxyRequest<T>(endpoint, 'POST', body, usePaymentsAPI);
+    return this.proxyRequest<T>(endpoint, 'PUT', body, usePaymentsAPI);
   }
 
   async delete(endpoint: string, usePaymentsAPI = false): Promise<void> {

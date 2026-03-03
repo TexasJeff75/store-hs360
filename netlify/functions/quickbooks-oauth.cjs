@@ -23,7 +23,7 @@ function getSupabaseAdmin() {
 
 function getQBConfig() {
   const clientId = process.env.QB_CLIENT_ID || process.env.VITE_QB_CLIENT_ID;
-  const clientSecret = process.env.QB_CLIENT_SECRET || process.env.VITE_QB_CLIENT_SECRET;
+  const clientSecret = process.env.QB_CLIENT_SECRET;
   const redirectUri = process.env.QB_REDIRECT_URI || process.env.VITE_QB_REDIRECT_URI;
 
   const missing = [];

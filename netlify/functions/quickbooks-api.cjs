@@ -42,6 +42,16 @@ async function authenticateUser(authHeader) {
     throw new Error(error ? `Auth error: ${error.message}` : 'Unauthorized');
   }
 
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (!profile || profile.role !== 'admin') {
+    throw new Error('Only admins can access QuickBooks API');
+  }
+
   return user;
 }
 
@@ -71,7 +81,7 @@ async function getCredentials() {
 
 async function refreshTokens(creds, supabase) {
   const clientId = process.env.QB_CLIENT_ID || process.env.VITE_QB_CLIENT_ID;
-  const clientSecret = process.env.QB_CLIENT_SECRET || process.env.VITE_QB_CLIENT_SECRET;
+  const clientSecret = process.env.QB_CLIENT_SECRET;
 
   if (!clientId || !clientSecret) {
     throw new Error('QuickBooks client credentials not configured');

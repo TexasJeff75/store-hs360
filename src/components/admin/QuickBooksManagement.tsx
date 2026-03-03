@@ -564,7 +564,7 @@ export function QuickBooksManagement() {
                   </div>
                   <div className="border-t border-gray-200 pt-4">
                     <p className="text-xs text-gray-500">
-                      Credentials are stored securely on the server (Netlify Blobs). They never pass through the browser or the database.
+                      Credentials are stored securely on the server. Tokens never pass through the browser.
                     </p>
                   </div>
                 </div>
