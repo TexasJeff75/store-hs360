@@ -317,35 +317,36 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return false;
     }
 
-    const isOrderingForOtherUser = user?.id && selectedCustomerId !== user.id;
+    if (!user?.id) return true;
+
+    const isOrderingForOtherUser = selectedCustomerId !== user.id;
     if (isOrderingForOtherUser) {
       return true;
     }
 
-    const addressToSave = {
-      user_id: selectedCustomerId,
-      organization_id: selectedOrgId,
-      location_id: selectedLocationId,
-      address_type: addressType,
-      label: label.trim(),
-      first_name: addressData.firstName,
-      last_name: addressData.lastName,
-      company: addressData.company,
-      address1: addressData.address1,
-      address2: addressData.address2,
-      city: addressData.city,
-      state_or_province: addressData.state,
-      postal_code: addressData.postalCode,
-      country_code: addressData.country,
-      phone: addressData.phone,
-      email: 'email' in addressData ? addressData.email : undefined,
-    };
+    try {
+      const addressToSave = {
+        user_id: user.id,
+        organization_id: selectedOrgId,
+        location_id: selectedLocationId,
+        address_type: addressType,
+        label: label.trim(),
+        first_name: addressData.firstName,
+        last_name: addressData.lastName,
+        company: addressData.company,
+        address1: addressData.address1,
+        address2: addressData.address2,
+        city: addressData.city,
+        state_or_province: addressData.state,
+        postal_code: addressData.postalCode,
+        country_code: addressData.country,
+        phone: addressData.phone,
+        email: 'email' in addressData ? addressData.email : undefined,
+      };
 
-    const savedAddress = await customerAddressService.createAddress(addressToSave);
-
-    if (!savedAddress) {
-      setError('Failed to save address. Please try again.');
-      return false;
+      await customerAddressService.createAddress(addressToSave);
+    } catch {
+      console.warn('Could not save address, continuing with checkout');
     }
 
     return true;
