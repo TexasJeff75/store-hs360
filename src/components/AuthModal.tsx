@@ -111,7 +111,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden">
-      <div className="absolute inset-0 bg-black bg-opacity-50" onClick={handleClose}></div>
+      <div className="absolute inset-0 bg-black bg-opacity-50"></div>
       
       <div className="absolute inset-0 flex items-center justify-center p-4">
         <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">

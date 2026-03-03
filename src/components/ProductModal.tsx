@@ -138,7 +138,6 @@ const ProductModal: React.FC<ProductModalProps> = ({
           {/* Background overlay */}
           <div
             className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-            onClick={onClose}
           ></div>
         
         {/* Modal panel */}
@@ -460,7 +459,6 @@ const ProductModal: React.FC<ProductModalProps> = ({
         <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20">
           <div
             className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
-            onClick={onClose}
           ></div>
           <div className="relative bg-white rounded-lg p-8 max-w-md">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to display product</h3>

@@ -177,7 +177,6 @@ const PricingForm: React.FC<PricingFormProps> = ({
       <div className="flex items-center justify-center min-h-screen px-4">
         <div
           className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"
-          onClick={onClose}
         />
 
         <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg transform transition-all">
