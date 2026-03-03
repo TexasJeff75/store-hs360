@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { quickbooksPayments } from './quickbooks';
 
 export interface OrderItem {
   productId: number;
@@ -606,6 +607,15 @@ class OrderService {
 
       if (order.payment_status !== 'authorized') {
         return { success: false, error: 'Payment must be authorized before capture' };
+      }
+
+      if (order.payment_authorization_id && !order.payment_authorization_id.startsWith('auth_') && !order.payment_authorization_id.startsWith('saved_')) {
+        try {
+          await quickbooksPayments.captureCharge(order.payment_authorization_id, order.total);
+        } catch (captureError: any) {
+          console.error('QB Payments capture failed:', captureError);
+          return { success: false, error: `Payment capture failed: ${captureError.message}` };
+        }
       }
 
       const captureResult = await this.updatePaymentStatus(orderId, 'captured');

@@ -178,13 +178,20 @@ exports.handler = async (event) => {
       url = `${QB_API_BASE_URL}/v3/company/${creds.realm_id}/${endpoint}`;
     }
 
+    const headers = {
+      'Authorization': `Bearer ${creds.access_token}`,
+      'Accept': 'application/json',
+      'Content-Type': 'application/json'
+    };
+
+    if (usePaymentsAPI) {
+      const crypto = require('crypto');
+      headers['Request-Id'] = crypto.randomUUID();
+    }
+
     const fetchOptions = {
       method: method.toUpperCase(),
-      headers: {
-        'Authorization': `Bearer ${creds.access_token}`,
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      }
+      headers
     };
 
     if (data && ['POST', 'PUT'].includes(method.toUpperCase())) {

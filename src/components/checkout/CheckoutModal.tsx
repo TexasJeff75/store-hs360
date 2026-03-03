@@ -6,8 +6,10 @@ import { restCheckoutService } from '@/services/restCheckout';
 import CustomerSelector from './CustomerSelector';
 import AddressSelector from './AddressSelector';
 import PaymentForm from './BigCommercePaymentForm';
+import type { PaymentData } from './BigCommercePaymentForm';
 import { CustomerAddress, customerAddressService } from '@/services/customerAddresses';
 import { supabase } from '@/services/supabase';
+import { quickbooksPayments } from '@/services/quickbooks';
 
 interface CartItem {
   id: number;
@@ -74,6 +76,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
   const [cartId, setCartId] = useState<string | null>(null);
   const [checkoutId, setCheckoutId] = useState<string | null>(null);
+  const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   
   // Form data
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
@@ -464,8 +467,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   };
 
   const handlePlaceOrder = async () => {
-    if (!sessionId || !checkoutId) {
-      setError('Checkout session not found. Please try again.');
+    if (!sessionId || !checkoutId || !paymentData) {
+      setError('Checkout session or payment data not found. Please try again.');
       return;
     }
 
@@ -473,31 +476,127 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setError(null);
 
     try {
-      // This would collect payment information from the payment step form
-      // For now, using test card data
-      const paymentData = {
-        cardholder_name: `${billingAddress.firstName} ${billingAddress.lastName}`,
-        number: '4111111111111111',
-        expiry_month: 12,
-        expiry_year: 2025,
-        verification_value: '123',
+      let paymentAuthId = '';
+      let paymentLastFour = '';
+      let paymentStatus = 'authorized';
+
+      if (paymentData.type === 'card') {
+        const tokenResponse = await quickbooksPayments.tokenizeCard({
+          card: {
+            number: paymentData.cardNumber,
+            expMonth: paymentData.expiryMonth.padStart(2, '0'),
+            expYear: '20' + paymentData.expiryYear,
+            cvc: paymentData.cvv,
+            name: paymentData.cardholderName,
+          },
+        });
+
+        const authResponse = await quickbooksPayments.authorizeCard(
+          total,
+          tokenResponse.value,
+          'USD',
+          `Order from checkout session ${sessionId}`
+        );
+
+        paymentAuthId = authResponse.id;
+        paymentLastFour = paymentData.cardNumber.slice(-4);
+
+        if (paymentData.savePaymentMethod && selectedOrgId && user?.id) {
+          try {
+            await quickbooksPayments.savePaymentMethod({
+              organizationId: selectedOrgId,
+              locationId: selectedLocationId,
+              userId: user.id,
+              label: paymentData.paymentMethodLabel || `Card ****${paymentLastFour}`,
+              paymentType: 'credit_card',
+              lastFour: paymentLastFour,
+              expiryMonth: parseInt(paymentData.expiryMonth),
+              expiryYear: parseInt('20' + paymentData.expiryYear),
+              accountHolderName: paymentData.cardholderName,
+              token: tokenResponse.value,
+            });
+          } catch {
+          }
+        }
+      } else if (paymentData.type === 'ach') {
+        const achResponse = await quickbooksPayments.processACH(
+          total,
+          {
+            name: paymentData.accountHolderName,
+            routingNumber: paymentData.routingNumber,
+            accountNumber: paymentData.accountNumber,
+            accountType: paymentData.accountType,
+            phone: paymentData.phone,
+          },
+          'USD',
+          `Order from checkout session ${sessionId}`
+        );
+
+        paymentAuthId = achResponse.id;
+        paymentLastFour = paymentData.accountNumber.slice(-4);
+        paymentStatus = 'pending';
+
+        if (paymentData.savePaymentMethod && selectedOrgId && user?.id) {
+          try {
+            const acctTypeLower = paymentData.accountType.toLowerCase();
+            await quickbooksPayments.savePaymentMethod({
+              organizationId: selectedOrgId,
+              locationId: selectedLocationId,
+              userId: user.id,
+              label: paymentData.paymentMethodLabel || `Bank ****${paymentLastFour}`,
+              paymentType: 'ach',
+              lastFour: paymentLastFour,
+              accountHolderName: paymentData.accountHolderName,
+              accountType: acctTypeLower.includes('checking') ? 'checking' : 'savings',
+              token: achResponse.id,
+            });
+          } catch {
+          }
+        }
+      } else if (paymentData.type === 'saved') {
+        if (paymentData.paymentType === 'ach' || paymentData.paymentType === 'bank_account') {
+          paymentAuthId = `saved_ach_${paymentData.paymentMethodId}`;
+          paymentLastFour = paymentData.lastFour;
+          paymentStatus = 'pending';
+        } else {
+          const authResponse = await quickbooksPayments.authorizeCard(
+            total,
+            paymentData.paymentToken,
+            'USD',
+            `Order from checkout session ${sessionId}`
+          );
+          paymentAuthId = authResponse.id;
+          paymentLastFour = paymentData.lastFour;
+        }
+      }
+
+      const legacyPaymentData = {
+        cardholder_name: paymentData.type === 'card' ? paymentData.cardholderName
+          : paymentData.type === 'ach' ? paymentData.accountHolderName
+          : 'Saved Method',
+        number: paymentLastFour.padStart(16, '*'),
+        expiry_month: 1,
+        expiry_year: 2030,
+        verification_value: '000',
       };
 
       const result = await restCheckoutService.processPayment(
         sessionId,
         checkoutId,
-        paymentData
+        legacyPaymentData
       );
 
       if (result.success && result.orderId) {
+        const { orderService } = await import('@/services/orderService');
+        await orderService.updatePaymentStatus(result.orderId, paymentStatus, paymentAuthId);
         setCompletedOrderId(result.orderId);
         setCurrentStep('confirmation');
       } else {
         setError(result.error || 'Failed to process payment');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Order placement error:', err);
-      setError('Failed to place order. Please try again.');
+      setError(err.message || 'Failed to place order. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -864,37 +963,46 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const renderPaymentStep = () => (
     <div className="space-y-6">
       <div className="flex items-center space-x-2 mb-4">
-        <CreditCard className="h-5 w-5 text-pink-600" />
+        <CreditCard className="h-5 w-5 text-blue-600" />
         <h3 className="text-lg font-semibold">Payment Information</h3>
       </div>
 
       <PaymentForm
-        onPaymentReady={(ready) => console.log('Payment ready:', ready)}
-        onPaymentSubmit={(paymentData) => {
+        onPaymentReady={() => {}}
+        onPaymentSubmit={(data) => {
+          setPaymentData(data);
           setCurrentStep('review');
         }}
         billingAddress={billingAddress}
         total={total}
-        organizationId={organizationId}
+        organizationId={selectedOrgId}
         locationId={selectedLocationId}
       />
     </div>
   );
 
 
+  const getPaymentSummary = () => {
+    if (!paymentData) return 'No payment method selected';
+    if (paymentData.type === 'card') return `Credit Card ****${paymentData.cardNumber.slice(-4)}`;
+    if (paymentData.type === 'ach') return `Bank Account ****${paymentData.accountNumber.slice(-4)}`;
+    if (paymentData.type === 'saved') return `Saved Method ****${paymentData.lastFour}`;
+    return 'Unknown';
+  };
+
   const renderReviewStep = () => (
     <div className="space-y-6">
       <h3 className="text-lg font-semibold mb-4">Order Review</h3>
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start space-x-2">
-          <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-          <div className="text-blue-800">
-            <p className="font-medium text-sm">Test Mode</p>
-            <p className="text-xs mt-1">
-              This order will be created in the system but payment is simulated.
-              No actual charge will be made to the test card.
-            </p>
+      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+        <div className="flex items-center gap-3">
+          <CreditCard className="h-5 w-5 text-gray-600" />
+          <div>
+            <p className="text-sm font-medium text-gray-900">Payment Method</p>
+            <p className="text-sm text-gray-600">{getPaymentSummary()}</p>
+            {paymentData?.type === 'ach' && (
+              <p className="text-xs text-amber-600 mt-1">ACH payments take 3-5 business days to settle</p>
+            )}
           </div>
         </div>
       </div>
