@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Save, Loader, Package } from 'lucide-react';
 import { productService, Product, Category, Brand } from '@/services/productService';
-import { productImageService, ProductImage } from '@/services/productImageService';
-import ImageUploader from './ImageUploader';
 
 interface ProductFormProps {
   product?: Product | null;
@@ -17,8 +15,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, isOpen, onClose, onS
   const [error, setError] = useState<string | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
-  const [images, setImages] = useState<ProductImage[]>([]);
-  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [newBrandName, setNewBrandName] = useState('');
   const [showNewBrand, setShowNewBrand] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
@@ -61,7 +57,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, isOpen, onClose, onS
           is_in_stock: product.isInStock ?? true,
           is_active: product.isActive ?? true,
         });
-        loadImages(product.id);
       } else {
         resetForm();
       }
@@ -85,8 +80,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, isOpen, onClose, onS
       is_in_stock: true,
       is_active: true,
     });
-    setImages([]);
-    setPendingFiles([]);
     setError(null);
   };
 
@@ -97,11 +90,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, isOpen, onClose, onS
     ]);
     setCategories(cats);
     setBrands(brs);
-  };
-
-  const loadImages = async (productId: number) => {
-    const imgs = await productImageService.getImages(productId);
-    setImages(imgs);
   };
 
   const handleCreateBrand = async () => {
@@ -182,19 +170,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, isOpen, onClose, onS
       }
 
       if (!savedProduct) throw new Error('Failed to save product');
-
-      if (pendingFiles.length > 0) {
-        for (const file of pendingFiles) {
-          const isPrimary = images.length === 0;
-          await productImageService.uploadImage(file, savedProduct.id, {
-            isPrimary,
-            altText: file.name.replace(/\.[^.]+$/, ''),
-          });
-        }
-        setPendingFiles([]);
-        const refreshed = await productService.getProductById(savedProduct.id);
-        if (refreshed) savedProduct = refreshed;
-      }
 
       onSave(savedProduct);
       onClose();
@@ -494,19 +469,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, isOpen, onClose, onS
               </div>
 
               <div className="space-y-5">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Product Images
-                  </label>
-                  <ImageUploader
-                    productId={product?.id ?? null}
-                    images={images}
-                    onImagesChange={setImages}
-                    pendingFiles={pendingFiles}
-                    onPendingFilesChange={setPendingFiles}
-                  />
-                </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Description

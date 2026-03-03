@@ -1,7 +1,6 @@
 import { supabase } from './supabase';
 import { Product, productService } from './productService';
 import { ENV } from '../config/env';
-import { descriptionTemplateService, DescriptionTemplate, TemplateSection } from './descriptionTemplateService';
 
 interface GenerateDescriptionPayload {
   name: string;
@@ -16,29 +15,7 @@ interface GenerateDescriptionPayload {
   existingDescription?: string;
 }
 
-interface EdgeFunctionPayload extends GenerateDescriptionPayload {
-  templateSections?: TemplateSection[];
-  systemPrompt?: string;
-  guidelines?: string;
-}
-
-let cachedTemplate: DescriptionTemplate | null | undefined = undefined;
-
-async function getDefaultTemplate(): Promise<DescriptionTemplate | null> {
-  if (cachedTemplate !== undefined) return cachedTemplate;
-  try {
-    cachedTemplate = await descriptionTemplateService.getDefault();
-  } catch {
-    cachedTemplate = null;
-  }
-  return cachedTemplate;
-}
-
-export function clearTemplateCache(): void {
-  cachedTemplate = undefined;
-}
-
-export async function generateProductDescription(product: Product, templateId?: string): Promise<string> {
+export async function generateProductDescription(product: Product): Promise<string> {
   const payload: GenerateDescriptionPayload = {
     name: product.name,
     category: product.category !== 'Uncategorized' ? product.category : undefined,
@@ -52,39 +29,23 @@ export async function generateProductDescription(product: Product, templateId?: 
     existingDescription: product.plainTextDescription || undefined,
   };
 
-  let template: DescriptionTemplate | null = null;
-  if (templateId) {
-    template = await descriptionTemplateService.getById(templateId);
-  } else {
-    template = await getDefaultTemplate();
-  }
-
   try {
-    const description = await fetchFromEdgeFunction(payload, template);
+    const description = await fetchFromEdgeFunction(payload);
     if (description) return description;
   } catch {
     // Edge function unavailable, fall through to client-side generation
   }
 
-  return generateClientDescription(payload, template);
+  return generateClientDescription(payload);
 }
 
 async function fetchFromEdgeFunction(
-  payload: GenerateDescriptionPayload,
-  template: DescriptionTemplate | null
+  payload: GenerateDescriptionPayload
 ): Promise<string> {
-  const apiUrl = `${ENV.SUPABASE_URL}/functions/v1/super-responder`;
+  const apiUrl = `${ENV.SUPABASE_URL}/functions/v1/generate-product-description`;
 
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token || ENV.SUPABASE_ANON_KEY;
-
-  const edgePayload: EdgeFunctionPayload = { ...payload };
-
-  if (template) {
-    edgePayload.templateSections = template.sections;
-    edgePayload.systemPrompt = template.system_prompt;
-    edgePayload.guidelines = template.guidelines;
-  }
 
   const response = await fetch(apiUrl, {
     method: 'POST',
@@ -93,7 +54,7 @@ async function fetchFromEdgeFunction(
       'Content-Type': 'application/json',
       'apikey': ENV.SUPABASE_ANON_KEY,
     },
-    body: JSON.stringify(edgePayload),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -104,18 +65,11 @@ async function fetchFromEdgeFunction(
   return data.description;
 }
 
-function generateClientDescription(
-  product: GenerateDescriptionPayload,
-  template: DescriptionTemplate | null
-): string {
+function generateClientDescription(product: GenerateDescriptionPayload): string {
   const name = product.name;
   const category = product.category || 'health and wellness';
   const brand = product.brand || '';
   const benefits = product.benefits || [];
-
-  if (template && template.sections.length > 0) {
-    return buildFromTemplate(template.sections, { name, category, brand, benefits, product });
-  }
 
   return buildDefaultHtml({ name, category, brand, benefits, product });
 }
@@ -126,42 +80,6 @@ interface DescContext {
   brand: string;
   benefits: string[];
   product: GenerateDescriptionPayload;
-}
-
-function buildFromTemplate(sections: TemplateSection[], ctx: DescContext): string {
-  const parts = sections.map(section => {
-    const heading = section.heading;
-
-    if (section.type === 'list') {
-      const items = ctx.benefits.length > 0
-        ? ctx.benefits.map(b => `    <li>${escapeHtml(b)}</li>`).join('\n')
-        : section.placeholder.split('\n').filter(Boolean).map(line => `    <li>${escapeHtml(line)}</li>`).join('\n');
-      return `  <h3>${escapeHtml(heading)}</h3>\n  <ul>\n${items}\n  </ul>`;
-    }
-
-    const content = getSectionContent(heading, section.placeholder, ctx);
-    return `  <h3>${escapeHtml(heading)}</h3>\n  <p>${content}</p>`;
-  });
-
-  return `<div>\n${parts.join('\n\n')}\n</div>`;
-}
-
-function getSectionContent(heading: string, placeholder: string, ctx: DescContext): string {
-  const brandLine = ctx.brand ? ` by ${escapeHtml(ctx.brand)}` : '';
-  const weightLine = ctx.product.weight && ctx.product.weightUnit
-    ? ` Available in ${ctx.product.weight} ${ctx.product.weightUnit} size.`
-    : '';
-  const existingContext = ctx.product.existingDescription
-    ? ` ${escapeHtml(ctx.product.existingDescription)}`
-    : '';
-
-  const productIntro = `${escapeHtml(ctx.name)} is a professional-grade ${escapeHtml(ctx.category.toLowerCase())} product${brandLine}`;
-
-  if (placeholder && placeholder.trim().length > 0) {
-    return `${productIntro}. ${escapeHtml(placeholder)}${weightLine}${existingContext}`;
-  }
-
-  return `${productIntro} designed for healthcare practitioners and their patients.${weightLine}${existingContext}`;
 }
 
 function buildDefaultHtml(ctx: DescContext): string {

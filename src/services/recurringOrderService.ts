@@ -124,26 +124,6 @@ export const recurringOrderService = {
     }
   },
 
-  async getOrganizationRecurringOrders(organizationId: string): Promise<RecurringOrder[]> {
-    try {
-      const { data, error } = await supabase
-        .from('recurring_orders')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching organization recurring orders:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Error in getOrganizationRecurringOrders:', error);
-      return [];
-    }
-  },
-
   async getAllRecurringOrders(): Promise<RecurringOrder[]> {
     try {
       const { data, error } = await supabase
@@ -261,25 +241,6 @@ export const recurringOrderService = {
     }
   },
 
-  async deleteRecurringOrder(recurringOrderId: string): Promise<boolean> {
-    try {
-      const { error } = await supabase
-        .from('recurring_orders')
-        .delete()
-        .eq('id', recurringOrderId);
-
-      if (error) {
-        console.error('Error deleting recurring order:', error);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('Error in deleteRecurringOrder:', error);
-      return false;
-    }
-  },
-
   async getRecurringOrderHistory(recurringOrderId: string): Promise<RecurringOrderHistory[]> {
     try {
       const { data, error } = await supabase
@@ -296,29 +257,6 @@ export const recurringOrderService = {
       return data || [];
     } catch (error) {
       console.error('Error in getRecurringOrderHistory:', error);
-      return [];
-    }
-  },
-
-  async getDueRecurringOrders(date?: string): Promise<RecurringOrder[]> {
-    try {
-      const targetDate = date || new Date().toISOString().split('T')[0];
-
-      const { data, error } = await supabase
-        .from('recurring_orders')
-        .select('*')
-        .eq('status', 'active')
-        .lte('next_order_date', targetDate)
-        .order('next_order_date', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching due recurring orders:', error);
-        return [];
-      }
-
-      return data || [];
-    } catch (error) {
-      console.error('Error in getDueRecurringOrders:', error);
       return [];
     }
   },
@@ -355,31 +293,5 @@ export const recurringOrderService = {
           return `${frequency} (${interval}x)`;
       }
     }
-  },
-
-  calculateNextOrderDate(currentDate: string, frequency: string, interval: number = 1): string {
-    const date = new Date(currentDate);
-
-    switch (frequency) {
-      case 'weekly':
-        date.setDate(date.getDate() + (interval * 7));
-        break;
-      case 'biweekly':
-        date.setDate(date.getDate() + (interval * 14));
-        break;
-      case 'monthly':
-        date.setMonth(date.getMonth() + interval);
-        break;
-      case 'quarterly':
-        date.setMonth(date.getMonth() + (interval * 3));
-        break;
-      case 'yearly':
-        date.setFullYear(date.getFullYear() + interval);
-        break;
-      default:
-        date.setDate(date.getDate() + (interval * 30));
-    }
-
-    return date.toISOString().split('T')[0];
   }
 };

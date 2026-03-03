@@ -183,29 +183,6 @@ class OrderService {
     }
   }
 
-  async getUserOrders(userId: string): Promise<{ orders: Order[]; error?: string }> {
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching user orders:', error);
-        return { orders: [], error: error.message };
-      }
-
-      return { orders: data || [] };
-    } catch (error) {
-      console.error('Error fetching user orders:', error);
-      return {
-        orders: [],
-        error: error instanceof Error ? error.message : 'Failed to fetch orders'
-      };
-    }
-  }
-
   async getOrderById(orderId: string): Promise<{ order: Order | null; error?: string }> {
     try {
       const { data, error } = await supabase
@@ -225,31 +202,6 @@ class OrderService {
       return {
         order: null,
         error: error instanceof Error ? error.message : 'Failed to fetch order'
-      };
-    }
-  }
-
-  async getOrganizationOrders(
-    organizationId: string
-  ): Promise<{ orders: Order[]; error?: string }> {
-    try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('organization_id', organizationId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error('Error fetching organization orders:', error);
-        return { orders: [], error: error.message };
-      }
-
-      return { orders: data || [] };
-    } catch (error) {
-      console.error('Error fetching organization orders:', error);
-      return {
-        orders: [],
-        error: error instanceof Error ? error.message : 'Failed to fetch orders'
       };
     }
   }

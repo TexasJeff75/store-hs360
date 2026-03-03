@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 
-const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
-const ACTIVITY_CHECK_INTERVAL_MS = 60 * 1000; // Check every minute
+const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+const ACTIVITY_CHECK_INTERVAL_MS = 60 * 1000;
 
 class SessionTrackingService {
   private currentSessionId: string | null = null;
@@ -49,7 +49,6 @@ class SessionTrackingService {
       const sessionInfo = this.getStoredSessionInfo();
 
       if (!sessionInfo?.auditId) {
-        console.warn('No active session to log out');
         return;
       }
 
@@ -96,38 +95,10 @@ class SessionTrackingService {
     }
   }
 
-  getCurrentSessionId(): string | null {
-    const sessionInfo = this.getStoredSessionInfo();
-    return sessionInfo?.sessionId || null;
-  }
-
-  async getSessionDuration(): Promise<number | null> {
-    try {
-      const sessionInfo = this.getStoredSessionInfo();
-
-      if (!sessionInfo?.auditId) {
-        return null;
-      }
-
-      const { data, error } = await supabase
-        .from('login_audit')
-        .select('login_timestamp')
-        .eq('id', sessionInfo.auditId)
-        .single();
-
-      if (error || !data) {
-        return null;
-      }
-
-      const loginTime = new Date(data.login_timestamp).getTime();
-      const now = Date.now();
-      const durationSeconds = Math.floor((now - loginTime) / 1000);
-
-      return durationSeconds;
-    } catch (error) {
-      console.error('Error getting session duration:', error);
-      return null;
-    }
+  setupBeforeUnloadHandler(): void {
+    window.addEventListener('beforeunload', () => {
+      this.recordBrowserClose();
+    });
   }
 
   private storeSessionInfo(sessionId: string, auditId: string): void {
@@ -173,33 +144,6 @@ class SessionTrackingService {
     }
   }
 
-  setupBeforeUnloadHandler(): void {
-    window.addEventListener('beforeunload', () => {
-      const sessionInfo = this.getStoredSessionInfo();
-      if (sessionInfo?.auditId) {
-        navigator.sendBeacon(
-          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/login_audit?id=eq.${sessionInfo.auditId}`,
-          JSON.stringify({
-            logout_timestamp: new Date().toISOString(),
-            session_ended: false
-          })
-        );
-      }
-    });
-  }
-
-  async cleanupOrphanedSessions(): Promise<void> {
-    try {
-      const { error } = await supabase.rpc('expire_orphaned_sessions');
-
-      if (error) {
-        console.error('Error cleaning up orphaned sessions:', error);
-      }
-    } catch (error) {
-      console.error('Error in cleanupOrphanedSessions:', error);
-    }
-  }
-
   private startActivityMonitoring(): void {
     this.lastActivityTime = Date.now();
 
@@ -216,7 +160,6 @@ class SessionTrackingService {
       const timeSinceActivity = Date.now() - this.lastActivityTime;
 
       if (timeSinceActivity > SESSION_TIMEOUT_MS) {
-        console.log('Session expired due to inactivity');
         await this.handleSessionTimeout();
       }
     }, ACTIVITY_CHECK_INTERVAL_MS);
@@ -238,17 +181,6 @@ class SessionTrackingService {
     } catch (error) {
       console.error('Error handling session timeout:', error);
     }
-  }
-
-  isSessionValid(): boolean {
-    const timeSinceActivity = Date.now() - this.lastActivityTime;
-    return timeSinceActivity < SESSION_TIMEOUT_MS;
-  }
-
-  getTimeUntilTimeout(): number {
-    const timeSinceActivity = Date.now() - this.lastActivityTime;
-    const timeRemaining = SESSION_TIMEOUT_MS - timeSinceActivity;
-    return Math.max(0, timeRemaining);
   }
 }
 

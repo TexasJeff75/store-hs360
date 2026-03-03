@@ -1,5 +1,14 @@
 import { supabase } from './supabase';
-import { imageLibraryService } from './imageLibraryService';
+
+const IMAGE_BUCKET = 'product-images-library';
+
+function resolveImageUrl(value: string): string {
+  if (!value) return '';
+  if (value.startsWith('http://') || value.startsWith('https://')) return value;
+  const cleaned = value.replace(/\s+/g, '-');
+  const { data } = supabase.storage.from(IMAGE_BUCKET).getPublicUrl(cleaned);
+  return data.publicUrl;
+}
 
 export interface ImportRow {
   name: string;
@@ -361,7 +370,7 @@ export async function importProducts(
       if (row.weight !== undefined) productPayload.weight = row.weight;
       if (row.weight_unit) productPayload.weight_unit = row.weight_unit;
       if (row.image_url) {
-        productPayload.image_url = imageLibraryService.resolveImageUrl(row.image_url);
+        productPayload.image_url = resolveImageUrl(row.image_url);
       }
 
       let existingId: number | undefined;
