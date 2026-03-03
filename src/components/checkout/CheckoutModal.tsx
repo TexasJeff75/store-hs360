@@ -490,25 +490,22 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       let paymentStatus = 'authorized';
 
       if (paymentData.type === 'card') {
-        const tokenResponse = await quickbooksPayments.tokenizeCard({
-          card: {
-            number: paymentData.cardNumber,
-            expMonth: paymentData.expiryMonth.padStart(2, '0'),
-            expYear: '20' + paymentData.expiryYear,
-            cvc: paymentData.cvv,
-            name: paymentData.cardholderName,
-          },
-        });
-
         const authResponse = await quickbooksPayments.authorizeCard(
           total,
-          tokenResponse.value,
+          paymentData.token,
           'USD',
           `Order from checkout session ${sessionId}`
         );
 
+        if (authResponse.status === 'DECLINED') {
+          setError('Your payment was declined. Please try a different payment method.');
+          setCurrentStep('payment');
+          setLoading(false);
+          return;
+        }
+
         paymentAuthId = authResponse.id;
-        paymentLastFour = paymentData.cardNumber.slice(-4);
+        paymentLastFour = paymentData.lastFour;
 
         if (paymentData.savePaymentMethod && selectedOrgId && user?.id) {
           try {
@@ -522,27 +519,28 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               expiryMonth: parseInt(paymentData.expiryMonth),
               expiryYear: parseInt('20' + paymentData.expiryYear),
               accountHolderName: paymentData.cardholderName,
-              token: tokenResponse.value,
+              token: paymentData.token,
             });
           } catch {
           }
         }
       } else if (paymentData.type === 'ach') {
-        const achResponse = await quickbooksPayments.processACH(
+        const achResponse = await quickbooksPayments.processACHWithToken(
           total,
-          {
-            name: paymentData.accountHolderName,
-            routingNumber: paymentData.routingNumber,
-            accountNumber: paymentData.accountNumber,
-            accountType: paymentData.accountType,
-            phone: paymentData.phone,
-          },
+          paymentData.token,
           'USD',
           `Order from checkout session ${sessionId}`
         );
 
+        if (achResponse.status === 'DECLINED') {
+          setError('Your payment was declined. Please try a different payment method.');
+          setCurrentStep('payment');
+          setLoading(false);
+          return;
+        }
+
         paymentAuthId = achResponse.id;
-        paymentLastFour = paymentData.accountNumber.slice(-4);
+        paymentLastFour = paymentData.lastFour;
         paymentStatus = 'pending';
 
         if (paymentData.savePaymentMethod && selectedOrgId && user?.id) {
@@ -557,29 +555,45 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               lastFour: paymentLastFour,
               accountHolderName: paymentData.accountHolderName,
               accountType: acctTypeLower.includes('checking') ? 'checking' : 'savings',
-              token: achResponse.id,
+              token: paymentData.token,
             });
           } catch {
           }
         }
       } else if (paymentData.type === 'saved') {
-        if (paymentData.paymentType === 'ach' || paymentData.paymentType === 'bank_account') {
-          paymentAuthId = `saved_ach_${paymentData.paymentMethodId}`;
-          paymentLastFour = paymentData.lastFour;
-          paymentStatus = 'pending';
-        } else {
-          const authResponse = await quickbooksPayments.authorizeCard(
-            total,
-            paymentData.paymentToken,
-            'USD',
-            `Order from checkout session ${sessionId}`
-          );
-          paymentAuthId = authResponse.id;
-          paymentLastFour = paymentData.lastFour;
+        const { data: { session: authSession } } = await supabase.auth.getSession();
+
+        const savedResponse = await fetch('/api/process-saved-payment', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${authSession?.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            paymentMethodId: paymentData.paymentMethodId,
+            amount: total,
+            currency: 'USD',
+            description: `Order from checkout session ${sessionId}`,
+          }),
+        });
+
+        const savedResult = await savedResponse.json();
+        if (!savedResponse.ok || savedResult.error) {
+          if (savedResult.status === 'DECLINED') {
+            setError('Your payment was declined. Please try a different payment method.');
+            setCurrentStep('payment');
+            setLoading(false);
+            return;
+          }
+          throw new Error(savedResult.error || 'Failed to process saved payment');
         }
+
+        paymentAuthId = savedResult.transactionId;
+        paymentLastFour = paymentData.lastFour;
+        paymentStatus = savedResult.paymentStatus || 'authorized';
       }
 
-      const legacyPaymentData = {
+      const sanitizedPaymentData = {
         cardholder_name: paymentData.type === 'card' ? paymentData.cardholderName
           : paymentData.type === 'ach' ? paymentData.accountHolderName
           : 'Saved Method',
@@ -592,7 +606,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       const result = await restCheckoutService.processPayment(
         sessionId,
         checkoutId,
-        legacyPaymentData
+        sanitizedPaymentData
       );
 
       if (result.success && result.orderId) {
@@ -626,8 +640,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setError(result.error || 'Failed to process payment');
       }
     } catch (err: any) {
-      console.error('Order placement error:', err);
-      setError(err.message || 'Failed to place order. Please try again.');
+      const msg = err?.message || '';
+      if (msg.toLowerCase().includes('decline')) {
+        setError('Your payment was declined. Please try a different payment method.');
+        setCurrentStep('payment');
+      } else {
+        setError(msg || 'Failed to place order. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -1015,8 +1034,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const getPaymentSummary = () => {
     if (!paymentData) return 'No payment method selected';
-    if (paymentData.type === 'card') return `Credit Card ****${paymentData.cardNumber.slice(-4)}`;
-    if (paymentData.type === 'ach') return `Bank Account ****${paymentData.accountNumber.slice(-4)}`;
+    if (paymentData.type === 'card') return `Credit Card ****${paymentData.lastFour}`;
+    if (paymentData.type === 'ach') return `Bank Account ****${paymentData.lastFour}`;
     if (paymentData.type === 'saved') return `Saved Method ****${paymentData.lastFour}`;
     return 'Unknown';
   };

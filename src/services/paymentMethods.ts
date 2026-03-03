@@ -14,7 +14,6 @@ export interface PaymentMethod {
   bank_name?: string;
   account_type?: 'checking' | 'savings';
   is_default: boolean;
-  payment_token?: string;
   payment_processor: string;
   created_at: string;
   updated_at: string;
@@ -27,7 +26,7 @@ export async function getPaymentMethods(
   try {
     let query = supabase
       .from('payment_methods')
-      .select('*')
+      .select('id, organization_id, location_id, user_id, label, payment_type, last_four, expiry_month, expiry_year, account_holder_name, bank_name, account_type, is_default, payment_processor, created_at, updated_at')
       .eq('organization_id', organizationId)
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: false });

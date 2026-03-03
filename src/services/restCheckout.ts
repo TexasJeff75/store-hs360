@@ -195,7 +195,7 @@ class RestCheckoutService {
       number: string;
       expiry_month: number;
       expiry_year: number;
-      verification_value: string;
+      verification_value?: string;
     }
   ): Promise<CheckoutFlowResult> {
     try {
@@ -258,7 +258,7 @@ class RestCheckoutService {
         customerEmail: session.billing_address?.email || '',
         organizationId: session.organization_id,
         locationId: session.metadata?.location_id,
-        notes: 'Order placed (card ending in ' + paymentData.number.slice(-4) + ')',
+        notes: `Order placed via checkout session ${sessionId}`,
       };
 
       const result = await orderService.createOrder(orderData);

@@ -1,9 +1,11 @@
 const { createClient } = require('@supabase/supabase-js');
 
+const ALLOWED_ORIGIN = process.env.CORS_ALLOWED_ORIGIN || '*';
+
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
   'Content-Type': 'application/json'
 };
 
@@ -135,6 +137,24 @@ async function refreshTokens(creds, supabase) {
   return updated;
 }
 
+const paymentRateLimits = new Map();
+const PAYMENT_MAX_ATTEMPTS = 10;
+const PAYMENT_WINDOW_MS = 15 * 60 * 1000;
+
+function checkPaymentRateLimit(userId) {
+  const now = Date.now();
+  const record = paymentRateLimits.get(userId);
+  if (!record || now - record.windowStart > PAYMENT_WINDOW_MS) {
+    paymentRateLimits.set(userId, { windowStart: now, count: 1 });
+    return true;
+  }
+  if (record.count >= PAYMENT_MAX_ATTEMPTS) {
+    return false;
+  }
+  record.count++;
+  return true;
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: corsHeaders, body: '' };
@@ -142,7 +162,7 @@ exports.handler = async (event) => {
 
   try {
     const authHeader = event.headers.authorization || event.headers.Authorization;
-    await authenticateUser(authHeader);
+    const user = await authenticateUser(authHeader);
 
     let body = {};
     if (event.body) {
@@ -158,6 +178,16 @@ exports.handler = async (event) => {
     }
 
     const { endpoint, method = 'GET', data, usePaymentsAPI = false, isQuery = false } = body;
+
+    if (usePaymentsAPI && method.toUpperCase() === 'POST') {
+      if (!checkPaymentRateLimit(user.id)) {
+        return {
+          statusCode: 429,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: 'Too many payment attempts. Please try again later.' })
+        };
+      }
+    }
 
     if (!endpoint) {
       return {

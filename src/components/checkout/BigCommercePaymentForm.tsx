@@ -1,25 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { Lock, CreditCard, AlertCircle, Save, Building2, Loader, CheckCircle } from 'lucide-react';
+import { Lock, CreditCard, AlertCircle, Save, Building2, Loader, CheckCircle, ShieldCheck } from 'lucide-react';
 import { getPaymentMethods } from '@/services/paymentMethods';
 
 export type PaymentMethodType = 'card' | 'ach' | 'saved';
 
-export interface CardPaymentData {
+export interface TokenizedCardPayment {
   type: 'card';
+  token: string;
+  lastFour: string;
   cardholderName: string;
-  cardNumber: string;
   expiryMonth: string;
   expiryYear: string;
-  cvv: string;
+  cardBrand: string;
   savePaymentMethod: boolean;
   paymentMethodLabel?: string;
 }
 
-export interface ACHPaymentData {
+export interface TokenizedACHPayment {
   type: 'ach';
+  token: string;
+  lastFour: string;
   accountHolderName: string;
-  routingNumber: string;
-  accountNumber: string;
   accountType: 'PERSONAL_CHECKING' | 'PERSONAL_SAVINGS' | 'BUSINESS_CHECKING' | 'BUSINESS_SAVINGS';
   phone: string;
   savePaymentMethod: boolean;
@@ -29,12 +30,11 @@ export interface ACHPaymentData {
 export interface SavedPaymentData {
   type: 'saved';
   paymentMethodId: string;
-  paymentToken: string;
   paymentType: string;
   lastFour: string;
 }
 
-export type PaymentData = CardPaymentData | ACHPaymentData | SavedPaymentData;
+export type PaymentData = TokenizedCardPayment | TokenizedACHPayment | SavedPaymentData;
 
 interface PaymentFormProps {
   onPaymentReady: (isReady: boolean) => void;
@@ -54,9 +54,11 @@ interface SavedMethod {
   expiry_year?: number;
   account_holder_name: string;
   bank_name?: string;
-  payment_token?: string;
   is_default: boolean;
 }
+
+const MAX_DECLINE_ATTEMPTS = 3;
+const LOCKOUT_DURATION_MS = 30 * 60 * 1000;
 
 const PaymentForm: React.FC<PaymentFormProps> = ({
   onPaymentReady,
@@ -73,6 +75,9 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
   const [savePaymentMethod, setSavePaymentMethod] = useState(false);
   const [paymentMethodLabel, setPaymentMethodLabel] = useState('');
+  const [isTokenizing, setIsTokenizing] = useState(false);
+  const [declineCount, setDeclineCount] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
 
   const [cardData, setCardData] = useState({
     cardholderName: '',
@@ -100,6 +105,18 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
       loadSavedMethods();
     }
   }, [organizationId, locationId]);
+
+  useEffect(() => {
+    if (lockedUntil && Date.now() < lockedUntil) {
+      const timer = setTimeout(() => {
+        setLockedUntil(null);
+        setDeclineCount(0);
+      }, lockedUntil - Date.now());
+      return () => clearTimeout(timer);
+    }
+  }, [lockedUntil]);
+
+  const isLocked = lockedUntil !== null && Date.now() < lockedUntil;
 
   const loadSavedMethods = async () => {
     if (!organizationId) return;
@@ -192,17 +209,97 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
     return true;
   };
 
-  const handleSubmit = () => {
+  const tokenizeCardData = async (): Promise<{ token: string; lastFour: string } | null> => {
+    try {
+      const { quickbooksPayments } = await import('@/services/quickbooks');
+      const stripped = cardData.cardNumber.replace(/\s/g, '');
+      const tokenResponse = await quickbooksPayments.tokenizeCard({
+        card: {
+          number: stripped,
+          expMonth: cardData.expiryMonth.padStart(2, '0'),
+          expYear: '20' + cardData.expiryYear,
+          cvc: cardData.cvv,
+          name: cardData.cardholderName,
+        },
+      });
+      return { token: tokenResponse.value, lastFour: stripped.slice(-4) };
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.toLowerCase().includes('decline')) {
+        handleDecline();
+        return null;
+      }
+      setError('Failed to process card. Please check your details and try again.');
+      return null;
+    }
+  };
+
+  const tokenizeACHData = async (): Promise<{ token: string; lastFour: string } | null> => {
+    try {
+      const { quickbooksPayments } = await import('@/services/quickbooks');
+      const tokenResponse = await quickbooksPayments.tokenizeBankAccount({
+        bankAccount: {
+          name: achData.accountHolderName,
+          routingNumber: achData.routingNumber,
+          accountNumber: achData.accountNumber,
+          accountType: achData.accountType,
+          phone: achData.phone.replace(/\D/g, ''),
+        },
+      });
+      return { token: tokenResponse.value, lastFour: achData.accountNumber.slice(-4) };
+    } catch (err: any) {
+      const msg = err?.message || '';
+      if (msg.toLowerCase().includes('decline')) {
+        handleDecline();
+        return null;
+      }
+      setError('Failed to process bank account. Please check your details and try again.');
+      return null;
+    }
+  };
+
+  const handleDecline = () => {
+    const newCount = declineCount + 1;
+    setDeclineCount(newCount);
+    if (newCount >= MAX_DECLINE_ATTEMPTS) {
+      setLockedUntil(Date.now() + LOCKOUT_DURATION_MS);
+      setError('Too many unsuccessful attempts. Please try again in 30 minutes.');
+    } else {
+      setError('Your payment was declined. Please verify your information and try again.');
+    }
+  };
+
+  const clearSensitiveData = () => {
+    setCardData({
+      cardholderName: cardData.cardholderName,
+      cardNumber: '',
+      expiryMonth: cardData.expiryMonth,
+      expiryYear: cardData.expiryYear,
+      cvv: '',
+    });
+    setAchData({
+      ...achData,
+      routingNumber: '',
+      accountNumber: '',
+      accountNumberConfirm: '',
+    });
+  };
+
+  const handleSubmit = async () => {
+    if (isLocked) {
+      setError('Too many unsuccessful attempts. Please try again later.');
+      return;
+    }
+
     if (selectedMethod === 'saved') {
       const saved = savedMethods.find((m) => m.id === selectedSavedId);
-      if (!saved || !saved.payment_token) {
+      if (!saved) {
         setError('Please select a saved payment method');
         return;
       }
       onPaymentSubmit({
         type: 'saved',
         paymentMethodId: saved.id,
-        paymentToken: saved.payment_token,
         paymentType: saved.payment_type,
         lastFour: saved.last_four,
       });
@@ -211,31 +308,55 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
     if (selectedMethod === 'card') {
       if (!validateCard()) return;
-      onPaymentSubmit({
-        type: 'card',
-        cardholderName: cardData.cardholderName,
-        cardNumber: cardData.cardNumber.replace(/\s/g, ''),
-        expiryMonth: cardData.expiryMonth,
-        expiryYear: cardData.expiryYear,
-        cvv: cardData.cvv,
-        savePaymentMethod,
-        paymentMethodLabel: savePaymentMethod ? paymentMethodLabel : undefined,
-      });
+      setIsTokenizing(true);
+      setError(null);
+      try {
+        const result = await tokenizeCardData();
+        if (!result) {
+          return;
+        }
+        const brand = getCardBrand(cardData.cardNumber);
+        clearSensitiveData();
+        onPaymentSubmit({
+          type: 'card',
+          token: result.token,
+          lastFour: result.lastFour,
+          cardholderName: cardData.cardholderName,
+          expiryMonth: cardData.expiryMonth,
+          expiryYear: cardData.expiryYear,
+          cardBrand: brand,
+          savePaymentMethod,
+          paymentMethodLabel: savePaymentMethod ? paymentMethodLabel : undefined,
+        });
+      } finally {
+        setIsTokenizing(false);
+      }
       return;
     }
 
     if (selectedMethod === 'ach') {
       if (!validateACH()) return;
-      onPaymentSubmit({
-        type: 'ach',
-        accountHolderName: achData.accountHolderName,
-        routingNumber: achData.routingNumber,
-        accountNumber: achData.accountNumber,
-        accountType: achData.accountType,
-        phone: achData.phone.replace(/\D/g, ''),
-        savePaymentMethod,
-        paymentMethodLabel: savePaymentMethod ? paymentMethodLabel : undefined,
-      });
+      setIsTokenizing(true);
+      setError(null);
+      try {
+        const result = await tokenizeACHData();
+        if (!result) {
+          return;
+        }
+        clearSensitiveData();
+        onPaymentSubmit({
+          type: 'ach',
+          token: result.token,
+          lastFour: result.lastFour,
+          accountHolderName: achData.accountHolderName,
+          accountType: achData.accountType,
+          phone: achData.phone.replace(/\D/g, ''),
+          savePaymentMethod,
+          paymentMethodLabel: savePaymentMethod ? paymentMethodLabel : undefined,
+        });
+      } finally {
+        setIsTokenizing(false);
+      }
     }
   };
 
@@ -247,7 +368,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Method Tabs */}
       <div className="flex rounded-lg border border-gray-200 overflow-hidden">
         <button
           type="button"
@@ -295,7 +415,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           <span className="text-sm text-green-600 font-medium">Secure Payment</span>
         </div>
 
-        {/* Card Form */}
         {selectedMethod === 'card' && (
           <div className="space-y-4">
             <div>
@@ -305,6 +424,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 value={cardData.cardholderName}
                 onChange={(e) => setCardData({ ...cardData, cardholderName: e.target.value })}
                 placeholder="Name on card"
+                autoComplete="cc-name"
                 className={inputCls}
               />
             </div>
@@ -314,10 +434,12 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               <div className="relative">
                 <input
                   type="text"
+                  inputMode="numeric"
                   value={formatCardNumber(cardData.cardNumber)}
                   onChange={handleCardNumberChange}
                   placeholder="1234 5678 9012 3456"
                   maxLength={19}
+                  autoComplete="cc-number"
                   className={`${inputCls} font-mono pr-20`}
                 />
                 {cardBrand && (
@@ -333,6 +455,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 <label className={labelCls}>Month</label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   value={cardData.expiryMonth}
                   onChange={(e) => {
                     const v = e.target.value.replace(/\D/g, '');
@@ -340,6 +463,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                   }}
                   placeholder="MM"
                   maxLength={2}
+                  autoComplete="cc-exp-month"
                   className={`${inputCls} font-mono`}
                 />
               </div>
@@ -347,6 +471,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 <label className={labelCls}>Year</label>
                 <input
                   type="text"
+                  inputMode="numeric"
                   value={cardData.expiryYear}
                   onChange={(e) => {
                     const v = e.target.value.replace(/\D/g, '');
@@ -354,20 +479,23 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                   }}
                   placeholder="YY"
                   maxLength={2}
+                  autoComplete="cc-exp-year"
                   className={`${inputCls} font-mono`}
                 />
               </div>
               <div>
                 <label className={labelCls}>CVV</label>
                 <input
-                  type="text"
+                  type="password"
+                  inputMode="numeric"
                   value={cardData.cvv}
                   onChange={(e) => {
                     const v = e.target.value.replace(/\D/g, '');
                     setCardData({ ...cardData, cvv: v.substring(0, 4) });
                   }}
-                  placeholder="123"
+                  placeholder="***"
                   maxLength={4}
+                  autoComplete="cc-csc"
                   className={`${inputCls} font-mono`}
                 />
               </div>
@@ -375,7 +503,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           </div>
         )}
 
-        {/* ACH Form */}
         {selectedMethod === 'ach' && (
           <div className="space-y-4">
             <div>
@@ -385,6 +512,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 value={achData.accountHolderName}
                 onChange={(e) => setAchData({ ...achData, accountHolderName: e.target.value })}
                 placeholder="Name on account"
+                autoComplete="name"
                 className={inputCls}
               />
             </div>
@@ -394,6 +522,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
               <select
                 value={achData.accountType}
                 onChange={(e) => setAchData({ ...achData, accountType: e.target.value as any })}
+                autoComplete="off"
                 className={inputCls}
               >
                 <option value="BUSINESS_CHECKING">Business Checking</option>
@@ -406,7 +535,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             <div>
               <label className={labelCls}>Routing Number</label>
               <input
-                type="text"
+                type="password"
+                inputMode="numeric"
                 value={achData.routingNumber}
                 onChange={(e) => {
                   const v = e.target.value.replace(/\D/g, '');
@@ -414,6 +544,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 }}
                 placeholder="9 digits"
                 maxLength={9}
+                autoComplete="off"
                 className={`${inputCls} font-mono`}
               />
             </div>
@@ -421,7 +552,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             <div>
               <label className={labelCls}>Account Number</label>
               <input
-                type="text"
+                type="password"
+                inputMode="numeric"
                 value={achData.accountNumber}
                 onChange={(e) => {
                   const v = e.target.value.replace(/\D/g, '');
@@ -429,6 +561,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 }}
                 placeholder="Account number"
                 maxLength={17}
+                autoComplete="off"
                 className={`${inputCls} font-mono`}
               />
             </div>
@@ -436,7 +569,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
             <div>
               <label className={labelCls}>Confirm Account Number</label>
               <input
-                type="text"
+                type="password"
+                inputMode="numeric"
                 value={achData.accountNumberConfirm}
                 onChange={(e) => {
                   const v = e.target.value.replace(/\D/g, '');
@@ -444,6 +578,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 }}
                 placeholder="Re-enter account number"
                 maxLength={17}
+                autoComplete="off"
                 className={`${inputCls} font-mono`}
               />
             </div>
@@ -455,6 +590,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 value={achData.phone}
                 onChange={(e) => setAchData({ ...achData, phone: e.target.value })}
                 placeholder="(555) 123-4567"
+                autoComplete="tel"
                 className={inputCls}
               />
             </div>
@@ -468,7 +604,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           </div>
         )}
 
-        {/* Saved Methods */}
         {selectedMethod === 'saved' && (
           <div className="space-y-3">
             {loadingSaved ? (
@@ -532,7 +667,6 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
           </div>
         )}
 
-        {/* Save option */}
         {selectedMethod !== 'saved' && (organizationId || locationId) && (
           <div className="border-t mt-5 pt-4">
             <label className="flex items-center gap-2 cursor-pointer">
@@ -555,6 +689,7 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
                 value={paymentMethodLabel}
                 onChange={(e) => setPaymentMethodLabel(e.target.value)}
                 placeholder="e.g., Corporate Card, Primary Checking"
+                autoComplete="off"
                 className="mt-2 w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
               />
             )}
@@ -569,24 +704,34 @@ const PaymentForm: React.FC<PaymentFormProps> = ({
         </div>
       )}
 
-      {/* Security Badges */}
       <div className="flex items-center justify-center gap-6 text-xs text-gray-400">
         <div className="flex items-center gap-1">
           <Lock className="h-3 w-3" />
           <span>SSL Encrypted</span>
         </div>
-        <span>PCI DSS Compliant</span>
-        <span>256-bit Security</span>
+        <div className="flex items-center gap-1">
+          <ShieldCheck className="h-3 w-3" />
+          <span>Secured by Intuit</span>
+        </div>
       </div>
 
-      {/* Submit */}
       <button
         type="button"
         onClick={handleSubmit}
-        className="w-full py-3.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+        disabled={isTokenizing || isLocked}
+        className="w-full py-3.5 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <Lock className="h-4 w-4" />
-        Continue to Review - ${total.toFixed(2)}
+        {isTokenizing ? (
+          <>
+            <Loader className="h-4 w-4 animate-spin" />
+            Securing Payment...
+          </>
+        ) : (
+          <>
+            <Lock className="h-4 w-4" />
+            Continue to Review - ${total.toFixed(2)}
+          </>
+        )}
       </button>
     </div>
   );
