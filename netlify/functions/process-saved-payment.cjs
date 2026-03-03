@@ -202,19 +202,29 @@ exports.handler = async (event) => {
       };
     }
 
-    const { data: membership } = await supabase
-      .from('user_organization_roles')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('organization_id', paymentMethod.organization_id)
+    const { data: userProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
       .maybeSingle();
 
-    if (!membership) {
-      return {
-        statusCode: 403,
-        headers: corsHeaders,
-        body: JSON.stringify({ error: 'Not authorized to use this payment method' })
-      };
+    const isSystemAdmin = userProfile?.role === 'admin';
+
+    if (!isSystemAdmin) {
+      const { data: membership } = await supabase
+        .from('user_organization_roles')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('organization_id', paymentMethod.organization_id)
+        .maybeSingle();
+
+      if (!membership) {
+        return {
+          statusCode: 403,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: 'Not authorized to use this payment method' })
+        };
+      }
     }
 
     const token = paymentMethod.payment_token;
