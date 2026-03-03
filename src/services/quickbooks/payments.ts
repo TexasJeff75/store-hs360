@@ -122,23 +122,54 @@ export interface QBVoidRequest {
   amount?: string;
 }
 
+function sanitizeForLog(data: any): any {
+  if (!data) return data;
+  const sanitized = { ...data };
+  if (sanitized.card) {
+    sanitized.card = {
+      ...sanitized.card,
+      number: `****${sanitized.card.number?.slice(-4) || ''}`,
+      cvc: '***',
+    };
+  }
+  if (sanitized.bankAccount) {
+    sanitized.bankAccount = {
+      ...sanitized.bankAccount,
+      accountNumber: `****${sanitized.bankAccount.accountNumber?.slice(-4) || ''}`,
+      routingNumber: '***masked***',
+    };
+  }
+  if (sanitized.token && typeof sanitized.token === 'string' && sanitized.token.length > 8) {
+    sanitized.token = `${sanitized.token.slice(0, 4)}...${sanitized.token.slice(-4)}`;
+  }
+  return sanitized;
+}
+
 export const quickbooksPayments = {
   async tokenizeCard(cardData: QBCardTokenRequest): Promise<QBCardToken> {
-    const response = await qbClient.post<QBCardToken>(
-      'payments/tokens',
-      cardData,
-      true
-    );
-    return response;
+    const logId = `token_card_${Date.now()}`;
+    try {
+      await qbClient.logSync('payment_token', logId, 'create', 'pending', undefined, sanitizeForLog(cardData));
+      const response = await qbClient.post<QBCardToken>('payments/tokens', cardData, true);
+      await qbClient.logSync('payment_token', logId, 'create', 'success', undefined, sanitizeForLog(cardData), { created: response.created });
+      return response;
+    } catch (error: any) {
+      await qbClient.logSync('payment_token', logId, 'create', 'failed', undefined, sanitizeForLog(cardData), undefined, error.message);
+      throw error;
+    }
   },
 
   async tokenizeBankAccount(bankData: QBBankAccountTokenRequest): Promise<QBBankAccountToken> {
-    const response = await qbClient.post<QBBankAccountToken>(
-      'payments/tokens',
-      bankData,
-      true
-    );
-    return response;
+    const logId = `token_bank_${Date.now()}`;
+    try {
+      await qbClient.logSync('payment_token', logId, 'create', 'pending', undefined, sanitizeForLog(bankData));
+      const response = await qbClient.post<QBBankAccountToken>('payments/tokens', bankData, true);
+      await qbClient.logSync('payment_token', logId, 'create', 'success', undefined, sanitizeForLog(bankData), { created: response.created });
+      return response;
+    } catch (error: any) {
+      await qbClient.logSync('payment_token', logId, 'create', 'failed', undefined, sanitizeForLog(bankData), undefined, error.message);
+      throw error;
+    }
   },
 
   async authorizeCard(
@@ -152,19 +183,19 @@ export const quickbooksPayments = {
       currency,
       token,
       capture: false,
-      context: {
-        mobile: false,
-        isEcommerce: true,
-      },
+      context: { mobile: false, isEcommerce: true },
       description,
     };
-
-    const response = await qbClient.post<QBChargeResponse>(
-      'payments/charges',
-      chargeData,
-      true
-    );
-    return response;
+    const logId = `auth_${Date.now()}`;
+    try {
+      await qbClient.logSync('payment_authorize', logId, 'create', 'pending', undefined, sanitizeForLog(chargeData));
+      const response = await qbClient.post<QBChargeResponse>('payments/charges', chargeData, true);
+      await qbClient.logSync('payment_authorize', logId, 'create', 'success', response.id, sanitizeForLog(chargeData), response);
+      return response;
+    } catch (error: any) {
+      await qbClient.logSync('payment_authorize', logId, 'create', 'failed', undefined, sanitizeForLog(chargeData), undefined, error.message);
+      throw error;
+    }
   },
 
   async chargeCard(
@@ -178,19 +209,19 @@ export const quickbooksPayments = {
       currency,
       token,
       capture: true,
-      context: {
-        mobile: false,
-        isEcommerce: true,
-      },
+      context: { mobile: false, isEcommerce: true },
       description,
     };
-
-    const response = await qbClient.post<QBChargeResponse>(
-      'payments/charges',
-      chargeData,
-      true
-    );
-    return response;
+    const logId = `charge_${Date.now()}`;
+    try {
+      await qbClient.logSync('payment_charge', logId, 'create', 'pending', undefined, sanitizeForLog(chargeData));
+      const response = await qbClient.post<QBChargeResponse>('payments/charges', chargeData, true);
+      await qbClient.logSync('payment_charge', logId, 'create', 'success', response.id, sanitizeForLog(chargeData), response);
+      return response;
+    } catch (error: any) {
+      await qbClient.logSync('payment_charge', logId, 'create', 'failed', undefined, sanitizeForLog(chargeData), undefined, error.message);
+      throw error;
+    }
   },
 
   async captureCharge(
@@ -199,18 +230,17 @@ export const quickbooksPayments = {
   ): Promise<QBChargeResponse> {
     const captureData: QBCaptureRequest = {
       amount: amount.toFixed(2),
-      context: {
-        mobile: false,
-        isEcommerce: true,
-      },
+      context: { mobile: false, isEcommerce: true },
     };
-
-    const response = await qbClient.post<QBChargeResponse>(
-      `payments/charges/${chargeId}/capture`,
-      captureData,
-      true
-    );
-    return response;
+    try {
+      await qbClient.logSync('payment_capture', chargeId, 'update', 'pending', chargeId, captureData);
+      const response = await qbClient.post<QBChargeResponse>(`payments/charges/${chargeId}/capture`, captureData, true);
+      await qbClient.logSync('payment_capture', chargeId, 'update', 'success', chargeId, captureData, response);
+      return response;
+    } catch (error: any) {
+      await qbClient.logSync('payment_capture', chargeId, 'update', 'failed', chargeId, captureData, undefined, error.message);
+      throw error;
+    }
   },
 
   async processACH(
@@ -225,32 +255,26 @@ export const quickbooksPayments = {
       bankAccount,
       description,
       paymentMode: 'WEB',
-      context: {
-        mobile: false,
-        isEcommerce: true,
-      },
+      context: { mobile: false, isEcommerce: true },
     };
-
-    const response = await qbClient.post<QBECheckResponse>(
-      'payments/echecks',
-      echeckData,
-      true
-    );
-    return response;
+    const logId = `ach_${Date.now()}`;
+    try {
+      await qbClient.logSync('payment_ach', logId, 'create', 'pending', undefined, sanitizeForLog(echeckData));
+      const response = await qbClient.post<QBECheckResponse>('payments/echecks', echeckData, true);
+      await qbClient.logSync('payment_ach', logId, 'create', 'success', response.id, sanitizeForLog(echeckData), response);
+      return response;
+    } catch (error: any) {
+      await qbClient.logSync('payment_ach', logId, 'create', 'failed', undefined, sanitizeForLog(echeckData), undefined, error.message);
+      throw error;
+    }
   },
 
   async getCharge(chargeId: string): Promise<QBChargeResponse> {
-    return qbClient.get<QBChargeResponse>(
-      `payments/charges/${chargeId}`,
-      true
-    );
+    return qbClient.get<QBChargeResponse>(`payments/charges/${chargeId}`, true);
   },
 
   async getECheck(echeckId: string): Promise<QBECheckResponse> {
-    return qbClient.get<QBECheckResponse>(
-      `payments/echecks/${echeckId}`,
-      true
-    );
+    return qbClient.get<QBECheckResponse>(`payments/echecks/${echeckId}`, true);
   },
 
   async refundCharge(
@@ -258,26 +282,31 @@ export const quickbooksPayments = {
     amount?: number,
     description?: string
   ): Promise<QBChargeResponse> {
-    const refundData: QBRefundRequest = {
-      description,
-    };
+    const refundData: QBRefundRequest = { description };
     if (amount) {
       refundData.amount = amount.toFixed(2);
     }
-
-    return qbClient.post<QBChargeResponse>(
-      `payments/charges/${chargeId}/refunds`,
-      refundData,
-      true
-    );
+    try {
+      await qbClient.logSync('payment_refund', chargeId, 'create', 'pending', chargeId, refundData);
+      const response = await qbClient.post<QBChargeResponse>(`payments/charges/${chargeId}/refunds`, refundData, true);
+      await qbClient.logSync('payment_refund', chargeId, 'create', 'success', chargeId, refundData, response);
+      return response;
+    } catch (error: any) {
+      await qbClient.logSync('payment_refund', chargeId, 'create', 'failed', chargeId, refundData, undefined, error.message);
+      throw error;
+    }
   },
 
   async voidCharge(chargeId: string): Promise<QBChargeResponse> {
-    return qbClient.post<QBChargeResponse>(
-      `payments/charges/${chargeId}/void`,
-      {},
-      true
-    );
+    try {
+      await qbClient.logSync('payment_void', chargeId, 'update', 'pending', chargeId);
+      const response = await qbClient.post<QBChargeResponse>(`payments/charges/${chargeId}/void`, {}, true);
+      await qbClient.logSync('payment_void', chargeId, 'update', 'success', chargeId, undefined, response);
+      return response;
+    } catch (error: any) {
+      await qbClient.logSync('payment_void', chargeId, 'update', 'failed', chargeId, undefined, undefined, error.message);
+      throw error;
+    }
   },
 
   async refundECheck(
@@ -285,26 +314,31 @@ export const quickbooksPayments = {
     amount?: number,
     description?: string
   ): Promise<QBECheckResponse> {
-    const refundData: QBRefundRequest = {
-      description,
-    };
+    const refundData: QBRefundRequest = { description };
     if (amount) {
       refundData.amount = amount.toFixed(2);
     }
-
-    return qbClient.post<QBECheckResponse>(
-      `payments/echecks/${echeckId}/refunds`,
-      refundData,
-      true
-    );
+    try {
+      await qbClient.logSync('payment_ach_refund', echeckId, 'create', 'pending', echeckId, refundData);
+      const response = await qbClient.post<QBECheckResponse>(`payments/echecks/${echeckId}/refunds`, refundData, true);
+      await qbClient.logSync('payment_ach_refund', echeckId, 'create', 'success', echeckId, refundData, response);
+      return response;
+    } catch (error: any) {
+      await qbClient.logSync('payment_ach_refund', echeckId, 'create', 'failed', echeckId, refundData, undefined, error.message);
+      throw error;
+    }
   },
 
   async voidECheck(echeckId: string): Promise<QBECheckResponse> {
-    return qbClient.post<QBECheckResponse>(
-      `payments/echecks/${echeckId}/void`,
-      {},
-      true
-    );
+    try {
+      await qbClient.logSync('payment_ach_void', echeckId, 'update', 'pending', echeckId);
+      const response = await qbClient.post<QBECheckResponse>(`payments/echecks/${echeckId}/void`, {}, true);
+      await qbClient.logSync('payment_ach_void', echeckId, 'update', 'success', echeckId, undefined, response);
+      return response;
+    } catch (error: any) {
+      await qbClient.logSync('payment_ach_void', echeckId, 'update', 'failed', echeckId, undefined, undefined, error.message);
+      throw error;
+    }
   },
 
   async savePaymentMethod(params: {
