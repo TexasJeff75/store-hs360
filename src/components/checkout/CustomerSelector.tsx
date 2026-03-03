@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Building2, User, MapPin } from 'lucide-react';
 import { supabase } from '@/services/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Organization {
   id: string;
@@ -33,6 +34,7 @@ interface CustomerSelectorProps {
 }
 
 const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUserId, preSelectedOrganizationId }) => {
+  const { profile } = useAuth();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -68,19 +70,31 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
 
   const fetchOrganizations = async () => {
     try {
-      const { data, error } = await supabase
-        .from('user_organization_roles')
-        .select(`
-          organization_id,
-          organizations!inner(id, name, code)
-        `)
-        .eq('user_id', currentUserId)
-        .in('role', ['admin', 'manager']);
+      const isSystemAdmin = profile?.role === 'admin';
 
-      if (error) throw error;
+      if (isSystemAdmin) {
+        const { data, error } = await supabase
+          .from('organizations')
+          .select('id, name, code')
+          .order('name');
 
-      const orgs = data?.map((item: any) => item.organizations) || [];
-      setOrganizations(orgs);
+        if (error) throw error;
+        setOrganizations(data || []);
+      } else {
+        const { data, error } = await supabase
+          .from('user_organization_roles')
+          .select(`
+            organization_id,
+            organizations!inner(id, name, code)
+          `)
+          .eq('user_id', currentUserId)
+          .in('role', ['admin', 'manager']);
+
+        if (error) throw error;
+
+        const orgs = data?.map((item: any) => item.organizations) || [];
+        setOrganizations(orgs);
+      }
     } catch (error) {
       console.error('Error fetching organizations:', error);
     }

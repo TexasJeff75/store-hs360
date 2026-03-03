@@ -141,15 +141,22 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const checkUserRole = async () => {
     if (!user?.id) return;
 
-    const { data } = await supabase
-      .from('user_organization_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .in('role', ['admin', 'manager'])
-      .limit(1)
-      .maybeSingle();
+    const isSystemAdmin = profile?.role === 'admin';
 
-    const isAdmin = !!data;
+    let isAdmin = isSystemAdmin;
+
+    if (!isAdmin) {
+      const { data } = await supabase
+        .from('user_organization_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .in('role', ['admin', 'manager'])
+        .limit(1)
+        .maybeSingle();
+
+      isAdmin = !!data;
+    }
+
     setIsAdminOrManager(isAdmin);
 
     // If organization is selected, pre-populate it
