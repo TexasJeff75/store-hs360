@@ -1,12 +1,18 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Youtube } from 'lucide-react';
+import { siteSettingsService, type ContactInfo } from '@/services/siteSettings';
 
 const Footer: React.FC = () => {
+  const [contact, setContact] = useState<ContactInfo>(siteSettingsService.getDefaults().contact);
+
+  useEffect(() => {
+    siteSettingsService.getSettings().then(s => setContact(s.contact));
+  }, []);
+
   return (
     <footer className="bg-gray-900 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          {/* Company Info */}
           <div>
             <a href="#" className="flex items-center space-x-3 mb-4">
               <div>
@@ -29,7 +35,6 @@ const Footer: React.FC = () => {
             </div>
           </div>
 
-          {/* Products */}
           <div>
             <h4 className="text-lg font-semibold mb-4">Services</h4>
             <ul className="space-y-2">
@@ -41,7 +46,6 @@ const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Support */}
           <div>
             <h4 className="text-lg font-semibold mb-4">Support</h4>
             <ul className="space-y-2">
@@ -53,23 +57,22 @@ const Footer: React.FC = () => {
             </ul>
           </div>
 
-          {/* Contact */}
           <div>
             <h4 className="text-lg font-semibold mb-4">Contact Us</h4>
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
                 <Phone className="h-5 w-5 text-pink-400" />
-                <span className="text-gray-300">1-800-HEALTH-360</span>
+                <span className="text-gray-300">{contact.phone}</span>
               </div>
               <div className="flex items-center space-x-3">
                 <Mail className="h-5 w-5 text-pink-400" />
-                <span className="text-gray-300">support@healthspan360.com</span>
+                <span className="text-gray-300">{contact.email}</span>
               </div>
               <div className="flex items-start space-x-3">
                 <MapPin className="h-5 w-5 text-pink-400 mt-1" />
                 <span className="text-gray-300">
-                  123 Wellness Way<br />
-                  Health City, HC 12345
+                  {contact.addressLine1}<br />
+                  {contact.addressLine2}
                 </span>
               </div>
             </div>
@@ -79,7 +82,7 @@ const Footer: React.FC = () => {
         <div className="border-t border-gray-800 mt-12 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
-              © 2025 HealthSpan360. All rights reserved.
+              &copy; {new Date().getFullYear()} HealthSpan360. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <a href="https://hs360.co/privacy" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">Privacy Policy</a>

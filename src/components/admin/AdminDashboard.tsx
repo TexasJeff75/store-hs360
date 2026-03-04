@@ -21,6 +21,7 @@ import ProfitReport from './ProfitReport';
 import CostAdminManagement from './CostAdminManagement';
 import QuickBooksManagement from './QuickBooksManagement';
 import CategoryManagement from './CategoryManagement';
+import SiteSettingsManagement from './SiteSettingsManagement';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -29,7 +30,7 @@ interface AdminDashboardProps {
 }
 
 type AdminTab = 'users' | 'orders' | 'commissions' | 'help' | 'my-orgs' | 'my-recurring-orders' | 'locations' | 'payments' | 'admin-settings' | 'quickbooks';
-type AdminSettingsTab = 'organizations' | 'pricing' | 'products' | 'categories' | 'recurring-orders' | 'distributors' | 'salesreps' | 'analytics' | 'profit-report' | 'cost-admins';
+type AdminSettingsTab = 'organizations' | 'pricing' | 'products' | 'categories' | 'recurring-orders' | 'distributors' | 'salesreps' | 'analytics' | 'profit-report' | 'cost-admins' | 'site-settings';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initialTab }) => {
   const { profile, user, isImpersonating, effectiveProfile } = useAuth();
@@ -127,6 +128,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
     { id: 'analytics' as AdminSettingsTab, label: 'Analytics', icon: BarChart3 },
     { id: 'profit-report' as AdminSettingsTab, label: 'Profit Report', icon: PieChart },
     { id: 'cost-admins' as AdminSettingsTab, label: 'Cost Admins', icon: Shield },
+    { id: 'site-settings' as AdminSettingsTab, label: 'Site Settings', icon: Settings },
   ];
 
   const tabs = adminTabs.filter(tab =>
@@ -158,6 +160,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
         return <ProfitReport />;
       case 'cost-admins':
         return <CostAdminManagement />;
+      case 'site-settings':
+        return <SiteSettingsManagement />;
       default:
         return null;
     }

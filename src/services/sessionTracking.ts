@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
+import { siteSettingsService } from './siteSettings';
 
-const SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+const DEFAULT_SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 const ACTIVITY_CHECK_INTERVAL_MS = 60 * 1000;
 
 class SessionTrackingService {
@@ -8,10 +9,13 @@ class SessionTrackingService {
   private loginAuditId: string | null = null;
   private lastActivityTime: number = Date.now();
   private activityCheckInterval: NodeJS.Timeout | null = null;
+  private sessionTimeoutMs: number = DEFAULT_SESSION_TIMEOUT_MS;
 
   async recordLogin(userId: string, email: string, ageVerified: boolean): Promise<string | null> {
     try {
       this.currentSessionId = crypto.randomUUID();
+
+      await this.loadTimeoutSetting();
 
       const { data, error } = await supabase
         .from('login_audit')
@@ -101,6 +105,17 @@ class SessionTrackingService {
     });
   }
 
+  private async loadTimeoutSetting(): Promise<void> {
+    try {
+      const settings = await siteSettingsService.getSettings();
+      if (settings.sessionTimeoutMinutes > 0) {
+        this.sessionTimeoutMs = settings.sessionTimeoutMinutes * 60 * 1000;
+      }
+    } catch {
+      this.sessionTimeoutMs = DEFAULT_SESSION_TIMEOUT_MS;
+    }
+  }
+
   private storeSessionInfo(sessionId: string, auditId: string): void {
     try {
       sessionStorage.setItem('session_info', JSON.stringify({
@@ -159,7 +174,7 @@ class SessionTrackingService {
     this.activityCheckInterval = setInterval(async () => {
       const timeSinceActivity = Date.now() - this.lastActivityTime;
 
-      if (timeSinceActivity > SESSION_TIMEOUT_MS) {
+      if (timeSinceActivity > this.sessionTimeoutMs) {
         await this.handleSessionTimeout();
       }
     }, ACTIVITY_CHECK_INTERVAL_MS);

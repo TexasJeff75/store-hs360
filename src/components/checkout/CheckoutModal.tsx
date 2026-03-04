@@ -11,6 +11,7 @@ import { CustomerAddress, customerAddressService } from '@/services/customerAddr
 import { supabase } from '@/services/supabase';
 import { quickbooksPayments } from '@/services/quickbooks';
 import OrderReceipt from './OrderReceipt';
+import { siteSettingsService, type ShippingMethod } from '@/services/siteSettings';
 
 interface CartItem {
   id: number;
@@ -116,17 +117,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   
   const [sameAsShipping, setSameAsShipping] = useState(true);
   const [selectedShippingMethod, setSelectedShippingMethod] = useState('standard');
-
-  const shippingMethods = [
-    { id: 'standard', name: 'Standard Shipping', price: 9.99, days: '5-7 business days' },
-    { id: 'express', name: 'Express Shipping', price: 19.99, days: '2-3 business days' },
-    { id: 'overnight', name: 'Overnight Shipping', price: 39.99, days: '1 business day' }
-  ];
+  const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>(siteSettingsService.getDefaults().shipping);
 
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   const shippingCost = shippingMethods.find(m => m.id === selectedShippingMethod)?.price || 0;
   const tax = 0;
   const total = subtotal + shippingCost + tax;
+
+  useEffect(() => {
+    if (isOpen) {
+      siteSettingsService.getSettings().then(s => setShippingMethods(s.shipping));
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     checkUserRole();
