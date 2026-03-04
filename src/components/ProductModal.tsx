@@ -6,6 +6,7 @@ import { contractPricingService, ContractPrice } from '../services/contractPrici
 import { useAuth } from '../contexts/AuthContext';
 import { useFavorites } from '../contexts/FavoritesContext';
 import RecurringOrderModal from './RecurringOrderModal';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 
 
 interface ProductModalProps {
@@ -81,22 +82,13 @@ const ProductModal: React.FC<ProductModalProps> = ({
     const favorited = user ? isFavorite(product.id) : false;
 
     const getSafeDescription = () => {
-      try {
-        if (product.plainTextDescription) {
-          return product.plainTextDescription;
-        }
-        if (product.description) {
-          const tempDiv = document.createElement('div');
-          tempDiv.innerHTML = product.description;
-          const scripts = tempDiv.querySelectorAll('script');
-          scripts.forEach(script => script.remove());
-          return tempDiv.innerHTML;
-        }
-        return '';
-      } catch (error) {
-        console.error('Error processing product description:', error);
-        return 'Description not available';
+      if (product.plainTextDescription) {
+        return product.plainTextDescription;
       }
+      if (product.description) {
+        return sanitizeHtml(product.description);
+      }
+      return '';
     };
 
     const handleFavoriteClick = async (e: React.MouseEvent) => {

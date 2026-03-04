@@ -3,6 +3,7 @@ import { Hash, Lock, CreditCard as Edit2, CheckCircle2, XCircle, Building2, Penc
 import { Product } from '@/services/productService';
 import { SecretCostMap } from '@/services/secretCostService';
 import { ContractPricingInfo } from './useContractPricing';
+import { sanitizeHtml } from '@/utils/sanitizeHtml';
 
 
 interface ProductDetailsModalProps {
@@ -360,7 +361,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
                     <h5 className="text-sm font-medium text-gray-700 mb-2">Description</h5>
                     <div
                       className="text-sm text-gray-600 prose max-w-none"
-                      dangerouslySetInnerHTML={{ __html: product.description }}
+                      dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }}
                     />
                   </div>
                 )}

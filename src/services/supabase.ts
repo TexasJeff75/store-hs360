@@ -5,28 +5,19 @@ const supabaseUrl = ENV.SUPABASE_URL;
 const supabaseAnonKey = ENV.SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('Missing Supabase environment variables:', {
-    VITE_SUPABASE_URL: !!supabaseUrl,
-    VITE_SUPABASE_ANON_KEY: !!supabaseAnonKey
-  });
+  throw new Error(
+    'Missing required Supabase environment variables. ' +
+    'Ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your .env file.'
+  );
 }
 
-if (supabaseUrl && !supabaseUrl.startsWith('https://')) {
-  console.error('Invalid Supabase URL format:', supabaseUrl);
+if (!supabaseUrl.startsWith('https://')) {
+  throw new Error(`Invalid Supabase URL format: must start with https://`);
 }
 
-// Clean the URL by removing trailing slashes but preserve the base domain
-const cleanSupabaseUrl = supabaseUrl ? supabaseUrl.replace(/\/$/, '') : '';
+const cleanSupabaseUrl = supabaseUrl.replace(/\/$/, '');
 
-if (cleanSupabaseUrl && !cleanSupabaseUrl.match(/^https:\/\/[a-z0-9-]+\.supabase\.co$/)) {
-  console.error('Invalid Supabase URL format:', supabaseUrl);
-}
-
-// Create Supabase client with fallback for missing env vars
-export const supabase = createClient(
-  cleanSupabaseUrl || 'https://placeholder.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
-);
+export const supabase = createClient(cleanSupabaseUrl, supabaseAnonKey);
 
 // Database types
 type ApprovalStatus = 'pending' | 'approved' | 'denied';

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Sparkles, Loader, Save, RefreshCw, AlertTriangle } from 'lucide-react';
 import { Product } from '../services/productService';
 import { generateProductDescription, saveGeneratedDescription } from '../services/aiDescriptionService';
+import { sanitizeHtml } from '../utils/sanitizeHtml';
 
 interface AIDescriptionSectionProps {
   product: Product;
@@ -111,7 +112,7 @@ const AIDescriptionSection: React.FC<AIDescriptionSectionProps> = ({
               prose-headings:text-gray-900 prose-headings:font-semibold prose-headings:text-base prose-headings:mt-4 prose-headings:mb-2
               prose-p:leading-relaxed prose-p:mb-3
               prose-ul:my-2 prose-li:text-gray-600 prose-li:mb-1"
-            dangerouslySetInnerHTML={{ __html: generatedHtml }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHtml(generatedHtml) }}
           />
         </div>
       </div>

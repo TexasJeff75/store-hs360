@@ -94,10 +94,6 @@ function AppContent() {
     fetchData();
   }, [logError]);
 
-  // Debug auth state
-  useEffect(() => {
-  }, [user, profile, authLoading]);
-
   // Reset org selection when impersonation changes
   useEffect(() => {
     setSelectedOrganization(null);
@@ -296,23 +292,12 @@ function AppContent() {
           hasMarkup: hasMarkup,
           brand: product.brand
         };
-        console.log('Adding to cart:', { name: product.name, brand: product.brand });
         return [...prev, newItem];
       }
     });
   };
 
   const handleProductClick = (product: Product) => {
-
-    // Add to window for debugging
-    if (typeof window !== 'undefined') {
-      (window as any).lastClickedProduct = {
-        name: product.name,
-        id: product.id,
-        timestamp: new Date().toISOString()
-      };
-    }
-
     setSelectedProduct(product);
     setIsProductModalOpen(true);
   };
