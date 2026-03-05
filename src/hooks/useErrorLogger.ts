@@ -17,14 +17,20 @@ export function useErrorLogger() {
     console.error(prefix, error);
 
     const errorLog: ErrorLog = {
-      id: Math.random().toString(36).substr(2, 9),
+      id: Math.random().toString(36).substring(2, 11),
       message: error.message,
       context,
       timestamp: new Date(),
       stack: error.stack
     };
 
-    setErrors(prev => [...prev, errorLog]);
+    setErrors(prev => {
+      const updated = [...prev, errorLog];
+      if (updated.length > 100) {
+        return updated.slice(-100);
+      }
+      return updated;
+    });
   }, []);
 
   const clearErrors = useCallback(() => {

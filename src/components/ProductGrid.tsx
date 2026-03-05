@@ -101,15 +101,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
           <div className="p-4">
             <h3
               className="font-semibold text-gray-900 mb-2 line-clamp-2 cursor-pointer hover:text-pink-600 transition-colors"
-              onClick={(e) => {
-
-                // Try alert for visibility
-                if (product.name.toLowerCase().includes('proxigene')) {
-                  alert('Proxigene name clicked! Check console for details.');
-                }
-
-                onProductClick(product);
-              }}
+              onClick={() => onProductClick(product)}
             >
               {product.name}
             </h3>
