@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { DollarSign, Plus, RefreshCw, Download } from 'lucide-react';
+import { DollarSign, Plus, RefreshCw, Download, Upload } from 'lucide-react';
 import { usePricingData, EnrichedPricingEntry } from './pricing/usePricingData';
 import PricingTable from './pricing/PricingTable';
 import PricingForm from './pricing/PricingForm';
+import ContractPricingImport from './pricing/ContractPricingImport';
 
 interface PricingManagementProps {
   organizationId?: string;
@@ -23,6 +24,7 @@ const PricingManagement: React.FC<PricingManagementProps> = () => {
   } = usePricingData();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<EnrichedPricingEntry | null>(null);
 
   const handleAdd = () => {
@@ -97,6 +99,13 @@ const PricingManagement: React.FC<PricingManagementProps> = () => {
 
         <div className="flex items-center space-x-2">
           <button
+            onClick={() => setIsImportOpen(true)}
+            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <Upload className="h-4 w-4 mr-1.5" />
+            Import
+          </button>
+          <button
             onClick={handleExportCSV}
             disabled={entries.length === 0}
             className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
@@ -169,6 +178,12 @@ const PricingManagement: React.FC<PricingManagementProps> = () => {
         locations={locations}
         users={users}
         editEntry={editEntry}
+      />
+
+      <ContractPricingImport
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onImportComplete={fetchPricingData}
       />
     </div>
   );
