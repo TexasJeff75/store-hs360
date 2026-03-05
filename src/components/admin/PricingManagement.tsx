@@ -1,15 +1,17 @@
-import React, { useState } from 'react';
-import { DollarSign, Plus, RefreshCw, Download, Upload } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { DollarSign, Plus, RefreshCw, Download, Upload, LayoutGrid, List } from 'lucide-react';
 import { usePricingData, EnrichedPricingEntry } from './pricing/usePricingData';
 import PricingTable from './pricing/PricingTable';
 import PricingForm from './pricing/PricingForm';
-import ContractPricingImport from './pricing/ContractPricingImport';
+import ProductPricingGrid from './pricing/ProductPricingGrid';
+import PricingImport from './pricing/PricingImport';
+import { activityLogService } from '@/services/activityLog';
+import { useAuth } from '@/contexts/AuthContext';
 
-interface PricingManagementProps {
-  organizationId?: string;
-}
+type ViewMode = 'grid' | 'rules';
 
-const PricingManagement: React.FC<PricingManagementProps> = () => {
+const PricingManagement: React.FC = () => {
+  const { user } = useAuth();
   const {
     entries,
     loading,
@@ -18,6 +20,7 @@ const PricingManagement: React.FC<PricingManagementProps> = () => {
     organizations,
     locations,
     users,
+    products,
     fetchPricingData,
     savePricing,
     deletePricing,
@@ -26,6 +29,17 @@ const PricingManagement: React.FC<PricingManagementProps> = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<EnrichedPricingEntry | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [selectedOrgId, setSelectedOrgId] = useState('');
+  const [selectedEntityType, setSelectedEntityType] = useState<'organization' | 'location'>('organization');
+
+  const selectedOrgName = useMemo(() => {
+    if (!selectedOrgId) return '';
+    if (selectedEntityType === 'organization') {
+      return organizations.find((o) => o.id === selectedOrgId)?.name || selectedOrgId;
+    }
+    return locations.find((l) => l.id === selectedOrgId)?.name || selectedOrgId;
+  }, [selectedOrgId, selectedEntityType, organizations, locations]);
 
   const handleAdd = () => {
     setEditEntry(null);
@@ -42,21 +56,56 @@ const PricingManagement: React.FC<PricingManagementProps> = () => {
     setEditEntry(null);
   };
 
-  const handleExportCSV = () => {
+  const handleSavePricing = async (params: Parameters<typeof savePricing>[0]) => {
+    const result = await savePricing(params);
+    if (result?.success && user) {
+      activityLogService.logAction({
+        userId: user.id,
+        action: 'pricing_updated',
+        resourceType: params.pricingType,
+        resourceId: params.entityId,
+        details: {
+          product_id: params.productId,
+          contract_price: params.contractPrice,
+          markup_price: params.markupPrice,
+          entity_name: selectedOrgName || undefined,
+        },
+      });
+    }
+    return result;
+  };
+
+  const handleDownloadTemplate = () => {
+    const orgPriceMap = new Map<number, number | null>();
+    entries.forEach((e) => {
+      if (e.entity_id === selectedOrgId && e.pricing_type === selectedEntityType) {
+        orgPriceMap.set(e.product_id, e.contract_price);
+      }
+    });
+
+    const headers = ['product_id', 'sku', 'product_name', 'retail_price', 'contract_price'];
+    const rows = products.map((p) => [
+      p.id,
+      p.sku ?? '',
+      `"${p.name.replace(/"/g, '""')}"`,
+      p.price.toFixed(2),
+      orgPriceMap.has(p.id) ? (orgPriceMap.get(p.id) ?? '').toString() : '',
+    ]);
+
+    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const safeName = selectedOrgName.replace(/[^a-z0-9]/gi, '-').toLowerCase() || 'pricing';
+    a.download = `contract-pricing-template-${safeName}-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportRules = () => {
     if (entries.length === 0) return;
-
-    const headers = [
-      'Type',
-      'Entity',
-      'Product ID',
-      'Contract Price',
-      'Markup Price',
-      'Min Qty',
-      'Max Qty',
-      'Effective Date',
-      'Expiry Date',
-    ];
-
+    const headers = ['Type', 'Entity', 'Product ID', 'Contract Price', 'Markup Price', 'Min Qty', 'Max Qty', 'Effective Date', 'Expiry Date', 'Updated'];
     const rows = entries.map((e) => [
       e.pricing_type,
       e.entity_name,
@@ -67,23 +116,21 @@ const PricingManagement: React.FC<PricingManagementProps> = () => {
       e.max_quantity || '',
       e.effective_date ? new Date(e.effective_date).toLocaleDateString() : '',
       e.expiry_date ? new Date(e.expiry_date).toLocaleDateString() : '',
+      new Date(e.updated_at).toLocaleDateString(),
     ]);
-
-    const csvContent = [headers, ...rows]
-      .map((row) => row.map((cell) => `"${cell}"`).join(','))
-      .join('\n');
-
+    const csvContent = [headers, ...rows].map((row) => row.map((cell) => `"${cell}"`).join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `contract-pricing-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `contract-pricing-rules-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
     <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-3">
           <div className="p-2.5 bg-teal-50 rounded-xl">
@@ -92,27 +139,12 @@ const PricingManagement: React.FC<PricingManagementProps> = () => {
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Contract Pricing</h2>
             <p className="text-sm text-gray-500">
-              Manage pricing rules for organizations, locations, and individual users
+              Set and manage pricing rules for organizations, locations, and users
             </p>
           </div>
         </div>
 
         <div className="flex items-center space-x-2">
-          <button
-            onClick={() => setIsImportOpen(true)}
-            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <Upload className="h-4 w-4 mr-1.5" />
-            Import
-          </button>
-          <button
-            onClick={handleExportCSV}
-            disabled={entries.length === 0}
-            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Download className="h-4 w-4 mr-1.5" />
-            Export
-          </button>
           <button
             onClick={fetchPricingData}
             className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -125,7 +157,7 @@ const PricingManagement: React.FC<PricingManagementProps> = () => {
             className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
           >
             <Plus className="h-4 w-4 mr-1.5" />
-            Add Price
+            Add Rule
           </button>
         </div>
       </div>
@@ -136,43 +168,171 @@ const PricingManagement: React.FC<PricingManagementProps> = () => {
         </div>
       )}
 
+      {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-            Total Rules
-          </div>
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Total Rules</div>
           <div className="text-2xl font-bold text-gray-900">{entries.length}</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-            Organizations
-          </div>
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Organizations</div>
           <div className="text-2xl font-bold text-emerald-600">
             {entries.filter((e) => e.pricing_type === 'organization').length}
           </div>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">
-            Products Covered
-          </div>
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Products Covered</div>
           <div className="text-2xl font-bold text-sky-600">
             {new Set(entries.map((e) => e.product_id)).size}
           </div>
         </div>
       </div>
 
-      <PricingTable
-        entries={entries}
-        loading={loading}
-        onEdit={handleEdit}
-        onDelete={deletePricing}
-        deleting={saving}
-      />
+      {/* View Mode Tabs */}
+      <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
+        <button
+          onClick={() => setViewMode('grid')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            viewMode === 'grid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <LayoutGrid className="h-4 w-4" />
+          All Products
+        </button>
+        <button
+          onClick={() => setViewMode('rules')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+            viewMode === 'rules' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <List className="h-4 w-4" />
+          Pricing Rules
+        </button>
+      </div>
+
+      {/* All Products view */}
+      {viewMode === 'grid' && (
+        <div className="space-y-4">
+          {/* Org selector + actions */}
+          <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
+            <h3 className="text-sm font-semibold text-gray-700">Set Pricing For</h3>
+            <div className="flex flex-wrap gap-3">
+              <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
+                <button
+                  onClick={() => { setSelectedEntityType('organization'); setSelectedOrgId(''); }}
+                  className={`px-3 py-2 font-medium transition-colors ${
+                    selectedEntityType === 'organization' ? 'bg-teal-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Organization
+                </button>
+                <button
+                  onClick={() => { setSelectedEntityType('location'); setSelectedOrgId(''); }}
+                  className={`px-3 py-2 font-medium transition-colors ${
+                    selectedEntityType === 'location' ? 'bg-teal-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Location
+                </button>
+              </div>
+
+              <select
+                value={selectedOrgId}
+                onChange={(e) => setSelectedOrgId(e.target.value)}
+                className="flex-1 min-w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+              >
+                <option value="">
+                  {selectedEntityType === 'organization' ? '— Select an organization —' : '— Select a location —'}
+                </option>
+                {selectedEntityType === 'organization'
+                  ? organizations.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name} {o.code ? `(${o.code})` : ''}
+                      </option>
+                    ))
+                  : locations.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} {l.organization_name ? `— ${l.organization_name}` : ''}
+                      </option>
+                    ))}
+              </select>
+
+              {selectedOrgId && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={handleDownloadTemplate}
+                    disabled={products.length === 0}
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                    title="Download CSV template pre-populated with all products"
+                  >
+                    <Download className="h-4 w-4 mr-1.5" />
+                    Template
+                  </button>
+                  <button
+                    onClick={() => setIsImportOpen(true)}
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-teal-600 border border-teal-600 rounded-lg hover:bg-teal-700 transition-colors"
+                  >
+                    <Upload className="h-4 w-4 mr-1.5" />
+                    Import CSV
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {!selectedOrgId && (
+              <p className="text-xs text-gray-400">
+                Select an organization or location above to view and edit product prices inline. You can also download a pre-filled CSV template and import bulk changes.
+              </p>
+            )}
+          </div>
+
+          {selectedOrgId ? (
+            <ProductPricingGrid
+              products={products}
+              entries={entries}
+              orgId={selectedOrgId}
+              pricingType={selectedEntityType}
+              onSavePrice={handleSavePricing}
+              onDeletePrice={deletePricing}
+              saving={saving}
+            />
+          ) : (
+            <div className="bg-white border border-dashed border-gray-300 rounded-xl py-16 text-center text-gray-400">
+              <LayoutGrid className="mx-auto h-10 w-10 text-gray-300 mb-3" />
+              <p className="text-sm font-medium text-gray-500">Select an organization to manage pricing</p>
+              <p className="text-xs mt-1">All products will be listed so you can set prices inline</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Pricing Rules view */}
+      {viewMode === 'rules' && (
+        <div className="space-y-4">
+          <div className="flex justify-end">
+            <button
+              onClick={handleExportRules}
+              disabled={entries.length === 0}
+              className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Download className="h-4 w-4 mr-1.5" />
+              Export Rules
+            </button>
+          </div>
+          <PricingTable
+            entries={entries}
+            loading={loading}
+            onEdit={handleEdit}
+            onDelete={deletePricing}
+            deleting={saving}
+          />
+        </div>
+      )}
 
       <PricingForm
         isOpen={isFormOpen}
         onClose={handleFormClose}
-        onSave={savePricing}
+        onSave={handleSavePricing}
         saving={saving}
         organizations={organizations}
         locations={locations}
@@ -180,11 +340,19 @@ const PricingManagement: React.FC<PricingManagementProps> = () => {
         editEntry={editEntry}
       />
 
-      <ContractPricingImport
-        isOpen={isImportOpen}
-        onClose={() => setIsImportOpen(false)}
-        onImportComplete={fetchPricingData}
-      />
+      {isImportOpen && selectedOrgId && (
+        <PricingImport
+          isOpen={isImportOpen}
+          onClose={() => setIsImportOpen(false)}
+          onImportComplete={() => { fetchPricingData(); }}
+          products={products}
+          entries={entries}
+          orgId={selectedOrgId}
+          orgName={selectedOrgName}
+          pricingType={selectedEntityType}
+          onSavePrice={handleSavePricing}
+        />
+      )}
     </div>
   );
 };
