@@ -1,5 +1,10 @@
-import React, { useState } from 'react';
-import { Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart, Shield, ChevronLeft, ChevronRight, DollarSign, FolderTree, MessageSquare } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart,
+  TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart,
+  Shield, ChevronLeft, ChevronRight, DollarSign, FolderTree, MessageSquare,
+  LayoutDashboard, X, Clock, CheckCircle, XCircle, Eye, EyeOff, Menu
+} from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
 import UserManagement from './UserManagement';
@@ -28,121 +33,419 @@ import SupportTicketManagement from './SupportTicketManagement';
 interface AdminDashboardProps {
   isOpen: boolean;
   onClose: () => void;
-  initialTab?: AdminTab;
+  initialTab?: string;
 }
 
-type AdminTab = 'users' | 'orders' | 'commissions' | 'help' | 'my-orgs' | 'my-recurring-orders' | 'locations' | 'payments' | 'admin-settings' | 'quickbooks' | 'support';
-type AdminSettingsTab = 'organizations' | 'pricing' | 'products' | 'categories' | 'recurring-orders' | 'distributors' | 'salesreps' | 'analytics' | 'profit-report' | 'cost-admins' | 'site-settings';
+type ActiveTab =
+  | 'home' | 'users' | 'orders' | 'commissions' | 'help'
+  | 'my-orgs' | 'my-recurring-orders' | 'locations' | 'payments'
+  | 'quickbooks' | 'support'
+  | 'organizations' | 'pricing' | 'products' | 'categories'
+  | 'recurring-orders' | 'distributors' | 'salesreps'
+  | 'analytics' | 'profit-report' | 'cost-admins' | 'site-settings';
+
+interface PendingUser {
+  id: string;
+  email: string;
+  full_name?: string;
+  created_at: string;
+}
+
+interface SidebarItem {
+  id: ActiveTab;
+  label: string;
+  icon: React.ElementType;
+  roles: string[];
+  badge?: number;
+}
+
+interface SidebarGroup {
+  label: string;
+  roles: string[];
+  items: SidebarItem[];
+}
+
+const ROLE_LABELS: Record<string, string> = {
+  admin: 'Company Admin',
+  sales_rep: 'Sales Rep',
+  distributor: 'Distributor',
+  customer: 'Customer',
+};
+
+const ROLE_COLORS: Record<string, string> = {
+  admin: 'bg-purple-100 text-purple-800',
+  sales_rep: 'bg-blue-100 text-blue-800',
+  distributor: 'bg-orange-100 text-orange-800',
+  customer: 'bg-green-100 text-green-800',
+};
+
+// ─── Admin Home Dashboard ────────────────────────────────────────────────────
+
+interface AdminHomeProps {
+  pendingUsers: PendingUser[];
+  pendingCount: number;
+  onNavigate: (tab: ActiveTab) => void;
+  onApprove: (userId: string) => void;
+  onDeny: (userId: string) => void;
+}
+
+const AdminHome: React.FC<AdminHomeProps> = ({ pendingUsers, pendingCount, onNavigate, onApprove, onDeny }) => {
+  const [actioning, setActioning] = useState<Record<string, boolean>>({});
+
+  const handleAction = async (userId: string, action: 'approve' | 'deny') => {
+    setActioning(prev => ({ ...prev, [userId]: true }));
+    try {
+      if (action === 'approve') await onApprove(userId);
+      else await onDeny(userId);
+    } finally {
+      setActioning(prev => ({ ...prev, [userId]: false }));
+    }
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      <h2 className="text-xl font-bold text-gray-900">Dashboard</h2>
+
+      {/* Pending Approvals — high priority, shown first */}
+      {pendingCount > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-amber-200">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-amber-600" />
+              <span className="font-semibold text-amber-900">
+                {pendingCount} Pending Approval{pendingCount !== 1 ? 's' : ''}
+              </span>
+            </div>
+            <button
+              onClick={() => onNavigate('users')}
+              className="text-sm text-amber-700 hover:text-amber-900 font-medium underline underline-offset-2"
+            >
+              View all in Users
+            </button>
+          </div>
+          <div className="divide-y divide-amber-100">
+            {pendingUsers.slice(0, 5).map(u => (
+              <div key={u.id} className="flex items-center justify-between px-5 py-3">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">{u.full_name || u.email}</p>
+                  {u.full_name && <p className="text-xs text-gray-500">{u.email}</p>}
+                  <p className="text-xs text-gray-400">
+                    {new Date(u.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleAction(u.id, 'approve')}
+                    disabled={actioning[u.id]}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
+                  >
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => handleAction(u.id, 'deny')}
+                    disabled={actioning[u.id]}
+                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-white text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
+                  >
+                    <XCircle className="h-3.5 w-3.5" />
+                    Deny
+                  </button>
+                </div>
+              </div>
+            ))}
+            {pendingCount > 5 && (
+              <div className="px-5 py-3 text-center">
+                <button
+                  onClick={() => onNavigate('users')}
+                  className="text-sm text-amber-700 hover:text-amber-900 font-medium"
+                >
+                  + {pendingCount - 5} more — view all
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {pendingCount === 0 && (
+        <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl text-green-800">
+          <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
+          <span className="text-sm font-medium">All users approved — no pending requests</span>
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div>
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Quick Actions</h3>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {[
+            { id: 'orders' as ActiveTab, label: 'View Orders', icon: ShoppingCart, color: 'text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-100' },
+            { id: 'users' as ActiveTab, label: 'Manage Users', icon: Users, color: 'text-purple-600 bg-purple-50 hover:bg-purple-100 border-purple-100' },
+            { id: 'organizations' as ActiveTab, label: 'Organizations', icon: Building2, color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-indigo-100' },
+            { id: 'products' as ActiveTab, label: 'Products', icon: Package, color: 'text-teal-600 bg-teal-50 hover:bg-teal-100 border-teal-100' },
+            { id: 'analytics' as ActiveTab, label: 'Analytics', icon: BarChart3, color: 'text-pink-600 bg-pink-50 hover:bg-pink-100 border-pink-100' },
+            { id: 'support' as ActiveTab, label: 'Support', icon: MessageSquare, color: 'text-orange-600 bg-orange-50 hover:bg-orange-100 border-orange-100' },
+          ].map(action => (
+            <button
+              key={action.id}
+              onClick={() => onNavigate(action.id)}
+              className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border font-medium text-sm transition-colors ${action.color}`}
+            >
+              <action.icon className="h-6 w-6" />
+              {action.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Sidebar Nav (shared between desktop + mobile overlay) ───────────────────
+
+interface SidebarNavProps {
+  visibleGroups: (SidebarGroup & { items: SidebarItem[] })[];
+  activeTab: ActiveTab;
+  collapsed: boolean;
+  onSelect: (tab: ActiveTab) => void;
+}
+
+const SidebarNav: React.FC<SidebarNavProps> = ({ visibleGroups, activeTab, collapsed, onSelect }) => (
+  <nav className="py-3 flex-1">
+    {visibleGroups.map((group, gi) => (
+      <div key={group.label} className={gi > 0 ? 'mt-1' : ''}>
+        {!collapsed && (
+          <p className="px-4 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-widest select-none">
+            {group.label}
+          </p>
+        )}
+        {collapsed && gi > 0 && (
+          <div className="mx-3 my-2 border-t border-gray-200" />
+        )}
+        {group.items.map(item => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (
+            <button
+              key={`${group.label}-${item.id}`}
+              onClick={() => onSelect(item.id)}
+              title={collapsed ? item.label : undefined}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
+                ${collapsed ? 'justify-center' : ''}
+                ${isActive
+                  ? 'bg-purple-100 text-purple-700 border-r-2 border-purple-500'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-r-2 border-transparent'
+                }`}
+            >
+              <div className="relative flex-shrink-0">
+                <Icon className="h-[18px] w-[18px]" />
+                {collapsed && item.badge !== undefined && item.badge > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full">
+                    {item.badge > 99 ? '99+' : item.badge}
+                  </span>
+                )}
+              </div>
+              {!collapsed && (
+                <span className="text-sm font-medium truncate flex-1">{item.label}</span>
+              )}
+              {!collapsed && item.badge !== undefined && item.badge > 0 && (
+                <span className="ml-auto flex-shrink-0 flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                  {item.badge > 99 ? '99+' : item.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    ))}
+  </nav>
+);
+
+// ─── Main Component ──────────────────────────────────────────────────────────
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initialTab }) => {
-  const { profile, user, isImpersonating, effectiveProfile } = useAuth();
+  const { profile, user, isImpersonating, effectiveProfile, impersonation, stopImpersonation } = useAuth();
   const displayRole = isImpersonating ? effectiveProfile?.role : profile?.role;
   const isAdmin = displayRole === 'admin';
   const isSalesRep = displayRole === 'sales_rep';
   const isDistributor = displayRole === 'distributor';
   const isCustomer = displayRole === 'customer';
-  const [userOrgId, setUserOrgId] = React.useState<string | undefined>();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [pendingUsersCount, setPendingUsersCount] = useState(0);
 
-  const getDefaultTab = (): AdminTab => {
-    if (initialTab) return initialTab;
-    if (isCustomer) return 'orders';
-    if (isSalesRep) return 'my-orgs';
-    if (isDistributor) return 'commissions';
-    return 'organizations';
+  const [userOrgId, setUserOrgId] = useState<string | undefined>();
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
+
+  const resolveInitialTab = (tab?: string): ActiveTab => {
+    if (!tab) {
+      if (isAdmin) return 'home';
+      if (isCustomer) return 'orders';
+      if (isSalesRep) return 'my-orgs';
+      if (isDistributor) return 'commissions';
+      return 'home';
+    }
+    // Map legacy 'admin-settings' to 'organizations'
+    if (tab === 'admin-settings') return 'organizations';
+    return tab as ActiveTab;
   };
 
-  const [activeTab, setActiveTab] = useState<AdminTab>(getDefaultTab());
-  const [adminSettingsTab, setAdminSettingsTab] = useState<AdminSettingsTab>('organizations');
-  const [isAdminSettingsOpen, setIsAdminSettingsOpen] = useState(false);
-  const [isAdminSettingsSidebarCollapsed, setIsAdminSettingsSidebarCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => resolveInitialTab(initialTab));
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isOpen) {
-      if (initialTab) {
-        setActiveTab(initialTab);
-      } else {
-        setActiveTab(getDefaultTab());
-      }
-      setIsAdminSettingsOpen(false);
+      setActiveTab(resolveInitialTab(initialTab));
     }
   }, [initialTab, isOpen]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (isCustomer && user?.id) {
       const fetchUserOrg = async () => {
         const { multiTenantService } = await import('@/services/multiTenant');
         const roles = await multiTenantService.getUserOrganizationRoles(user.id);
-        if (roles.length > 0) {
-          setUserOrgId(roles[0].organization_id);
-        }
+        if (roles.length > 0) setUserOrgId(roles[0].organization_id);
       };
       fetchUserOrg();
     }
   }, [isCustomer, user?.id]);
 
-  React.useEffect(() => {
-    if (isAdmin) {
-      fetchPendingUsersCount();
-    }
+  useEffect(() => {
+    if (isAdmin) fetchPendingUsers();
   }, [isAdmin]);
 
-  const fetchPendingUsersCount = async () => {
+  const fetchPendingUsers = async () => {
     try {
-      const { count, error } = await supabase
+      const { data, count, error } = await supabase
         .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('approval_status', 'pending');
-
+        .select('id, email, full_name, created_at', { count: 'exact' })
+        .eq('approval_status', 'pending')
+        .order('created_at', { ascending: false });
       if (error) throw error;
-      setPendingUsersCount(count || 0);
+      setPendingCount(count || 0);
+      setPendingUsers((data as PendingUser[]) || []);
     } catch (err) {
-      console.error('Error fetching pending users count:', err);
+      console.error('Error fetching pending users:', err);
     }
+  };
+
+  const handleApprove = async (userId: string) => {
+    await supabase.from('profiles').update({ approval_status: 'approved', is_approved: true }).eq('id', userId);
+    fetchPendingUsers();
+  };
+
+  const handleDeny = async (userId: string) => {
+    await supabase.from('profiles').update({ approval_status: 'denied', is_approved: false }).eq('id', userId);
+    fetchPendingUsers();
   };
 
   if (!isOpen) return null;
 
-  const adminTabs = [
-    { id: 'users' as AdminTab, label: 'Users', icon: Users, roles: ['admin'] },
-    { id: 'orders' as AdminTab, label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep', 'customer'] },
-    { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep', 'distributor'] },
-    { id: 'quickbooks' as AdminTab, label: 'QuickBooks', icon: DollarSign, roles: ['admin'] },
-    { id: 'admin-settings' as AdminTab, label: 'Admin Settings', icon: Settings, roles: ['admin'] },
-    { id: 'support' as AdminTab, label: 'Support', icon: MessageSquare, roles: ['admin', 'customer'] },
-    { id: 'help' as AdminTab, label: 'Help', icon: HelpCircle, roles: ['admin', 'sales_rep', 'distributor', 'customer'] },
-
-    // User-facing items (non-admin)
-    { id: 'my-orgs' as AdminTab, label: 'My Organizations', icon: Building2, roles: ['sales_rep'] },
-    { id: 'my-recurring-orders' as AdminTab, label: 'My Recurring Orders', icon: Repeat, roles: ['customer'] },
-    { id: 'locations' as AdminTab, label: 'Locations', icon: MapPin, roles: ['customer'] },
-    { id: 'payments' as AdminTab, label: 'Payment Methods', icon: CreditCard, roles: ['customer'] },
+  // ── Sidebar groups definition ──────────────────────────────────────────────
+  const groups: SidebarGroup[] = [
+    {
+      label: 'Overview',
+      roles: ['admin'],
+      items: [
+        { id: 'home', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin'] },
+      ],
+    },
+    {
+      label: 'My Account',
+      roles: ['customer', 'sales_rep', 'distributor'],
+      items: [
+        { id: 'orders', label: 'My Orders', icon: ShoppingCart, roles: ['customer'] },
+        { id: 'my-recurring-orders', label: 'Recurring Orders', icon: Repeat, roles: ['customer'] },
+        { id: 'locations', label: 'Locations', icon: MapPin, roles: ['customer'] },
+        { id: 'payments', label: 'Payment Methods', icon: CreditCard, roles: ['customer'] },
+        { id: 'my-orgs', label: 'My Organizations', icon: Building2, roles: ['sales_rep'] },
+        { id: 'commissions', label: 'Commissions', icon: TrendingUp, roles: ['distributor'] },
+      ],
+    },
+    {
+      label: 'Operations',
+      roles: ['admin', 'sales_rep'],
+      items: [
+        { id: 'orders', label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep'] },
+        { id: 'commissions', label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep'] },
+        { id: 'support', label: 'Support', icon: MessageSquare, roles: ['admin'] },
+      ],
+    },
+    {
+      label: 'Management',
+      roles: ['admin'],
+      items: [
+        { id: 'users', label: 'Users', icon: Users, roles: ['admin'], badge: pendingCount > 0 ? pendingCount : undefined },
+        { id: 'organizations', label: 'Organizations', icon: Building2, roles: ['admin'] },
+        { id: 'products', label: 'Products', icon: Package, roles: ['admin'] },
+        { id: 'categories', label: 'Categories', icon: FolderTree, roles: ['admin'] },
+        { id: 'pricing', label: 'Pricing', icon: DollarSign, roles: ['admin'] },
+        { id: 'recurring-orders', label: 'Recurring Orders', icon: Repeat, roles: ['admin'] },
+        { id: 'distributors', label: 'Distributors', icon: Building, roles: ['admin'] },
+        { id: 'salesreps', label: 'Sales Reps', icon: UserCheck, roles: ['admin'] },
+      ],
+    },
+    {
+      label: 'Analytics',
+      roles: ['admin'],
+      items: [
+        { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['admin'] },
+        { id: 'profit-report', label: 'Profit Report', icon: PieChart, roles: ['admin'] },
+        { id: 'cost-admins', label: 'Cost Admins', icon: Shield, roles: ['admin'] },
+      ],
+    },
+    {
+      label: 'System',
+      roles: ['admin'],
+      items: [
+        { id: 'quickbooks', label: 'QuickBooks', icon: DollarSign, roles: ['admin'] },
+        { id: 'site-settings', label: 'Site Settings', icon: Settings, roles: ['admin'] },
+      ],
+    },
+    {
+      label: 'Support',
+      roles: ['customer'],
+      items: [
+        { id: 'support', label: 'Support', icon: MessageSquare, roles: ['customer'] },
+      ],
+    },
+    {
+      label: 'Help',
+      roles: ['admin', 'sales_rep', 'distributor', 'customer'],
+      items: [
+        { id: 'help', label: 'Help', icon: HelpCircle, roles: ['admin', 'sales_rep', 'distributor', 'customer'] },
+      ],
+    },
   ];
 
-  const adminSettingsTabs = [
-    { id: 'organizations' as AdminSettingsTab, label: 'Organizations', icon: Building2 },
-    { id: 'pricing' as AdminSettingsTab, label: 'Pricing', icon: DollarSign },
-    { id: 'products' as AdminSettingsTab, label: 'Products', icon: Package },
-    { id: 'categories' as AdminSettingsTab, label: 'Categories', icon: FolderTree },
-    { id: 'recurring-orders' as AdminSettingsTab, label: 'Recurring Orders', icon: Repeat },
-    { id: 'distributors' as AdminSettingsTab, label: 'Distributors', icon: Building },
-    { id: 'salesreps' as AdminSettingsTab, label: 'Sales Reps', icon: UserCheck },
-    { id: 'analytics' as AdminSettingsTab, label: 'Analytics', icon: BarChart3 },
-    { id: 'profit-report' as AdminSettingsTab, label: 'Profit Report', icon: PieChart },
-    { id: 'cost-admins' as AdminSettingsTab, label: 'Cost Admins', icon: Shield },
-    { id: 'site-settings' as AdminSettingsTab, label: 'Site Settings', icon: Settings },
-  ];
+  const visibleGroups = groups
+    .filter(g => g.roles.includes(displayRole || ''))
+    .map(g => ({
+      ...g,
+      items: g.items.filter(item => item.roles.includes(displayRole || '')),
+    }))
+    .filter(g => g.items.length > 0);
 
-  const tabs = adminTabs.filter(tab =>
-    (isAdmin && tab.roles.includes('admin')) ||
-    (isSalesRep && tab.roles.includes('sales_rep')) ||
-    (isDistributor && tab.roles.includes('distributor')) ||
-    (isCustomer && tab.roles.includes('customer'))
-  );
-
-  const renderAdminSettingsContent = () => {
-    switch (adminSettingsTab) {
+  // ── Content renderer ───────────────────────────────────────────────────────
+  const renderContent = () => {
+    switch (activeTab) {
+      case 'home':
+        return (
+          <AdminHome
+            pendingUsers={pendingUsers}
+            pendingCount={pendingCount}
+            onNavigate={setActiveTab}
+            onApprove={handleApprove}
+            onDeny={handleDeny}
+          />
+        );
+      case 'users':
+        return <UserManagement onUserApproved={fetchPendingUsers} onClose={onClose} />;
+      case 'orders':
+        return <OrderManagement />;
+      case 'commissions':
+        return <CommissionManagement />;
+      case 'quickbooks':
+        return <QuickBooksManagement />;
       case 'organizations':
         return <OrganizationManagement />;
       case 'pricing':
@@ -165,76 +468,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
         return <CostAdminManagement />;
       case 'site-settings':
         return <SiteSettingsManagement />;
-      default:
-        return null;
-    }
-  };
-
-  const renderTabContent = () => {
-    if (activeTab === 'admin-settings') {
-      return (
-        <div className="flex h-full">
-          {/* Admin Settings Sidebar */}
-          <div className={`${isAdminSettingsSidebarCollapsed ? 'w-16' : 'w-64'} bg-gray-50 border-r border-gray-200 transition-all duration-300 relative`}>
-            {/* Collapse/Expand Button */}
-            <button
-              onClick={() => setIsAdminSettingsSidebarCollapsed(!isAdminSettingsSidebarCollapsed)}
-              className="absolute -right-3 top-6 bg-white border border-gray-300 rounded-full p-1 shadow-md hover:bg-gray-100 z-10"
-              title={isAdminSettingsSidebarCollapsed ? 'Expand submenu' : 'Collapse submenu'}
-            >
-              {isAdminSettingsSidebarCollapsed ? (
-                <ChevronRight className="h-4 w-4 text-gray-600" />
-              ) : (
-                <ChevronLeft className="h-4 w-4 text-gray-600" />
-              )}
-            </button>
-
-            <div className="p-4">
-              {!isAdminSettingsSidebarCollapsed && (
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Admin Settings</h2>
-              )}
-              <nav className="space-y-2">
-                {adminSettingsTabs.map((tab) => {
-                  const Icon = tab.icon;
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setAdminSettingsTab(tab.id)}
-                      className={`w-full flex items-center ${isAdminSettingsSidebarCollapsed ? 'justify-center' : 'space-x-3'} px-4 py-3 rounded-lg text-left transition-colors ${
-                        adminSettingsTab === tab.id
-                          ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                      title={isAdminSettingsSidebarCollapsed ? tab.label : undefined}
-                    >
-                      <Icon className="h-5 w-5 flex-shrink-0" />
-                      {!isAdminSettingsSidebarCollapsed && <span className="font-medium">{tab.label}</span>}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
-          </div>
-
-          {/* Admin Settings Content */}
-          <div className="flex-1 overflow-y-auto">
-            {renderAdminSettingsContent()}
-          </div>
-        </div>
-      );
-    }
-
-    switch (activeTab) {
       case 'my-orgs':
         return <SalesRepDashboard />;
-      case 'users':
-        return <UserManagement onUserApproved={fetchPendingUsersCount} onClose={onClose} />;
-      case 'orders':
-        return <OrderManagement />;
-      case 'commissions':
-        return <CommissionManagement />;
-      case 'quickbooks':
-        return <QuickBooksManagement />;
       case 'locations':
         return <LocationManagement organizationId={isCustomer ? userOrgId : undefined} />;
       case 'payments':
@@ -250,85 +485,117 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
     }
   };
 
+  const dashboardTitle = isCustomer ? 'My Account' : isSalesRep ? 'Sales Dashboard' : isDistributor ? 'Distributor Portal' : 'Admin Dashboard';
+  const impersonatedName = impersonation?.profile?.full_name || impersonation?.profile?.email || 'Unknown User';
+  const impersonatedRole = impersonation?.profile?.role || '';
+
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold">
-                  {isCustomer ? 'My Account' : isSalesRep ? 'Sales Dashboard' : 'Admin Dashboard'}
-                </h1>
-                <p className="text-purple-100">
-                  {isCustomer
-                    ? 'Manage your orders, locations, and payment methods'
-                    : isSalesRep
-                    ? 'View your orders and commissions'
-                    : 'Manage users, organizations, and pricing'
-                  }
+
+      {/* Header */}
+      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-4 flex-shrink-0">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Mobile hamburger */}
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="sm:hidden flex-shrink-0 text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors mr-1"
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold leading-tight">{dashboardTitle}</h1>
+              {isImpersonating && (
+                <p className="text-purple-200 text-xs mt-0.5 flex items-center gap-1">
+                  <Eye className="h-3 w-3 flex-shrink-0" />
+                  Viewing as {impersonatedName}
                 </p>
+              )}
+            </div>
+            {displayRole && (
+              <span className={`flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full ${ROLE_COLORS[displayRole] || 'bg-gray-100 text-gray-800'}`}>
+                {ROLE_LABELS[displayRole] || displayRole}
+              </span>
+            )}
+            {isImpersonating && (
+              <button
+                onClick={stopImpersonation}
+                className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1 bg-amber-400 text-amber-900 rounded-full text-xs font-semibold hover:bg-amber-300 transition-colors"
+              >
+                <EyeOff className="h-3 w-3" />
+                Exit
+              </button>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="flex-shrink-0 text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors"
+            aria-label="Close dashboard"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-1 overflow-hidden">
+
+        {/* Mobile sidebar overlay */}
+        {isMobileSidebarOpen && (
+          <div
+            className="sm:hidden fixed inset-0 z-[55] bg-black/40"
+            onClick={() => setIsMobileSidebarOpen(false)}
+          >
+            <div
+              className="w-64 h-full bg-white shadow-xl flex flex-col overflow-y-auto"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+                <span className="font-semibold text-gray-800">Menu</span>
+                <button
+                  onClick={() => setIsMobileSidebarOpen(false)}
+                  className="text-gray-500 hover:text-gray-900 rounded-full p-1 hover:bg-gray-100"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
-              <button
-                onClick={onClose}
-                className="text-white hover:text-purple-200 text-2xl font-bold"
-              >
-                ×
-              </button>
+              <SidebarNav
+                visibleGroups={visibleGroups}
+                activeTab={activeTab}
+                collapsed={false}
+                onSelect={tab => { setActiveTab(tab); setIsMobileSidebarOpen(false); }}
+              />
             </div>
           </div>
+        )}
 
-          <div className="flex flex-1 overflow-hidden">
-            {/* Sidebar */}
-            <div className={`${isSidebarCollapsed ? 'w-16' : 'w-64'} bg-gray-50 border-r border-gray-200 transition-all duration-300 relative`}>
-              {/* Collapse/Expand Button */}
-              <button
-                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-                className="absolute -right-3 top-6 bg-white border border-gray-300 rounded-full p-1 shadow-md hover:bg-gray-100 z-10"
-                title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              >
-                {isSidebarCollapsed ? (
-                  <ChevronRight className="h-4 w-4 text-gray-600" />
-                ) : (
-                  <ChevronLeft className="h-4 w-4 text-gray-600" />
-                )}
-              </button>
+        {/* Desktop Sidebar */}
+        <div className={`hidden sm:flex ${isSidebarCollapsed ? 'w-16' : 'w-56'} bg-gray-50 border-r border-gray-200 transition-all duration-200 relative flex-col overflow-y-auto flex-shrink-0`}>
+          {/* Collapse toggle */}
+          <button
+            onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="absolute -right-3 top-4 bg-white border border-gray-300 rounded-full p-1 shadow-sm hover:bg-gray-100 z-10 flex-shrink-0"
+            title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {isSidebarCollapsed
+              ? <ChevronRight className="h-3.5 w-3.5 text-gray-500" />
+              : <ChevronLeft className="h-3.5 w-3.5 text-gray-500" />
+            }
+          </button>
+          <SidebarNav
+            visibleGroups={visibleGroups}
+            activeTab={activeTab}
+            collapsed={isSidebarCollapsed}
+            onSelect={setActiveTab}
+          />
+        </div>
 
-              <nav className="p-4 space-y-2">
-                {tabs.map((tab) => {
-                  const Icon = tab.icon;
-                  const showBadge = tab.id === 'users' && pendingUsersCount > 0;
-
-                  return (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'} px-4 py-3 rounded-lg text-left transition-colors relative ${
-                        activeTab === tab.id
-                          ? 'bg-purple-100 text-purple-700 border border-purple-200'
-                          : 'text-gray-700 hover:bg-gray-100'
-                      }`}
-                      title={isSidebarCollapsed ? tab.label : undefined}
-                    >
-                      <div className="flex items-center space-x-3">
-                        <Icon className="h-5 w-5 flex-shrink-0" />
-                        {!isSidebarCollapsed && <span className="font-medium">{tab.label}</span>}
-                      </div>
-                      {showBadge && (
-                        <span className={`${isSidebarCollapsed ? 'absolute -top-1 -right-1' : ''} flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full`}>
-                          {pendingUsersCount}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </nav>
-            </div>
-
-            {/* Main Content */}
-            <div className="flex-1 overflow-y-auto">
-              {renderTabContent()}
-            </div>
-          </div>
+        {/* Main Content */}
+        <div className="flex-1 overflow-y-auto">
+          {renderContent()}
+        </div>
+      </div>
     </div>
   );
 };
