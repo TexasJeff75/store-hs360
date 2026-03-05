@@ -507,6 +507,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         );
 
         if (authResponse.status === 'DECLINED') {
+          console.warn('Card payment declined:', { sessionId, lastFour: paymentData.lastFour });
           setError('Your payment was declined. Please try a different payment method.');
           setCurrentStep('payment');
           setLoading(false);
@@ -530,7 +531,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               accountHolderName: paymentData.cardholderName,
               token: paymentData.token,
             });
-          } catch {
+          } catch (saveErr) {
+            console.warn('Failed to save card payment method:', saveErr);
           }
         }
       } else if (paymentData.type === 'ach') {
@@ -542,6 +544,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         );
 
         if (achResponse.status === 'DECLINED') {
+          console.warn('ACH payment declined:', { sessionId, lastFour: paymentData.lastFour });
           setError('Your payment was declined. Please try a different payment method.');
           setCurrentStep('payment');
           setLoading(false);
@@ -566,7 +569,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               accountType: acctTypeLower.includes('checking') ? 'checking' : 'savings',
               token: paymentData.token,
             });
-          } catch {
+          } catch (saveErr) {
+            console.warn('Failed to save ACH payment method:', saveErr);
           }
         }
       } else if (paymentData.type === 'saved') {
@@ -615,7 +619,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       const result = await restCheckoutService.processPayment(
         sessionId,
         checkoutId,
-        sanitizedPaymentData
+        sanitizedPaymentData,
+        paymentAuthId
       );
 
       if (result.success && result.orderId) {

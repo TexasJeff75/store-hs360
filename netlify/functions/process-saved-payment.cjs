@@ -265,13 +265,25 @@ exports.handler = async (event) => {
       };
     }
 
+    const requestId = crypto.randomUUID();
+    const logId = `saved_${isACH ? 'ach' : 'card'}_${Date.now()}`;
+
+    // Log pending payment attempt
+    await supabase.from('quickbooks_sync_log').insert({
+      entity_type: isACH ? 'payment_ach' : 'payment_charge',
+      entity_id: logId,
+      sync_type: 'create',
+      status: 'pending',
+      request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId },
+    }).then(() => {}).catch(() => {});
+
     const qbResponse = await fetch(qbUrl, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${creds.access_token}`,
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'Request-Id': crypto.randomUUID(),
+        'Request-Id': requestId,
       },
       body: JSON.stringify(requestBody),
     });
@@ -289,6 +301,17 @@ exports.handler = async (event) => {
         || responseData?.message
         || 'Payment processing failed';
 
+      // Log failed payment
+      await supabase.from('quickbooks_sync_log').insert({
+        entity_type: isACH ? 'payment_ach' : 'payment_charge',
+        entity_id: logId,
+        sync_type: 'create',
+        status: 'failed',
+        request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId },
+        error_message: errorMsg,
+        response_data: { status: responseData?.status, httpStatus: qbResponse.status },
+      }).then(() => {}).catch(() => {});
+
       return {
         statusCode: qbResponse.status >= 400 && qbResponse.status < 500 ? qbResponse.status : 502,
         headers: corsHeaders,
@@ -300,6 +323,18 @@ exports.handler = async (event) => {
     }
 
     if (responseData.status === 'DECLINED') {
+      // Log declined payment
+      await supabase.from('quickbooks_sync_log').insert({
+        entity_type: isACH ? 'payment_ach' : 'payment_charge',
+        entity_id: logId,
+        quickbooks_id: responseData.id,
+        sync_type: 'create',
+        status: 'failed',
+        request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId },
+        error_message: 'Payment declined',
+        response_data: { id: responseData.id, status: 'DECLINED', amount: responseData.amount },
+      }).then(() => {}).catch(() => {});
+
       return {
         statusCode: 402,
         headers: corsHeaders,
@@ -309,6 +344,18 @@ exports.handler = async (event) => {
         })
       };
     }
+
+    // Log successful payment
+    await supabase.from('quickbooks_sync_log').insert({
+      entity_type: isACH ? 'payment_ach' : 'payment_charge',
+      entity_id: logId,
+      quickbooks_id: responseData.id,
+      sync_type: 'create',
+      status: 'success',
+      request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId },
+      response_data: { id: responseData.id, status: responseData.status, amount: responseData.amount, authCode: responseData.authCode },
+      synced_at: new Date().toISOString(),
+    }).then(() => {}).catch(() => {});
 
     return {
       statusCode: 200,
