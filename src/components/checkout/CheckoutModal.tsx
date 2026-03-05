@@ -74,7 +74,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [customerEmail, setCustomerEmail] = useState<string>('');
   const [availableLocations, setAvailableLocations] = useState<OrgLocation[]>([]);
   const [showAddressSelector, setShowAddressSelector] = useState(true);
+  const [showBillingAddressSelector, setShowBillingAddressSelector] = useState(true);
   const [useManualAddress, setUseManualAddress] = useState(false);
+  const [useManualBillingAddress, setUseManualBillingAddress] = useState(false);
   const [isAdminOrManager, setIsAdminOrManager] = useState(false);
   const [saveShippingAddress, setSaveShippingAddress] = useState(false);
   const [saveBillingAddress, setSaveBillingAddress] = useState(false);
@@ -541,6 +543,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
+    // If on billing step showing manual form (from selecting a saved address), go back to selector
+    if (currentStep === 'billing' && !sameAsShipping && !showBillingAddressSelector && !useManualBillingAddress) {
+      setShowBillingAddressSelector(true);
+      return;
+    }
+    // If on billing step showing manual entry form (from "Add New"), go back to selector
+    if (currentStep === 'billing' && !sameAsShipping && useManualBillingAddress) {
+      setUseManualBillingAddress(false);
+      setShowBillingAddressSelector(true);
+      return;
+    }
+
     // If going back from shipping and there are multiple locations, go to location step
     if (currentStep === 'shipping' && availableLocations.length > 1) {
       setCurrentStep('location');
@@ -760,6 +774,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setShowAddressSelector(false);
     } else {
       setBillingAddress({ ...addressData, email: address.email || customerEmail });
+      setShowBillingAddressSelector(false);
     }
   };
 
@@ -1033,19 +1048,60 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     );
   };
 
-  const renderBillingStep = () => (
+  const renderBillingStep = () => {
+    // Show saved billing address selector when not same-as-shipping and not manually entering
+    if (!sameAsShipping && !useManualBillingAddress && showBillingAddressSelector) {
+      return (
+        <div className="space-y-6">
+          <div className="flex items-center space-x-2 mb-4">
+            <MapPin className="h-5 w-5 text-pink-600" />
+            <h3 className="text-lg font-semibold">Billing Address</h3>
+          </div>
+
+          <div className="mb-4">
+            <label className="flex items-center">
+              <input
+                type="checkbox"
+                checked={sameAsShipping}
+                onChange={(e) => setSameAsShipping(e.target.checked)}
+                className="mr-2"
+              />
+              <span className="text-sm">Same as shipping address</span>
+            </label>
+          </div>
+
+          <AddressSelector
+            userId={selectedCustomerId}
+            organizationId={selectedOrgId}
+            locationId={selectedLocationId}
+            addressType="billing"
+            onSelect={(addr) => handleAddressSelect(addr, 'billing')}
+            onAddNew={() => setUseManualBillingAddress(true)}
+          />
+        </div>
+      );
+    }
+
+    return (
     <div className="space-y-6">
       <div className="flex items-center space-x-2 mb-4">
         <MapPin className="h-5 w-5 text-pink-600" />
         <h3 className="text-lg font-semibold">Billing Address</h3>
       </div>
-      
+
       <div className="mb-4">
         <label className="flex items-center">
           <input
             type="checkbox"
             checked={sameAsShipping}
-            onChange={(e) => setSameAsShipping(e.target.checked)}
+            onChange={(e) => {
+              setSameAsShipping(e.target.checked);
+              if (!e.target.checked) {
+                // Reset to show address selector when unchecking
+                setShowBillingAddressSelector(true);
+                setUseManualBillingAddress(false);
+              }
+            }}
             className="mr-2"
           />
           <span className="text-sm">Same as shipping address</span>
@@ -1074,7 +1130,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               />
             </div>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
             <input
@@ -1084,7 +1140,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
             />
           </div>
-          
+
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
@@ -1116,7 +1172,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
         </>
       )}
-      
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Email Address *</label>
         <input
@@ -1162,7 +1218,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         </div>
       )}
     </div>
-  );
+    );
+  };
 
   const renderPaymentStep = () => (
     <div className="space-y-6">
