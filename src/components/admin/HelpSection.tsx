@@ -503,14 +503,9 @@ const HelpSection: React.FC<HelpSectionProps> = () => {
             <p className="text-gray-600 text-sm mb-4">
               If you cannot find what you are looking for, contact our support team for assistance.
             </p>
-            <div className="flex space-x-3">
-              <a
-                href="mailto:support@example.com"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
-              >
-                Contact Support
-              </a>
-            </div>
+            <p className="text-sm text-gray-700">
+              Use the <strong>Support</strong> tab in the sidebar to create a support ticket and our team will get back to you.
+            </p>
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart, Shield, ChevronLeft, ChevronRight, DollarSign, FolderTree } from 'lucide-react';
+import { Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart, TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart, Shield, ChevronLeft, ChevronRight, DollarSign, FolderTree, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
 import UserManagement from './UserManagement';
@@ -22,6 +22,8 @@ import CostAdminManagement from './CostAdminManagement';
 import QuickBooksManagement from './QuickBooksManagement';
 import CategoryManagement from './CategoryManagement';
 import SiteSettingsManagement from './SiteSettingsManagement';
+import SupportTickets from '../SupportTickets';
+import SupportTicketManagement from './SupportTicketManagement';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -29,7 +31,7 @@ interface AdminDashboardProps {
   initialTab?: AdminTab;
 }
 
-type AdminTab = 'users' | 'orders' | 'commissions' | 'help' | 'my-orgs' | 'my-recurring-orders' | 'locations' | 'payments' | 'admin-settings' | 'quickbooks';
+type AdminTab = 'users' | 'orders' | 'commissions' | 'help' | 'my-orgs' | 'my-recurring-orders' | 'locations' | 'payments' | 'admin-settings' | 'quickbooks' | 'support';
 type AdminSettingsTab = 'organizations' | 'pricing' | 'products' | 'categories' | 'recurring-orders' | 'distributors' | 'salesreps' | 'analytics' | 'profit-report' | 'cost-admins' | 'site-settings';
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initialTab }) => {
@@ -108,6 +110,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
     { id: 'commissions' as AdminTab, label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep', 'distributor'] },
     { id: 'quickbooks' as AdminTab, label: 'QuickBooks', icon: DollarSign, roles: ['admin'] },
     { id: 'admin-settings' as AdminTab, label: 'Admin Settings', icon: Settings, roles: ['admin'] },
+    { id: 'support' as AdminTab, label: 'Support', icon: MessageSquare, roles: ['admin', 'customer'] },
     { id: 'help' as AdminTab, label: 'Help', icon: HelpCircle, roles: ['admin', 'sales_rep', 'distributor', 'customer'] },
 
     // User-facing items (non-admin)
@@ -238,6 +241,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
         return <CustomerPaymentMethods organizationId={isCustomer ? userOrgId : undefined} />;
       case 'my-recurring-orders':
         return <MyRecurringOrders />;
+      case 'support':
+        return isAdmin ? <SupportTicketManagement /> : <SupportTickets />;
       case 'help':
         return <HelpSection />;
       default:

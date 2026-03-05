@@ -62,6 +62,7 @@ interface UpdateRecurringOrderData {
   location_id?: string;
   discount_percentage?: number;
   end_date?: string;
+  next_order_date?: string;
   notes?: string;
 }
 
@@ -259,6 +260,63 @@ export const recurringOrderService = {
       console.error('Error in getRecurringOrderHistory:', error);
       return [];
     }
+  },
+
+  async skipNextOrder(recurringOrderId: string, reason?: string): Promise<boolean> {
+    try {
+      const order = await this.getRecurringOrder(recurringOrderId);
+      if (!order) return false;
+
+      const nextDate = this.calculateNextDate(order.next_order_date, order.frequency, order.frequency_interval);
+
+      await supabase
+        .from('recurring_order_history')
+        .insert({
+          recurring_order_id: recurringOrderId,
+          status: 'skipped',
+          scheduled_date: order.next_order_date,
+          amount: 0,
+          skip_reason: reason || 'Skipped by customer',
+        });
+
+      const { error } = await supabase
+        .from('recurring_orders')
+        .update({ next_order_date: nextDate })
+        .eq('id', recurringOrderId);
+
+      if (error) {
+        console.error('Error skipping order:', error);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('Error in skipNextOrder:', error);
+      return false;
+    }
+  },
+
+  calculateNextDate(currentDate: string, frequency: string, interval: number): string {
+    const date = new Date(currentDate);
+    switch (frequency) {
+      case 'weekly':
+        date.setDate(date.getDate() + interval * 7);
+        break;
+      case 'biweekly':
+        date.setDate(date.getDate() + interval * 14);
+        break;
+      case 'monthly':
+        date.setMonth(date.getMonth() + interval);
+        break;
+      case 'quarterly':
+        date.setMonth(date.getMonth() + interval * 3);
+        break;
+      case 'yearly':
+        date.setFullYear(date.getFullYear() + interval);
+        break;
+      default:
+        date.setDate(date.getDate() + interval * 30);
+    }
+    return date.toISOString().split('T')[0];
   },
 
   getFrequencyDisplay(frequency: string, interval: number = 1): string {
