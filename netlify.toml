@@ -2,12 +2,11 @@
   command = "npm run build"
   publish = "dist"
   functions = "netlify/functions"
-  # SECRETS_SCAN_ENABLED is disabled because Vite inlines VITE_* env vars into the
-  # client bundle by design. These are all public keys (Supabase anon key, storefront
-  # token) that are safe for client-side use. To re-enable, set SECRETS_SCAN_OMIT_KEYS
-  # in the Netlify dashboard for: VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY,
-  # VITE_BC_STOREFRONT_TOKEN, VITE_BC_STORE_HASH
-  environment = { NODE_VERSION = "18", SECRETS_SCAN_ENABLED = "false" }
+  # SECRETS_SCAN_OMIT_KEYS lists env vars that are intentionally public and safe to
+  # inline in the client bundle (Supabase anon key/URL are public by design, QB OAuth
+  # config is non-secret). BC_STORE_HASH and BC_STOREFRONT_TOKEN are NOT listed here
+  # because they should NOT have the VITE_ prefix — rename them in Netlify dashboard.
+  environment = { NODE_VERSION = "18", SECRETS_SCAN_ENABLED = "true", SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_URL,VITE_SUPABASE_ANON_KEY,VITE_API_BASE,VITE_QB_CLIENT_ID,VITE_QB_ENVIRONMENT,VITE_QB_REALM_ID,VITE_QB_REDIRECT_URI,VITE_QB_REDIRECT_URI_PROD" }
 
 [dev]
   command = "vite --port 3000 --host"
