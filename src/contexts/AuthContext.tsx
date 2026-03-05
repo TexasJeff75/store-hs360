@@ -247,13 +247,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error('No user logged in') };
 
+    // Only allow safe fields to be updated from the client
+    const { role, approval_status, approved, can_view_secret_cost, id, created_at, ...safeUpdates } = updates as any;
+
     const { error } = await supabase
       .from('profiles')
-      .update(updates)
+      .update(safeUpdates)
       .eq('id', user.id);
 
     if (!error) {
-      setProfile({ ...profile, ...updates });
+      setProfile({ ...profile, ...safeUpdates });
     }
 
     return { error };
@@ -274,7 +277,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const startImpersonation = async (userId: string) => {
-    if (profile?.role !== 'admin') return;
+    if (profile?.role !== 'admin' || !user) return;
 
     const { data, error } = await supabase
       .from('profiles')
@@ -285,6 +288,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error || !data) {
       console.error('Failed to load impersonated user profile:', error);
       return;
+    }
+
+    // Log impersonation event for audit trail
+    try {
+      await supabase.from('login_audit').insert({
+        user_id: user.id,
+        email: user.email,
+        session_id: `impersonation_${crypto.randomUUID()}`,
+        login_timestamp: new Date().toISOString(),
+        session_ended: false,
+        user_agent: `IMPERSONATION: admin ${user.id} impersonating ${userId}`,
+      });
+    } catch (auditErr) {
+      console.error('Failed to log impersonation event:', auditErr);
     }
 
     setImpersonation({ userId, profile: data });

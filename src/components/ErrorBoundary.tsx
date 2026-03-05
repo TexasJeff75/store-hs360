@@ -55,7 +55,7 @@ class ErrorBoundary extends Component<Props, State> {
               The application encountered an error. Please try refreshing the page.
             </p>
 
-            {this.state.error && (
+            {import.meta.env.DEV && this.state.error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
                 <h2 className="font-semibold text-red-900 mb-2">Error Details:</h2>
                 <pre className="text-sm text-red-800 overflow-auto">
@@ -64,7 +64,7 @@ class ErrorBoundary extends Component<Props, State> {
               </div>
             )}
 
-            {this.state.errorInfo && (
+            {import.meta.env.DEV && this.state.errorInfo && (
               <details className="mb-4">
                 <summary className="cursor-pointer font-semibold text-gray-700 hover:text-gray-900">
                   View Stack Trace

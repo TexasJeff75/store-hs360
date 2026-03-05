@@ -321,11 +321,20 @@ exports.handler = async (event) => {
       })
     };
   } catch (error) {
-    const statusCode = error.message === 'Unauthorized' ? 401 : 500;
+    const knownErrors = [
+      'Unauthorized',
+      'Missing or invalid authorization header',
+      'No active QuickBooks connection',
+      'QuickBooks client credentials not configured',
+      'Token refresh failed',
+      'Supabase config missing',
+    ];
+    const isKnown = knownErrors.includes(error.message);
+    const statusCode = error.message === 'Unauthorized' || error.message === 'Missing or invalid authorization header' ? 401 : 500;
     return {
       statusCode,
       headers: corsHeaders,
-      body: JSON.stringify({ error: error.message })
+      body: JSON.stringify({ error: isKnown ? error.message : 'An internal error occurred' })
     };
   }
 };

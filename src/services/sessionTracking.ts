@@ -10,6 +10,7 @@ class SessionTrackingService {
   private lastActivityTime: number = Date.now();
   private activityCheckInterval: NodeJS.Timeout | null = null;
   private sessionTimeoutMs: number = DEFAULT_SESSION_TIMEOUT_MS;
+  private activityHandler: (() => void) | null = null;
 
   async recordLogin(userId: string, email: string, ageVerified: boolean): Promise<string | null> {
     try {
@@ -151,24 +152,30 @@ class SessionTrackingService {
 
   private async getClientIP(): Promise<string | undefined> {
     try {
-      const response = await fetch('https://api.ipify.org?format=json');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const response = await fetch('https://api.ipify.org?format=json', {
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
       const data = await response.json();
       return data.ip;
-    } catch (error) {
+    } catch {
       return undefined;
     }
   }
 
   private startActivityMonitoring(): void {
+    this.stopActivityMonitoring();
     this.lastActivityTime = Date.now();
 
     const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
-    const updateActivity = () => {
+    this.activityHandler = () => {
       this.lastActivityTime = Date.now();
     };
 
     activityEvents.forEach(event => {
-      window.addEventListener(event, updateActivity, { passive: true });
+      window.addEventListener(event, this.activityHandler!, { passive: true });
     });
 
     this.activityCheckInterval = setInterval(async () => {
@@ -184,6 +191,13 @@ class SessionTrackingService {
     if (this.activityCheckInterval) {
       clearInterval(this.activityCheckInterval);
       this.activityCheckInterval = null;
+    }
+    if (this.activityHandler) {
+      const activityEvents = ['mousedown', 'keydown', 'scroll', 'touchstart', 'click'];
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, this.activityHandler!);
+      });
+      this.activityHandler = null;
     }
   }
 
