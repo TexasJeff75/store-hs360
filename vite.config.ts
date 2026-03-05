@@ -32,8 +32,8 @@ function handleGqlProxy(env: Record<string, string>) {
     const body = await readBody(req)
     try {
       const requestBody = JSON.parse(body)
-      const BC_STORE_HASH = env.VITE_BC_STORE_HASH || env.BC_STORE_HASH
-      const BC_STOREFRONT_TOKEN = env.VITE_BC_STOREFRONT_TOKEN || env.BC_STOREFRONT_TOKEN
+      const BC_STORE_HASH = env.BC_STORE_HASH || env.VITE_BC_STORE_HASH
+      const BC_STOREFRONT_TOKEN = env.BC_STOREFRONT_TOKEN || env.VITE_BC_STOREFRONT_TOKEN
 
       if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
         sendJson(res, 500, { errors: [{ message: 'Missing BigCommerce credentials' }] })
@@ -120,11 +120,7 @@ export default defineConfig(({ mode }) => {
     strictPort: true
   },
   define: {
-    'import.meta.env.VITE_BC_STORE_HASH': JSON.stringify(env.VITE_BC_STORE_HASH),
-    'import.meta.env.VITE_BC_STOREFRONT_TOKEN': JSON.stringify(env.VITE_BC_STOREFRONT_TOKEN),
     'import.meta.env.VITE_API_BASE': JSON.stringify(env.VITE_API_BASE || '/.netlify/functions'),
-    'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
-    'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
   },
   }
 })
