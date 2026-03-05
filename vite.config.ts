@@ -19,51 +19,7 @@ function sendJson(res: any, statusCode: number, data: any) {
   res.end(JSON.stringify(data))
 }
 
-function readBody(req: any): Promise<string> {
-  return new Promise((resolve) => {
-    let body = ''
-    req.on('data', (chunk: Buffer) => { body += chunk.toString() })
-    req.on('end', () => resolve(body))
-  })
-}
-
-function handleGqlProxy(env: Record<string, string>) {
-  return async (req: any, res: any) => {
-    const body = await readBody(req)
-    try {
-      const requestBody = JSON.parse(body)
-      const BC_STORE_HASH = env.BC_STORE_HASH || env.VITE_BC_STORE_HASH
-      const BC_STOREFRONT_TOKEN = env.BC_STOREFRONT_TOKEN || env.VITE_BC_STOREFRONT_TOKEN
-
-      if (!BC_STORE_HASH || !BC_STOREFRONT_TOKEN) {
-        sendJson(res, 500, { errors: [{ message: 'Missing BigCommerce credentials' }] })
-        return
-      }
-
-      const ENDPOINT = `https://store-${BC_STORE_HASH}.mybigcommerce.com/graphql`
-
-      const response = await fetch(ENDPOINT, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${BC_STOREFRONT_TOKEN}`
-        },
-        body: JSON.stringify(requestBody)
-      })
-
-      const responseText = await response.text()
-      res.writeHead(response.status, {
-        ...CORS_HEADERS,
-        'Cache-Control': 'public, max-age=60'
-      })
-      res.end(responseText)
-    } catch (error) {
-      sendJson(res, 500, { errors: [{ message: 'Internal server error' }] })
-    }
-  }
-}
-
-function netlifyFunctionsPlugin(env: Record<string, string>) {
+function netlifyFunctionsPlugin() {
   return {
     name: 'netlify-functions-dev',
     configureServer(server: any) {
@@ -73,11 +29,6 @@ function netlifyFunctionsPlugin(env: Record<string, string>) {
         if (req.method === 'OPTIONS' && pathname?.startsWith('/.netlify/functions/')) {
           res.writeHead(200, CORS_HEADERS)
           res.end()
-          return
-        }
-
-        if (pathname === '/.netlify/functions/gql' && req.method === 'POST') {
-          await handleGqlProxy(env)(req, res)
           return
         }
 
@@ -98,7 +49,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-  plugins: [react(), netlifyFunctionsPlugin(env)],
+  plugins: [react(), netlifyFunctionsPlugin()],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, 'src')
