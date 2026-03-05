@@ -3,6 +3,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 import type { Profile } from '../services/supabase';
 import { sessionTrackingService } from '../services/sessionTracking';
+import { activityLogService } from '../services/activityLog';
 
 interface ImpersonationState {
   userId: string;
@@ -305,9 +306,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     setImpersonation({ userId, profile: data });
+
+    // Log impersonation start as a user action
+    activityLogService.logAction({
+      userId: user.id,
+      action: 'impersonation_started',
+      resourceType: 'user',
+      resourceId: userId,
+      details: { impersonated_email: data.email, impersonated_role: data.role },
+    });
   };
 
   const stopImpersonation = () => {
+    if (user && impersonation) {
+      activityLogService.logAction({
+        userId: user.id,
+        action: 'impersonation_stopped',
+        resourceType: 'user',
+        resourceId: impersonation.userId,
+        details: { impersonated_email: impersonation.profile.email },
+      });
+    }
     setImpersonation(null);
   };
 
