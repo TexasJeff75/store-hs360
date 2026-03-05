@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { quickbooksPayments } from './quickbooks';
+import { activityLogService } from './activityLog';
 
 export interface OrderItem {
   productId: number;
@@ -134,6 +135,20 @@ class OrderService {
         console.error('Error creating order:', error);
         return { order: null, error: error.message };
       }
+
+      // Log the order placement
+      activityLogService.logAction({
+        userId: data.userId,
+        action: 'order_placed',
+        resourceType: 'order',
+        resourceId: order.id,
+        details: {
+          total: data.total,
+          items_count: data.items.length,
+          organization_id: data.organizationId,
+          location_id: data.locationId,
+        },
+      });
 
       return { order };
     } catch (error) {

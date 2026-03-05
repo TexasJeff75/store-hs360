@@ -3,6 +3,7 @@ import { User, Mail, Shield, Clock, CheckCircle, CreditCard as Edit, Trash2, Sea
 import { supabase } from '@/services/supabase';
 import type { Profile } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import { activityLogService } from '@/services/activityLog';
 
 interface UserManagementProps {
   onUserApproved?: () => void;
@@ -135,6 +136,23 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
         setModalMessage({
           type: 'success',
           text: 'User updated successfully.'
+        });
+      }
+
+      // Log the role/status change
+      if (currentUser) {
+        const originalUser2 = users.find(u => u.id === userId);
+        activityLogService.logAction({
+          userId: currentUser.id,
+          action: 'user_role_changed',
+          resourceType: 'user',
+          resourceId: userId,
+          details: {
+            email: selectedUser?.email || originalUser2?.email,
+            old_role: originalUser2?.role,
+            new_role: newRole,
+            approval_status: selectedUser?.approval_status,
+          },
         });
       }
 
@@ -508,6 +526,15 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                           await fetchUsers();
                           onUserApproved?.();
                           setSaveMessage({ type: 'success', text: `User approved as ${role}!` });
+                          if (currentUser) {
+                            activityLogService.logAction({
+                              userId: currentUser.id,
+                              action: 'user_approved',
+                              resourceType: 'user',
+                              resourceId: user.id,
+                              details: { email: user.email, assigned_role: role },
+                            });
+                          }
                         } catch (err) {
                           setSaveMessage({ type: 'error', text: 'Failed to approve user' });
                         }
@@ -536,6 +563,15 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                           await fetchUsers();
                           onUserApproved?.();
                           setSaveMessage({ type: 'success', text: 'User denied!' });
+                          if (currentUser) {
+                            activityLogService.logAction({
+                              userId: currentUser.id,
+                              action: 'user_denied',
+                              resourceType: 'user',
+                              resourceId: user.id,
+                              details: { email: user.email },
+                            });
+                          }
                         } catch (err) {
                           setSaveMessage({ type: 'error', text: 'Failed to deny user' });
                         }

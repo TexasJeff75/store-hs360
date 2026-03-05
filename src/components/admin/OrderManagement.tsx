@@ -5,6 +5,7 @@ import { orderService } from '../../services/orderService';
 import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle } from 'lucide-react';
 import type { Order, OrderItem, Shipment } from './orders/types';
 import { normalizeAddress } from './orders/types';
+import { activityLogService } from '../../services/activityLog';
 
 const OrderManagement: React.FC = () => {
   const { user, profile } = useAuth();
@@ -253,6 +254,23 @@ const OrderManagement: React.FC = () => {
         .eq('id', orderId);
 
       if (error) throw error;
+
+      // Log the status change
+      if (user) {
+        const order2 = orders.find(o => o.id === orderId);
+        activityLogService.logAction({
+          userId: user.id,
+          action: 'order_status_changed',
+          resourceType: 'order',
+          resourceId: orderId,
+          details: {
+            old_status: order2?.status,
+            new_status: newStatus,
+            customer_email: order2?.customer_email,
+            organization_id: order2?.organization_id,
+          },
+        });
+      }
 
       await fetchOrders();
       if (selectedOrder?.id === orderId) {
