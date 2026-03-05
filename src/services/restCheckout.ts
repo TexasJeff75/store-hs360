@@ -68,6 +68,7 @@ class RestCheckoutService {
         .insert({
           user_id: userId,
           organization_id: organizationId,
+          location_id: locationId,
           cart_items: items,
           status: 'pending',
           subtotal,
@@ -258,7 +259,7 @@ class RestCheckoutService {
         billingAddress: mapAddress(session.billing_address),
         customerEmail: session.billing_address?.email || '',
         organizationId: session.organization_id,
-        locationId: session.metadata?.location_id,
+        locationId: session.location_id || session.metadata?.location_id,
         notes: `Order placed via checkout session ${sessionId}`,
       };
 

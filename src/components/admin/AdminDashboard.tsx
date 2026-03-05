@@ -29,6 +29,7 @@ import CategoryManagement from './CategoryManagement';
 import SiteSettingsManagement from './SiteSettingsManagement';
 import SupportTickets from '../SupportTickets';
 import SupportTicketManagement from './SupportTicketManagement';
+import LoginAuditLog from './LoginAuditLog';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -42,7 +43,7 @@ type ActiveTab =
   | 'quickbooks' | 'support'
   | 'organizations' | 'pricing' | 'products' | 'categories'
   | 'recurring-orders' | 'distributors' | 'salesreps'
-  | 'analytics' | 'profit-report' | 'cost-admins' | 'site-settings';
+  | 'analytics' | 'profit-report' | 'cost-admins' | 'login-audit' | 'site-settings';
 
 interface PendingUser {
   id: string;
@@ -391,6 +392,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
         { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['admin'] },
         { id: 'profit-report', label: 'Profit Report', icon: PieChart, roles: ['admin'] },
         { id: 'cost-admins', label: 'Cost Admins', icon: Shield, roles: ['admin'] },
+        { id: 'login-audit', label: 'Login Audit', icon: Clock, roles: ['admin'] },
       ],
     },
     {
@@ -466,6 +468,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
         return <ProfitReport />;
       case 'cost-admins':
         return <CostAdminManagement />;
+      case 'login-audit':
+        return <LoginAuditLog />;
       case 'site-settings':
         return <SiteSettingsManagement />;
       case 'my-orgs':

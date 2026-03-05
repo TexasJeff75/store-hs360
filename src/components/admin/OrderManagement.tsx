@@ -5,6 +5,7 @@ import { orderService } from '../../services/orderService';
 import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle } from 'lucide-react';
 import type { Order, OrderItem, Shipment } from './orders/types';
 import { normalizeAddress } from './orders/types';
+import { activityLogService } from '../../services/activityLog';
 
 const OrderManagement: React.FC = () => {
   const { user, profile } = useAuth();
@@ -33,6 +34,8 @@ const OrderManagement: React.FC = () => {
   const [showSubOrders, setShowSubOrders] = useState(false);
   const [showDebugModal, setShowDebugModal] = useState(false);
   const [debugOrder, setDebugOrder] = useState<Order | null>(null);
+  const [selectedOrderOrgName, setSelectedOrderOrgName] = useState<string | null>(null);
+  const [selectedOrderLocationName, setSelectedOrderLocationName] = useState<string | null>(null);
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -50,11 +53,54 @@ const OrderManagement: React.FC = () => {
   useEffect(() => {
     if (selectedOrder) {
       loadSubOrders(selectedOrder.id);
+      resolveSelectedOrderNames(selectedOrder);
     } else {
       setSubOrders([]);
       setShowSubOrders(false);
+      setSelectedOrderOrgName(null);
+      setSelectedOrderLocationName(null);
     }
-  }, [selectedOrder]);
+  }, [selectedOrder?.id]);
+
+  const resolveSelectedOrderNames = async (order: Order) => {
+    if (order.organization_id) {
+      const cached = organizationNames[order.organization_id];
+      if (cached) {
+        setSelectedOrderOrgName(cached);
+      } else {
+        const { data } = await supabase
+          .from('organizations')
+          .select('name')
+          .eq('id', order.organization_id)
+          .maybeSingle();
+        setSelectedOrderOrgName(data?.name || null);
+        if (data?.name) {
+          setOrganizationNames(prev => ({ ...prev, [order.organization_id!]: data.name }));
+        }
+      }
+    } else {
+      setSelectedOrderOrgName(null);
+    }
+
+    if (order.location_id) {
+      const cached = locationNames[order.location_id];
+      if (cached) {
+        setSelectedOrderLocationName(cached);
+      } else {
+        const { data } = await supabase
+          .from('locations')
+          .select('name')
+          .eq('id', order.location_id)
+          .maybeSingle();
+        setSelectedOrderLocationName(data?.name || null);
+        if (data?.name) {
+          setLocationNames(prev => ({ ...prev, [order.location_id!]: data.name }));
+        }
+      }
+    } else {
+      setSelectedOrderLocationName(null);
+    }
+  };
 
   const checkManagementPermissions = async () => {
     if (!user) {
@@ -131,32 +177,32 @@ const OrderManagement: React.FC = () => {
 
       const locationIds = [...new Set(data?.map(o => o.location_id).filter(Boolean))];
       if (locationIds.length > 0) {
-        const { data: locations } = await supabase
+        const { data: locations, error: locErr } = await supabase
           .from('locations')
           .select('id, name')
           .in('id', locationIds);
 
-        if (locations) {
+        if (locErr) {
+          console.error('Failed to fetch location names:', locErr);
+        } else if (locations) {
           const names: Record<string, string> = {};
-          locations.forEach(loc => {
-            names[loc.id] = loc.name;
-          });
+          locations.forEach(loc => { names[loc.id] = loc.name; });
           setLocationNames(names);
         }
       }
 
       const organizationIds = [...new Set(data?.map(o => o.organization_id).filter(Boolean))];
       if (organizationIds.length > 0) {
-        const { data: organizations } = await supabase
+        const { data: organizations, error: orgErr } = await supabase
           .from('organizations')
           .select('id, name')
           .in('id', organizationIds);
 
-        if (organizations) {
+        if (orgErr) {
+          console.error('Failed to fetch organization names:', orgErr);
+        } else if (organizations) {
           const names: Record<string, string> = {};
-          organizations.forEach(org => {
-            names[org.id] = org.name;
-          });
+          organizations.forEach(org => { names[org.id] = org.name; });
           setOrganizationNames(names);
         }
       }
@@ -208,6 +254,23 @@ const OrderManagement: React.FC = () => {
         .eq('id', orderId);
 
       if (error) throw error;
+
+      // Log the status change
+      if (user) {
+        const order2 = orders.find(o => o.id === orderId);
+        activityLogService.logAction({
+          userId: user.id,
+          action: 'order_status_changed',
+          resourceType: 'order',
+          resourceId: orderId,
+          details: {
+            old_status: order2?.status,
+            new_status: newStatus,
+            customer_email: order2?.customer_email,
+            organization_id: order2?.organization_id,
+          },
+        });
+      }
 
       await fetchOrders();
       if (selectedOrder?.id === orderId) {
@@ -458,10 +521,13 @@ const OrderManagement: React.FC = () => {
 
   const filteredOrders = React.useMemo(() => {
     let filtered = orders.filter(order => {
+      const lowerSearch = searchTerm.toLowerCase();
       const matchesSearch =
-        order.customer_email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        order.order_number?.toLowerCase().includes(searchTerm.toLowerCase());
+        order.customer_email.toLowerCase().includes(lowerSearch) ||
+        order.id.toLowerCase().includes(lowerSearch) ||
+        order.order_number?.toLowerCase().includes(lowerSearch) ||
+        (order.organization_id && organizationNames[order.organization_id]?.toLowerCase().includes(lowerSearch)) ||
+        (order.location_id && locationNames[order.location_id]?.toLowerCase().includes(lowerSearch));
 
       const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
 
@@ -664,7 +730,9 @@ const OrderManagement: React.FC = () => {
                       <span className="text-gray-600">Organization:</span>
                       <p className="font-medium flex items-center mt-1">
                         <Building2 className="h-3 w-3 mr-1 text-green-600" />
-                        {organizationNames[order.organization_id] || 'Unknown Organization'}
+                        {selectedOrderOrgName || organizationNames[order.organization_id] || (
+                          <span className="text-gray-400 italic text-xs">Loading…</span>
+                        )}
                       </p>
                     </div>
                   )}
@@ -672,8 +740,10 @@ const OrderManagement: React.FC = () => {
                     <div>
                       <span className="text-gray-600">Shipping Location:</span>
                       <p className="font-medium flex items-center mt-1">
-                        <Building2 className="h-3 w-3 mr-1 text-blue-600" />
-                        {locationNames[order.location_id] || 'Unknown Location'}
+                        <MapPin className="h-3 w-3 mr-1 text-blue-600" />
+                        {selectedOrderLocationName || locationNames[order.location_id] || (
+                          <span className="text-gray-400 italic text-xs">Loading…</span>
+                        )}
                       </p>
                     </div>
                   )}
@@ -1300,7 +1370,7 @@ const OrderManagement: React.FC = () => {
                           {parent.organization_id ? (
                             <p className="text-sm text-gray-900 flex items-center">
                               <Building2 className="h-3 w-3 mr-1 text-green-600" />
-                              {organizationNames[parent.organization_id] || 'Unknown'}
+                              {organizationNames[parent.organization_id] || <span className="text-gray-400 italic text-xs">Resolving…</span>}
                             </p>
                           ) : (
                             <p className="text-sm text-gray-400">—</p>
@@ -1310,8 +1380,8 @@ const OrderManagement: React.FC = () => {
                           <p className="text-xs text-gray-500 mb-1">Location</p>
                           {parent.location_id ? (
                             <p className="text-sm text-gray-900 flex items-center">
-                              <Building2 className="h-3 w-3 mr-1 text-blue-600" />
-                              {locationNames[parent.location_id] || 'Unknown'}
+                              <MapPin className="h-3 w-3 mr-1 text-blue-600" />
+                              {locationNames[parent.location_id] || <span className="text-gray-400 italic text-xs">Resolving…</span>}
                             </p>
                           ) : (
                             <p className="text-sm text-gray-400">—</p>

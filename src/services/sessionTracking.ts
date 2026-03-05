@@ -1,8 +1,17 @@
 import { supabase } from './supabase';
 import { siteSettingsService } from './siteSettings';
+import { ENV } from '../config/env';
 
 const DEFAULT_SESSION_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 const ACTIVITY_CHECK_INTERVAL_MS = 60 * 1000;
+
+interface StoredSessionInfo {
+  sessionId: string;
+  auditId: string;
+  timestamp: number;
+  loginTimestamp: number;
+  authToken?: string;
+}
 
 class SessionTrackingService {
   private currentSessionId: string | null = null;
@@ -18,6 +27,10 @@ class SessionTrackingService {
 
       await this.loadTimeoutSetting();
 
+      // Capture auth token for reliable beforeunload use
+      const { data: authData } = await supabase.auth.getSession();
+      const authToken = authData.session?.access_token;
+
       const { data, error } = await supabase
         .from('login_audit')
         .insert({
@@ -28,23 +41,23 @@ class SessionTrackingService {
           login_timestamp: new Date().toISOString(),
           session_ended: false,
           ip_address: await this.getClientIP(),
-          user_agent: navigator.userAgent
+          user_agent: navigator.userAgent,
         })
         .select('id')
         .single();
 
       if (error) {
-        console.error('Error recording login:', error);
+        console.error('[SessionTracking] Error recording login:', error.message, error.details, error.hint);
         return null;
       }
 
       this.loginAuditId = data.id;
-      this.storeSessionInfo(this.currentSessionId, data.id);
+      this.storeSessionInfo(this.currentSessionId, data.id, authToken);
       this.startActivityMonitoring();
 
       return this.currentSessionId;
     } catch (error) {
-      console.error('Error in recordLogin:', error);
+      console.error('[SessionTracking] Unexpected error in recordLogin:', error);
       return null;
     }
   }
@@ -57,53 +70,69 @@ class SessionTrackingService {
         return;
       }
 
+      const logoutTime = new Date().toISOString();
+      const sessionDuration = Math.floor((Date.now() - sessionInfo.loginTimestamp) / 1000);
+
       const { error } = await supabase
         .from('login_audit')
         .update({
-          logout_timestamp: new Date().toISOString(),
-          session_ended: true
+          logout_timestamp: logoutTime,
+          session_ended: true,
+          session_duration: sessionDuration,
         })
         .eq('id', sessionInfo.auditId);
 
       if (error) {
-        console.error('Error recording logout:', error);
+        console.error('[SessionTracking] Error recording logout:', error.message);
       }
 
       this.clearSessionInfo();
       this.stopActivityMonitoring();
     } catch (error) {
-      console.error('Error in recordLogout:', error);
+      console.error('[SessionTracking] Unexpected error in recordLogout:', error);
     }
   }
 
-  async recordBrowserClose(): Promise<void> {
-    try {
-      const sessionInfo = this.getStoredSessionInfo();
+  // Called when browser/tab is closed — uses keepalive fetch for reliability
+  private recordBrowserCloseSync(): void {
+    const sessionInfo = this.getStoredSessionInfo();
+    if (!sessionInfo?.auditId) return;
 
-      if (!sessionInfo?.auditId) {
-        return;
-      }
+    const supabaseUrl = ENV.SUPABASE_URL.replace(/\/$/, '');
+    const anonKey = ENV.SUPABASE_ANON_KEY;
+    if (!supabaseUrl || !anonKey) return;
 
-      const { error } = await supabase
-        .from('login_audit')
-        .update({
-          logout_timestamp: new Date().toISOString(),
-          session_ended: false
-        })
-        .eq('id', sessionInfo.auditId);
+    const sessionDuration = Math.floor((Date.now() - sessionInfo.loginTimestamp) / 1000);
+    const authToken = sessionInfo.authToken || anonKey;
 
-      if (error) {
-        console.error('Error recording browser close:', error);
-      }
-    } catch (error) {
-      console.error('Error in recordBrowserClose:', error);
-    }
+    // keepalive: true guarantees the request completes even if the page is unloading
+    fetch(`${supabaseUrl}/rest/v1/login_audit?id=eq.${sessionInfo.auditId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': anonKey,
+        'Authorization': `Bearer ${authToken}`,
+        'Prefer': 'return=minimal',
+      },
+      body: JSON.stringify({
+        logout_timestamp: new Date().toISOString(),
+        session_ended: false,
+        session_duration: sessionDuration,
+      }),
+      keepalive: true,
+    }).catch(() => {
+      // Intentionally silent — browser may still be closing
+    });
   }
 
   setupBeforeUnloadHandler(): void {
     window.addEventListener('beforeunload', () => {
-      this.recordBrowserClose();
+      this.recordBrowserCloseSync();
     });
+  }
+
+  getCurrentSessionId(): string | null {
+    return this.currentSessionId || this.getStoredSessionInfo()?.sessionId || null;
   }
 
   private async loadTimeoutSetting(): Promise<void> {
@@ -117,25 +146,31 @@ class SessionTrackingService {
     }
   }
 
-  private storeSessionInfo(sessionId: string, auditId: string): void {
+  private storeSessionInfo(sessionId: string, auditId: string, authToken?: string): void {
     try {
-      sessionStorage.setItem('session_info', JSON.stringify({
+      const info: StoredSessionInfo = {
         sessionId,
         auditId,
-        timestamp: Date.now()
-      }));
+        timestamp: Date.now(),
+        loginTimestamp: Date.now(),
+        authToken,
+      };
+      sessionStorage.setItem('session_info', JSON.stringify(info));
     } catch (error) {
-      console.error('Error storing session info:', error);
+      console.error('[SessionTracking] Error storing session info:', error);
     }
   }
 
-  private getStoredSessionInfo(): { sessionId: string; auditId: string; timestamp: number } | null {
+  private getStoredSessionInfo(): StoredSessionInfo | null {
     try {
       const stored = sessionStorage.getItem('session_info');
       if (!stored) return null;
-      return JSON.parse(stored);
+      const parsed = JSON.parse(stored) as StoredSessionInfo;
+      // Backward compat: old entries didn't have loginTimestamp
+      if (!parsed.loginTimestamp) parsed.loginTimestamp = parsed.timestamp;
+      return parsed;
     } catch (error) {
-      console.error('Error reading session info:', error);
+      console.error('[SessionTracking] Error reading session info:', error);
       return null;
     }
   }
@@ -146,7 +181,7 @@ class SessionTrackingService {
       this.currentSessionId = null;
       this.loginAuditId = null;
     } catch (error) {
-      console.error('Error clearing session info:', error);
+      console.error('[SessionTracking] Error clearing session info:', error);
     }
   }
 
@@ -208,7 +243,7 @@ class SessionTrackingService {
 
       window.location.href = '/?session_expired=true';
     } catch (error) {
-      console.error('Error handling session timeout:', error);
+      console.error('[SessionTracking] Error handling session timeout:', error);
     }
   }
 }
