@@ -42,6 +42,21 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
     fetchOrganizations();
   }, []);
 
+  // Auto-dismiss success messages after 3 seconds
+  useEffect(() => {
+    if (saveMessage?.type === 'success') {
+      const t = setTimeout(() => setSaveMessage(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [saveMessage]);
+
+  useEffect(() => {
+    if (modalMessage?.type === 'success') {
+      const t = setTimeout(() => setModalMessage(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [modalMessage]);
+
   const fetchOrganizations = async () => {
     try {
       setLoadingOrgs(true);
