@@ -8,6 +8,13 @@ export interface EnrichedPricingEntry extends ContractPrice {
   product_name?: string;
 }
 
+export interface ProductOption {
+  id: number;
+  name: string;
+  sku: string | null;
+  price: number;
+}
+
 interface OrganizationOption {
   id: string;
   name: string;
@@ -35,6 +42,7 @@ export function usePricingData() {
   const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
+  const [products, setProducts] = useState<ProductOption[]>([]);
   const [saving, setSaving] = useState(false);
 
   const fetchPricingData = useCallback(async () => {
@@ -70,6 +78,19 @@ export function usePricingData() {
       setError('Failed to load pricing data');
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  const fetchProducts = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from('products')
+        .select('id, name, sku, price')
+        .eq('is_active', true)
+        .order('name');
+      if (data) setProducts(data as ProductOption[]);
+    } catch (err) {
+      console.error('Error fetching products for pricing:', err);
     }
   }, []);
 
@@ -111,7 +132,8 @@ export function usePricingData() {
   useEffect(() => {
     fetchPricingData();
     fetchEntityOptions();
-  }, [fetchPricingData, fetchEntityOptions]);
+    fetchProducts();
+  }, [fetchPricingData, fetchEntityOptions, fetchProducts]);
 
   const savePricing = async (params: {
     id?: string;
@@ -170,6 +192,7 @@ export function usePricingData() {
     organizations,
     locations,
     users,
+    products,
     fetchPricingData,
     savePricing,
     deletePricing,
