@@ -118,6 +118,7 @@ interface DistributorSalesRep {
 
 const DistributorManagement: React.FC = () => {
   const [distributors, setDistributors] = useState<Distributor[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<SalesRep[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
   const [distributorSalesReps, setDistributorSalesReps] = useState<DistributorSalesRep[]>([]);
@@ -155,6 +156,7 @@ const DistributorManagement: React.FC = () => {
     try {
       setLoading(true);
 
+      const [distributorsRes, allUsersRes, salesRepsRes, distSalesRepsRes] = await Promise.all([
       const [distributorsRes, orgsRes, salesRepsRes, distSalesRepsRes] = await Promise.all([
         supabase
           .from('distributors')
@@ -168,6 +170,13 @@ const DistributorManagement: React.FC = () => {
         supabase
           .from('profiles')
           .select('id, email, role')
+          .eq('approved', true)
+          .neq('role', 'admin')
+          .order('email'),
+        supabase
+          .from('profiles')
+          .select('id, email, role')
+          .eq('role', 'sales_rep')
           .in('role', ['sales_rep', 'distributor'])
           .order('email'),
         supabase
@@ -177,6 +186,17 @@ const DistributorManagement: React.FC = () => {
       ]);
 
       if (distributorsRes.error) throw distributorsRes.error;
+      if (allUsersRes.error) throw allUsersRes.error;
+      if (salesRepsRes.error) throw salesRepsRes.error;
+      if (distSalesRepsRes.error) throw distSalesRepsRes.error;
+
+      const distData = distributorsRes.data || [];
+      setDistributors(distData);
+
+      // Filter out users who already have a distributor record
+      const existingProfileIds = new Set(distData.map(d => d.profile_id));
+      setAvailableUsers((allUsersRes.data || []).filter(u => !existingProfileIds.has(u.id)));
+
       if (orgsRes.error) throw orgsRes.error;
       if (salesRepsRes.error) throw salesRepsRes.error;
       if (distSalesRepsRes.error) throw distSalesRepsRes.error;
@@ -196,6 +216,10 @@ const DistributorManagement: React.FC = () => {
     e.preventDefault();
     try {
       setError(null);
+      const { error: insertError } = await supabase
+        .from('distributors')
+        .insert([{ ...newDistributor, user_id: newDistributor.profile_id }]);
+
       const payload = {
         ...newDistributor,
         organization_id: newDistributor.organization_id || null,
@@ -427,6 +451,64 @@ const DistributorManagement: React.FC = () => {
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                         title="Edit"
                       >
+                        <option value="">Select a user</option>
+                        {availableUsers.map(u => (
+                          <option key={u.id} value={u.id}>{u.email} ({u.role || 'no role'})</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Distributor Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newDistributor.name}
+                        onChange={(e) => setNewDistributor({ ...newDistributor, name: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                        placeholder="e.g., ABC Distribution"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Code *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={newDistributor.code}
+                        onChange={(e) => setNewDistributor({ ...newDistributor, code: e.target.value.toUpperCase() })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                        placeholder="e.g., DIST001"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Base Commission Rate (%) *
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        value={newDistributor.commission_rate}
+                        onChange={(e) => setNewDistributor({ ...newDistributor, commission_rate: parseFloat(e.target.value) })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Notes
+                      </label>
+                      <textarea
+                        value={newDistributor.notes}
+                        onChange={(e) => setNewDistributor({ ...newDistributor, notes: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                        rows={3}
+                        placeholder="Optional notes..."
+                      />
                         <Edit2 className="h-4 w-4 text-gray-500" />
                       </button>
                       <button
