@@ -38,6 +38,7 @@ interface DistributorSalesRep {
 
 const DistributorManagement: React.FC = () => {
   const [distributors, setDistributors] = useState<Distributor[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<SalesRep[]>([]);
   const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
   const [distributorSalesReps, setDistributorSalesReps] = useState<DistributorSalesRep[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,11 +75,17 @@ const DistributorManagement: React.FC = () => {
     try {
       setLoading(true);
 
-      const [distributorsRes, salesRepsRes, distSalesRepsRes] = await Promise.all([
+      const [distributorsRes, allUsersRes, salesRepsRes, distSalesRepsRes] = await Promise.all([
         supabase
           .from('distributors')
           .select('*, profiles!distributors_profile_id_fkey(email)')
           .order('created_at', { ascending: false }),
+        supabase
+          .from('profiles')
+          .select('id, email, role')
+          .eq('approved', true)
+          .neq('role', 'admin')
+          .order('email'),
         supabase
           .from('profiles')
           .select('id, email, role')
@@ -91,10 +98,17 @@ const DistributorManagement: React.FC = () => {
       ]);
 
       if (distributorsRes.error) throw distributorsRes.error;
+      if (allUsersRes.error) throw allUsersRes.error;
       if (salesRepsRes.error) throw salesRepsRes.error;
       if (distSalesRepsRes.error) throw distSalesRepsRes.error;
 
-      setDistributors(distributorsRes.data || []);
+      const distData = distributorsRes.data || [];
+      setDistributors(distData);
+
+      // Filter out users who already have a distributor record
+      const existingProfileIds = new Set(distData.map(d => d.profile_id));
+      setAvailableUsers((allUsersRes.data || []).filter(u => !existingProfileIds.has(u.id)));
+
       setSalesReps(salesRepsRes.data || []);
       setDistributorSalesReps(distSalesRepsRes.data || []);
     } catch (err) {
@@ -110,7 +124,7 @@ const DistributorManagement: React.FC = () => {
       setError(null);
       const { error: insertError } = await supabase
         .from('distributors')
-        .insert([newDistributor]);
+        .insert([{ ...newDistributor, user_id: newDistributor.profile_id }]);
 
       if (insertError) throw insertError;
 
@@ -485,8 +499,8 @@ const DistributorManagement: React.FC = () => {
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
                       >
                         <option value="">Select a user</option>
-                        {salesReps.map(rep => (
-                          <option key={rep.id} value={rep.id}>{rep.email}</option>
+                        {availableUsers.map(u => (
+                          <option key={u.id} value={u.id}>{u.email} ({u.role || 'no role'})</option>
                         ))}
                       </select>
                     </div>
