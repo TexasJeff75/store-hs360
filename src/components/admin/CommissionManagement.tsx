@@ -1,8 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter } from 'lucide-react';
+import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
 import { commissionService, Commission } from '../../services/commissionService';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
+
+interface DiagnosticData {
+  totalOrders: number;
+  completedOrders: number;
+  completedWithSalesRep: number;
+  completedWithOrg: number;
+  completedWithBoth: number;
+  orgSalesRepEntries: number;
+  commissionRecords: number;
+  ordersWithoutCommission: { id: string; status: string; sales_rep_id: string | null; organization_id: string | null; total: number; created_at: string }[];
+}
 
 const CommissionManagement: React.FC = () => {
   const { user, profile } = useAuth();
@@ -21,6 +32,8 @@ const CommissionManagement: React.FC = () => {
     paid: 0
   });
   const [error, setError] = useState<string | null>(null);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticData | null>(null);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   useEffect(() => {
     fetchCommissions();
@@ -113,6 +126,64 @@ const CommissionManagement: React.FC = () => {
       setLoading(false);
     }
   };
+
+  const fetchDiagnostics = async () => {
+    try {
+      // Get all orders
+      const { data: allOrders, count: totalOrders } = await supabase
+        .from('orders')
+        .select('id', { count: 'exact', head: true });
+
+      // Get completed orders with details
+      const { data: completedOrdersData } = await supabase
+        .from('orders')
+        .select('id, status, sales_rep_id, organization_id, total, created_at')
+        .eq('status', 'completed');
+
+      const completed = completedOrdersData || [];
+      const completedWithSalesRep = completed.filter(o => o.sales_rep_id);
+      const completedWithOrg = completed.filter(o => o.organization_id);
+      const completedWithBoth = completed.filter(o => o.sales_rep_id && o.organization_id);
+
+      // Get organization_sales_reps count
+      const { count: osrCount } = await supabase
+        .from('organization_sales_reps')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true);
+
+      // Get commission records count
+      const { count: commCount } = await supabase
+        .from('commissions')
+        .select('id', { count: 'exact', head: true });
+
+      // Find completed orders that DON'T have a commission record
+      const { data: existingCommissions } = await supabase
+        .from('commissions')
+        .select('order_id');
+
+      const commissionOrderIds = new Set((existingCommissions || []).map(c => c.order_id));
+      const ordersWithoutCommission = completed.filter(o => !commissionOrderIds.has(o.id));
+
+      setDiagnostics({
+        totalOrders: totalOrders || 0,
+        completedOrders: completed.length,
+        completedWithSalesRep: completedWithSalesRep.length,
+        completedWithOrg: completedWithOrg.length,
+        completedWithBoth: completedWithBoth.length,
+        orgSalesRepEntries: osrCount || 0,
+        commissionRecords: commCount || 0,
+        ordersWithoutCommission: ordersWithoutCommission.slice(0, 20), // limit to 20
+      });
+    } catch (err) {
+      console.error('Error fetching diagnostics:', err);
+    }
+  };
+
+  useEffect(() => {
+    if (profile?.role === 'admin' && showDiagnostics && !diagnostics) {
+      fetchDiagnostics();
+    }
+  }, [showDiagnostics, profile?.role]);
 
   const fetchOrderItems = async (orderId: string) => {
     try {
@@ -266,6 +337,118 @@ const CommissionManagement: React.FC = () => {
       {error && (
         <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
           <p className="text-red-800 text-sm">{error}</p>
+        </div>
+      )}
+
+      {profile?.role === 'admin' && (
+        <div className="mb-4">
+          <button
+            onClick={() => setShowDiagnostics(!showDiagnostics)}
+            className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
+          >
+            {showDiagnostics ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+            <AlertTriangle className="h-4 w-4" />
+            Commission Diagnostics
+          </button>
+
+          {showDiagnostics && diagnostics && (
+            <div className="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-4">
+              <h4 className="font-semibold text-amber-900 mb-3 text-sm">Data Pipeline Diagnostics</h4>
+              <p className="text-xs text-amber-700 mb-3">
+                Commissions are created by a database trigger when an order is marked "completed" and has both a <code className="bg-amber-100 px-1 rounded">sales_rep_id</code> and a matching <code className="bg-amber-100 px-1 rounded">organization_sales_reps</code> entry.
+              </p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div className="bg-white rounded p-3 border border-amber-200">
+                  <p className="text-xs text-gray-500">Total Orders</p>
+                  <p className="text-lg font-bold text-gray-900">{diagnostics.totalOrders}</p>
+                </div>
+                <div className="bg-white rounded p-3 border border-amber-200">
+                  <p className="text-xs text-gray-500">Completed Orders</p>
+                  <p className="text-lg font-bold text-gray-900">{diagnostics.completedOrders}</p>
+                </div>
+                <div className={`bg-white rounded p-3 border ${diagnostics.completedWithSalesRep < diagnostics.completedOrders ? 'border-red-300 bg-red-50' : 'border-amber-200'}`}>
+                  <p className="text-xs text-gray-500">...with Sales Rep</p>
+                  <p className="text-lg font-bold text-gray-900">{diagnostics.completedWithSalesRep}</p>
+                  {diagnostics.completedWithSalesRep < diagnostics.completedOrders && (
+                    <p className="text-xs text-red-600 mt-1">
+                      {diagnostics.completedOrders - diagnostics.completedWithSalesRep} missing sales rep
+                    </p>
+                  )}
+                </div>
+                <div className={`bg-white rounded p-3 border ${diagnostics.completedWithBoth < diagnostics.completedWithSalesRep ? 'border-red-300 bg-red-50' : 'border-amber-200'}`}>
+                  <p className="text-xs text-gray-500">...with Rep + Org</p>
+                  <p className="text-lg font-bold text-gray-900">{diagnostics.completedWithBoth}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+                <div className="bg-white rounded p-3 border border-amber-200">
+                  <p className="text-xs text-gray-500">Active Org-Rep Assignments</p>
+                  <p className="text-lg font-bold text-gray-900">{diagnostics.orgSalesRepEntries}</p>
+                  {diagnostics.orgSalesRepEntries === 0 && (
+                    <p className="text-xs text-red-600 mt-1">No assignments! Go to Organizations to assign reps.</p>
+                  )}
+                </div>
+                <div className="bg-white rounded p-3 border border-green-200">
+                  <p className="text-xs text-gray-500">Commission Records</p>
+                  <p className="text-lg font-bold text-green-700">{diagnostics.commissionRecords}</p>
+                </div>
+                <div className={`bg-white rounded p-3 border ${diagnostics.ordersWithoutCommission.length > 0 ? 'border-red-300 bg-red-50' : 'border-green-200'}`}>
+                  <p className="text-xs text-gray-500">Completed Without Commission</p>
+                  <p className="text-lg font-bold text-gray-900">{diagnostics.ordersWithoutCommission.length}</p>
+                </div>
+              </div>
+
+              {diagnostics.ordersWithoutCommission.length > 0 && (
+                <div className="mt-3">
+                  <h5 className="text-xs font-semibold text-amber-800 mb-2">Completed Orders Missing Commissions (up to 20):</h5>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="text-left text-gray-500">
+                          <th className="pb-1 pr-3">Order ID</th>
+                          <th className="pb-1 pr-3">Total</th>
+                          <th className="pb-1 pr-3">Sales Rep ID</th>
+                          <th className="pb-1 pr-3">Org ID</th>
+                          <th className="pb-1 pr-3">Issue</th>
+                          <th className="pb-1">Date</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {diagnostics.ordersWithoutCommission.map(order => (
+                          <tr key={order.id} className="border-t border-amber-100">
+                            <td className="py-1 pr-3 font-mono">{order.id.slice(0, 8)}...</td>
+                            <td className="py-1 pr-3">${Number(order.total).toFixed(2)}</td>
+                            <td className="py-1 pr-3 font-mono">
+                              {order.sales_rep_id ? order.sales_rep_id.slice(0, 8) + '...' : <span className="text-red-600 font-semibold">NULL</span>}
+                            </td>
+                            <td className="py-1 pr-3 font-mono">
+                              {order.organization_id ? order.organization_id.slice(0, 8) + '...' : <span className="text-red-600 font-semibold">NULL</span>}
+                            </td>
+                            <td className="py-1 pr-3">
+                              {!order.sales_rep_id && !order.organization_id && <span className="text-red-600">No rep or org</span>}
+                              {!order.sales_rep_id && order.organization_id && <span className="text-red-600">No sales rep</span>}
+                              {order.sales_rep_id && !order.organization_id && <span className="text-red-600">No organization</span>}
+                              {order.sales_rep_id && order.organization_id && <span className="text-orange-600">No org-rep assignment?</span>}
+                            </td>
+                            <td className="py-1">{new Date(order.created_at).toLocaleDateString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={fetchDiagnostics}
+                  className="text-xs px-3 py-1 bg-amber-200 text-amber-800 rounded hover:bg-amber-300 transition-colors"
+                >
+                  Refresh Diagnostics
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
