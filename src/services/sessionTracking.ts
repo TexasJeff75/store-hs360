@@ -31,20 +31,36 @@ class SessionTrackingService {
       const { data: authData } = await supabase.auth.getSession();
       const authToken = authData.session?.access_token;
 
-      const { data, error } = await supabase
+      const clientIP = await this.getClientIP();
+      const insertPayload: Record<string, unknown> = {
+        user_id: userId,
+        email: email,
+        age_verified: ageVerified,
+        session_id: this.currentSessionId,
+        login_timestamp: new Date().toISOString(),
+        session_ended: false,
+        ip_address: clientIP,
+        user_agent: navigator.userAgent,
+      };
+
+      let { data, error } = await supabase
         .from('login_audit')
-        .insert({
-          user_id: userId,
-          email: email,
-          age_verified: ageVerified,
-          session_id: this.currentSessionId,
-          login_timestamp: new Date().toISOString(),
-          session_ended: false,
-          ip_address: await this.getClientIP(),
-          user_agent: navigator.userAgent,
-        })
+        .insert(insertPayload)
         .select('id')
         .single();
+
+      // If the session_ended column doesn't exist yet (migration not run),
+      // retry without it so login audit still works.
+      if (error?.message?.includes('session_ended')) {
+        const { session_ended, ...fallbackPayload } = insertPayload;
+        const retry = await supabase
+          .from('login_audit')
+          .insert(fallbackPayload)
+          .select('id')
+          .single();
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (error) {
         console.error('[SessionTracking] Error recording login:', error.message, error.details, error.hint);
@@ -73,7 +89,7 @@ class SessionTrackingService {
       const logoutTime = new Date().toISOString();
       const sessionDuration = Math.floor((Date.now() - sessionInfo.loginTimestamp) / 1000);
 
-      const { error } = await supabase
+      let { error } = await supabase
         .from('login_audit')
         .update({
           logout_timestamp: logoutTime,
@@ -81,6 +97,15 @@ class SessionTrackingService {
           session_duration: sessionDuration,
         })
         .eq('id', sessionInfo.auditId);
+
+      // Fallback if session tracking columns don't exist yet
+      if (error?.message?.includes('session_ended') || error?.message?.includes('session_duration')) {
+        const retry = await supabase
+          .from('login_audit')
+          .update({ logout_timestamp: logoutTime })
+          .eq('id', sessionInfo.auditId);
+        error = retry.error;
+      }
 
       if (error) {
         console.error('[SessionTracking] Error recording logout:', error.message);

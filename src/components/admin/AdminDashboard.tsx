@@ -3,7 +3,7 @@ import {
   Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart,
   TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart,
   Shield, ChevronLeft, ChevronRight, DollarSign, FolderTree, MessageSquare,
-  LayoutDashboard, X, Clock, Eye, EyeOff, Menu
+  LayoutDashboard, X, Eye, EyeOff, Menu
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
@@ -31,7 +31,6 @@ import CategoryManagement from './CategoryManagement';
 import SiteSettingsManagement from './SiteSettingsManagement';
 import SupportTickets from '../SupportTickets';
 import SupportTicketManagement from './SupportTicketManagement';
-import LoginAuditLog from './LoginAuditLog';
 
 interface AdminDashboardProps {
   isOpen: boolean;
@@ -185,7 +184,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
         { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['admin'] },
         { id: 'profit-report', label: 'Profit Report', icon: PieChart, roles: ['admin'] },
         { id: 'cost-admins', label: 'Cost Admins', icon: Shield, roles: ['admin'] },
-        { id: 'login-audit', label: 'Login Audit', icon: Clock, roles: ['admin'] },
       ],
     },
     {
@@ -261,8 +259,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
         return <ProfitReport />;
       case 'cost-admins':
         return <CostAdminManagement />;
-      case 'login-audit':
-        return <LoginAuditLog />;
       case 'site-settings':
         return <SiteSettingsManagement />;
       case 'my-orgs':
