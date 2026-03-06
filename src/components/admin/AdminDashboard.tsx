@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart,
   TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart,
@@ -81,11 +81,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
   };
 
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => resolveInitialTab(initialTab));
+  const wasOpenRef = useRef(isOpen);
 
   useEffect(() => {
-    if (isOpen) {
+    // Only reset the tab when the modal transitions from closed to open,
+    // not on every re-render where isOpen is already true (e.g. tab switch).
+    if (isOpen && !wasOpenRef.current) {
       setActiveTab(resolveInitialTab(initialTab));
     }
+    wasOpenRef.current = isOpen;
   }, [initialTab, isOpen]);
 
   useEffect(() => {
