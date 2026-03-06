@@ -3,7 +3,7 @@ import {
   Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart,
   TrendingUp, CreditCard, Repeat, Building, HelpCircle, PieChart,
   Shield, ChevronLeft, ChevronRight, DollarSign, FolderTree, MessageSquare,
-  LayoutDashboard, X, Eye, EyeOff, Menu
+  LayoutDashboard, ArrowLeft, Eye, EyeOff, Menu, X, BookOpen
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
@@ -32,7 +32,6 @@ import SupportTickets from '../SupportTickets';
 import SupportTicketManagement from './SupportTicketManagement';
 
 interface AdminDashboardProps {
-  isOpen: boolean;
   onClose: () => void;
   initialTab?: string;
 }
@@ -51,7 +50,7 @@ const ROLE_COLORS: Record<string, string> = {
   customer: 'bg-green-100 text-green-800',
 };
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initialTab }) => {
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) => {
   const { profile, user, isImpersonating, effectiveProfile, impersonation, stopImpersonation } = useAuth();
   const displayRole = isImpersonating ? effectiveProfile?.role : profile?.role;
   const isAdmin = displayRole === 'admin';
@@ -73,22 +72,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
       if (isDistributor) return 'commissions';
       return 'home';
     }
-    // Map legacy 'admin-settings' to 'organizations'
     if (tab === 'admin-settings') return 'organizations';
     return tab as ActiveTab;
   };
 
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => resolveInitialTab(initialTab));
-  const wasOpenRef = useRef(isOpen);
-
-  useEffect(() => {
-    // Only reset the tab when the modal transitions from closed to open,
-    // not on every re-render where isOpen is already true (e.g. tab switch).
-    if (isOpen && !wasOpenRef.current) {
-      setActiveTab(resolveInitialTab(initialTab));
-    }
-    wasOpenRef.current = isOpen;
-  }, [initialTab, isOpen]);
 
   useEffect(() => {
     if (isCustomer && user?.id) {
@@ -130,17 +118,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
     fetchPendingUsers();
   };
 
-  if (!isOpen) return null;
-
-  // ── Sidebar groups definition ──────────────────────────────────────────────
+  // ── Sidebar groups ────────────────────────────────────────────────────────
   const groups: SidebarGroup[] = [
+    // ── Dashboard (standalone) ──
     {
-      label: 'Overview',
+      label: 'Dashboard',
       roles: ['admin'],
+      standalone: true,
       items: [
         { id: 'home', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin'] },
       ],
     },
+    // ── My Account (customer / sales_rep / distributor) ──
     {
       label: 'My Account',
       roles: ['customer', 'sales_rep', 'distributor'],
@@ -153,45 +142,43 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
         { id: 'commissions', label: 'Commissions', icon: TrendingUp, roles: ['distributor'] },
       ],
     },
+    // ── Operations ──
     {
       label: 'Operations',
       roles: ['admin', 'sales_rep'],
       items: [
+        { id: 'organizations', label: 'Organizations', icon: Building2, roles: ['admin'] },
         { id: 'orders', label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep'] },
+        { id: 'recurring-orders', label: 'Recurring Orders', icon: Repeat, roles: ['admin'] },
         { id: 'commissions', label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep'] },
+        { id: 'pricing', label: 'Pricing', icon: DollarSign, roles: ['admin'] },
         { id: 'support', label: 'Support', icon: MessageSquare, roles: ['admin'] },
       ],
     },
+    // ── Settings ──
     {
-      label: 'Management',
+      label: 'Settings',
       roles: ['admin'],
       items: [
         { id: 'users', label: 'Users', icon: Users, roles: ['admin'], badge: pendingCount > 0 ? pendingCount : undefined },
-        { id: 'organizations', label: 'Organizations', icon: Building2, roles: ['admin'] },
         { id: 'products', label: 'Products', icon: Package, roles: ['admin'] },
         { id: 'categories', label: 'Categories', icon: FolderTree, roles: ['admin'] },
-        { id: 'pricing', label: 'Pricing', icon: DollarSign, roles: ['admin'] },
-        { id: 'recurring-orders', label: 'Recurring Orders', icon: Repeat, roles: ['admin'] },
         { id: 'distributors', label: 'Distributors', icon: Building, roles: ['admin'] },
+        { id: 'cost-admins', label: 'Cost Admins', icon: Shield, roles: ['admin'] },
+        { id: 'quickbooks', label: 'QuickBooks', icon: BookOpen, roles: ['admin'] },
+        { id: 'site-settings', label: 'Settings', icon: Settings, roles: ['admin'] },
       ],
     },
+    // ── Analytics ──
     {
       label: 'Analytics',
       roles: ['admin'],
       items: [
         { id: 'analytics', label: 'Analytics', icon: BarChart3, roles: ['admin'] },
         { id: 'profit-report', label: 'Profit Report', icon: PieChart, roles: ['admin'] },
-        { id: 'cost-admins', label: 'Cost Admins', icon: Shield, roles: ['admin'] },
       ],
     },
-    {
-      label: 'System',
-      roles: ['admin'],
-      items: [
-        { id: 'quickbooks', label: 'QuickBooks', icon: DollarSign, roles: ['admin'] },
-        { id: 'site-settings', label: 'Site Settings', icon: Settings, roles: ['admin'] },
-      ],
-    },
+    // ── Support (customer) ──
     {
       label: 'Support',
       roles: ['customer'],
@@ -199,9 +186,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
         { id: 'support', label: 'Support', icon: MessageSquare, roles: ['customer'] },
       ],
     },
+    // ── Help (standalone) ──
     {
       label: 'Help',
       roles: ['admin', 'sales_rep', 'distributor', 'customer'],
+      standalone: true,
       items: [
         { id: 'help', label: 'Help', icon: HelpCircle, roles: ['admin', 'sales_rep', 'distributor', 'customer'] },
       ],
@@ -216,7 +205,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
     }))
     .filter(g => g.items.length > 0);
 
-  // ── Content renderer ───────────────────────────────────────────────────────
+  // ── Content renderer ────────────────────────────────────────────────────
   const renderContent = () => {
     switch (activeTab) {
       case 'home':
@@ -278,10 +267,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
   const impersonatedName = impersonation?.profile?.full_name || impersonation?.profile?.email || 'Unknown User';
 
   return (
-    <div className="fixed inset-0 z-50 bg-white flex flex-col">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-4 flex-shrink-0">
+      <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white px-6 py-3 flex-shrink-0">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             {/* Mobile hamburger */}
@@ -294,7 +283,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
             </button>
 
             <div className="min-w-0">
-              <h1 className="text-xl font-bold leading-tight">{dashboardTitle}</h1>
+              <h1 className="text-lg font-bold leading-tight">{dashboardTitle}</h1>
               {isImpersonating && (
                 <p className="text-purple-200 text-xs mt-0.5 flex items-center gap-1">
                   <Eye className="h-3 w-3 flex-shrink-0" />
@@ -319,10 +308,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
           </div>
           <button
             onClick={onClose}
-            className="flex-shrink-0 text-white/80 hover:text-white hover:bg-white/10 rounded-full p-1.5 transition-colors"
-            aria-label="Close dashboard"
+            className="flex-shrink-0 flex items-center gap-2 text-white/80 hover:text-white hover:bg-white/10 rounded-lg px-3 py-1.5 transition-colors text-sm font-medium"
+            aria-label="Back to store"
           >
-            <X className="h-5 w-5" />
+            <ArrowLeft className="h-4 w-4" />
+            <span className="hidden sm:inline">Back to Store</span>
           </button>
         </div>
       </div>
@@ -359,7 +349,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
         )}
 
         {/* Desktop Sidebar */}
-        <div className={`hidden sm:flex ${isSidebarCollapsed ? 'w-16' : 'w-56'} bg-gray-50 border-r border-gray-200 transition-all duration-200 relative flex-col overflow-y-auto flex-shrink-0`}>
+        <div className={`hidden sm:flex ${isSidebarCollapsed ? 'w-16' : 'w-56'} bg-white border-r border-gray-200 transition-all duration-200 relative flex-col overflow-y-auto flex-shrink-0`}>
           {/* Collapse toggle */}
           <button
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
