@@ -118,6 +118,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
+          // On token refresh (e.g. window regaining focus), skip re-fetching
+          // the profile if we already have it — avoids flashing a loading
+          // spinner and unmounting the dashboard.
+          if (event === 'TOKEN_REFRESHED') {
+            return;
+          }
           fetchProfile(session.user.id);
         } else {
           setProfile(null);
@@ -136,7 +142,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
-      setLoading(true);
+      // Only show the global loading spinner on initial load, not on
+      // background re-fetches — setting loading=true unmounts the entire
+      // app shell (including the admin dashboard) causing tab state loss.
+      if (!profile) {
+        setLoading(true);
+      }
       
       // Check if Supabase is properly configured
       if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
