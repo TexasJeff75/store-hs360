@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { FavoritesProvider } from '@/contexts/FavoritesContext';
 import Header from '@/components/Header';
@@ -66,6 +66,7 @@ function AppContent() {
   const [productsWithContractPricing, setProductsWithContractPricing] = useState<number[]>([]);
   const [needsOrganizationSetup, setNeedsOrganizationSetup] = useState(false);
   const [checkingOrganization, setCheckingOrganization] = useState(true);
+  const prevEffectiveUserIdRef = useRef<string | undefined>();
 
   const isQuickBooksCallback = window.location.pathname.includes('/quickbooks/callback') ||
     window.location.search.includes('realmId=');
@@ -105,16 +106,25 @@ function AppContent() {
     const loadUserOrganization = async () => {
       if (!effectiveUserId) {
         setCheckingOrganization(false);
+        prevEffectiveUserIdRef.current = undefined;
         return;
       }
 
       if (selectedOrganization && !isImpersonating) {
         setCheckingOrganization(false);
+        prevEffectiveUserIdRef.current = effectiveUserId;
         return;
       }
 
+      // Only show the loading spinner when the user actually changes,
+      // not on re-renders caused by token refresh (which keep the same userId).
+      const userChanged = prevEffectiveUserIdRef.current !== effectiveUserId;
+      prevEffectiveUserIdRef.current = effectiveUserId;
+
       try {
-        setCheckingOrganization(true);
+        if (userChanged) {
+          setCheckingOrganization(true);
+        }
         const { data, error } = await supabase
           .from('user_organization_roles')
           .select(`
