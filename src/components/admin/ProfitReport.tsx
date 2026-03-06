@@ -106,8 +106,8 @@ const ProfitReport: React.FC = () => {
 
       // Fetch product costs (secret costs)
       const { data: costsData, error: costsError } = await supabase
-        .from('product_costs')
-        .select('product_id, secret_cost, cost_price')
+        .from('product_secret_costs')
+        .select('product_id, secret_cost')
         .in('product_id', Array.from(productIds));
 
       if (costsError) throw costsError;
@@ -115,8 +115,7 @@ const ProfitReport: React.FC = () => {
       // Build cost map
       const costMap = new Map<number, number>();
       costsData?.forEach(cost => {
-        // Use secret_cost if available, fallback to cost_price
-        costMap.set(cost.product_id, cost.secret_cost || cost.cost_price || 0);
+        costMap.set(cost.product_id, cost.secret_cost || 0);
       });
 
       // Calculate profit for each order
@@ -171,12 +170,12 @@ const ProfitReport: React.FC = () => {
 
       setSummary(summaryData);
 
-      // Log access for audit
-      await supabase.from('cost_admin_audit').insert({
+      // Log access for audit (non-blocking)
+      supabase.from('cost_admin_audit').insert({
         user_id: (await supabase.auth.getUser()).data.user?.id,
         action: 'viewed_profit_report',
         accessed_at: new Date().toISOString()
-      });
+      }).then(() => {}, () => {});
 
     } catch (err) {
       console.error('Error fetching profit data:', err);
