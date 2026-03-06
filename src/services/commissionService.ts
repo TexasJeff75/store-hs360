@@ -153,7 +153,8 @@ class CommissionService {
         .select(`
           *,
           distributor:distributors(id, name, code),
-          sales_rep:profiles!sales_rep_id(id, email, full_name)
+          sales_rep:profiles!sales_rep_id(id, email, full_name),
+          organization:organizations(id, name)
         `)
         .eq('sales_rep_id', salesRepId)
         .order('created_at', { ascending: false });
