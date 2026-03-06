@@ -160,12 +160,39 @@ Deno.serve(async (req: Request) => {
           },
         ];
 
+        // Look up sales rep for this organization
+        let salesRepId = null;
+        if (order.organization_id) {
+          const { data: orgData } = await supabase
+            .from("organizations")
+            .select("default_sales_rep_id, is_house_account")
+            .eq("id", order.organization_id)
+            .maybeSingle();
+
+          if (orgData && !orgData.is_house_account) {
+            salesRepId = orgData.default_sales_rep_id;
+            if (!salesRepId) {
+              const { data: osrData } = await supabase
+                .from("organization_sales_reps")
+                .select("sales_rep_id")
+                .eq("organization_id", order.organization_id)
+                .eq("is_active", true)
+                .limit(1)
+                .maybeSingle();
+              if (osrData) {
+                salesRepId = osrData.sales_rep_id;
+              }
+            }
+          }
+        }
+
         const { data: newOrder, error: orderError } = await supabase
           .from("orders")
           .insert({
             user_id: order.user_id,
             organization_id: order.organization_id,
             location_id: order.location_id,
+            sales_rep_id: salesRepId,
             customer_email: profile?.email || "",
             items: orderItems,
             subtotal: totalAmount,

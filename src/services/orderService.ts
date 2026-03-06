@@ -67,6 +67,7 @@ interface Order {
   created_at: string;
   updated_at: string;
   completed_at?: string;
+  sales_rep_id?: string;
   parent_order_id?: string;
   split_from_order_id?: string;
   order_type?: string;
@@ -407,6 +408,7 @@ class OrderService {
           customer_email: originalOrder.customer_email,
           organization_id: originalOrder.organization_id,
           location_id: originalOrder.location_id,
+          sales_rep_id: originalOrder.sales_rep_id || null,
           parent_order_id: originalOrder.parent_order_id || orderId,
           split_from_order_id: orderId,
           payment_status: originalOrder.payment_status,
@@ -543,6 +545,7 @@ class OrderService {
           customer_email: originalOrder.customer_email,
           organization_id: originalOrder.organization_id,
           location_id: originalOrder.location_id,
+          sales_rep_id: originalOrder.sales_rep_id || null,
           parent_order_id: originalOrder.parent_order_id || orderId,
           split_from_order_id: orderId,
           payment_status: originalOrder.payment_status,
@@ -807,6 +810,7 @@ class OrderService {
             customer_email: originalOrder.customer_email,
             organization_id: originalOrder.organization_id,
             location_id: originalOrder.location_id,
+            sales_rep_id: originalOrder.sales_rep_id || null,
             parent_order_id: orderId,
             payment_status: originalOrder.payment_status,
             payment_authorization_id: originalOrder.payment_authorization_id,

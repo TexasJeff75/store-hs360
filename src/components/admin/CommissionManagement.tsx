@@ -34,6 +34,8 @@ const CommissionManagement: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticData | null>(null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [repairing, setRepairing] = useState(false);
+  const [repairResult, setRepairResult] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCommissions();
@@ -176,6 +178,103 @@ const CommissionManagement: React.FC = () => {
       });
     } catch (err) {
       console.error('Error fetching diagnostics:', err);
+    }
+  };
+
+  const repairMissingSalesReps = async () => {
+    setRepairing(true);
+    setRepairResult(null);
+    let repaired = 0;
+    let commissionCreated = 0;
+    let errors: string[] = [];
+
+    try {
+      // Get completed orders without a commission record
+      const { data: completedOrders } = await supabase
+        .from('orders')
+        .select('id, organization_id, sales_rep_id, status, total')
+        .eq('status', 'completed');
+
+      const { data: existingCommissions } = await supabase
+        .from('commissions')
+        .select('order_id');
+
+      const commissionOrderIds = new Set((existingCommissions || []).map(c => c.order_id));
+      const ordersNeedingFix = (completedOrders || []).filter(o => !commissionOrderIds.has(o.id));
+
+      for (const order of ordersNeedingFix) {
+        // Step 1: If missing sales_rep_id, try to backfill from organization
+        if (!order.sales_rep_id && order.organization_id) {
+          const { data: orgData } = await supabase
+            .from('organizations')
+            .select('default_sales_rep_id, is_house_account')
+            .eq('id', order.organization_id)
+            .maybeSingle();
+
+          let salesRepId: string | null = null;
+          if (orgData && !orgData.is_house_account) {
+            salesRepId = orgData.default_sales_rep_id;
+            if (!salesRepId) {
+              const { data: osrData } = await supabase
+                .from('organization_sales_reps')
+                .select('sales_rep_id')
+                .eq('organization_id', order.organization_id)
+                .eq('is_active', true)
+                .limit(1)
+                .maybeSingle();
+              if (osrData) salesRepId = osrData.sales_rep_id;
+            }
+          }
+
+          if (salesRepId) {
+            // Updating sales_rep_id will fire the commission trigger
+            const { error: updateErr } = await supabase
+              .from('orders')
+              .update({ sales_rep_id: salesRepId })
+              .eq('id', order.id);
+
+            if (updateErr) {
+              errors.push(`Order ${order.id.slice(0, 8)}: ${updateErr.message}`);
+            } else {
+              repaired++;
+              commissionCreated++;
+            }
+          }
+        } else if (order.sales_rep_id && order.organization_id) {
+          // Has both but no commission — trigger may not have fired.
+          // Touch status to re-fire the trigger.
+          const { error: touchErr } = await supabase
+            .from('orders')
+            .update({ updated_at: new Date().toISOString() })
+            .eq('id', order.id);
+
+          // The trigger fires on UPDATE OF status, sales_rep_id, items, total
+          // A simple updated_at touch won't fire it. We need to re-set the status.
+          const { error: retriggerErr } = await supabase
+            .from('orders')
+            .update({ status: 'completed' })
+            .eq('id', order.id);
+
+          if (retriggerErr) {
+            errors.push(`Order ${order.id.slice(0, 8)}: ${retriggerErr.message}`);
+          } else {
+            commissionCreated++;
+          }
+        }
+      }
+
+      const msg = `Repair complete: ${repaired} orders got sales_rep backfilled, ${commissionCreated} commission triggers fired.` +
+        (errors.length > 0 ? ` ${errors.length} errors.` : '');
+      setRepairResult(msg);
+
+      // Refresh diagnostics and commissions
+      await fetchDiagnostics();
+      await fetchCommissions();
+    } catch (err) {
+      console.error('Repair error:', err);
+      setRepairResult(`Repair failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setRepairing(false);
     }
   };
 
@@ -439,6 +538,12 @@ const CommissionManagement: React.FC = () => {
                 </div>
               )}
 
+              {repairResult && (
+                <div className={`mt-3 p-3 rounded text-xs ${repairResult.includes('failed') ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                  {repairResult}
+                </div>
+              )}
+
               <div className="mt-3 flex gap-2">
                 <button
                   onClick={fetchDiagnostics}
@@ -446,6 +551,15 @@ const CommissionManagement: React.FC = () => {
                 >
                   Refresh Diagnostics
                 </button>
+                {diagnostics.ordersWithoutCommission.length > 0 && (
+                  <button
+                    onClick={repairMissingSalesReps}
+                    disabled={repairing}
+                    className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {repairing ? 'Repairing...' : `Repair ${diagnostics.ordersWithoutCommission.length} Orders`}
+                  </button>
+                )}
               </div>
             </div>
           )}
