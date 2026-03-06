@@ -48,7 +48,7 @@ function AppContent() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
-  const [adminInitialTab, setAdminInitialTab] = useState<'orders' | 'users' | undefined>(undefined);
+  const [adminInitialTab, setAdminInitialTab] = useState<string | undefined>(undefined);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
@@ -536,6 +536,19 @@ function AppContent() {
     }
   }
 
+  // ── Admin page (static, full-page) ──────────────────────────────────────
+  if (isAdminOpen) {
+    return (
+      <AdminDashboard
+        onClose={() => {
+          setIsAdminOpen(false);
+          setAdminInitialTab(undefined);
+        }}
+        initialTab={adminInitialTab}
+      />
+    );
+  }
+
   return (
       <div className="min-h-screen bg-gray-50">
         <ImpersonationBanner />
@@ -814,14 +827,6 @@ function AppContent() {
           onClose={() => setIsProfileOpen(false)}
         />
 
-        <AdminDashboard
-          isOpen={isAdminOpen}
-          onClose={() => {
-            setIsAdminOpen(false);
-            setAdminInitialTab(undefined);
-          }}
-          initialTab={adminInitialTab}
-        />
 
         <OrganizationSelector
           isOpen={isOrgSelectorOpen}
