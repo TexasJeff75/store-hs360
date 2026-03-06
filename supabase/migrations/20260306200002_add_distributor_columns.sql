@@ -12,8 +12,8 @@
 -- Add commission_type column
 ALTER TABLE distributors ADD COLUMN IF NOT EXISTS commission_type TEXT NOT NULL DEFAULT 'percent_margin';
 
--- Add organization_id column with FK to organizations
-ALTER TABLE distributors ADD COLUMN IF NOT EXISTS organization_id UUID REFERENCES organizations(id) ON DELETE SET NULL;
+-- organization_id removed: replaced by distributor_customers junction table
+-- (see 20260306200003_distributor_multi_customer.sql)
 
 -- Add user_id column (mirrors profile_id, used by RLS policies and commission queries)
 ALTER TABLE distributors ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES profiles(id) ON DELETE CASCADE;

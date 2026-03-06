@@ -88,12 +88,19 @@ interface Distributor {
   code: string;
   commission_rate: number;
   commission_type: CommissionType;
-  organization_id?: string;
   is_active: boolean;
   notes?: string;
   created_at: string;
   profiles?: { email: string };
-  organizations?: { name: string; code: string } | null;
+}
+
+interface DistributorCustomer {
+  id: string;
+  distributor_id: string;
+  organization_id: string;
+  is_active: boolean;
+  notes?: string;
+  organizations: { name: string; code: string };
 }
 
 interface SalesRep {
@@ -121,6 +128,7 @@ const DistributorManagement: React.FC = () => {
   const [availableUsers, setAvailableUsers] = useState<SalesRep[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
+  const [distributorCustomers, setDistributorCustomers] = useState<DistributorCustomer[]>([]);
   const [distributorSalesReps, setDistributorSalesReps] = useState<DistributorSalesRep[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDistributor, setShowAddDistributor] = useState(false);
@@ -136,7 +144,6 @@ const DistributorManagement: React.FC = () => {
     code: '',
     commission_rate: 45,
     commission_type: 'percent_margin' as CommissionType,
-    organization_id: '',
     notes: '',
   });
 
@@ -156,10 +163,10 @@ const DistributorManagement: React.FC = () => {
     try {
       setLoading(true);
 
-      const [distributorsRes, orgsRes, allUsersRes, salesRepsRes, distSalesRepsRes] = await Promise.all([
+      const [distributorsRes, orgsRes, allUsersRes, salesRepsRes, distSalesRepsRes, distCustomersRes] = await Promise.all([
         supabase
           .from('distributors')
-          .select('*, profiles!distributors_profile_id_fkey(email), organizations(name, code)')
+          .select('*, profiles!distributors_profile_id_fkey(email)')
           .order('created_at', { ascending: false }),
         supabase
           .from('organizations')
@@ -181,6 +188,10 @@ const DistributorManagement: React.FC = () => {
           .from('distributor_sales_reps')
           .select('*, profiles!distributor_sales_reps_sales_rep_id_fkey(email)')
           .order('created_at', { ascending: false }),
+        supabase
+          .from('distributor_customers')
+          .select('*, organizations(name, code)')
+          .eq('is_active', true),
       ]);
 
       if (distributorsRes.error) throw distributorsRes.error;
@@ -188,10 +199,12 @@ const DistributorManagement: React.FC = () => {
       if (allUsersRes.error) throw allUsersRes.error;
       if (salesRepsRes.error) throw salesRepsRes.error;
       if (distSalesRepsRes.error) throw distSalesRepsRes.error;
+      if (distCustomersRes.error) throw distCustomersRes.error;
 
       const distData = (distributorsRes.data as Distributor[]) || [];
       setDistributors(distData);
       setOrganizations(orgsRes.data || []);
+      setDistributorCustomers((distCustomersRes.data as DistributorCustomer[]) || []);
 
       // Filter out users who already have a distributor record
       const existingProfileIds = new Set(distData.map(d => d.profile_id));
@@ -213,7 +226,6 @@ const DistributorManagement: React.FC = () => {
       const payload = {
         ...newDistributor,
         user_id: newDistributor.profile_id,
-        organization_id: newDistributor.organization_id || null,
       };
       const { error: insertError } = await supabase.from('distributors').insert([payload]);
       if (insertError) throw insertError;
@@ -226,7 +238,6 @@ const DistributorManagement: React.FC = () => {
         code: '',
         commission_rate: 45,
         commission_type: 'percent_margin',
-        organization_id: '',
         notes: '',
       });
       fetchData();
@@ -246,7 +257,6 @@ const DistributorManagement: React.FC = () => {
           code: editingDistributor.code,
           commission_rate: editingDistributor.commission_rate,
           commission_type: editingDistributor.commission_type,
-          organization_id: editingDistributor.organization_id || null,
           is_active: editingDistributor.is_active,
           notes: editingDistributor.notes,
           updated_at: new Date().toISOString(),
@@ -323,6 +333,37 @@ const DistributorManagement: React.FC = () => {
   const getDistributorSalesReps = (distributorId: string) =>
     distributorSalesReps.filter((dsr) => dsr.distributor_id === distributorId && dsr.is_active);
 
+  const getDistributorCustomerOrgs = (distributorId: string) =>
+    distributorCustomers.filter((dc) => dc.distributor_id === distributorId);
+
+  const handleAddCustomerOrg = async (distributorId: string, organizationId: string) => {
+    try {
+      setError(null);
+      const { error: insertError } = await supabase.from('distributor_customers').insert([{
+        distributor_id: distributorId,
+        organization_id: organizationId,
+      }]);
+      if (insertError) throw insertError;
+      setSuccess('Customer organization added');
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add customer organization');
+    }
+  };
+
+  const handleRemoveCustomerOrg = async (id: string) => {
+    if (!confirm('Remove this customer organization from the distributor?')) return;
+    try {
+      setError(null);
+      const { error: deleteError } = await supabase.from('distributor_customers').delete().eq('id', id);
+      if (deleteError) throw deleteError;
+      setSuccess('Customer organization removed');
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove customer organization');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -380,7 +421,6 @@ const DistributorManagement: React.FC = () => {
                 /* ── Edit mode ─────────────────────────────────────────── */
                 <EditDistributorForm
                   distributor={editingDistributor}
-                  organizations={organizations}
                   onChange={setEditingDistributor}
                   onSave={handleUpdateDistributor}
                   onCancel={() => setEditingDistributor(null)}
@@ -398,16 +438,53 @@ const DistributorManagement: React.FC = () => {
                         <p className="text-sm text-gray-500">Code: {distributor.code}</p>
                         <p className="text-sm text-gray-500">User: {distributor.profiles?.email ?? 'N/A'}</p>
 
-                        {/* Organization badge */}
-                        {distributor.organizations ? (
-                          <div className="flex items-center gap-1.5 mt-1.5 text-sm text-indigo-700">
-                            <Building2 className="h-4 w-4 shrink-0" />
-                            <span className="font-medium">{distributor.organizations.name}</span>
-                            <span className="text-indigo-400">({distributor.organizations.code})</span>
-                          </div>
-                        ) : (
-                          <p className="mt-1 text-xs text-gray-400 italic">No organization linked</p>
-                        )}
+                        {/* Customer organizations */}
+                        {(() => {
+                          const custOrgs = getDistributorCustomerOrgs(distributor.id);
+                          const linkedOrgIds = new Set(custOrgs.map(dc => dc.organization_id));
+                          const availableOrgs = organizations.filter(o => !linkedOrgIds.has(o.id));
+                          return (
+                            <div className="mt-2">
+                              <div className="flex items-center gap-1.5 mb-1.5 text-xs font-medium text-gray-500">
+                                <Building2 className="h-3.5 w-3.5" />
+                                Customers ({custOrgs.length})
+                              </div>
+                              {custOrgs.length > 0 ? (
+                                <div className="flex flex-wrap gap-1.5">
+                                  {custOrgs.map((dc) => (
+                                    <span key={dc.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs">
+                                      {dc.organizations.name}
+                                      <span className="text-indigo-400">({dc.organizations.code})</span>
+                                      <button
+                                        onClick={() => handleRemoveCustomerOrg(dc.id)}
+                                        className="ml-0.5 hover:bg-indigo-200 rounded-full p-0.5 transition-colors"
+                                        title="Remove"
+                                      >
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </span>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-gray-400 italic">No customers linked</p>
+                              )}
+                              {availableOrgs.length > 0 && (
+                                <select
+                                  className="mt-1.5 text-xs px-2 py-1 border border-gray-200 rounded-lg text-gray-600 bg-white"
+                                  value=""
+                                  onChange={(e) => {
+                                    if (e.target.value) handleAddCustomerOrg(distributor.id, e.target.value);
+                                  }}
+                                >
+                                  <option value="">+ Add customer...</option>
+                                  {availableOrgs.map((org) => (
+                                    <option key={org.id} value={org.id}>{org.name} ({org.code})</option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {distributor.notes && (
                           <p className="text-sm text-gray-500 mt-1">{distributor.notes}</p>
@@ -570,20 +647,6 @@ const DistributorManagement: React.FC = () => {
                   />
                 </Field>
               </div>
-
-              <Field label="Customer Organization">
-                <select
-                  value={newDistributor.organization_id}
-                  onChange={(e) => setNewDistributor({ ...newDistributor, organization_id: e.target.value })}
-                  className={selectCls}
-                >
-                  <option value="">— Unlinked —</option>
-                  {organizations.map((org) => (
-                    <option key={org.id} value={org.id}>{org.name} ({org.code})</option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-400 mt-1">The primary account this distributor serves</p>
-              </Field>
 
               <Field label="Commission Basis *">
                 <select
@@ -807,14 +870,13 @@ const DistributorManagement: React.FC = () => {
 
 interface EditDistributorFormProps {
   distributor: Distributor;
-  organizations: Organization[];
   onChange: (d: Distributor) => void;
   onSave: () => void;
   onCancel: () => void;
 }
 
 const EditDistributorForm: React.FC<EditDistributorFormProps> = ({
-  distributor, organizations, onChange, onSave, onCancel,
+  distributor, onChange, onSave, onCancel,
 }) => {
   const typeConfig = getCommissionTypeConfig(distributor.commission_type);
   return (
@@ -837,19 +899,6 @@ const EditDistributorForm: React.FC<EditDistributorFormProps> = ({
           />
         </Field>
       </div>
-
-      <Field label="Customer Organization">
-        <select
-          value={distributor.organization_id ?? ''}
-          onChange={(e) => onChange({ ...distributor, organization_id: e.target.value || undefined })}
-          className={selectCls}
-        >
-          <option value="">— Unlinked —</option>
-          {organizations.map((org) => (
-            <option key={org.id} value={org.id}>{org.name} ({org.code})</option>
-          ))}
-        </select>
-      </Field>
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="Commission Basis">
