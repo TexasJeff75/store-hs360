@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart,
-  TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart,
+  TrendingUp, CreditCard, Repeat, Building, HelpCircle, PieChart,
   Shield, ChevronLeft, ChevronRight, DollarSign, FolderTree, MessageSquare,
   LayoutDashboard, X, Eye, EyeOff, Menu
 } from 'lucide-react';
@@ -16,7 +16,6 @@ import ProductsManagement from './products/ProductsManagement';
 import PricingManagement from './PricingManagement';
 import OrderManagement from './OrderManagement';
 import CommissionManagement from './CommissionManagement';
-import SalesRepAssignment from './SalesRepAssignment';
 import SalesRepDashboard from './SalesRepDashboard';
 import CustomerPaymentMethods from './CustomerPaymentMethods';
 import Analytics from './Analytics';
@@ -174,7 +173,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
         { id: 'pricing', label: 'Pricing', icon: DollarSign, roles: ['admin'] },
         { id: 'recurring-orders', label: 'Recurring Orders', icon: Repeat, roles: ['admin'] },
         { id: 'distributors', label: 'Distributors', icon: Building, roles: ['admin'] },
-        { id: 'salesreps', label: 'Sales Reps', icon: UserCheck, roles: ['admin'] },
       ],
     },
     {
@@ -251,8 +249,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
         return <RecurringOrderManagement />;
       case 'distributors':
         return <DistributorManagement />;
-      case 'salesreps':
-        return <SalesRepAssignment />;
       case 'analytics':
         return <Analytics />;
       case 'profit-report':
