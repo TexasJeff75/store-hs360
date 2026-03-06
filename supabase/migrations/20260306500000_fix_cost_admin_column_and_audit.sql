@@ -31,7 +31,8 @@ CREATE INDEX IF NOT EXISTS idx_cost_admin_audit_user
 ALTER TABLE public.cost_admin_audit ENABLE ROW LEVEL SECURITY;
 
 -- Admins can view audit log
-CREATE POLICY IF NOT EXISTS "Cost admins can view audit log"
+DROP POLICY IF EXISTS "Cost admins can view audit log" ON public.cost_admin_audit;
+CREATE POLICY "Cost admins can view audit log"
   ON public.cost_admin_audit FOR SELECT
   TO authenticated
   USING (
@@ -39,7 +40,8 @@ CREATE POLICY IF NOT EXISTS "Cost admins can view audit log"
   );
 
 -- Allow inserts for authenticated users (audit logging)
-CREATE POLICY IF NOT EXISTS "Authenticated users can insert audit log"
+DROP POLICY IF EXISTS "Authenticated users can insert audit log" ON public.cost_admin_audit;
+CREATE POLICY "Authenticated users can insert audit log"
   ON public.cost_admin_audit FOR INSERT
   TO authenticated
   WITH CHECK (true);
