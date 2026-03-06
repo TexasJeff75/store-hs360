@@ -131,17 +131,24 @@ class CustomerAddressService {
 
   async getDefaultAddress(
     userId: string,
-    addressType: 'shipping' | 'billing'
+    addressType: 'shipping' | 'billing',
+    organizationId?: string
   ): Promise<CustomerAddress | null> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('customer_addresses')
         .select('*')
-        .eq('user_id', userId)
         .eq('address_type', addressType)
         .eq('is_default', true)
-        .eq('is_active', true)
-        .maybeSingle();
+        .eq('is_active', true);
+
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId);
+      } else {
+        query = query.eq('user_id', userId).is('organization_id', null);
+      }
+
+      const { data, error } = await query.maybeSingle();
 
       if (error) throw error;
       return data;
@@ -154,7 +161,7 @@ class CustomerAddressService {
   async createAddress(addressData: CreateAddressData): Promise<CustomerAddress | null> {
     try {
       if (addressData.is_default) {
-        await this.clearDefaultAddress(addressData.user_id, addressData.address_type);
+        await this.clearDefaultAddress(addressData.user_id, addressData.address_type, addressData.organization_id);
       }
 
       const { data, error } = await supabase
@@ -176,12 +183,12 @@ class CustomerAddressService {
       if (updates.is_default) {
         const { data: existingAddress } = await supabase
           .from('customer_addresses')
-          .select('user_id, address_type')
+          .select('user_id, address_type, organization_id')
           .eq('id', addressId)
           .single();
 
         if (existingAddress) {
-          await this.clearDefaultAddress(existingAddress.user_id, existingAddress.address_type);
+          await this.clearDefaultAddress(existingAddress.user_id, existingAddress.address_type, existingAddress.organization_id);
         }
       }
 
@@ -217,13 +224,13 @@ class CustomerAddressService {
     try {
       const { data: address } = await supabase
         .from('customer_addresses')
-        .select('user_id, address_type')
+        .select('user_id, address_type, organization_id')
         .eq('id', addressId)
         .single();
 
       if (!address) return false;
 
-      await this.clearDefaultAddress(address.user_id, address.address_type);
+      await this.clearDefaultAddress(address.user_id, address.address_type, address.organization_id);
 
       const { error } = await supabase
         .from('customer_addresses')
@@ -238,13 +245,24 @@ class CustomerAddressService {
     }
   }
 
-  private async clearDefaultAddress(userId: string, addressType: 'shipping' | 'billing'): Promise<void> {
-    await supabase
+  private async clearDefaultAddress(
+    userId: string,
+    addressType: 'shipping' | 'billing',
+    organizationId?: string | null
+  ): Promise<void> {
+    let query = supabase
       .from('customer_addresses')
       .update({ is_default: false })
-      .eq('user_id', userId)
       .eq('address_type', addressType)
       .eq('is_default', true);
+
+    if (organizationId) {
+      query = query.eq('organization_id', organizationId);
+    } else {
+      query = query.eq('user_id', userId).is('organization_id', null);
+    }
+
+    await query;
   }
 }
 
