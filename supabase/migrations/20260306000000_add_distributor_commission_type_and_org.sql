@@ -50,47 +50,9 @@ BEGIN
   END IF;
 END $$;
 
--- ── organization_id ──────────────────────────────────────────────────────────
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns
-    WHERE table_name = 'distributors' AND column_name = 'organization_id'
-  ) THEN
-    ALTER TABLE distributors
-      ADD COLUMN organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL;
-
-    CREATE INDEX IF NOT EXISTS idx_distributors_organization
-      ON distributors(organization_id);
-  END IF;
-END $$;
-
--- ── helpful view ─────────────────────────────────────────────────────────────
--- Shows each distributor with their org, commission config, and sales rep count.
-CREATE OR REPLACE VIEW distributor_overview AS
-SELECT
-  d.id,
-  d.name,
-  d.code,
-  d.commission_type,
-  d.commission_rate,
-  d.is_active,
-  d.notes,
-  d.profile_id,
-  p.email                         AS profile_email,
-  d.organization_id,
-  o.name                          AS organization_name,
-  COUNT(dsr.id) FILTER (WHERE dsr.is_active) AS active_sales_rep_count
-FROM distributors d
-LEFT JOIN profiles      p   ON p.id  = d.profile_id
-LEFT JOIN organizations o   ON o.id  = d.organization_id
-LEFT JOIN distributor_sales_reps dsr ON dsr.distributor_id = d.id
-GROUP BY d.id, p.email, o.name;
-
-COMMENT ON VIEW distributor_overview IS
-  'Convenience view: distributor + linked org + rep count';
+-- organization_id removed: replaced by distributor_customers junction table
+-- (see 20260306200003_distributor_multi_customer.sql)
+-- The distributor_overview view is also created in that migration.
 
 COMMENT ON COLUMN distributors.commission_type IS
   'percent_gross_sales | percent_margin | percent_net_sales | flat_per_order | flat_per_unit';
-COMMENT ON COLUMN distributors.organization_id IS
-  'Primary customer organization this distributor is responsible for';
