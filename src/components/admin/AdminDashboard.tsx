@@ -3,10 +3,12 @@ import {
   Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart,
   TrendingUp, UserCheck, CreditCard, Repeat, Building, HelpCircle, PieChart,
   Shield, ChevronLeft, ChevronRight, DollarSign, FolderTree, MessageSquare,
-  LayoutDashboard, X, Clock, CheckCircle, XCircle, Eye, EyeOff, Menu
+  LayoutDashboard, X, Clock, Eye, EyeOff, Menu
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
+import AdminHome, { type ActiveTab, type PendingUser } from './AdminHome';
+import SidebarNav, { type SidebarGroup } from './SidebarNav';
 import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
 import LocationManagement from './LocationManagement';
@@ -37,35 +39,6 @@ interface AdminDashboardProps {
   initialTab?: string;
 }
 
-type ActiveTab =
-  | 'home' | 'users' | 'orders' | 'commissions' | 'help'
-  | 'my-orgs' | 'my-recurring-orders' | 'locations' | 'payments'
-  | 'quickbooks' | 'support'
-  | 'organizations' | 'pricing' | 'products' | 'categories'
-  | 'recurring-orders' | 'distributors' | 'salesreps'
-  | 'analytics' | 'profit-report' | 'cost-admins' | 'login-audit' | 'site-settings';
-
-interface PendingUser {
-  id: string;
-  email: string;
-  full_name?: string;
-  created_at: string;
-}
-
-interface SidebarItem {
-  id: ActiveTab;
-  label: string;
-  icon: React.ElementType;
-  roles: string[];
-  badge?: number;
-}
-
-interface SidebarGroup {
-  label: string;
-  roles: string[];
-  items: SidebarItem[];
-}
-
 const ROLE_LABELS: Record<string, string> = {
   admin: 'Company Admin',
   sales_rep: 'Sales Rep',
@@ -79,190 +52,6 @@ const ROLE_COLORS: Record<string, string> = {
   distributor: 'bg-orange-100 text-orange-800',
   customer: 'bg-green-100 text-green-800',
 };
-
-// ─── Admin Home Dashboard ────────────────────────────────────────────────────
-
-interface AdminHomeProps {
-  pendingUsers: PendingUser[];
-  pendingCount: number;
-  onNavigate: (tab: ActiveTab) => void;
-  onApprove: (userId: string) => void;
-  onDeny: (userId: string) => void;
-}
-
-const AdminHome: React.FC<AdminHomeProps> = ({ pendingUsers, pendingCount, onNavigate, onApprove, onDeny }) => {
-  const [actioning, setActioning] = useState<Record<string, boolean>>({});
-
-  const handleAction = async (userId: string, action: 'approve' | 'deny') => {
-    setActioning(prev => ({ ...prev, [userId]: true }));
-    try {
-      if (action === 'approve') await onApprove(userId);
-      else await onDeny(userId);
-    } finally {
-      setActioning(prev => ({ ...prev, [userId]: false }));
-    }
-  };
-
-  return (
-    <div className="p-6 space-y-6">
-      <h2 className="text-xl font-bold text-gray-900">Dashboard</h2>
-
-      {/* Pending Approvals — high priority, shown first */}
-      {pendingCount > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-4 border-b border-amber-200">
-            <div className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-amber-600" />
-              <span className="font-semibold text-amber-900">
-                {pendingCount} Pending Approval{pendingCount !== 1 ? 's' : ''}
-              </span>
-            </div>
-            <button
-              onClick={() => onNavigate('users')}
-              className="text-sm text-amber-700 hover:text-amber-900 font-medium underline underline-offset-2"
-            >
-              View all in Users
-            </button>
-          </div>
-          <div className="divide-y divide-amber-100">
-            {pendingUsers.slice(0, 5).map(u => (
-              <div key={u.id} className="flex items-center justify-between px-5 py-3">
-                <div>
-                  <p className="text-sm font-medium text-gray-900">{u.full_name || u.email}</p>
-                  {u.full_name && <p className="text-xs text-gray-500">{u.email}</p>}
-                  <p className="text-xs text-gray-400">
-                    {new Date(u.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => handleAction(u.id, 'approve')}
-                    disabled={actioning[u.id]}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 transition-colors"
-                  >
-                    <CheckCircle className="h-3.5 w-3.5" />
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => handleAction(u.id, 'deny')}
-                    disabled={actioning[u.id]}
-                    className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-white text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-50 transition-colors"
-                  >
-                    <XCircle className="h-3.5 w-3.5" />
-                    Deny
-                  </button>
-                </div>
-              </div>
-            ))}
-            {pendingCount > 5 && (
-              <div className="px-5 py-3 text-center">
-                <button
-                  onClick={() => onNavigate('users')}
-                  className="text-sm text-amber-700 hover:text-amber-900 font-medium"
-                >
-                  + {pendingCount - 5} more — view all
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {pendingCount === 0 && (
-        <div className="flex items-center gap-3 p-4 bg-green-50 border border-green-200 rounded-xl text-green-800">
-          <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
-          <span className="text-sm font-medium">All users approved — no pending requests</span>
-        </div>
-      )}
-
-      {/* Quick Actions */}
-      <div>
-        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Quick Actions</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {[
-            { id: 'orders' as ActiveTab, label: 'View Orders', icon: ShoppingCart, color: 'text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-100' },
-            { id: 'users' as ActiveTab, label: 'Manage Users', icon: Users, color: 'text-purple-600 bg-purple-50 hover:bg-purple-100 border-purple-100' },
-            { id: 'organizations' as ActiveTab, label: 'Organizations', icon: Building2, color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-indigo-100' },
-            { id: 'products' as ActiveTab, label: 'Products', icon: Package, color: 'text-teal-600 bg-teal-50 hover:bg-teal-100 border-teal-100' },
-            { id: 'analytics' as ActiveTab, label: 'Analytics', icon: BarChart3, color: 'text-pink-600 bg-pink-50 hover:bg-pink-100 border-pink-100' },
-            { id: 'support' as ActiveTab, label: 'Support', icon: MessageSquare, color: 'text-orange-600 bg-orange-50 hover:bg-orange-100 border-orange-100' },
-          ].map(action => (
-            <button
-              key={action.id}
-              onClick={() => onNavigate(action.id)}
-              className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border font-medium text-sm transition-colors ${action.color}`}
-            >
-              <action.icon className="h-6 w-6" />
-              {action.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-// ─── Sidebar Nav (shared between desktop + mobile overlay) ───────────────────
-
-interface SidebarNavProps {
-  visibleGroups: (SidebarGroup & { items: SidebarItem[] })[];
-  activeTab: ActiveTab;
-  collapsed: boolean;
-  onSelect: (tab: ActiveTab) => void;
-}
-
-const SidebarNav: React.FC<SidebarNavProps> = ({ visibleGroups, activeTab, collapsed, onSelect }) => (
-  <nav className="py-3 flex-1">
-    {visibleGroups.map((group, gi) => (
-      <div key={group.label} className={gi > 0 ? 'mt-1' : ''}>
-        {!collapsed && (
-          <p className="px-4 pt-3 pb-1 text-xs font-semibold text-gray-400 uppercase tracking-widest select-none">
-            {group.label}
-          </p>
-        )}
-        {collapsed && gi > 0 && (
-          <div className="mx-3 my-2 border-t border-gray-200" />
-        )}
-        {group.items.map(item => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <button
-              key={`${group.label}-${item.id}`}
-              onClick={() => onSelect(item.id)}
-              title={collapsed ? item.label : undefined}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors
-                ${collapsed ? 'justify-center' : ''}
-                ${isActive
-                  ? 'bg-purple-100 text-purple-700 border-r-2 border-purple-500'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 border-r-2 border-transparent'
-                }`}
-            >
-              <div className="relative flex-shrink-0">
-                <Icon className="h-[18px] w-[18px]" />
-                {collapsed && item.badge !== undefined && item.badge > 0 && (
-                  <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center min-w-[16px] h-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full">
-                    {item.badge > 99 ? '99+' : item.badge}
-                  </span>
-                )}
-              </div>
-              {!collapsed && (
-                <span className="text-sm font-medium truncate flex-1">{item.label}</span>
-              )}
-              {!collapsed && item.badge !== undefined && item.badge > 0 && (
-                <span className="ml-auto flex-shrink-0 flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-red-500 text-white text-xs font-bold rounded-full">
-                  {item.badge > 99 ? '99+' : item.badge}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    ))}
-  </nav>
-);
-
-// ─── Main Component ──────────────────────────────────────────────────────────
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initialTab }) => {
   const { profile, user, isImpersonating, effectiveProfile, impersonation, stopImpersonation } = useAuth();
@@ -491,7 +280,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ isOpen, onClose, initia
 
   const dashboardTitle = isCustomer ? 'My Account' : isSalesRep ? 'Sales Dashboard' : isDistributor ? 'Distributor Portal' : 'Admin Dashboard';
   const impersonatedName = impersonation?.profile?.full_name || impersonation?.profile?.email || 'Unknown User';
-  const impersonatedRole = impersonation?.profile?.role || '';
 
   return (
     <div className="fixed inset-0 z-50 bg-white flex flex-col">
