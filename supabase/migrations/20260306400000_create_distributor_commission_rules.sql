@@ -1,17 +1,22 @@
 /*
-  # Per-Product and Per-Category Commission Rules for Distributors
+  # Per-Product, Per-Category, and Per-Customer Commission Rules for Distributors
 
   Allows distributors to have different commission types and rates depending on
-  the product or product category — overriding the distributor-level default.
+  the product, product category, and/or specific customer (organization) —
+  overriding the distributor-level default.
 
   ## Priority (highest → lowest)
-  1. Product-specific rule  (scope = 'product')
-  2. Category-specific rule (scope = 'category')
-  3. Distributor default    (distributors.commission_type / commission_rate)
+  1. Customer + Product  rule  (organization_id + product_id)
+  2. Customer + Category rule  (organization_id + category_id)
+  3. Product-only rule         (product_id, no organization_id)
+  4. Category-only rule        (category_id, no organization_id)
+  5. Distributor default       (distributors.commission_type / commission_rate)
 
   ## Examples
-  - Genetics test: distributor cost $199, sells at $249 → flat_per_unit $50
-  - Peptides: 15% of gross sales → percent_gross_sales 15
+  - Acme Corp + Genetics test: flat_per_unit $50
+  - Beta Inc  + Genetics test: flat_per_unit $35
+  - Genetics test (any customer): flat_per_unit $45
+  - Peptides category: percent_gross_sales 15%
   - Default for everything else: percent_margin 45%
 
   ## Customer-specific pricing effect on commission
@@ -24,6 +29,9 @@
 CREATE TABLE IF NOT EXISTS distributor_commission_rules (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   distributor_id uuid NOT NULL REFERENCES distributors(id) ON DELETE CASCADE,
+
+  -- Optional: restrict rule to a specific customer organization
+  organization_id uuid REFERENCES organizations(id) ON DELETE CASCADE,
 
   -- What this rule applies to
   scope         text NOT NULL CHECK (scope IN ('product', 'category')),
@@ -50,10 +58,11 @@ CREATE TABLE IF NOT EXISTS distributor_commission_rules (
   created_at    timestamptz NOT NULL DEFAULT now(),
   updated_at    timestamptz NOT NULL DEFAULT now(),
 
-  -- Prevent duplicate rules per distributor/product or distributor/category
-  CONSTRAINT uq_dist_product  UNIQUE (distributor_id, product_id)
+  -- Prevent duplicate rules per distributor/org/product or distributor/org/category
+  -- NULL organization_id = applies to all customers (global rule)
+  CONSTRAINT uq_dist_org_product  UNIQUE NULLS NOT DISTINCT (distributor_id, organization_id, product_id)
     DEFERRABLE INITIALLY DEFERRED,
-  CONSTRAINT uq_dist_category UNIQUE (distributor_id, category_id)
+  CONSTRAINT uq_dist_org_category UNIQUE NULLS NOT DISTINCT (distributor_id, organization_id, category_id)
     DEFERRABLE INITIALLY DEFERRED,
 
   -- Validate scope matches the populated FK
@@ -63,6 +72,7 @@ CREATE TABLE IF NOT EXISTS distributor_commission_rules (
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_dcr_distributor   ON distributor_commission_rules(distributor_id);
+CREATE INDEX IF NOT EXISTS idx_dcr_org           ON distributor_commission_rules(organization_id) WHERE organization_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_dcr_product       ON distributor_commission_rules(product_id)  WHERE product_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_dcr_category      ON distributor_commission_rules(category_id) WHERE category_id IS NOT NULL;
 
@@ -102,7 +112,9 @@ CREATE POLICY "Distributors can view own commission rules"
 
 -- ── Updated commission calculation function ─────────────────────────────────
 -- Replaces the existing trigger function to support per-product/category rules
--- and customer-price-based margin calculation.
+-- with optional customer (organization) specificity.
+--
+-- Priority: customer+product > customer+category > product > category > default
 
 DROP TRIGGER IF EXISTS trigger_calculate_commission ON orders;
 DROP FUNCTION IF EXISTS calculate_commission_for_order();
@@ -190,36 +202,66 @@ BEGIN
           FROM products WHERE id = v_item_product_id;
 
         -- Determine effective commission rule for this item.
-        -- Priority: product rule > category rule > distributor default
+        -- Priority: customer+product > customer+category > product > category > default
         v_rule_type           := NULL;
         v_rule_rate           := NULL;
         v_rule_use_cust_price := NULL;
 
         IF v_distributor_id IS NOT NULL THEN
-          -- Try product-level rule first
+
+          -- 1. Customer + Product rule
           SELECT commission_type, commission_rate, use_customer_price
             INTO v_rule_type, v_rule_rate, v_rule_use_cust_price
             FROM distributor_commission_rules
            WHERE distributor_id = v_distributor_id
+             AND organization_id = NEW.organization_id
              AND scope = 'product'
              AND product_id = v_item_product_id
              AND is_active = true
            LIMIT 1;
 
-          -- Fall back to category-level rule
+          -- 2. Customer + Category rule
           IF v_rule_type IS NULL AND v_item_category_id IS NOT NULL THEN
             SELECT commission_type, commission_rate, use_customer_price
               INTO v_rule_type, v_rule_rate, v_rule_use_cust_price
               FROM distributor_commission_rules
              WHERE distributor_id = v_distributor_id
+               AND organization_id = NEW.organization_id
                AND scope = 'category'
                AND category_id = v_item_category_id
                AND is_active = true
              LIMIT 1;
           END IF;
+
+          -- 3. Product-only rule (any customer)
+          IF v_rule_type IS NULL THEN
+            SELECT commission_type, commission_rate, use_customer_price
+              INTO v_rule_type, v_rule_rate, v_rule_use_cust_price
+              FROM distributor_commission_rules
+             WHERE distributor_id = v_distributor_id
+               AND organization_id IS NULL
+               AND scope = 'product'
+               AND product_id = v_item_product_id
+               AND is_active = true
+             LIMIT 1;
+          END IF;
+
+          -- 4. Category-only rule (any customer)
+          IF v_rule_type IS NULL AND v_item_category_id IS NOT NULL THEN
+            SELECT commission_type, commission_rate, use_customer_price
+              INTO v_rule_type, v_rule_rate, v_rule_use_cust_price
+              FROM distributor_commission_rules
+             WHERE distributor_id = v_distributor_id
+               AND organization_id IS NULL
+               AND scope = 'category'
+               AND category_id = v_item_category_id
+               AND is_active = true
+             LIMIT 1;
+          END IF;
+
         END IF;
 
-        -- Fall back to distributor / org default
+        -- 5. Fall back to distributor / org default
         IF v_rule_type IS NULL THEN
           IF v_distributor_id IS NOT NULL THEN
             v_rule_type           := v_base_dist_type;
@@ -233,8 +275,6 @@ BEGIN
         END IF;
 
         -- Decide which price to use for margin
-        -- When use_customer_price is true, use the actual selling price;
-        -- otherwise use the retail (base) price.
         IF v_rule_use_cust_price THEN
           v_effective_price := v_item_price;
         ELSE
@@ -254,10 +294,8 @@ BEGIN
           WHEN 'percent_gross_sales' THEN
             v_item_commission := (v_item_price * v_item_quantity) * (v_rule_rate / 100);
           WHEN 'percent_net_sales' THEN
-            -- net = gross minus any discount (price vs retail)
             v_item_commission := (v_item_price * v_item_quantity) * (v_rule_rate / 100);
           WHEN 'flat_per_order' THEN
-            -- flat_per_order is accumulated once after the loop; store 0 here
             v_item_commission := 0;
           WHEN 'flat_per_unit' THEN
             v_item_commission := v_rule_rate * v_item_quantity;
@@ -273,13 +311,8 @@ BEGIN
         v_commission_amount := v_commission_amount + v_item_commission;
       END LOOP;
 
-      -- Handle flat_per_order: if ANY item used flat_per_order as its rule,
-      -- we've already skipped per-item amounts; add the flat amount once.
-      -- However, if the distributor default is flat_per_order and no product/
-      -- category rules override it, the whole order gets the flat amount.
+      -- Handle flat_per_order
       IF v_base_dist_type = 'flat_per_order' AND v_distributor_id IS NOT NULL THEN
-        -- Only add if no product/category rules overrode every item
-        -- Simple approach: if commission_amount is 0 from items, apply flat
         IF v_commission_amount = 0 THEN
           v_commission_amount := v_base_distributor_rate;
         END IF;
@@ -293,8 +326,6 @@ BEGIN
           v_sales_rep_commission  := v_commission_amount * (v_sales_rep_rate / 100);
           v_distributor_commission := v_commission_amount - v_sales_rep_commission;
         ELSIF v_commission_split_type = 'fixed_with_override' THEN
-          -- In fixed_with_override the rep and distributor each get their
-          -- own rate applied to the margin; markup goes to the rep.
           v_sales_rep_commission   := v_total_margin * (v_sales_rep_rate / 100);
           v_distributor_commission := v_total_margin * (v_distributor_override_rate / 100);
           -- Add markup commission to sales rep
@@ -355,7 +386,7 @@ CREATE TRIGGER trigger_calculate_commission
   EXECUTE FUNCTION calculate_commission_for_order();
 
 COMMENT ON FUNCTION calculate_commission_for_order() IS
-  'Calculates commission for completed orders. Supports per-product and per-category '
-  'commission rules that override the distributor default. When use_customer_price is '
-  'true, margin is based on the customer''s actual price (reducing commission for '
-  'discounted customers).';
+  'Calculates commission for completed orders. Supports per-product, per-category, '
+  'and per-customer commission rules that override the distributor default. '
+  'Priority: customer+product > customer+category > product > category > default. '
+  'When use_customer_price is true, margin uses customer actual price.';

@@ -96,6 +96,7 @@ interface SimpleCategory {
 interface CommissionRule {
   id: string;
   distributor_id: string;
+  organization_id: string | null;
   scope: 'product' | 'category';
   product_id: number | null;
   category_id: string | null;
@@ -170,6 +171,7 @@ const DistributorManagement: React.FC = () => {
   const [showAddRule, setShowAddRule] = useState<string | null>(null); // distributor id
   const [newRule, setNewRule] = useState({
     scope: 'product' as 'product' | 'category',
+    organization_id: '' as string, // empty = all customers
     product_id: '' as string,
     category_id: '' as string,
     commission_type: 'percent_margin' as CommissionType,
@@ -402,6 +404,7 @@ const DistributorManagement: React.FC = () => {
       setError(null);
       const payload: Record<string, unknown> = {
         distributor_id: showAddRule,
+        organization_id: newRule.organization_id || null,
         scope: newRule.scope,
         commission_type: newRule.commission_type,
         commission_rate: newRule.commission_rate,
@@ -423,6 +426,7 @@ const DistributorManagement: React.FC = () => {
       setShowAddRule(null);
       setNewRule({
         scope: 'product',
+        organization_id: '',
         product_id: '',
         category_id: '',
         commission_type: 'percent_margin',
@@ -701,6 +705,9 @@ const DistributorManagement: React.FC = () => {
                           const categoryName = rule.category_id
                             ? categories.find((c) => c.id === rule.category_id)?.name ?? 'Unknown Category'
                             : null;
+                          const customerName = rule.organization_id
+                            ? organizations.find((o) => o.id === rule.organization_id)?.name ?? 'Unknown Customer'
+                            : null;
                           return (
                             <div key={rule.id} className="flex items-center justify-between p-3 bg-violet-50 rounded-lg">
                               <div>
@@ -714,6 +721,15 @@ const DistributorManagement: React.FC = () => {
                                     <span className="inline-flex items-center gap-1">
                                       <Building2 className="h-3.5 w-3.5 text-violet-500" />
                                       Category: {categoryName}
+                                    </span>
+                                  )}
+                                  {customerName ? (
+                                    <span className="ml-2 text-xs px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
+                                      {customerName}
+                                    </span>
+                                  ) : (
+                                    <span className="ml-2 text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">
+                                      All customers
                                     </span>
                                   )}
                                 </p>
@@ -906,6 +922,7 @@ const DistributorManagement: React.FC = () => {
       {showAddRule && (() => {
         const dist = distributors.find((d) => d.id === showAddRule);
         const ruleCfg = getCommissionTypeConfig(newRule.commission_type);
+        const distCustOrgs = getDistributorCustomerOrgs(showAddRule);
         return (
           <Modal
             title={`Add Commission Rule — ${dist?.name ?? ''}`}
@@ -913,6 +930,24 @@ const DistributorManagement: React.FC = () => {
           >
             <form onSubmit={handleAddCommissionRule}>
               <div className="space-y-4">
+                <Field label="Customer (optional)">
+                  <select
+                    value={newRule.organization_id}
+                    onChange={(e) => setNewRule({ ...newRule, organization_id: e.target.value })}
+                    className={selectCls}
+                  >
+                    <option value="">All customers (global rule)</option>
+                    {distCustOrgs.map((dc) => (
+                      <option key={dc.organization_id} value={dc.organization_id}>
+                        {dc.organizations.name} ({dc.organizations.code})
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Leave blank to apply to all customers; select one to create a customer-specific override.
+                  </p>
+                </Field>
+
                 <Field label="Applies To *">
                   <select
                     required
