@@ -41,17 +41,26 @@ CREATE TABLE IF NOT EXISTS support_ticket_messages (
 );
 
 -- Indexes
-CREATE INDEX idx_support_tickets_user_id ON support_tickets(user_id);
-CREATE INDEX idx_support_tickets_organization_id ON support_tickets(organization_id);
-CREATE INDEX idx_support_tickets_status ON support_tickets(status);
-CREATE INDEX idx_support_tickets_assigned_to ON support_tickets(assigned_to);
-CREATE INDEX idx_support_ticket_messages_ticket_id ON support_ticket_messages(ticket_id);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_user_id ON support_tickets(user_id);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_organization_id ON support_tickets(organization_id);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_status ON support_tickets(status);
+CREATE INDEX IF NOT EXISTS idx_support_tickets_assigned_to ON support_tickets(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_support_ticket_messages_ticket_id ON support_ticket_messages(ticket_id);
 
 -- Enable RLS
 ALTER TABLE support_tickets ENABLE ROW LEVEL SECURITY;
 ALTER TABLE support_ticket_messages ENABLE ROW LEVEL SECURITY;
 
 -- RLS policies for support_tickets
+DROP POLICY IF EXISTS "Users can view own tickets" ON support_tickets;
+DROP POLICY IF EXISTS "Users can create own tickets" ON support_tickets;
+DROP POLICY IF EXISTS "Admins can view all tickets" ON support_tickets;
+DROP POLICY IF EXISTS "Admins can update all tickets" ON support_tickets;
+DROP POLICY IF EXISTS "Users can view messages on own tickets" ON support_ticket_messages;
+DROP POLICY IF EXISTS "Users can add messages to own tickets" ON support_ticket_messages;
+DROP POLICY IF EXISTS "Admins can view all messages" ON support_ticket_messages;
+DROP POLICY IF EXISTS "Admins can add messages to any ticket" ON support_ticket_messages;
+
 CREATE POLICY "Users can view own tickets"
   ON support_tickets FOR SELECT
   USING (auth.uid() = user_id);
@@ -132,6 +141,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS support_tickets_updated_at ON support_tickets;
 CREATE TRIGGER support_tickets_updated_at
   BEFORE UPDATE ON support_tickets
   FOR EACH ROW
