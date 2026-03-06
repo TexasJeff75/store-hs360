@@ -1,6 +1,85 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Building, Plus, CreditCard as Edit2, Trash2, X, Save, TrendingUp, DollarSign } from 'lucide-react';
+import {
+  Users, Building, Plus, CreditCard as Edit2, Trash2, X, Save,
+  TrendingUp, DollarSign, Building2, Percent, Package,
+} from 'lucide-react';
 import { supabase } from '@/services/supabase';
+
+// ── Commission type config ───────────────────────────────────────────────────
+
+export type CommissionType =
+  | 'percent_gross_sales'
+  | 'percent_margin'
+  | 'percent_net_sales'
+  | 'flat_per_order'
+  | 'flat_per_unit';
+
+const COMMISSION_TYPES: {
+  value: CommissionType;
+  label: string;
+  description: string;
+  rateLabel: string;
+  rateUnit: string;
+  isFlat: boolean;
+}[] = [
+  {
+    value: 'percent_margin',
+    label: '% of Margin',
+    description: 'Percentage of (contracted price − product cost)',
+    rateLabel: 'Rate',
+    rateUnit: '%',
+    isFlat: false,
+  },
+  {
+    value: 'percent_gross_sales',
+    label: '% of Gross Sales',
+    description: 'Percentage of the total order value before any deductions',
+    rateLabel: 'Rate',
+    rateUnit: '%',
+    isFlat: false,
+  },
+  {
+    value: 'percent_net_sales',
+    label: '% of Net Sales',
+    description: 'Percentage of order value after discounts / credits',
+    rateLabel: 'Rate',
+    rateUnit: '%',
+    isFlat: false,
+  },
+  {
+    value: 'flat_per_order',
+    label: 'Flat per Order',
+    description: 'Fixed dollar amount earned for each order placed',
+    rateLabel: 'Amount',
+    rateUnit: '$',
+    isFlat: true,
+  },
+  {
+    value: 'flat_per_unit',
+    label: 'Flat per Unit',
+    description: 'Fixed dollar amount earned for each unit sold',
+    rateLabel: 'Amount',
+    rateUnit: '$',
+    isFlat: true,
+  },
+];
+
+function getCommissionTypeConfig(value: CommissionType) {
+  return COMMISSION_TYPES.find((t) => t.value === value) ?? COMMISSION_TYPES[0];
+}
+
+function commissionRateLabel(type: CommissionType, rate: number) {
+  const cfg = getCommissionTypeConfig(type);
+  return cfg.isFlat ? `$${Number(rate).toFixed(2)}` : `${rate}%`;
+}
+
+// ── Interfaces ───────────────────────────────────────────────────────────────
+
+interface Organization {
+  id: string;
+  name: string;
+  code: string;
+}
 
 interface Distributor {
   id: string;
@@ -8,12 +87,13 @@ interface Distributor {
   name: string;
   code: string;
   commission_rate: number;
+  commission_type: CommissionType;
+  organization_id?: string;
   is_active: boolean;
   notes?: string;
   created_at: string;
-  profiles?: {
-    email: string;
-  };
+  profiles?: { email: string };
+  organizations?: { name: string; code: string } | null;
 }
 
 interface SalesRep {
@@ -31,14 +111,15 @@ interface DistributorSalesRep {
   distributor_override_rate?: number;
   is_active: boolean;
   notes?: string;
-  profiles?: {
-    email: string;
-  };
+  profiles?: { email: string };
 }
+
+// ── Component ────────────────────────────────────────────────────────────────
 
 const DistributorManagement: React.FC = () => {
   const [distributors, setDistributors] = useState<Distributor[]>([]);
   const [availableUsers, setAvailableUsers] = useState<SalesRep[]>([]);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
   const [distributorSalesReps, setDistributorSalesReps] = useState<DistributorSalesRep[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,22 +130,22 @@ const DistributorManagement: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Form states for new distributor
   const [newDistributor, setNewDistributor] = useState({
     profile_id: '',
     name: '',
     code: '',
     commission_rate: 45,
-    notes: ''
+    commission_type: 'percent_margin' as CommissionType,
+    organization_id: '',
+    notes: '',
   });
 
-  // Form states for adding sales rep to distributor
   const [newDistributorSalesRep, setNewDistributorSalesRep] = useState({
     sales_rep_id: '',
     commission_split_type: 'percentage_of_distributor' as 'percentage_of_distributor' | 'fixed_with_override',
     sales_rep_rate: 50,
     distributor_override_rate: 0,
-    notes: ''
+    notes: '',
   });
 
   useEffect(() => {
@@ -76,10 +157,16 @@ const DistributorManagement: React.FC = () => {
       setLoading(true);
 
       const [distributorsRes, allUsersRes, salesRepsRes, distSalesRepsRes] = await Promise.all([
+      const [distributorsRes, orgsRes, salesRepsRes, distSalesRepsRes] = await Promise.all([
         supabase
           .from('distributors')
-          .select('*, profiles!distributors_profile_id_fkey(email)')
+          .select('*, profiles!distributors_profile_id_fkey(email), organizations(name, code)')
           .order('created_at', { ascending: false }),
+        supabase
+          .from('organizations')
+          .select('id, name, code')
+          .eq('is_active', true)
+          .order('name'),
         supabase
           .from('profiles')
           .select('id, email, role')
@@ -90,11 +177,12 @@ const DistributorManagement: React.FC = () => {
           .from('profiles')
           .select('id, email, role')
           .eq('role', 'sales_rep')
+          .in('role', ['sales_rep', 'distributor'])
           .order('email'),
         supabase
           .from('distributor_sales_reps')
           .select('*, profiles!distributor_sales_reps_sales_rep_id_fkey(email)')
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: false }),
       ]);
 
       if (distributorsRes.error) throw distributorsRes.error;
@@ -109,6 +197,12 @@ const DistributorManagement: React.FC = () => {
       const existingProfileIds = new Set(distData.map(d => d.profile_id));
       setAvailableUsers((allUsersRes.data || []).filter(u => !existingProfileIds.has(u.id)));
 
+      if (orgsRes.error) throw orgsRes.error;
+      if (salesRepsRes.error) throw salesRepsRes.error;
+      if (distSalesRepsRes.error) throw distSalesRepsRes.error;
+
+      setDistributors((distributorsRes.data as Distributor[]) || []);
+      setOrganizations(orgsRes.data || []);
       setSalesReps(salesRepsRes.data || []);
       setDistributorSalesReps(distSalesRepsRes.data || []);
     } catch (err) {
@@ -126,6 +220,11 @@ const DistributorManagement: React.FC = () => {
         .from('distributors')
         .insert([{ ...newDistributor, user_id: newDistributor.profile_id }]);
 
+      const payload = {
+        ...newDistributor,
+        organization_id: newDistributor.organization_id || null,
+      };
+      const { error: insertError } = await supabase.from('distributors').insert([payload]);
       if (insertError) throw insertError;
 
       setSuccess('Distributor created successfully');
@@ -135,7 +234,9 @@ const DistributorManagement: React.FC = () => {
         name: '',
         code: '',
         commission_rate: 45,
-        notes: ''
+        commission_type: 'percent_margin',
+        organization_id: '',
+        notes: '',
       });
       fetchData();
     } catch (err) {
@@ -153,9 +254,11 @@ const DistributorManagement: React.FC = () => {
           name: editingDistributor.name,
           code: editingDistributor.code,
           commission_rate: editingDistributor.commission_rate,
+          commission_type: editingDistributor.commission_type,
+          organization_id: editingDistributor.organization_id || null,
           is_active: editingDistributor.is_active,
           notes: editingDistributor.notes,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', editingDistributor.id);
 
@@ -170,18 +273,12 @@ const DistributorManagement: React.FC = () => {
   };
 
   const handleDeleteDistributor = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this distributor? This will remove all associated sales rep relationships.')) return;
-
+    if (!confirm('Delete this distributor? All associated sales rep relationships will also be removed.')) return;
     try {
       setError(null);
-      const { error: deleteError } = await supabase
-        .from('distributors')
-        .delete()
-        .eq('id', id);
-
+      const { error: deleteError } = await supabase.from('distributors').delete().eq('id', id);
       if (deleteError) throw deleteError;
-
-      setSuccess('Distributor deleted successfully');
+      setSuccess('Distributor deleted');
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete distributor');
@@ -191,29 +288,27 @@ const DistributorManagement: React.FC = () => {
   const handleAddSalesRepToDistributor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedDistributor) return;
-
     try {
       setError(null);
-      const { error: insertError } = await supabase
-        .from('distributor_sales_reps')
-        .insert([{
-          distributor_id: selectedDistributor,
-          ...newDistributorSalesRep,
-          distributor_override_rate: newDistributorSalesRep.commission_split_type === 'fixed_with_override'
+      const { error: insertError } = await supabase.from('distributor_sales_reps').insert([{
+        distributor_id: selectedDistributor,
+        ...newDistributorSalesRep,
+        distributor_override_rate:
+          newDistributorSalesRep.commission_split_type === 'fixed_with_override'
             ? newDistributorSalesRep.distributor_override_rate
-            : null
-        }]);
+            : null,
+      }]);
 
       if (insertError) throw insertError;
 
-      setSuccess('Sales rep added to distributor successfully');
+      setSuccess('Sales rep added to distributor');
       setShowAddSalesRep(false);
       setNewDistributorSalesRep({
         sales_rep_id: '',
         commission_split_type: 'percentage_of_distributor',
         sales_rep_rate: 50,
         distributor_override_rate: 0,
-        notes: ''
+        notes: '',
       });
       fetchData();
     } catch (err) {
@@ -222,30 +317,27 @@ const DistributorManagement: React.FC = () => {
   };
 
   const handleRemoveSalesRepFromDistributor = async (id: string) => {
-    if (!confirm('Are you sure you want to remove this sales rep from the distributor?')) return;
-
+    if (!confirm('Remove this sales rep from the distributor?')) return;
     try {
       setError(null);
-      const { error: deleteError } = await supabase
-        .from('distributor_sales_reps')
-        .delete()
-        .eq('id', id);
-
+      const { error: deleteError } = await supabase.from('distributor_sales_reps').delete().eq('id', id);
       if (deleteError) throw deleteError;
-
-      setSuccess('Sales rep removed successfully');
+      setSuccess('Sales rep removed');
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove sales rep');
     }
   };
 
-  const getDistributorSalesReps = (distributorId: string) => {
-    return distributorSalesReps.filter(dsr => dsr.distributor_id === distributorId && dsr.is_active);
-  };
+  const getDistributorSalesReps = (distributorId: string) =>
+    distributorSalesReps.filter((dsr) => dsr.distributor_id === distributorId && dsr.is_active);
 
   if (loading) {
-    return <div className="p-6">Loading...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500" />
+      </div>
+    );
   }
 
   return (
@@ -255,7 +347,7 @@ const DistributorManagement: React.FC = () => {
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Distributor Management</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Manage distributors and their hierarchical commission structure with sales reps
+            Manage distributors, their customer accounts, commission structures, and sales rep hierarchies
           </p>
         </div>
         <button
@@ -267,236 +359,97 @@ const DistributorManagement: React.FC = () => {
         </button>
       </div>
 
-      {/* Error/Success Messages */}
+      {/* Alerts */}
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700">
-          {error}
-        </div>
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
       )}
       {success && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-700">
-          {success}
+        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">{success}</div>
+      )}
+
+      {/* Empty state */}
+      {distributors.length === 0 && (
+        <div className="bg-white border border-dashed border-gray-300 rounded-xl py-16 text-center">
+          <Building className="mx-auto h-10 w-10 text-gray-300 mb-3" />
+          <p className="text-sm font-medium text-gray-500">No distributors yet</p>
+          <p className="text-xs text-gray-400 mt-1">Click "Add Distributor" to create one</p>
         </div>
       )}
 
-      {/* Distributors List */}
+      {/* Distributors list */}
       <div className="grid gap-6">
-        {distributors.map(distributor => (
-          <div key={distributor.id} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            {editingDistributor?.id === distributor.id ? (
-              /* Edit Mode */
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Distributor Name
-                    </label>
-                    <input
-                      type="text"
-                      value={editingDistributor.name}
-                      onChange={(e) => setEditingDistributor({ ...editingDistributor, name: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Code
-                    </label>
-                    <input
-                      type="text"
-                      value={editingDistributor.code}
-                      onChange={(e) => setEditingDistributor({ ...editingDistributor, code: e.target.value })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Commission Rate (%)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      value={editingDistributor.commission_rate}
-                      onChange={(e) => setEditingDistributor({ ...editingDistributor, commission_rate: parseFloat(e.target.value) })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Status
-                    </label>
-                    <select
-                      value={editingDistributor.is_active ? 'active' : 'inactive'}
-                      onChange={(e) => setEditingDistributor({ ...editingDistributor, is_active: e.target.value === 'active' })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    >
-                      <option value="active">Active</option>
-                      <option value="inactive">Inactive</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Notes
-                  </label>
-                  <textarea
-                    value={editingDistributor.notes || ''}
-                    onChange={(e) => setEditingDistributor({ ...editingDistributor, notes: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                    rows={2}
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={handleUpdateDistributor}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
-                  >
-                    <Save className="h-4 w-4" />
-                    Save
-                  </button>
-                  <button
-                    onClick={() => setEditingDistributor(null)}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              /* View Mode */
-              <>
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-start gap-4">
-                    <div className="p-3 bg-gradient-to-br from-pink-500 to-orange-500 rounded-lg">
-                      <Building className="h-6 w-6 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-semibold text-gray-900">{distributor.name}</h3>
-                      <p className="text-sm text-gray-600">Code: {distributor.code}</p>
-                      <p className="text-sm text-gray-600">User: {distributor.profiles?.email || 'N/A'}</p>
-                      {distributor.notes && (
-                        <p className="text-sm text-gray-500 mt-1">{distributor.notes}</p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      distributor.is_active
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-gray-100 text-gray-700'
-                    }`}>
-                      {distributor.is_active ? 'Active' : 'Inactive'}
-                    </span>
-                    <div className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full">
-                      <TrendingUp className="h-4 w-4" />
-                      <span className="text-sm font-medium">{distributor.commission_rate}%</span>
-                    </div>
-                    <button
-                      onClick={() => setEditingDistributor(distributor)}
-                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                      title="Edit"
-                    >
-                      <Edit2 className="h-4 w-4 text-gray-600" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteDistributor(distributor.id)}
-                      className="p-2 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-4 w-4 text-red-600" />
-                    </button>
-                  </div>
-                </div>
+        {distributors.map((distributor) => {
+          const typeConfig = getCommissionTypeConfig(distributor.commission_type ?? 'percent_margin');
+          const rateDisplay = commissionRateLabel(distributor.commission_type ?? 'percent_margin', distributor.commission_rate);
+          const reps = getDistributorSalesReps(distributor.id);
 
-                {/* Sales Reps under this Distributor */}
-                <div className="mt-4 pt-4 border-t border-gray-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                      <Users className="h-4 w-4" />
-                      Sales Representatives ({getDistributorSalesReps(distributor.id).length})
-                    </h4>
-                    <button
-                      onClick={() => {
-                        setSelectedDistributor(distributor.id);
-                        setShowAddSalesRep(true);
-                      }}
-                      className="text-sm px-3 py-1 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition-colors"
-                    >
-                      Add Sales Rep
-                    </button>
-                  </div>
+          return (
+            <div key={distributor.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+              {editingDistributor?.id === distributor.id ? (
+                /* ── Edit mode ─────────────────────────────────────────── */
+                <EditDistributorForm
+                  distributor={editingDistributor}
+                  organizations={organizations}
+                  onChange={setEditingDistributor}
+                  onSave={handleUpdateDistributor}
+                  onCancel={() => setEditingDistributor(null)}
+                />
+              ) : (
+                /* ── View mode ─────────────────────────────────────────── */
+                <>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-start gap-4">
+                      <div className="p-3 bg-gradient-to-br from-pink-500 to-orange-500 rounded-lg shrink-0">
+                        <Building className="h-6 w-6 text-white" />
+                      </div>
+                      <div className="min-w-0">
+                        <h3 className="text-xl font-semibold text-gray-900">{distributor.name}</h3>
+                        <p className="text-sm text-gray-500">Code: {distributor.code}</p>
+                        <p className="text-sm text-gray-500">User: {distributor.profiles?.email ?? 'N/A'}</p>
 
-                  {getDistributorSalesReps(distributor.id).length === 0 ? (
-                    <p className="text-sm text-gray-500 italic">No sales representatives assigned</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {getDistributorSalesReps(distributor.id).map(dsr => (
-                        <div key={dsr.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900">{dsr.profiles?.email}</p>
-                            <div className="flex items-center gap-4 mt-1">
-                              <span className="text-xs text-gray-600">
-                                Split: <span className="font-medium">{
-                                  dsr.commission_split_type === 'percentage_of_distributor'
-                                    ? `${dsr.sales_rep_rate}% of Distributor`
-                                    : `Fixed ${dsr.sales_rep_rate}% + ${dsr.distributor_override_rate}% Override`
-                                }</span>
-                              </span>
-                              {dsr.notes && (
-                                <span className="text-xs text-gray-500">{dsr.notes}</span>
-                              )}
-                            </div>
+                        {/* Organization badge */}
+                        {distributor.organizations ? (
+                          <div className="flex items-center gap-1.5 mt-1.5 text-sm text-indigo-700">
+                            <Building2 className="h-4 w-4 shrink-0" />
+                            <span className="font-medium">{distributor.organizations.name}</span>
+                            <span className="text-indigo-400">({distributor.organizations.code})</span>
                           </div>
-                          <button
-                            onClick={() => handleRemoveSalesRepFromDistributor(dsr.id)}
-                            className="p-1 hover:bg-red-100 rounded transition-colors"
-                            title="Remove"
-                          >
-                            <Trash2 className="h-4 w-4 text-red-600" />
-                          </button>
-                        </div>
-                      ))}
+                        ) : (
+                          <p className="mt-1 text-xs text-gray-400 italic">No organization linked</p>
+                        )}
+
+                        {distributor.notes && (
+                          <p className="text-sm text-gray-500 mt-1">{distributor.notes}</p>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
-        ))}
-      </div>
 
-      {/* Add Distributor Modal */}
-      {showAddDistributor && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-black bg-opacity-50"></div>
+                    {/* Right-side badges + actions */}
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                        distributor.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
+                      }`}>
+                        {distributor.is_active ? 'Active' : 'Inactive'}
+                      </span>
 
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <form onSubmit={handleCreateDistributor}>
-                <div className="bg-white px-6 pt-6 pb-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Add New Distributor</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddDistributor(false)}
-                      className="p-2 hover:bg-gray-100 rounded-full"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
-                  </div>
+                      {/* Commission type badge */}
+                      <span className="flex items-center gap-1 px-2.5 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-medium">
+                        {typeConfig.isFlat
+                          ? <Package className="h-3.5 w-3.5" />
+                          : <Percent className="h-3.5 w-3.5" />}
+                        {typeConfig.label}
+                      </span>
 
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Distributor User *
-                      </label>
-                      <select
-                        required
-                        value={newDistributor.profile_id}
-                        onChange={(e) => setNewDistributor({ ...newDistributor, profile_id: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                      {/* Rate badge */}
+                      <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                        <TrendingUp className="h-3.5 w-3.5" />
+                        {rateDisplay}
+                      </span>
+
+                      <button
+                        onClick={() => setEditingDistributor(distributor)}
+                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                        title="Edit"
                       >
                         <option value="">Select a user</option>
                         {availableUsers.map(u => (
@@ -556,167 +509,504 @@ const DistributorManagement: React.FC = () => {
                         rows={3}
                         placeholder="Optional notes..."
                       />
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-gray-50 px-6 py-4 flex gap-3 justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddDistributor(false)}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-gradient-to-r from-pink-500 to-orange-500 text-white rounded-lg hover:shadow-lg"
-                  >
-                    Create Distributor
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Sales Rep to Distributor Modal */}
-      {showAddSalesRep && selectedDistributor && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-black bg-opacity-50"></div>
-
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <form onSubmit={handleAddSalesRepToDistributor}>
-                <div className="bg-white px-6 pt-6 pb-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Add Sales Rep to Distributor</h3>
-                    <button
-                      type="button"
-                      onClick={() => setShowAddSalesRep(false)}
-                      className="p-2 hover:bg-gray-100 rounded-full"
-                    >
-                      <X className="h-5 w-5" />
-                    </button>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Sales Representative *
-                      </label>
-                      <select
-                        required
-                        value={newDistributorSalesRep.sales_rep_id}
-                        onChange={(e) => setNewDistributorSalesRep({ ...newDistributorSalesRep, sales_rep_id: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
+                        <Edit2 className="h-4 w-4 text-gray-500" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDistributor(distributor.id)}
+                        className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete"
                       >
-                        <option value="">Select a sales rep</option>
-                        {salesReps
-                          .filter(rep => !getDistributorSalesReps(selectedDistributor).find(dsr => dsr.sales_rep_id === rep.id))
-                          .map(rep => (
-                            <option key={rep.id} value={rep.id}>{rep.email}</option>
-                          ))}
-                      </select>
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </button>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Commission Split Type *
-                      </label>
-                      <select
-                        required
-                        value={newDistributorSalesRep.commission_split_type}
-                        onChange={(e) => setNewDistributorSalesRep({
-                          ...newDistributorSalesRep,
-                          commission_split_type: e.target.value as 'percentage_of_distributor' | 'fixed_with_override'
+                  </div>
+
+                  {/* Commission explanation */}
+                  <div className="mb-4 px-3 py-2 bg-gray-50 rounded-lg text-xs text-gray-600">
+                    <strong>Commission basis:</strong> {typeConfig.description}
+                    {' · '}
+                    <strong>Distributor earns:</strong> {rateDisplay}
+                    {reps.length > 0 && (
+                      <>
+                        {' · '}
+                        <strong>Sales rep splits:</strong>{' '}
+                        {reps.map((dsr) => {
+                          const repEarns =
+                            dsr.commission_split_type === 'percentage_of_distributor'
+                              ? `${dsr.sales_rep_rate}% of dist. commission`
+                              : typeConfig.isFlat
+                                ? `$${dsr.sales_rep_rate} per ${distributor.commission_type === 'flat_per_unit' ? 'unit' : 'order'}`
+                                : `${dsr.sales_rep_rate}% rate`;
+                          return `${dsr.profiles?.email?.split('@')[0]} → ${repEarns}`;
+                        }).join(', ')}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Sales reps */}
+                  <div className="pt-4 border-t border-gray-200">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Sales Representatives ({reps.length})
+                      </h4>
+                      <button
+                        onClick={() => { setSelectedDistributor(distributor.id); setShowAddSalesRep(true); }}
+                        className="text-sm px-3 py-1 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition-colors"
+                      >
+                        Add Sales Rep
+                      </button>
+                    </div>
+
+                    {reps.length === 0 ? (
+                      <p className="text-sm text-gray-400 italic">No sales representatives assigned</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {reps.map((dsr) => {
+                          const splitLabel =
+                            dsr.commission_split_type === 'percentage_of_distributor'
+                              ? `${dsr.sales_rep_rate}% of distributor commission`
+                              : `Fixed ${dsr.sales_rep_rate}${typeConfig.isFlat ? '$' : '%'} + ${dsr.distributor_override_rate ?? 0}${typeConfig.isFlat ? '$' : '%'} override`;
+                          return (
+                            <div key={dsr.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{dsr.profiles?.email}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  Split: <span className="font-medium text-gray-700">{splitLabel}</span>
+                                  {dsr.notes && <span className="ml-2 text-gray-400">{dsr.notes}</span>}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => handleRemoveSalesRepFromDistributor(dsr.id)}
+                                className="p-1 hover:bg-red-100 rounded transition-colors"
+                                title="Remove"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </button>
+                            </div>
+                          );
                         })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                      >
-                        <option value="percentage_of_distributor">Percentage of Distributor Commission</option>
-                        <option value="fixed_with_override">Fixed Rate with Distributor Override</option>
-                      </select>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {newDistributorSalesRep.commission_split_type === 'percentage_of_distributor'
-                          ? 'Sales rep gets a percentage of the distributor\'s total commission'
-                          : 'Sales rep gets a fixed commission rate, distributor gets an override'}
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Sales Rep Rate (%) *
-                      </label>
-                      <input
-                        type="number"
-                        required
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        value={newDistributorSalesRep.sales_rep_rate}
-                        onChange={(e) => setNewDistributorSalesRep({ ...newDistributorSalesRep, sales_rep_rate: parseFloat(e.target.value) })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        {newDistributorSalesRep.commission_split_type === 'percentage_of_distributor'
-                          ? 'Percentage of distributor commission (e.g., 50 = sales rep gets 50% of distributor\'s commission)'
-                          : 'Fixed commission rate for sales rep (e.g., 40 = 40% commission on margin)'}
-                      </p>
-                    </div>
-                    {newDistributorSalesRep.commission_split_type === 'fixed_with_override' && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Distributor Override Rate (%) *
-                        </label>
-                        <input
-                          type="number"
-                          required
-                          min="0"
-                          max="100"
-                          step="0.01"
-                          value={newDistributorSalesRep.distributor_override_rate}
-                          onChange={(e) => setNewDistributorSalesRep({ ...newDistributorSalesRep, distributor_override_rate: parseFloat(e.target.value) })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          Additional commission for distributor on top of sales rep commission
-                        </p>
                       </div>
                     )}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Notes
-                      </label>
-                      <textarea
-                        value={newDistributorSalesRep.notes}
-                        onChange={(e) => setNewDistributorSalesRep({ ...newDistributorSalesRep, notes: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500"
-                        rows={2}
-                        placeholder="Optional notes..."
-                      />
-                    </div>
                   </div>
-                </div>
-                <div className="bg-gray-50 px-6 py-4 flex gap-3 justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddSalesRep(false)}
-                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-gradient-to-r from-pink-500 to-orange-500 text-white rounded-lg hover:shadow-lg"
-                  >
-                    Add Sales Rep
-                  </button>
-                </div>
-              </form>
+                </>
+              )}
             </div>
-          </div>
-        </div>
+          );
+        })}
+      </div>
+
+      {/* ── Add Distributor Modal ────────────────────────────────────────────── */}
+      {showAddDistributor && (
+        <Modal title="Add New Distributor" onClose={() => setShowAddDistributor(false)}>
+          <form onSubmit={handleCreateDistributor}>
+            <div className="space-y-4">
+              <Field label="Distributor User *">
+                <select
+                  required
+                  value={newDistributor.profile_id}
+                  onChange={(e) => setNewDistributor({ ...newDistributor, profile_id: e.target.value })}
+                  className={selectCls}
+                >
+                  <option value="">Select a user</option>
+                  {salesReps.map((rep) => (
+                    <option key={rep.id} value={rep.id}>{rep.email} ({rep.role})</option>
+                  ))}
+                </select>
+              </Field>
+
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Distributor Name *">
+                  <input
+                    type="text"
+                    required
+                    value={newDistributor.name}
+                    onChange={(e) => setNewDistributor({ ...newDistributor, name: e.target.value })}
+                    className={inputCls}
+                    placeholder="ABC Distribution"
+                  />
+                </Field>
+                <Field label="Code *">
+                  <input
+                    type="text"
+                    required
+                    value={newDistributor.code}
+                    onChange={(e) => setNewDistributor({ ...newDistributor, code: e.target.value.toUpperCase() })}
+                    className={inputCls}
+                    placeholder="DIST001"
+                  />
+                </Field>
+              </div>
+
+              <Field label="Customer Organization">
+                <select
+                  value={newDistributor.organization_id}
+                  onChange={(e) => setNewDistributor({ ...newDistributor, organization_id: e.target.value })}
+                  className={selectCls}
+                >
+                  <option value="">— Unlinked —</option>
+                  {organizations.map((org) => (
+                    <option key={org.id} value={org.id}>{org.name} ({org.code})</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">The primary account this distributor serves</p>
+              </Field>
+
+              <Field label="Commission Basis *">
+                <select
+                  required
+                  value={newDistributor.commission_type}
+                  onChange={(e) =>
+                    setNewDistributor({ ...newDistributor, commission_type: e.target.value as CommissionType })
+                  }
+                  className={selectCls}
+                >
+                  {COMMISSION_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
+                  ))}
+                </select>
+                <p className="text-xs text-gray-400 mt-1">
+                  {getCommissionTypeConfig(newDistributor.commission_type).description}
+                </p>
+              </Field>
+
+              <Field
+                label={`${getCommissionTypeConfig(newDistributor.commission_type).rateLabel} (${getCommissionTypeConfig(newDistributor.commission_type).rateUnit}) *`}
+              >
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  max={getCommissionTypeConfig(newDistributor.commission_type).isFlat ? undefined : 100}
+                  step="0.01"
+                  value={newDistributor.commission_rate}
+                  onChange={(e) =>
+                    setNewDistributor({ ...newDistributor, commission_rate: parseFloat(e.target.value) })
+                  }
+                  className={inputCls}
+                />
+              </Field>
+
+              <Field label="Notes">
+                <textarea
+                  value={newDistributor.notes}
+                  onChange={(e) => setNewDistributor({ ...newDistributor, notes: e.target.value })}
+                  className={inputCls}
+                  rows={3}
+                  placeholder="Optional notes..."
+                />
+              </Field>
+            </div>
+
+            <div className="mt-6 flex gap-3 justify-end border-t border-gray-100 pt-4">
+              <button
+                type="button"
+                onClick={() => setShowAddDistributor(false)}
+                className={cancelBtnCls}
+              >
+                Cancel
+              </button>
+              <button type="submit" className={primaryBtnCls}>
+                Create Distributor
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
+
+      {/* ── Add Sales Rep Modal ──────────────────────────────────────────────── */}
+      {showAddSalesRep && selectedDistributor && (() => {
+        const dist = distributors.find((d) => d.id === selectedDistributor);
+        const typeConfig = dist ? getCommissionTypeConfig(dist.commission_type ?? 'percent_margin') : COMMISSION_TYPES[0];
+        return (
+          <Modal
+            title={`Add Sales Rep — ${dist?.name ?? ''}`}
+            onClose={() => setShowAddSalesRep(false)}
+          >
+            {dist && (
+              <div className="mb-4 px-3 py-2 bg-violet-50 border border-violet-100 rounded-lg text-xs text-violet-700">
+                <strong>Distributor commission:</strong> {commissionRateLabel(dist.commission_type, dist.commission_rate)}
+                {' · '}
+                <strong>Basis:</strong> {typeConfig.label}
+              </div>
+            )}
+            <form onSubmit={handleAddSalesRepToDistributor}>
+              <div className="space-y-4">
+                <Field label="Sales Representative *">
+                  <select
+                    required
+                    value={newDistributorSalesRep.sales_rep_id}
+                    onChange={(e) =>
+                      setNewDistributorSalesRep({ ...newDistributorSalesRep, sales_rep_id: e.target.value })
+                    }
+                    className={selectCls}
+                  >
+                    <option value="">Select a sales rep</option>
+                    {salesReps
+                      .filter(
+                        (rep) =>
+                          !getDistributorSalesReps(selectedDistributor).find(
+                            (dsr) => dsr.sales_rep_id === rep.id,
+                          ),
+                      )
+                      .map((rep) => (
+                        <option key={rep.id} value={rep.id}>{rep.email}</option>
+                      ))}
+                  </select>
+                </Field>
+
+                <Field label="Commission Split Type *">
+                  <select
+                    required
+                    value={newDistributorSalesRep.commission_split_type}
+                    onChange={(e) =>
+                      setNewDistributorSalesRep({
+                        ...newDistributorSalesRep,
+                        commission_split_type: e.target.value as 'percentage_of_distributor' | 'fixed_with_override',
+                      })
+                    }
+                    className={selectCls}
+                  >
+                    <option value="percentage_of_distributor">% of Distributor Commission</option>
+                    <option value="fixed_with_override">Fixed Rate with Distributor Override</option>
+                  </select>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {newDistributorSalesRep.commission_split_type === 'percentage_of_distributor'
+                      ? "Sales rep receives a percentage of the distributor's earned commission amount"
+                      : "Sales rep earns their own fixed rate; distributor earns an additional override rate"}
+                  </p>
+                </Field>
+
+                <Field
+                  label={
+                    newDistributorSalesRep.commission_split_type === 'percentage_of_distributor'
+                      ? "Rep's Share of Distributor Commission (%)"
+                      : `Rep's Fixed ${typeConfig.rateLabel} (${typeConfig.rateUnit}) *`
+                  }
+                >
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    max={
+                      newDistributorSalesRep.commission_split_type === 'percentage_of_distributor' || !typeConfig.isFlat
+                        ? 100
+                        : undefined
+                    }
+                    step="0.01"
+                    value={newDistributorSalesRep.sales_rep_rate}
+                    onChange={(e) =>
+                      setNewDistributorSalesRep({
+                        ...newDistributorSalesRep,
+                        sales_rep_rate: parseFloat(e.target.value),
+                      })
+                    }
+                    className={inputCls}
+                  />
+                  {newDistributorSalesRep.commission_split_type === 'percentage_of_distributor' && dist && (
+                    <p className="text-xs text-gray-400 mt-1">
+                      At {newDistributorSalesRep.sales_rep_rate}%: rep gets{' '}
+                      {typeConfig.isFlat
+                        ? `$${((dist.commission_rate * newDistributorSalesRep.sales_rep_rate) / 100).toFixed(2)}`
+                        : `${((dist.commission_rate * newDistributorSalesRep.sales_rep_rate) / 100).toFixed(2)}%`}
+                      {' '}of {typeConfig.label.toLowerCase()}
+                    </p>
+                  )}
+                </Field>
+
+                {newDistributorSalesRep.commission_split_type === 'fixed_with_override' && (
+                  <Field label={`Distributor Override ${typeConfig.rateLabel} (${typeConfig.rateUnit})`}>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      max={typeConfig.isFlat ? undefined : 100}
+                      step="0.01"
+                      value={newDistributorSalesRep.distributor_override_rate}
+                      onChange={(e) =>
+                        setNewDistributorSalesRep({
+                          ...newDistributorSalesRep,
+                          distributor_override_rate: parseFloat(e.target.value),
+                        })
+                      }
+                      className={inputCls}
+                    />
+                    <p className="text-xs text-gray-400 mt-1">
+                      Additional commission the distributor earns on top of the rep's rate
+                    </p>
+                  </Field>
+                )}
+
+                <Field label="Notes">
+                  <textarea
+                    value={newDistributorSalesRep.notes}
+                    onChange={(e) =>
+                      setNewDistributorSalesRep({ ...newDistributorSalesRep, notes: e.target.value })
+                    }
+                    className={inputCls}
+                    rows={2}
+                    placeholder="Optional notes..."
+                  />
+                </Field>
+              </div>
+
+              <div className="mt-6 flex gap-3 justify-end border-t border-gray-100 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAddSalesRep(false)}
+                  className={cancelBtnCls}
+                >
+                  Cancel
+                </button>
+                <button type="submit" className={primaryBtnCls}>
+                  Add Sales Rep
+                </button>
+              </div>
+            </form>
+          </Modal>
+        );
+      })()}
     </div>
   );
 };
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+
+interface EditDistributorFormProps {
+  distributor: Distributor;
+  organizations: Organization[];
+  onChange: (d: Distributor) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}
+
+const EditDistributorForm: React.FC<EditDistributorFormProps> = ({
+  distributor, organizations, onChange, onSave, onCancel,
+}) => {
+  const typeConfig = getCommissionTypeConfig(distributor.commission_type);
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Name">
+          <input
+            type="text"
+            value={distributor.name}
+            onChange={(e) => onChange({ ...distributor, name: e.target.value })}
+            className={inputCls}
+          />
+        </Field>
+        <Field label="Code">
+          <input
+            type="text"
+            value={distributor.code}
+            onChange={(e) => onChange({ ...distributor, code: e.target.value })}
+            className={inputCls}
+          />
+        </Field>
+      </div>
+
+      <Field label="Customer Organization">
+        <select
+          value={distributor.organization_id ?? ''}
+          onChange={(e) => onChange({ ...distributor, organization_id: e.target.value || undefined })}
+          className={selectCls}
+        >
+          <option value="">— Unlinked —</option>
+          {organizations.map((org) => (
+            <option key={org.id} value={org.id}>{org.name} ({org.code})</option>
+          ))}
+        </select>
+      </Field>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Commission Basis">
+          <select
+            value={distributor.commission_type}
+            onChange={(e) => onChange({ ...distributor, commission_type: e.target.value as CommissionType })}
+            className={selectCls}
+          >
+            {COMMISSION_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </select>
+        </Field>
+        <Field label={`${typeConfig.rateLabel} (${typeConfig.rateUnit})`}>
+          <input
+            type="number"
+            min="0"
+            max={typeConfig.isFlat ? undefined : 100}
+            step="0.01"
+            value={distributor.commission_rate}
+            onChange={(e) => onChange({ ...distributor, commission_rate: parseFloat(e.target.value) })}
+            className={inputCls}
+          />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Status">
+          <select
+            value={distributor.is_active ? 'active' : 'inactive'}
+            onChange={(e) => onChange({ ...distributor, is_active: e.target.value === 'active' })}
+            className={selectCls}
+          >
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </Field>
+        <Field label="Notes">
+          <input
+            type="text"
+            value={distributor.notes ?? ''}
+            onChange={(e) => onChange({ ...distributor, notes: e.target.value })}
+            className={inputCls}
+          />
+        </Field>
+      </div>
+
+      <div className="flex gap-2 pt-2">
+        <button onClick={onSave} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+          <Save className="h-4 w-4" /> Save
+        </button>
+        <button onClick={onCancel} className={cancelBtnCls}>Cancel</button>
+      </div>
+    </div>
+  );
+};
+
+const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode }> = ({
+  title, onClose, children,
+}) => (
+  <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="flex items-center justify-center min-h-screen px-4 py-8">
+      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg">
+        <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full transition-colors">
+            <X className="h-5 w-5 text-gray-500" />
+          </button>
+        </div>
+        <div className="px-6 py-5">{children}</div>
+      </div>
+    </div>
+  </div>
+);
+
+const Field: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <div>
+    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+    {children}
+  </div>
+);
+
+// Shared Tailwind class strings
+const inputCls =
+  'w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-pink-500 focus:border-transparent';
+const selectCls = inputCls;
+const primaryBtnCls =
+  'px-4 py-2 bg-gradient-to-r from-pink-500 to-orange-500 text-white rounded-lg hover:shadow-lg text-sm font-medium transition-all';
+const cancelBtnCls =
+  'px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-colors';
 
 export default DistributorManagement;
