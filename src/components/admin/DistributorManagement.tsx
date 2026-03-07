@@ -217,6 +217,12 @@ const DistributorManagement: React.FC = () => {
   const [codeManuallyEdited, setCodeManuallyEdited] = useState(false);
   const [showCommissionFields, setShowCommissionFields] = useState(false);
 
+  // Inline sales rep user creation state
+  const [showCreateSalesRepUser, setShowCreateSalesRepUser] = useState(false);
+  const [newSalesRepEmail, setNewSalesRepEmail] = useState('');
+  const [newSalesRepPassword, setNewSalesRepPassword] = useState('');
+  const [isCreatingSalesRepUser, setIsCreatingSalesRepUser] = useState(false);
+
   const [newDistributorSalesRep, setNewDistributorSalesRep] = useState({
     sales_rep_id: '',
     commission_split_type: 'percentage_of_distributor' as 'percentage_of_distributor' | 'fixed_with_override',
@@ -418,6 +424,74 @@ const DistributorManagement: React.FC = () => {
       setError(err instanceof Error ? err.message : 'Failed to create user');
     } finally {
       setIsCreatingUser(false);
+    }
+  };
+
+  const handleCreateSalesRepUser = async () => {
+    if (!newSalesRepEmail.trim() || !newSalesRepPassword.trim()) {
+      setError('Email and password are required');
+      return;
+    }
+    if (newSalesRepPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+    try {
+      setIsCreatingSalesRepUser(true);
+      setError(null);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No active session');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: newSalesRepEmail,
+            password: newSalesRepPassword,
+            role: 'sales_rep',
+            is_approved: true,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || 'User creation failed');
+
+      const createdEmail = newSalesRepEmail.trim().toLowerCase();
+      setNewSalesRepEmail('');
+      setNewSalesRepPassword('');
+      setShowCreateSalesRepUser(false);
+
+      // Re-fetch sales reps to include the new user
+      const salesRepsRes = await supabase
+        .from('profiles')
+        .select('id, email, role')
+        .in('role', ['sales_rep', 'distributor'])
+        .order('email');
+
+      if (!salesRepsRes.error) {
+        setSalesReps(salesRepsRes.data || []);
+        const newUser = (salesRepsRes.data || []).find(u => u.email.toLowerCase() === createdEmail);
+        if (newUser) {
+          setNewDistributorSalesRep(prev => ({ ...prev, sales_rep_id: newUser.id }));
+        }
+      }
+
+      setSuccess('Sales rep user created and selected');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create user');
+    } finally {
+      setIsCreatingSalesRepUser(false);
     }
   };
 
@@ -1315,7 +1389,7 @@ const DistributorManagement: React.FC = () => {
         return (
           <Modal
             title={`Add Sales Rep — ${dist?.name ?? ''}`}
-            onClose={() => setShowAddSalesRep(false)}
+            onClose={() => { setShowAddSalesRep(false); setShowCreateSalesRepUser(false); setNewSalesRepEmail(''); setNewSalesRepPassword(''); }}
           >
             {dist && (
               <div className="mb-4 px-3 py-2 bg-violet-50 border border-violet-100 rounded-lg text-xs text-violet-700">
@@ -1327,26 +1401,85 @@ const DistributorManagement: React.FC = () => {
             <form onSubmit={handleAddSalesRepToDistributor}>
               <div className="space-y-4">
                 <Field label="Sales Representative *">
-                  <select
-                    required
-                    value={newDistributorSalesRep.sales_rep_id}
-                    onChange={(e) =>
-                      setNewDistributorSalesRep({ ...newDistributorSalesRep, sales_rep_id: e.target.value })
-                    }
-                    className={selectCls}
-                  >
-                    <option value="">Select a sales rep</option>
-                    {salesReps
-                      .filter(
-                        (rep) =>
-                          !getDistributorSalesReps(selectedDistributor).find(
-                            (dsr) => dsr.sales_rep_id === rep.id,
-                          ),
-                      )
-                      .map((rep) => (
-                        <option key={rep.id} value={rep.id}>{rep.email}</option>
-                      ))}
-                  </select>
+                  {!showCreateSalesRepUser ? (
+                    <div className="flex gap-2">
+                      <select
+                        required
+                        value={newDistributorSalesRep.sales_rep_id}
+                        onChange={(e) =>
+                          setNewDistributorSalesRep({ ...newDistributorSalesRep, sales_rep_id: e.target.value })
+                        }
+                        className={`${selectCls} flex-1`}
+                      >
+                        <option value="">Select a sales rep</option>
+                        {salesReps
+                          .filter(
+                            (rep) =>
+                              !getDistributorSalesReps(selectedDistributor).find(
+                                (dsr) => dsr.sales_rep_id === rep.id,
+                              ),
+                          )
+                          .map((rep) => (
+                            <option key={rep.id} value={rep.id}>{rep.email}</option>
+                          ))}
+                      </select>
+                      <button
+                        type="button"
+                        onClick={() => setShowCreateSalesRepUser(true)}
+                        className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg whitespace-nowrap"
+                      >
+                        <UserPlus className="h-4 w-4" />
+                        New User
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="border border-purple-200 bg-purple-50 rounded-lg p-3 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-purple-700">Create New Sales Rep</span>
+                        <button
+                          type="button"
+                          onClick={() => { setShowCreateSalesRepUser(false); setNewSalesRepEmail(''); setNewSalesRepPassword(''); }}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <input
+                        type="email"
+                        value={newSalesRepEmail}
+                        onChange={(e) => setNewSalesRepEmail(e.target.value)}
+                        className={inputCls}
+                        placeholder="Email address"
+                      />
+                      <input
+                        type="password"
+                        value={newSalesRepPassword}
+                        onChange={(e) => setNewSalesRepPassword(e.target.value)}
+                        className={inputCls}
+                        placeholder="Password (min 6 characters)"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCreateSalesRepUser}
+                          disabled={isCreatingSalesRepUser}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg disabled:opacity-50"
+                        >
+                          {isCreatingSalesRepUser ? 'Creating...' : 'Create & Select'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => { setShowCreateSalesRepUser(false); setNewSalesRepEmail(''); setNewSalesRepPassword(''); }}
+                          className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-500">
+                        User will be created with the <strong>sales_rep</strong> role and auto-approved.
+                      </p>
+                    </div>
+                  )}
                 </Field>
 
                 <Field label="Commission Split Type *">
@@ -1447,7 +1580,7 @@ const DistributorManagement: React.FC = () => {
               <div className="mt-6 flex gap-3 justify-end border-t border-gray-100 pt-4">
                 <button
                   type="button"
-                  onClick={() => setShowAddSalesRep(false)}
+                  onClick={() => { setShowAddSalesRep(false); setShowCreateSalesRepUser(false); setNewSalesRepEmail(''); setNewSalesRepPassword(''); }}
                   className={cancelBtnCls}
                 >
                   Cancel
