@@ -65,18 +65,31 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
   const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
 
   const resolveInitialTab = (tab?: string): ActiveTab => {
-    if (!tab) {
-      if (isAdmin) return 'home';
-      if (isCustomer) return 'orders';
-      if (isSalesRep) return 'my-orgs';
-      if (isDistributor) return 'commissions';
-      return 'home';
+    // If an explicit tab was passed (e.g. from store navigation), use it
+    if (tab) {
+      if (tab === 'admin-settings') return 'organizations';
+      return tab as ActiveTab;
     }
-    if (tab === 'admin-settings') return 'organizations';
-    return tab as ActiveTab;
+
+    // Otherwise, restore persisted tab from sessionStorage
+    const stored = sessionStorage.getItem('admin_active_tab');
+    if (stored) return stored as ActiveTab;
+
+    // Role-based default
+    if (isAdmin) return 'home';
+    if (isCustomer) return 'orders';
+    if (isSalesRep) return 'my-orgs';
+    if (isDistributor) return 'commissions';
+    return 'home';
   };
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>(() => resolveInitialTab(initialTab));
+  const [activeTab, setActiveTabRaw] = useState<ActiveTab>(() => resolveInitialTab(initialTab));
+
+  // Persist active tab to sessionStorage so it survives re-renders and tab switches
+  const setActiveTab = (tab: ActiveTab) => {
+    sessionStorage.setItem('admin_active_tab', tab);
+    setActiveTabRaw(tab);
+  };
 
   useEffect(() => {
     if (isCustomer && user?.id) {

@@ -541,6 +541,7 @@ function AppContent() {
     return (
       <AdminDashboard
         onClose={() => {
+          sessionStorage.removeItem('admin_active_tab');
           setIsAdminOpen(false);
           setAdminInitialTab(undefined);
         }}
