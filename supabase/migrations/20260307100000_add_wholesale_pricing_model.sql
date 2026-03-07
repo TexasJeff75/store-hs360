@@ -350,21 +350,30 @@ BEGIN
 
       -- ════════════════════════════════════════════════════════════════════════
       -- Split commission between sales rep and distributor
-      -- (same logic for both pricing models)
+      -- ════════════════════════════════════════════════════════════════════════
+      -- For WHOLESALE distributors:
+      --   v_commission_amount = distributor's spread (customer_price − wholesale_price)
+      --   v_total_margin      = YOUR margin (wholesale_price − product_cost)
+      --   The distributor keeps their full spread (v_commission_amount).
+      --   The sales person earns a % of YOUR margin (v_total_margin).
+      --   These are independent — sales person commission does NOT reduce distributor spread.
+      --
+      -- For MARGIN_SPLIT distributors:
+      --   Existing split logic applies (percentage_of_distributor or fixed_with_override).
       -- ════════════════════════════════════════════════════════════════════════
       IF v_distributor_id IS NOT NULL THEN
-        IF v_commission_split_type = 'percentage_of_distributor' THEN
+        IF v_pricing_model = 'wholesale' THEN
+          -- Wholesale: distributor keeps full spread, sales person gets % of YOUR margin
+          v_distributor_commission := v_commission_amount;  -- full spread
+          v_sales_rep_commission   := v_total_margin * (v_sales_rep_rate / 100);
+          -- Total tracked commission = distributor spread + sales rep share of your margin
+          v_commission_amount      := v_distributor_commission + v_sales_rep_commission;
+        ELSIF v_commission_split_type = 'percentage_of_distributor' THEN
           v_sales_rep_commission  := v_commission_amount * (v_sales_rep_rate / 100);
           v_distributor_commission := v_commission_amount - v_sales_rep_commission;
         ELSIF v_commission_split_type = 'fixed_with_override' THEN
-          -- For wholesale model, fixed_with_override uses commission amount as base
-          IF v_pricing_model = 'wholesale' THEN
-            v_sales_rep_commission  := v_commission_amount * (v_sales_rep_rate / 100);
-            v_distributor_commission := v_commission_amount * (v_distributor_override_rate / 100);
-          ELSE
-            v_sales_rep_commission   := v_total_margin * (v_sales_rep_rate / 100);
-            v_distributor_commission := v_total_margin * (v_distributor_override_rate / 100);
-          END IF;
+          v_sales_rep_commission   := v_total_margin * (v_sales_rep_rate / 100);
+          v_distributor_commission := v_total_margin * (v_distributor_override_rate / 100);
           -- Add markup commission to sales rep
           IF NEW.items IS NOT NULL THEN
             FOR v_item IN SELECT * FROM jsonb_array_elements(NEW.items)
@@ -425,5 +434,5 @@ CREATE TRIGGER trigger_calculate_commission
 COMMENT ON FUNCTION calculate_commission_for_order() IS
   'Calculates commission for completed orders. Supports two pricing models: '
   'margin_split (rate% of margin with per-product/category rules) and '
-  'wholesale (earnings = customer_price − wholesale_price). '
-  'Both models split commission between distributor and sales rep.';
+  'wholesale (distributor keeps spread = customer_price − wholesale_price, '
+  'sales person earns % of YOUR margin = wholesale_price − product_cost).';

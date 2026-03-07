@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Users, Building, Plus, CreditCard as Edit2, Trash2, X, Save,
   TrendingUp, DollarSign, Building2, Percent, Package,
-  ChevronDown, UserPlus, Pencil,
+  ChevronDown, UserPlus, Pencil, Upload,
 } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 
@@ -690,6 +690,101 @@ const DistributorManagement: React.FC = () => {
     }
   };
 
+  const handleCsvUploadPricing = async (distributorId: string, file: File) => {
+    try {
+      setError(null);
+      const text = await file.text();
+      const lines = text.split(/\r?\n/).filter((l) => l.trim());
+      if (lines.length < 2) {
+        setError('CSV must have a header row and at least one data row');
+        return;
+      }
+
+      // Parse header — look for product_id/sku and wholesale_price columns
+      const header = lines[0].toLowerCase().split(',').map((h) => h.trim().replace(/"/g, ''));
+      const skuIdx = header.findIndex((h) => ['sku', 'product_sku'].includes(h));
+      const idIdx = header.findIndex((h) => ['product_id', 'id', 'productid'].includes(h));
+      const priceIdx = header.findIndex((h) => ['wholesale_price', 'price', 'cost', 'wholesale_cost', 'wholesale'].includes(h));
+      const notesIdx = header.findIndex((h) => ['notes', 'note'].includes(h));
+
+      if (priceIdx === -1) {
+        setError('CSV must have a "wholesale_price" (or "price"/"cost") column');
+        return;
+      }
+      if (skuIdx === -1 && idIdx === -1) {
+        setError('CSV must have a "sku" or "product_id" column to identify products');
+        return;
+      }
+
+      const rows: { product_id: number; wholesale_price: number; notes: string | null }[] = [];
+      const errors: string[] = [];
+
+      for (let i = 1; i < lines.length; i++) {
+        const cols = lines[i].split(',').map((c) => c.trim().replace(/^"|"$/g, ''));
+        const price = parseFloat(cols[priceIdx]);
+        if (isNaN(price) || price < 0) {
+          errors.push(`Row ${i + 1}: invalid price "${cols[priceIdx]}"`);
+          continue;
+        }
+
+        let productId: number | null = null;
+
+        if (idIdx !== -1 && cols[idIdx]) {
+          productId = parseInt(cols[idIdx], 10);
+          if (isNaN(productId)) {
+            errors.push(`Row ${i + 1}: invalid product_id "${cols[idIdx]}"`);
+            continue;
+          }
+        } else if (skuIdx !== -1 && cols[skuIdx]) {
+          const sku = cols[skuIdx];
+          const product = products.find((p) => p.sku === sku);
+          if (!product) {
+            errors.push(`Row ${i + 1}: SKU "${sku}" not found`);
+            continue;
+          }
+          productId = product.id;
+        }
+
+        if (productId === null) {
+          errors.push(`Row ${i + 1}: no product identifier`);
+          continue;
+        }
+
+        rows.push({
+          product_id: productId,
+          wholesale_price: price,
+          notes: notesIdx !== -1 ? cols[notesIdx] || null : null,
+        });
+      }
+
+      if (rows.length === 0) {
+        setError(`No valid rows found. ${errors.join('; ')}`);
+        return;
+      }
+
+      // Upsert rows (on conflict update wholesale_price)
+      const payload = rows.map((r) => ({
+        distributor_id: distributorId,
+        product_id: r.product_id,
+        wholesale_price: r.wholesale_price,
+        notes: r.notes,
+        is_active: true,
+      }));
+
+      const { error: upsertError } = await supabase
+        .from('distributor_product_pricing')
+        .upsert(payload, { onConflict: 'distributor_id,product_id' });
+
+      if (upsertError) throw upsertError;
+
+      const msg = `Uploaded ${rows.length} wholesale price(s)`;
+      setSuccess(errors.length > 0 ? `${msg}. Skipped: ${errors.join('; ')}` : msg);
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload CSV');
+    }
+  };
+
   const handleDeleteProductPricing = async (id: string) => {
     if (!confirm('Remove this wholesale price?')) return;
     try {
@@ -921,13 +1016,14 @@ const DistributorManagement: React.FC = () => {
                   <div className="mb-4 px-3 py-2 bg-gray-50 rounded-lg text-xs text-gray-600">
                     {(distributor.pricing_model) === 'wholesale' ? (
                       <>
-                        <strong>Model:</strong> Wholesale — buys at wholesale price, keeps spread to customer price
+                        <strong>Model:</strong> Wholesale — distributor buys at wholesale price, keeps spread to customer price.
+                        {' '}Your margin = wholesale − cost.
                         {reps.length > 0 && (
                           <>
                             {' · '}
-                            <strong>Sales rep splits:</strong>{' '}
+                            <strong>Sales person splits your margin:</strong>{' '}
                             {reps.map((dsr) =>
-                              `${dsr.profiles?.email?.split('@')[0]} → ${dsr.sales_rep_rate}% of spread`
+                              `${dsr.profiles?.email?.split('@')[0]} → ${dsr.sales_rep_rate}% of your margin`
                             ).join(', ')}
                           </>
                         )}
@@ -1050,13 +1146,33 @@ const DistributorManagement: React.FC = () => {
                         <DollarSign className="h-4 w-4" />
                         Wholesale Product Pricing ({getDistributorPricing(distributor.id).length})
                       </h4>
-                      <button
-                        onClick={() => setShowAddPricing(distributor.id)}
-                        className="text-sm px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
-                      >
-                        Add Price
-                      </button>
+                      <div className="flex gap-2">
+                        <label className="text-sm px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer flex items-center gap-1">
+                          <Upload className="h-3.5 w-3.5" />
+                          Upload CSV
+                          <input
+                            type="file"
+                            accept=".csv"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleCsvUploadPricing(distributor.id, file);
+                              e.target.value = '';
+                            }}
+                          />
+                        </label>
+                        <button
+                          onClick={() => setShowAddPricing(distributor.id)}
+                          className="text-sm px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
+                        >
+                          Add Price
+                        </button>
+                      </div>
                     </div>
+
+                    <p className="text-xs text-gray-400 mb-3">
+                      CSV format: columns <code className="bg-gray-100 px-1 rounded">sku</code> (or <code className="bg-gray-100 px-1 rounded">product_id</code>) and <code className="bg-gray-100 px-1 rounded">wholesale_price</code>. Optional: <code className="bg-gray-100 px-1 rounded">notes</code>.
+                    </p>
 
                     {getDistributorPricing(distributor.id).length === 0 ? (
                       <p className="text-sm text-gray-400 italic">
