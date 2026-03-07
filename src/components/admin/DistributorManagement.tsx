@@ -132,11 +132,21 @@ interface Distributor {
   code: string;
   commission_rate: number;
   commission_type: CommissionType;
+  pricing_model: 'margin_split' | 'wholesale';
   use_customer_price: boolean;
   is_active: boolean;
   notes?: string;
   created_at: string;
   profiles?: { email: string };
+}
+
+interface DistributorProductPrice {
+  id: string;
+  distributor_id: string;
+  product_id: number;
+  wholesale_price: number;
+  is_active: boolean;
+  notes?: string;
 }
 
 interface DistributorCustomer {
@@ -204,8 +214,14 @@ const DistributorManagement: React.FC = () => {
     code: '',
     commission_rate: 45,
     commission_type: 'percent_margin' as CommissionType,
+    pricing_model: 'margin_split' as 'margin_split' | 'wholesale',
     notes: '',
   });
+
+  // Wholesale product pricing state
+  const [distributorProductPricing, setDistributorProductPricing] = useState<DistributorProductPrice[]>([]);
+  const [showAddPricing, setShowAddPricing] = useState<string | null>(null); // distributor id
+  const [newPricing, setNewPricing] = useState({ product_id: '', wholesale_price: 0, notes: '' });
 
   // Inline user creation state
   const [showCreateUser, setShowCreateUser] = useState(false);
@@ -239,7 +255,7 @@ const DistributorManagement: React.FC = () => {
     try {
       setLoading(true);
 
-      const [distributorsRes, orgsRes, allUsersRes, salesRepsRes, distSalesRepsRes, distCustomersRes, productsRes, categoriesRes, rulesRes] = await Promise.all([
+      const [distributorsRes, orgsRes, allUsersRes, salesRepsRes, distSalesRepsRes, distCustomersRes, productsRes, categoriesRes, rulesRes, pricingRes] = await Promise.all([
         supabase
           .from('distributors')
           .select('*, profiles!distributors_profile_id_fkey(email)')
@@ -283,6 +299,11 @@ const DistributorManagement: React.FC = () => {
           .select('*')
           .eq('is_active', true)
           .order('created_at', { ascending: false }),
+        supabase
+          .from('distributor_product_pricing')
+          .select('*')
+          .eq('is_active', true)
+          .order('created_at', { ascending: false }),
       ]);
 
       if (distributorsRes.error) throw distributorsRes.error;
@@ -291,10 +312,11 @@ const DistributorManagement: React.FC = () => {
       if (salesRepsRes.error) throw salesRepsRes.error;
       if (distSalesRepsRes.error) throw distSalesRepsRes.error;
       if (distCustomersRes.error) throw distCustomersRes.error;
-      // Products/categories/rules may not exist yet — non-fatal
+      // Products/categories/rules/pricing may not exist yet — non-fatal
       if (!productsRes.error) setProducts(productsRes.data || []);
       if (!categoriesRes.error) setCategories(categoriesRes.data || []);
       if (!rulesRes.error) setCommissionRules((rulesRes.data as CommissionRule[]) || []);
+      if (!pricingRes.error) setDistributorProductPricing((pricingRes.data as DistributorProductPrice[]) || []);
 
       const distData = (distributorsRes.data as Distributor[]) || [];
       setDistributors(distData);
@@ -333,6 +355,7 @@ const DistributorManagement: React.FC = () => {
         code: '',
         commission_rate: 45,
         commission_type: 'percent_margin',
+        pricing_model: 'margin_split',
         notes: '',
       });
       setCodeManuallyEdited(false);
@@ -506,6 +529,7 @@ const DistributorManagement: React.FC = () => {
           code: editingDistributor.code,
           commission_rate: editingDistributor.commission_rate,
           commission_type: editingDistributor.commission_type,
+          pricing_model: editingDistributor.pricing_model,
           use_customer_price: editingDistributor.use_customer_price,
           is_active: editingDistributor.is_active,
           notes: editingDistributor.notes,
@@ -638,6 +662,44 @@ const DistributorManagement: React.FC = () => {
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove commission rule');
+    }
+  };
+
+  // ── Wholesale product pricing handlers ────────────────────────────────────
+  const getDistributorPricing = (distributorId: string) =>
+    distributorProductPricing.filter((p) => p.distributor_id === distributorId);
+
+  const handleAddProductPricing = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!showAddPricing) return;
+    try {
+      setError(null);
+      const { error: insertError } = await supabase.from('distributor_product_pricing').insert([{
+        distributor_id: showAddPricing,
+        product_id: parseInt(newPricing.product_id, 10),
+        wholesale_price: newPricing.wholesale_price,
+        notes: newPricing.notes || null,
+      }]);
+      if (insertError) throw insertError;
+      setSuccess('Wholesale price added');
+      setShowAddPricing(null);
+      setNewPricing({ product_id: '', wholesale_price: 0, notes: '' });
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add wholesale price');
+    }
+  };
+
+  const handleDeleteProductPricing = async (id: string) => {
+    if (!confirm('Remove this wholesale price?')) return;
+    try {
+      setError(null);
+      const { error: deleteError } = await supabase.from('distributor_product_pricing').delete().eq('id', id);
+      if (deleteError) throw deleteError;
+      setSuccess('Wholesale price removed');
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove wholesale price');
     }
   };
 
@@ -811,19 +873,32 @@ const DistributorManagement: React.FC = () => {
                         {distributor.is_active ? 'Active' : 'Inactive'}
                       </span>
 
-                      {/* Commission type badge */}
+                      {/* Pricing model badge */}
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                        (distributor.pricing_model) === 'wholesale'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-amber-100 text-amber-700'
+                      }`}>
+                        {(distributor.pricing_model) === 'wholesale' ? 'Wholesale' : 'Margin Split'}
+                      </span>
+
+                      {/* Commission type badge (margin_split only) */}
+                      {(distributor.pricing_model ?? 'margin_split') === 'margin_split' && (
                       <span className="flex items-center gap-1 px-2.5 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-medium">
                         {typeConfig.isFlat
                           ? <Package className="h-3.5 w-3.5" />
                           : <Percent className="h-3.5 w-3.5" />}
                         {typeConfig.label}
                       </span>
+                      )}
 
-                      {/* Rate badge */}
+                      {/* Rate badge (margin_split only) */}
+                      {(distributor.pricing_model ?? 'margin_split') === 'margin_split' && (
                       <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
                         <TrendingUp className="h-3.5 w-3.5" />
                         {rateDisplay}
                       </span>
+                      )}
 
                       <button
                         onClick={() => setEditingDistributor(distributor)}
@@ -842,29 +917,47 @@ const DistributorManagement: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Commission explanation */}
+                  {/* Commission / pricing explanation */}
                   <div className="mb-4 px-3 py-2 bg-gray-50 rounded-lg text-xs text-gray-600">
-                    <strong>Commission basis:</strong> {typeConfig.description}
-                    {' · '}
-                    <strong>Distributor earns:</strong> {rateDisplay}
-                    {reps.length > 0 && (
+                    {(distributor.pricing_model) === 'wholesale' ? (
                       <>
+                        <strong>Model:</strong> Wholesale — buys at wholesale price, keeps spread to customer price
+                        {reps.length > 0 && (
+                          <>
+                            {' · '}
+                            <strong>Sales rep splits:</strong>{' '}
+                            {reps.map((dsr) =>
+                              `${dsr.profiles?.email?.split('@')[0]} → ${dsr.sales_rep_rate}% of spread`
+                            ).join(', ')}
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        <strong>Commission basis:</strong> {typeConfig.description}
                         {' · '}
-                        <strong>Sales rep splits:</strong>{' '}
-                        {reps.map((dsr) => {
-                          const repEarns =
-                            dsr.commission_split_type === 'percentage_of_distributor'
-                              ? `${dsr.sales_rep_rate}% of dist. commission`
-                              : typeConfig.isFlat
-                                ? `$${dsr.sales_rep_rate} per ${distributor.commission_type === 'flat_per_unit' ? 'unit' : 'order'}`
-                                : `${dsr.sales_rep_rate}% rate`;
-                          return `${dsr.profiles?.email?.split('@')[0]} → ${repEarns}`;
-                        }).join(', ')}
+                        <strong>Distributor earns:</strong> {rateDisplay}
+                        {reps.length > 0 && (
+                          <>
+                            {' · '}
+                            <strong>Sales rep splits:</strong>{' '}
+                            {reps.map((dsr) => {
+                              const repEarns =
+                                dsr.commission_split_type === 'percentage_of_distributor'
+                                  ? `${dsr.sales_rep_rate}% of dist. commission`
+                                  : typeConfig.isFlat
+                                    ? `$${dsr.sales_rep_rate} per ${distributor.commission_type === 'flat_per_unit' ? 'unit' : 'order'}`
+                                    : `${dsr.sales_rep_rate}% rate`;
+                              return `${dsr.profiles?.email?.split('@')[0]} → ${repEarns}`;
+                            }).join(', ')}
+                          </>
+                        )}
                       </>
                     )}
                   </div>
 
-                  {/* Commission Rules (per-product / per-category) */}
+                  {/* Commission Rules — only for margin_split distributors */}
+                  {(distributor.pricing_model ?? 'margin_split') === 'margin_split' && (
                   <div className="pt-4 border-t border-gray-200 mb-4">
                     <div className="flex items-center justify-between mb-3">
                       <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
@@ -947,6 +1040,63 @@ const DistributorManagement: React.FC = () => {
                       </div>
                     )}
                   </div>
+                  )}
+
+                  {/* Wholesale Product Pricing — only for wholesale distributors */}
+                  {(distributor.pricing_model) === 'wholesale' && (
+                  <div className="pt-4 border-t border-gray-200 mb-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                        <DollarSign className="h-4 w-4" />
+                        Wholesale Product Pricing ({getDistributorPricing(distributor.id).length})
+                      </h4>
+                      <button
+                        onClick={() => setShowAddPricing(distributor.id)}
+                        className="text-sm px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
+                      >
+                        Add Price
+                      </button>
+                    </div>
+
+                    {getDistributorPricing(distributor.id).length === 0 ? (
+                      <p className="text-sm text-gray-400 italic">
+                        No wholesale prices set — add per-product prices the distributor pays you
+                      </p>
+                    ) : (
+                      <div className="space-y-2">
+                        {getDistributorPricing(distributor.id).map((pp) => {
+                          const product = products.find((p) => p.id === pp.product_id);
+                          return (
+                            <div key={pp.id} className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">
+                                  <span className="inline-flex items-center gap-1">
+                                    <Package className="h-3.5 w-3.5 text-emerald-500" />
+                                    {product?.name ?? `Product #${pp.product_id}`}
+                                  </span>
+                                  {product?.sku && (
+                                    <span className="ml-2 text-xs text-gray-400">{product.sku}</span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                  Wholesale: <span className="font-medium text-emerald-700">${pp.wholesale_price.toFixed(2)}</span>
+                                  {pp.notes && <span className="ml-2 text-gray-400">{pp.notes}</span>}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => handleDeleteProductPricing(pp.id)}
+                                className="p-1 hover:bg-red-100 rounded transition-colors"
+                                title="Remove"
+                              >
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  )}
 
                   {/* Sales reps */}
                   <div className="pt-4 border-t border-gray-200">
@@ -1144,6 +1294,48 @@ const DistributorManagement: React.FC = () => {
                 </p>
               </div>
 
+              {/* ── Pricing Model ── */}
+              <Field label="Pricing Model *">
+                <div className="flex gap-3">
+                  <label className={`flex-1 flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                    newDistributor.pricing_model === 'margin_split'
+                      ? 'border-pink-500 bg-pink-50 text-pink-700'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="pricing_model"
+                      value="margin_split"
+                      checked={newDistributor.pricing_model === 'margin_split'}
+                      onChange={() => setNewDistributor({ ...newDistributor, pricing_model: 'margin_split' })}
+                      className="text-pink-600 focus:ring-pink-500"
+                    />
+                    <div>
+                      <div className="text-sm font-medium">Margin Split</div>
+                      <div className="text-xs text-gray-500">Earns % of margin</div>
+                    </div>
+                  </label>
+                  <label className={`flex-1 flex items-center gap-2 p-3 border rounded-lg cursor-pointer transition-colors ${
+                    newDistributor.pricing_model === 'wholesale'
+                      ? 'border-pink-500 bg-pink-50 text-pink-700'
+                      : 'border-gray-200 hover:bg-gray-50'
+                  }`}>
+                    <input
+                      type="radio"
+                      name="pricing_model"
+                      value="wholesale"
+                      checked={newDistributor.pricing_model === 'wholesale'}
+                      onChange={() => setNewDistributor({ ...newDistributor, pricing_model: 'wholesale' })}
+                      className="text-pink-600 focus:ring-pink-500"
+                    />
+                    <div>
+                      <div className="text-sm font-medium">Wholesale</div>
+                      <div className="text-xs text-gray-500">Buys at wholesale, keeps spread</div>
+                    </div>
+                  </label>
+                </div>
+              </Field>
+
               {/* ── Notes ── */}
               <Field label="Notes">
                 <textarea
@@ -1155,7 +1347,8 @@ const DistributorManagement: React.FC = () => {
                 />
               </Field>
 
-              {/* ── Commission Settings (collapsible) ── */}
+              {/* ── Commission Settings (collapsible, hidden for wholesale) ── */}
+              {newDistributor.pricing_model === 'margin_split' && (
               <div className="border border-gray-200 rounded-lg">
                 <button
                   type="button"
@@ -1207,6 +1400,7 @@ const DistributorManagement: React.FC = () => {
                   </div>
                 )}
               </div>
+              )}
             </div>
 
             <div className="mt-6 flex gap-3 justify-end border-t border-gray-100 pt-4">
@@ -1376,6 +1570,78 @@ const DistributorManagement: React.FC = () => {
                 </button>
                 <button type="submit" className={primaryBtnCls}>
                   Add Rule
+                </button>
+              </div>
+            </form>
+          </Modal>
+        );
+      })()}
+
+      {/* ── Add Wholesale Product Pricing Modal ───────────────────────────── */}
+      {showAddPricing && (() => {
+        const dist = distributors.find((d) => d.id === showAddPricing);
+        const existingProductIds = new Set(
+          getDistributorPricing(showAddPricing).map((p) => p.product_id)
+        );
+        const availableProducts = products.filter((p) => !existingProductIds.has(p.id));
+        return (
+          <Modal
+            title={`Add Wholesale Price — ${dist?.name ?? ''}`}
+            onClose={() => setShowAddPricing(null)}
+          >
+            <form onSubmit={handleAddProductPricing}>
+              <div className="space-y-4">
+                <Field label="Product *">
+                  <select
+                    required
+                    value={newPricing.product_id}
+                    onChange={(e) => setNewPricing({ ...newPricing, product_id: e.target.value })}
+                    className={selectCls}
+                  >
+                    <option value="">Select a product</option>
+                    {availableProducts.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}{p.sku ? ` (${p.sku})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label="Wholesale Price ($) *">
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    value={newPricing.wholesale_price}
+                    onChange={(e) =>
+                      setNewPricing({ ...newPricing, wholesale_price: parseFloat(e.target.value) || 0 })
+                    }
+                    className={inputCls}
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">
+                    The price the distributor pays you for this product
+                  </p>
+                </Field>
+
+                <Field label="Notes">
+                  <textarea
+                    value={newPricing.notes}
+                    onChange={(e) => setNewPricing({ ...newPricing, notes: e.target.value })}
+                    className={inputCls}
+                    rows={2}
+                    placeholder="Optional notes..."
+                  />
+                </Field>
+              </div>
+
+              <div className="mt-6 flex gap-3 justify-end border-t border-gray-100 pt-4">
+                <button type="button" onClick={() => setShowAddPricing(null)} className={cancelBtnCls}>
+                  Cancel
+                </button>
+                <button type="submit" className={primaryBtnCls}>
+                  Add Price
                 </button>
               </div>
             </form>
@@ -1631,6 +1897,42 @@ const EditDistributorForm: React.FC<EditDistributorFormProps> = ({
         </Field>
       </div>
 
+      <Field label="Pricing Model">
+        <div className="flex gap-3">
+          <label className={`flex-1 flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer text-sm transition-colors ${
+            distributor.pricing_model === 'margin_split'
+              ? 'border-pink-500 bg-pink-50 text-pink-700'
+              : 'border-gray-200 hover:bg-gray-50'
+          }`}>
+            <input
+              type="radio"
+              name={`edit_pricing_model_${distributor.id}`}
+              value="margin_split"
+              checked={distributor.pricing_model === 'margin_split'}
+              onChange={() => onChange({ ...distributor, pricing_model: 'margin_split' })}
+              className="text-pink-600 focus:ring-pink-500"
+            />
+            Margin Split
+          </label>
+          <label className={`flex-1 flex items-center gap-2 p-2.5 border rounded-lg cursor-pointer text-sm transition-colors ${
+            distributor.pricing_model === 'wholesale'
+              ? 'border-pink-500 bg-pink-50 text-pink-700'
+              : 'border-gray-200 hover:bg-gray-50'
+          }`}>
+            <input
+              type="radio"
+              name={`edit_pricing_model_${distributor.id}`}
+              value="wholesale"
+              checked={distributor.pricing_model === 'wholesale'}
+              onChange={() => onChange({ ...distributor, pricing_model: 'wholesale' })}
+              className="text-pink-600 focus:ring-pink-500"
+            />
+            Wholesale
+          </label>
+        </div>
+      </Field>
+
+      {distributor.pricing_model === 'margin_split' && (
       <div className="grid grid-cols-2 gap-4">
         <Field label="Commission Basis">
           <select
@@ -1655,6 +1957,7 @@ const EditDistributorForm: React.FC<EditDistributorFormProps> = ({
           />
         </Field>
       </div>
+      )}
 
       <div className="grid grid-cols-2 gap-4">
         <Field label="Status">
@@ -1677,6 +1980,7 @@ const EditDistributorForm: React.FC<EditDistributorFormProps> = ({
         </Field>
       </div>
 
+      {distributor.pricing_model === 'margin_split' && (
       <div className="flex items-center gap-2">
         <input
           type="checkbox"
@@ -1689,6 +1993,7 @@ const EditDistributorForm: React.FC<EditDistributorFormProps> = ({
           Default: use customer's actual price for margin calculation
         </label>
       </div>
+      )}
 
       <div className="flex gap-2 pt-2">
         <button onClick={onSave} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
