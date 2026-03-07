@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Users, Building, Plus, CreditCard as Edit2, Trash2, X, Save,
   TrendingUp, DollarSign, Building2, Percent, Package,
+  ChevronDown, UserPlus, Pencil,
 } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 
@@ -71,6 +72,23 @@ function getCommissionTypeConfig(value: CommissionType) {
 function commissionRateLabel(type: CommissionType, rate: number) {
   const cfg = getCommissionTypeConfig(type);
   return cfg.isFlat ? `$${Number(rate).toFixed(2)}` : `${rate}%`;
+}
+
+function generateDistributorCode(name: string, existingCodes: string[]): string {
+  if (!name.trim()) return '';
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  let base: string;
+  if (words.length >= 2) {
+    base = words.map((w) => w[0]).join('').slice(0, 4).toUpperCase();
+  } else {
+    base = words[0].replace(/[^a-zA-Z]/g, '').slice(0, 4).toUpperCase();
+  }
+  if (!base) return '';
+  const codesSet = new Set(existingCodes.map((c) => c.toUpperCase()));
+  if (!codesSet.has(base)) return base;
+  let i = 2;
+  while (codesSet.has(`${base}${i}`)) i++;
+  return `${base}${i}`;
 }
 
 // ── Interfaces ───────────────────────────────────────────────────────────────
@@ -189,6 +207,16 @@ const DistributorManagement: React.FC = () => {
     notes: '',
   });
 
+  // Inline user creation state
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPassword, setNewUserPassword] = useState('');
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+
+  // Auto-code and commission collapse
+  const [codeManuallyEdited, setCodeManuallyEdited] = useState(false);
+  const [showCommissionFields, setShowCommissionFields] = useState(false);
+
   const [newDistributorSalesRep, setNewDistributorSalesRep] = useState({
     sales_rep_id: '',
     commission_split_type: 'percentage_of_distributor' as 'percentage_of_distributor' | 'fixed_with_override',
@@ -301,9 +329,95 @@ const DistributorManagement: React.FC = () => {
         commission_type: 'percent_margin',
         notes: '',
       });
+      setCodeManuallyEdited(false);
+      setShowCommissionFields(false);
+      setShowCreateUser(false);
+      setNewUserEmail('');
+      setNewUserPassword('');
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create distributor');
+    }
+  };
+
+  const handleCreateDistributorUser = async () => {
+    if (!newUserEmail.trim() || !newUserPassword.trim()) {
+      setError('Email and password are required');
+      return;
+    }
+    if (newUserPassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+    try {
+      setIsCreatingUser(true);
+      setError(null);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No active session');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: newUserEmail,
+            password: newUserPassword,
+            role: 'distributor',
+            is_approved: true,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+      }
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || 'User creation failed');
+
+      // Refresh data and auto-select the new user
+      const createdEmail = newUserEmail.trim().toLowerCase();
+      setNewUserEmail('');
+      setNewUserPassword('');
+      setShowCreateUser(false);
+
+      // Re-fetch to get the new user in availableUsers
+      const [distributorsRes, allUsersRes] = await Promise.all([
+        supabase
+          .from('distributors')
+          .select('*, profiles!distributors_profile_id_fkey(email)')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('profiles')
+          .select('id, email, role')
+          .eq('approved', true)
+          .neq('role', 'admin')
+          .order('email'),
+      ]);
+
+      if (!distributorsRes.error && !allUsersRes.error) {
+        const distData = (distributorsRes.data as Distributor[]) || [];
+        setDistributors(distData);
+        const existingProfileIds = new Set(distData.map(d => d.profile_id));
+        const freshUsers = (allUsersRes.data || []).filter(u => !existingProfileIds.has(u.id));
+        setAvailableUsers(freshUsers);
+
+        const newUser = freshUsers.find(u => u.email.toLowerCase() === createdEmail);
+        if (newUser) {
+          setNewDistributor(prev => ({ ...prev, profile_id: newUser.id }));
+        }
+      }
+
+      setSuccess('User created and selected');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create user');
+    } finally {
+      setIsCreatingUser(false);
     }
   };
 
@@ -815,81 +929,148 @@ const DistributorManagement: React.FC = () => {
 
       {/* ── Add Distributor Modal ────────────────────────────────────────────── */}
       {showAddDistributor && (
-        <Modal title="Add New Distributor" onClose={() => setShowAddDistributor(false)}>
+        <Modal title="Add New Distributor" onClose={() => {
+          setShowAddDistributor(false);
+          setShowCreateUser(false);
+          setNewUserEmail('');
+          setNewUserPassword('');
+          setCodeManuallyEdited(false);
+          setShowCommissionFields(false);
+        }}>
           <form onSubmit={handleCreateDistributor}>
             <div className="space-y-4">
+              {/* ── Distributor User: select or create inline ── */}
               <Field label="Distributor User *">
-                <select
-                  required
-                  value={newDistributor.profile_id}
-                  onChange={(e) => setNewDistributor({ ...newDistributor, profile_id: e.target.value })}
-                  className={selectCls}
-                >
-                  <option value="">Select a user</option>
-                  {availableUsers.map((u) => (
-                    <option key={u.id} value={u.id}>{u.email} ({u.role || 'no role'})</option>
-                  ))}
-                </select>
+                {!showCreateUser ? (
+                  <div className="flex gap-2">
+                    <select
+                      required
+                      value={newDistributor.profile_id}
+                      onChange={(e) => setNewDistributor({ ...newDistributor, profile_id: e.target.value })}
+                      className={`${selectCls} flex-1`}
+                    >
+                      <option value="">Select a user</option>
+                      {availableUsers.map((u) => (
+                        <option key={u.id} value={u.id}>{u.email} ({u.role || 'no role'})</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => setShowCreateUser(true)}
+                      className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg whitespace-nowrap"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                      New User
+                    </button>
+                  </div>
+                ) : (
+                  <div className="border border-purple-200 bg-purple-50 rounded-lg p-3 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-purple-700">Create New User</span>
+                      <button
+                        type="button"
+                        onClick={() => { setShowCreateUser(false); setNewUserEmail(''); setNewUserPassword(''); }}
+                        className="text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <input
+                      type="email"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      className={inputCls}
+                      placeholder="Email address"
+                    />
+                    <input
+                      type="password"
+                      value={newUserPassword}
+                      onChange={(e) => setNewUserPassword(e.target.value)}
+                      className={inputCls}
+                      placeholder="Password (min 6 characters)"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleCreateDistributorUser}
+                        disabled={isCreatingUser}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg disabled:opacity-50"
+                      >
+                        {isCreatingUser ? 'Creating...' : 'Create & Select'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setShowCreateUser(false); setNewUserEmail(''); setNewUserPassword(''); }}
+                        className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      User will be created with the <strong>distributor</strong> role and auto-approved.
+                    </p>
+                  </div>
+                )}
               </Field>
 
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Distributor Name *">
-                  <input
-                    type="text"
-                    required
-                    value={newDistributor.name}
-                    onChange={(e) => setNewDistributor({ ...newDistributor, name: e.target.value })}
-                    className={inputCls}
-                    placeholder="ABC Distribution"
-                  />
-                </Field>
-                <Field label="Code *">
-                  <input
-                    type="text"
-                    required
-                    value={newDistributor.code}
-                    onChange={(e) => setNewDistributor({ ...newDistributor, code: e.target.value.toUpperCase() })}
-                    className={inputCls}
-                    placeholder="DIST001"
-                  />
-                </Field>
-              </div>
-
-              <Field label="Commission Basis *">
-                <select
-                  required
-                  value={newDistributor.commission_type}
-                  onChange={(e) =>
-                    setNewDistributor({ ...newDistributor, commission_type: e.target.value as CommissionType })
-                  }
-                  className={selectCls}
-                >
-                  {COMMISSION_TYPES.map((t) => (
-                    <option key={t.value} value={t.value}>{t.label}</option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-400 mt-1">
-                  {getCommissionTypeConfig(newDistributor.commission_type).description}
-                </p>
-              </Field>
-
-              <Field
-                label={`${getCommissionTypeConfig(newDistributor.commission_type).rateLabel} (${getCommissionTypeConfig(newDistributor.commission_type).rateUnit}) *`}
-              >
+              {/* ── Distributor Name ── */}
+              <Field label="Distributor Name *">
                 <input
-                  type="number"
+                  type="text"
                   required
-                  min="0"
-                  max={getCommissionTypeConfig(newDistributor.commission_type).isFlat ? undefined : 100}
-                  step="0.01"
-                  value={newDistributor.commission_rate}
-                  onChange={(e) =>
-                    setNewDistributor({ ...newDistributor, commission_rate: parseFloat(e.target.value) })
-                  }
+                  value={newDistributor.name}
+                  onChange={(e) => {
+                    const name = e.target.value;
+                    const updates: { name: string; code?: string } = { name };
+                    if (!codeManuallyEdited) {
+                      updates.code = generateDistributorCode(name, distributors.map(d => d.code));
+                    }
+                    setNewDistributor({ ...newDistributor, ...updates });
+                  }}
                   className={inputCls}
+                  placeholder="ABC Distribution"
                 />
               </Field>
 
+              {/* ── Auto-generated Code ── */}
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium text-gray-700">Code:</span>
+                  {codeManuallyEdited ? (
+                    <input
+                      type="text"
+                      required
+                      value={newDistributor.code}
+                      onChange={(e) => setNewDistributor({ ...newDistributor, code: e.target.value.toUpperCase() })}
+                      className="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 uppercase w-32"
+                    />
+                  ) : (
+                    <span className="text-sm font-mono font-semibold text-indigo-600">
+                      {newDistributor.code || '—'}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (codeManuallyEdited) {
+                        // Reset to auto-generated
+                        const autoCode = generateDistributorCode(newDistributor.name, distributors.map(d => d.code));
+                        setNewDistributor({ ...newDistributor, code: autoCode });
+                      }
+                      setCodeManuallyEdited(!codeManuallyEdited);
+                    }}
+                    className="text-gray-400 hover:text-gray-600"
+                    title={codeManuallyEdited ? 'Use auto-generated code' : 'Edit code manually'}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">
+                  {codeManuallyEdited ? 'Manually editing code' : 'Auto-generated from name'}
+                </p>
+              </div>
+
+              {/* ── Notes ── */}
               <Field label="Notes">
                 <textarea
                   value={newDistributor.notes}
@@ -899,12 +1080,72 @@ const DistributorManagement: React.FC = () => {
                   placeholder="Optional notes..."
                 />
               </Field>
+
+              {/* ── Commission Settings (collapsible) ── */}
+              <div className="border border-gray-200 rounded-lg">
+                <button
+                  type="button"
+                  onClick={() => setShowCommissionFields(!showCommissionFields)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm text-gray-600 hover:bg-gray-50 rounded-lg"
+                >
+                  <span>
+                    <span className="font-medium">Commission Settings</span>
+                    <span className="text-gray-400 ml-2">
+                      Default: {commissionRateLabel(newDistributor.commission_type, newDistributor.commission_rate)} {getCommissionTypeConfig(newDistributor.commission_type).label}
+                    </span>
+                  </span>
+                  <ChevronDown className={`h-4 w-4 transition-transform ${showCommissionFields ? 'rotate-180' : ''}`} />
+                </button>
+                {showCommissionFields && (
+                  <div className="px-4 pb-4 space-y-4 border-t border-gray-100">
+                    <Field label="Commission Basis">
+                      <select
+                        value={newDistributor.commission_type}
+                        onChange={(e) =>
+                          setNewDistributor({ ...newDistributor, commission_type: e.target.value as CommissionType })
+                        }
+                        className={selectCls}
+                      >
+                        {COMMISSION_TYPES.map((t) => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {getCommissionTypeConfig(newDistributor.commission_type).description}
+                      </p>
+                    </Field>
+
+                    <Field
+                      label={`${getCommissionTypeConfig(newDistributor.commission_type).rateLabel} (${getCommissionTypeConfig(newDistributor.commission_type).rateUnit})`}
+                    >
+                      <input
+                        type="number"
+                        min="0"
+                        max={getCommissionTypeConfig(newDistributor.commission_type).isFlat ? undefined : 100}
+                        step="0.01"
+                        value={newDistributor.commission_rate}
+                        onChange={(e) =>
+                          setNewDistributor({ ...newDistributor, commission_rate: parseFloat(e.target.value) })
+                        }
+                        className={inputCls}
+                      />
+                    </Field>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="mt-6 flex gap-3 justify-end border-t border-gray-100 pt-4">
               <button
                 type="button"
-                onClick={() => setShowAddDistributor(false)}
+                onClick={() => {
+                  setShowAddDistributor(false);
+                  setShowCreateUser(false);
+                  setNewUserEmail('');
+                  setNewUserPassword('');
+                  setCodeManuallyEdited(false);
+                  setShowCommissionFields(false);
+                }}
                 className={cancelBtnCls}
               >
                 Cancel
