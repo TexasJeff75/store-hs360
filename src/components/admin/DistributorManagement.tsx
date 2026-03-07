@@ -136,6 +136,8 @@ interface Distributor {
   use_customer_price: boolean;
   is_active: boolean;
   notes?: string;
+  company_rep_id?: string | null;
+  company_rep_rate: number;
   created_at: string;
   profiles?: { email: string };
 }
@@ -533,6 +535,8 @@ const DistributorManagement: React.FC = () => {
           use_customer_price: editingDistributor.use_customer_price,
           is_active: editingDistributor.is_active,
           notes: editingDistributor.notes,
+          company_rep_id: editingDistributor.company_rep_id || null,
+          company_rep_rate: editingDistributor.company_rep_rate || 0,
           updated_at: new Date().toISOString(),
         })
         .eq('id', editingDistributor.id);
@@ -892,6 +896,7 @@ const DistributorManagement: React.FC = () => {
                   onChange={setEditingDistributor}
                   onSave={handleUpdateDistributor}
                   onCancel={() => setEditingDistributor(null)}
+                  salesReps={salesReps}
                 />
               ) : (
                 /* ── View mode ─────────────────────────────────────────── */
@@ -1050,6 +1055,16 @@ const DistributorManagement: React.FC = () => {
                         )}
                       </>
                     )}
+                    {distributor.company_rep_id && (() => {
+                      const companyRep = salesReps.find((r) => r.id === distributor.company_rep_id);
+                      return (
+                        <>
+                          {' · '}
+                          <strong>Company rep:</strong>{' '}
+                          {companyRep?.email?.split('@')[0] ?? 'Unknown'} → {distributor.company_rep_rate ?? 0}% of your margin
+                        </>
+                      );
+                    })()}
                   </div>
 
                   {/* Commission Rules — only for margin_split distributors */}
@@ -1986,10 +2001,11 @@ interface EditDistributorFormProps {
   onChange: (d: Distributor) => void;
   onSave: () => void;
   onCancel: () => void;
+  salesReps: SalesRep[];
 }
 
 const EditDistributorForm: React.FC<EditDistributorFormProps> = ({
-  distributor, onChange, onSave, onCancel,
+  distributor, onChange, onSave, onCancel, salesReps,
 }) => {
   const typeConfig = getCommissionTypeConfig(distributor.commission_type);
   return (
@@ -2110,6 +2126,40 @@ const EditDistributorForm: React.FC<EditDistributorFormProps> = ({
         </label>
       </div>
       )}
+
+      {/* Company Rep — your sales person who oversees this distributor */}
+      <div className="border border-gray-200 rounded-lg p-4 space-y-3">
+        <h4 className="text-sm font-semibold text-gray-700">Company Rep (Your Sales Person)</h4>
+        <p className="text-xs text-gray-400">
+          Assign one of your reps to oversee this distributor. They earn a % of your margin on every order.
+        </p>
+        <div className="grid grid-cols-2 gap-4">
+          <Field label="Company Rep">
+            <select
+              value={distributor.company_rep_id ?? ''}
+              onChange={(e) => onChange({ ...distributor, company_rep_id: e.target.value || null })}
+              className={selectCls}
+            >
+              <option value="">None</option>
+              {salesReps.map((rep) => (
+                <option key={rep.id} value={rep.id}>{rep.email}</option>
+              ))}
+            </select>
+          </Field>
+          <Field label="% of Your Margin">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              step="0.01"
+              value={distributor.company_rep_rate ?? 0}
+              onChange={(e) => onChange({ ...distributor, company_rep_rate: parseFloat(e.target.value) || 0 })}
+              className={inputCls}
+              disabled={!distributor.company_rep_id}
+            />
+          </Field>
+        </div>
+      </div>
 
       <div className="flex gap-2 pt-2">
         <button onClick={onSave} className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
