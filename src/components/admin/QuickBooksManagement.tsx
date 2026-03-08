@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { RefreshCw, CheckCircle, XCircle, AlertCircle, ExternalLink, Download, Activity } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { RefreshCw, CheckCircle, XCircle, AlertCircle, ExternalLink, Download, Activity, Upload, Search, Building2 } from 'lucide-react';
 import { quickbooksOAuth, quickbooksCustomers, quickbooksInvoices } from '../../services/quickbooks';
 import type { QBConnectionStatus } from '../../services/quickbooks/oauth';
 import { supabase } from '../../services/supabase';
@@ -313,12 +313,358 @@ function ConnectionDiagnostics() {
   );
 }
 
+interface QBCustomerRow {
+  Id?: string;
+  DisplayName: string;
+  CompanyName?: string;
+  PrimaryEmailAddr?: { Address: string };
+  PrimaryPhone?: { FreeFormNumber: string };
+  BillAddr?: {
+    Line1?: string;
+    City?: string;
+    CountrySubDivisionCode?: string;
+    PostalCode?: string;
+  };
+  Active?: boolean;
+  // local UI state
+  _selected?: boolean;
+  _alreadyLinked?: boolean;
+  _linkedOrgName?: string;
+}
+
+function ImportCustomers({ connected }: { connected: boolean }) {
+  const [qbCustomers, setQbCustomers] = useState<QBCustomerRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [search, setSearch] = useState('');
+  const [importResults, setImportResults] = useState<{ success: string[]; failed: { name: string; error: string }[] } | null>(null);
+  const [existingOrgs, setExistingOrgs] = useState<{ id: string; name: string; code: string; quickbooks_customer_id?: string }[]>([]);
+
+  const fetchCustomers = useCallback(async () => {
+    setLoading(true);
+    setImportResults(null);
+    try {
+      // Fetch QB customers and existing orgs in parallel
+      const [customers, orgsRes] = await Promise.all([
+        quickbooksCustomers.fetchAllCustomers(),
+        supabase.from('organizations').select('id, name, code, quickbooks_customer_id'),
+      ]);
+
+      const orgs = orgsRes.data || [];
+      setExistingOrgs(orgs);
+
+      // Map of QB ID → org for already-linked detection
+      const linkedQbIds = new Map(
+        orgs.filter(o => o.quickbooks_customer_id).map(o => [o.quickbooks_customer_id!, o])
+      );
+      // Also check by name match
+      const orgNameSet = new Set(orgs.map(o => o.name.toLowerCase()));
+
+      const enriched: QBCustomerRow[] = customers.map(c => {
+        const linkedOrg = linkedQbIds.get(c.Id || '');
+        const nameMatch = orgNameSet.has((c.CompanyName || c.DisplayName).toLowerCase());
+        return {
+          ...c,
+          _selected: false,
+          _alreadyLinked: !!(linkedOrg || nameMatch),
+          _linkedOrgName: linkedOrg?.name || (nameMatch ? (c.CompanyName || c.DisplayName) : undefined),
+        };
+      });
+
+      // Sort: unlinked first, then alphabetical
+      enriched.sort((a, b) => {
+        if (a._alreadyLinked !== b._alreadyLinked) return a._alreadyLinked ? 1 : -1;
+        return a.DisplayName.localeCompare(b.DisplayName);
+      });
+
+      setQbCustomers(enriched);
+    } catch (error: any) {
+      alert(`Failed to fetch QB customers: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const toggleSelect = (idx: number) => {
+    setQbCustomers(prev => prev.map((c, i) => i === idx ? { ...c, _selected: !c._selected } : c));
+  };
+
+  const selectAllUnlinked = () => {
+    setQbCustomers(prev => prev.map(c => c._alreadyLinked ? c : { ...c, _selected: true }));
+  };
+
+  const deselectAll = () => {
+    setQbCustomers(prev => prev.map(c => ({ ...c, _selected: false })));
+  };
+
+  const generateOrgCode = (name: string): string => {
+    const words = name.trim().split(/\s+/);
+    let code = '';
+    if (words.length === 1) {
+      code = words[0].substring(0, Math.min(6, words[0].length)).toUpperCase();
+    } else {
+      code = words
+        .slice(0, 3)
+        .map(word => word.substring(0, word.length >= 4 ? 3 : 2))
+        .join('')
+        .toUpperCase();
+    }
+    if (code.length < 3) {
+      code = code.padEnd(3, 'X');
+    }
+    const existingCodes = new Set(existingOrgs.map(o => o.code.toUpperCase()));
+    let finalCode = code;
+    let counter = 1;
+    while (existingCodes.has(finalCode)) {
+      finalCode = code + counter.toString().padStart(2, '0');
+      counter++;
+    }
+    return finalCode;
+  };
+
+  const handleImport = async () => {
+    const selected = qbCustomers.filter(c => c._selected && !c._alreadyLinked);
+    if (selected.length === 0) return;
+
+    if (!confirm(`Import ${selected.length} QuickBooks customer${selected.length > 1 ? 's' : ''} as new organization${selected.length > 1 ? 's' : ''}?`)) return;
+
+    setImporting(true);
+    const success: string[] = [];
+    const failed: { name: string; error: string }[] = [];
+    const usedCodes = new Set(existingOrgs.map(o => o.code.toUpperCase()));
+
+    for (const customer of selected) {
+      const name = customer.CompanyName || customer.DisplayName;
+      try {
+        let code = generateOrgCode(name);
+        // Avoid collisions within this batch
+        let counter = 1;
+        while (usedCodes.has(code.toUpperCase())) {
+          code = code.replace(/\d+$/, '') + counter.toString().padStart(2, '0');
+          counter++;
+        }
+        usedCodes.add(code.toUpperCase());
+
+        await quickbooksCustomers.importCustomerAsOrganization(customer as any, code);
+        success.push(name);
+      } catch (error: any) {
+        failed.push({ name, error: error.message });
+      }
+    }
+
+    setImportResults({ success, failed });
+
+    // Refresh the list to show newly linked customers
+    await fetchCustomers();
+    setImporting(false);
+  };
+
+  const filtered = qbCustomers.filter(c => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return (
+      c.DisplayName.toLowerCase().includes(s) ||
+      c.CompanyName?.toLowerCase().includes(s) ||
+      c.PrimaryEmailAddr?.Address.toLowerCase().includes(s)
+    );
+  });
+
+  const selectedCount = qbCustomers.filter(c => c._selected && !c._alreadyLinked).length;
+  const unlinkedCount = qbCustomers.filter(c => !c._alreadyLinked).length;
+
+  return (
+    <div className="bg-white shadow sm:rounded-lg">
+      <div className="px-4 py-5 sm:p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-medium text-gray-900">Import Customers from QuickBooks</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Fetch your QuickBooks customers and import them as organizations in this app.
+            </p>
+          </div>
+          <button
+            onClick={fetchCustomers}
+            disabled={loading || !connected}
+            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? (
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4 mr-2" />
+            )}
+            {loading ? 'Fetching...' : 'Fetch QB Customers'}
+          </button>
+        </div>
+
+        {!connected && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-800">
+            Connect to QuickBooks first (Connection tab) before importing customers.
+          </div>
+        )}
+
+        {importResults && (
+          <div className={`rounded-lg p-4 text-sm border ${importResults.failed.length > 0 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
+            <div className="flex items-center gap-2 font-medium">
+              {importResults.failed.length > 0 ? (
+                <AlertCircle className="h-4 w-4 text-amber-600" />
+              ) : (
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              )}
+              Import complete: {importResults.success.length} imported{importResults.failed.length > 0 ? `, ${importResults.failed.length} failed` : ''}
+            </div>
+            {importResults.failed.length > 0 && (
+              <ul className="mt-2 ml-6 list-disc text-amber-700">
+                {importResults.failed.map((f, i) => (
+                  <li key={i}>{f.name}: {f.error}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+
+        {qbCustomers.length > 0 && (
+          <>
+            {/* Search and bulk actions */}
+            <div className="flex items-center gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search customers..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 text-sm"
+                />
+              </div>
+              <button onClick={selectAllUnlinked} className="text-sm text-blue-600 hover:text-blue-700 whitespace-nowrap">
+                Select all new ({unlinkedCount})
+              </button>
+              <button onClick={deselectAll} className="text-sm text-gray-500 hover:text-gray-700 whitespace-nowrap">
+                Deselect all
+              </button>
+            </div>
+
+            {/* Summary bar */}
+            <div className="flex items-center justify-between bg-gray-50 rounded-lg px-4 py-3">
+              <div className="text-sm text-gray-600">
+                <span className="font-medium">{qbCustomers.length}</span> QB customers found
+                {' · '}
+                <span className="text-green-600 font-medium">{qbCustomers.length - unlinkedCount}</span> already linked
+                {' · '}
+                <span className="text-blue-600 font-medium">{unlinkedCount}</span> available to import
+              </div>
+              <button
+                onClick={handleImport}
+                disabled={selectedCount === 0 || importing}
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {importing ? (
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4 mr-2" />
+                )}
+                {importing ? 'Importing...' : `Import ${selectedCount > 0 ? selectedCount : ''} Selected`}
+              </button>
+            </div>
+
+            {/* Customer list */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="max-h-[500px] overflow-y-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50 sticky top-0">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-10"></th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Phone</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Location</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {filtered.map((customer, idx) => {
+                      const realIdx = qbCustomers.indexOf(customer);
+                      return (
+                        <tr
+                          key={customer.Id || idx}
+                          className={`${customer._alreadyLinked ? 'bg-gray-50 opacity-60' : customer._selected ? 'bg-blue-50' : 'hover:bg-gray-50'} cursor-pointer`}
+                          onClick={() => !customer._alreadyLinked && toggleSelect(realIdx)}
+                        >
+                          <td className="px-4 py-3">
+                            {customer._alreadyLinked ? (
+                              <CheckCircle className="h-4 w-4 text-green-500" />
+                            ) : (
+                              <input
+                                type="checkbox"
+                                checked={!!customer._selected}
+                                onChange={() => toggleSelect(realIdx)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm font-medium text-gray-900">{customer.DisplayName}</div>
+                            {customer.CompanyName && customer.CompanyName !== customer.DisplayName && (
+                              <div className="text-xs text-gray-500">{customer.CompanyName}</div>
+                            )}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {customer.PrimaryEmailAddr?.Address || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {customer.PrimaryPhone?.FreeFormNumber || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {customer.BillAddr ? (
+                              <span>{[customer.BillAddr.City, customer.BillAddr.CountrySubDivisionCode].filter(Boolean).join(', ') || '—'}</span>
+                            ) : '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {customer._alreadyLinked ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                <Building2 className="h-3 w-3" />
+                                Linked
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
+                                New
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {filtered.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-500">
+                          {search ? 'No customers match your search' : 'No customers found'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
+
+        {!loading && qbCustomers.length === 0 && connected && (
+          <div className="text-center py-8 text-gray-400 border-2 border-dashed border-gray-200 rounded-lg">
+            <Download className="h-8 w-8 mx-auto mb-2" />
+            <p className="text-sm">Click "Fetch QB Customers" to load your QuickBooks customers</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function QuickBooksManagement() {
   const [connectionStatus, setConnectionStatus] = useState<QBConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [syncing, setSyncing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'connection' | 'diagnostics' | 'sync' | 'logs'>('connection');
+  const [activeTab, setActiveTab] = useState<'connection' | 'diagnostics' | 'import' | 'sync' | 'logs'>('connection');
 
   useEffect(() => {
     loadConnectionStatus();
@@ -464,7 +810,7 @@ export function QuickBooksManagement() {
 
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8">
-          {(['connection', 'diagnostics', 'sync', 'logs'] as const).map(tab => (
+          {(['connection', 'diagnostics', 'import', 'sync', 'logs'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -478,6 +824,11 @@ export function QuickBooksManagement() {
                 <span className="flex items-center gap-1.5">
                   <Activity className="h-4 w-4" />
                   Diagnostics
+                </span>
+              ) : tab === 'import' ? (
+                <span className="flex items-center gap-1.5">
+                  <Upload className="h-4 w-4" />
+                  Import Customers
                 </span>
               ) : (
                 tab.charAt(0).toUpperCase() + tab.slice(1).replace(/([A-Z])/g, ' $1')
@@ -595,6 +946,10 @@ export function QuickBooksManagement() {
       )}
 
       {activeTab === 'diagnostics' && <ConnectionDiagnostics />}
+
+      {activeTab === 'import' && (
+        <ImportCustomers connected={!!connectionStatus?.connected} />
+      )}
 
       {activeTab === 'sync' && (
         <div className="bg-white shadow sm:rounded-lg">
