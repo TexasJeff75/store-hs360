@@ -299,5 +299,64 @@ export const quickbooksCustomers = {
     }
 
     return { success, failed };
+  },
+
+  /**
+   * Fetch all active customers from QuickBooks.
+   * Used to import QB customers as organizations in the app.
+   */
+  async fetchAllCustomers(): Promise<QBCustomer[]> {
+    const customers = await qbClient.query<QBCustomer>(
+      "SELECT * FROM Customer WHERE Active = true MAXRESULTS 1000"
+    );
+    return customers;
+  },
+
+  /**
+   * Import a QuickBooks customer as a new organization in the app.
+   * Links the org to the QB customer via quickbooks_customer_id.
+   */
+  async importCustomerAsOrganization(
+    customer: QBCustomer,
+    orgCode: string
+  ): Promise<string> {
+    const billingAddress = customer.BillAddr ? {
+      address1: customer.BillAddr.Line1 || '',
+      address2: customer.BillAddr.Line2 || '',
+      city: customer.BillAddr.City || '',
+      state_or_province: customer.BillAddr.CountrySubDivisionCode || '',
+      postal_code: customer.BillAddr.PostalCode || '',
+      country_code: customer.BillAddr.Country || 'US',
+    } : null;
+
+    const { data, error } = await supabase
+      .from('organizations')
+      .insert({
+        name: customer.CompanyName || customer.DisplayName,
+        code: orgCode,
+        contact_email: customer.PrimaryEmailAddr?.Address || null,
+        contact_phone: customer.PrimaryPhone?.FreeFormNumber || null,
+        billing_address: billingAddress,
+        description: customer.Notes || null,
+        quickbooks_customer_id: customer.Id,
+        last_synced_at: new Date().toISOString(),
+        is_active: true,
+      })
+      .select('id')
+      .single();
+
+    if (error) throw error;
+
+    await qbClient.logSync(
+      'customer',
+      data.id,
+      'create',
+      'success',
+      customer.Id,
+      customer,
+      data
+    );
+
+    return data.id;
   }
 };
