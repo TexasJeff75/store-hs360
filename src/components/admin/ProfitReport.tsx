@@ -17,6 +17,11 @@ interface OrderProfit {
   total_cost: number;
   gross_profit: number;
   profit_margin: number;
+  // Commission waterfall fields
+  distributor_commission: number;
+  sales_rep_commission: number;
+  company_rep_commission: number;
+  net_profit: number;
 }
 
 interface ProfitSummary {
@@ -25,6 +30,10 @@ interface ProfitSummary {
   total_profit: number;
   average_margin: number;
   order_count: number;
+  total_distributor_commission: number;
+  total_sales_rep_commission: number;
+  total_company_rep_commission: number;
+  total_net_profit: number;
 }
 
 const ProfitReport: React.FC = () => {
@@ -34,7 +43,11 @@ const ProfitReport: React.FC = () => {
     total_cost: 0,
     total_profit: 0,
     average_margin: 0,
-    order_count: 0
+    order_count: 0,
+    total_distributor_commission: 0,
+    total_sales_rep_commission: 0,
+    total_company_rep_commission: 0,
+    total_net_profit: 0
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +131,25 @@ const ProfitReport: React.FC = () => {
         costMap.set(cost.product_id, cost.secret_cost || 0);
       });
 
+      // Fetch commission records for these orders
+      const orderIds = ordersData?.map(o => o.id) || [];
+      const commissionMap = new Map<string, { distributor_commission: number; sales_rep_commission: number; company_rep_commission: number }>();
+
+      if (orderIds.length > 0) {
+        const { data: commData } = await supabase
+          .from('commissions')
+          .select('order_id, distributor_commission, sales_rep_commission, company_rep_commission')
+          .in('order_id', orderIds);
+
+        commData?.forEach(c => {
+          commissionMap.set(c.order_id, {
+            distributor_commission: Number(c.distributor_commission || 0),
+            sales_rep_commission: Number(c.sales_rep_commission || 0),
+            company_rep_commission: Number(c.company_rep_commission || 0)
+          });
+        });
+      }
+
       // Calculate profit for each order
       const ordersWithProfit: OrderProfit[] = ordersData?.map(order => {
         let totalCost = 0;
@@ -133,6 +165,9 @@ const ProfitReport: React.FC = () => {
         const grossProfit = revenue - totalCost;
         const profitMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
+        const comm = commissionMap.get(order.id) || { distributor_commission: 0, sales_rep_commission: 0, company_rep_commission: 0 };
+        const netProfit = grossProfit - comm.distributor_commission - comm.sales_rep_commission - comm.company_rep_commission;
+
         return {
           order_id: order.id,
           order_number: order.order_number,
@@ -146,7 +181,11 @@ const ProfitReport: React.FC = () => {
           revenue,
           total_cost: totalCost,
           gross_profit: grossProfit,
-          profit_margin: profitMargin
+          profit_margin: profitMargin,
+          distributor_commission: comm.distributor_commission,
+          sales_rep_commission: comm.sales_rep_commission,
+          company_rep_commission: comm.company_rep_commission,
+          net_profit: netProfit
         };
       }) || [];
 
@@ -159,9 +198,14 @@ const ProfitReport: React.FC = () => {
           total_cost: acc.total_cost + order.total_cost,
           total_profit: acc.total_profit + order.gross_profit,
           average_margin: 0,
-          order_count: acc.order_count + 1
+          order_count: acc.order_count + 1,
+          total_distributor_commission: acc.total_distributor_commission + order.distributor_commission,
+          total_sales_rep_commission: acc.total_sales_rep_commission + order.sales_rep_commission,
+          total_company_rep_commission: acc.total_company_rep_commission + order.company_rep_commission,
+          total_net_profit: acc.total_net_profit + order.net_profit
         }),
-        { total_revenue: 0, total_cost: 0, total_profit: 0, average_margin: 0, order_count: 0 }
+        { total_revenue: 0, total_cost: 0, total_profit: 0, average_margin: 0, order_count: 0,
+          total_distributor_commission: 0, total_sales_rep_commission: 0, total_company_rep_commission: 0, total_net_profit: 0 }
       );
 
       summaryData.average_margin = summaryData.total_revenue > 0
@@ -186,7 +230,7 @@ const ProfitReport: React.FC = () => {
   };
 
   const exportToCSV = () => {
-    const headers = ['Order Number', 'Date', 'Status', 'Revenue', 'Cost', 'Gross Profit', 'Margin %'];
+    const headers = ['Order Number', 'Date', 'Status', 'Revenue', 'True Cost', 'Gross Profit', 'Distributor Commission', 'Dist Rep Commission', 'Company Rep Commission', 'Net Profit', 'Margin %'];
     const rows = orders.map(order => [
       order.order_number,
       new Date(order.created_at).toLocaleDateString(),
@@ -194,6 +238,10 @@ const ProfitReport: React.FC = () => {
       order.revenue.toFixed(2),
       order.total_cost.toFixed(2),
       order.gross_profit.toFixed(2),
+      order.distributor_commission.toFixed(2),
+      order.sales_rep_commission.toFixed(2),
+      order.company_rep_commission.toFixed(2),
+      order.net_profit.toFixed(2),
       order.profit_margin.toFixed(2)
     ]);
 
@@ -294,8 +342,8 @@ const ProfitReport: React.FC = () => {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+        {/* Summary Cards - Row 1 */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
           <div className="bg-white rounded-lg border border-gray-200 p-4">
             <div className="flex items-center justify-between">
               <div>
@@ -347,6 +395,39 @@ const ProfitReport: React.FC = () => {
                 </p>
               </div>
               <TrendingUp className="w-8 h-8 text-blue-500" />
+            </div>
+          </div>
+        </div>
+
+        {/* Summary Cards - Row 2: Commission Waterfall */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-orange-50 rounded-lg border border-orange-200 p-4">
+            <div>
+              <p className="text-sm text-orange-700">Distributor Commission</p>
+              <p className="text-xl font-bold text-orange-900">${summary.total_distributor_commission.toFixed(2)}</p>
+            </div>
+          </div>
+
+          <div className="bg-purple-50 rounded-lg border border-purple-200 p-4">
+            <div>
+              <p className="text-sm text-purple-700">Dist Rep Commission</p>
+              <p className="text-xl font-bold text-purple-900">${summary.total_sales_rep_commission.toFixed(2)}</p>
+            </div>
+          </div>
+
+          <div className="bg-indigo-50 rounded-lg border border-indigo-200 p-4">
+            <div>
+              <p className="text-sm text-indigo-700">Company Rep Commission</p>
+              <p className="text-xl font-bold text-indigo-900">${summary.total_company_rep_commission.toFixed(2)}</p>
+            </div>
+          </div>
+
+          <div className={`rounded-lg border p-4 ${summary.total_net_profit >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+            <div>
+              <p className={`text-sm ${summary.total_net_profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>Net Profit</p>
+              <p className={`text-xl font-bold ${summary.total_net_profit >= 0 ? 'text-green-900' : 'text-red-900'}`}>
+                ${summary.total_net_profit.toFixed(2)}
+              </p>
             </div>
           </div>
         </div>
@@ -427,6 +508,54 @@ const ProfitReport: React.FC = () => {
             render: (order) => (
               <div className={`text-sm font-bold ${order.gross_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                 ${order.gross_profit.toFixed(2)}
+              </div>
+            )
+          },
+          {
+            key: 'distributor_commission',
+            label: 'Dist Comm',
+            sortable: true,
+            className: 'whitespace-nowrap text-right',
+            headerClassName: 'text-right',
+            render: (order) => (
+              <div className="text-sm font-medium text-orange-700">
+                {order.distributor_commission > 0 ? `$${order.distributor_commission.toFixed(2)}` : '-'}
+              </div>
+            )
+          },
+          {
+            key: 'sales_rep_commission',
+            label: 'Rep Comm',
+            sortable: true,
+            className: 'whitespace-nowrap text-right',
+            headerClassName: 'text-right',
+            render: (order) => (
+              <div className="text-sm font-medium text-purple-700">
+                {order.sales_rep_commission > 0 ? `$${order.sales_rep_commission.toFixed(2)}` : '-'}
+              </div>
+            )
+          },
+          {
+            key: 'company_rep_commission',
+            label: 'Co Rep Comm',
+            sortable: true,
+            className: 'whitespace-nowrap text-right',
+            headerClassName: 'text-right',
+            render: (order) => (
+              <div className="text-sm font-medium text-indigo-700">
+                {order.company_rep_commission > 0 ? `$${order.company_rep_commission.toFixed(2)}` : '-'}
+              </div>
+            )
+          },
+          {
+            key: 'net_profit',
+            label: 'Net Profit',
+            sortable: true,
+            className: 'whitespace-nowrap text-right',
+            headerClassName: 'text-right',
+            render: (order) => (
+              <div className={`text-sm font-bold ${order.net_profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                ${order.net_profit.toFixed(2)}
               </div>
             )
           },
