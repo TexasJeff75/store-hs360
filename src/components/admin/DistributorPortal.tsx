@@ -29,7 +29,7 @@ interface DistributorCustomer {
   organization_id: string;
   is_active: boolean;
   notes?: string;
-  organizations: { name: string; code: string; contact_email?: string; contact_phone?: string };
+  organizations: { name: string; code: string; contact_name?: string; contact_email?: string; contact_phone?: string; city?: string; state?: string };
 }
 
 interface DistributorSalesRep {
@@ -100,7 +100,8 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
   // ── Add Customer (create new org) ──────────────────────────────────────────
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
-    name: '', code: '', contact_email: '', contact_phone: '', description: '',
+    name: '', code: '', contact_name: '', contact_email: '', contact_phone: '',
+    address: '', city: '', state: '', zip: '', description: '',
   });
   const [codeManuallyEdited, setCodeManuallyEdited] = useState(false);
 
@@ -156,7 +157,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       const [custRes, repsRes, delegatesRes] = await Promise.all([
         supabase
           .from('distributor_customers')
-          .select('*, organizations(name, code, contact_email, contact_phone)')
+          .select('*, organizations(name, code, contact_name, contact_email, contact_phone, city, state)')
           .eq('distributor_id', distData.id)
           .eq('is_active', true),
         supabase
@@ -196,8 +197,13 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
         .insert([{
           name: newCustomer.name,
           code: newCustomer.code,
+          contact_name: newCustomer.contact_name || null,
           contact_email: newCustomer.contact_email || null,
           contact_phone: newCustomer.contact_phone || null,
+          address: newCustomer.address || null,
+          city: newCustomer.city || null,
+          state: newCustomer.state || null,
+          zip: newCustomer.zip || null,
           description: newCustomer.description || null,
           is_active: true,
         }])
@@ -221,7 +227,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
   };
 
   const resetNewCustomer = () => {
-    setNewCustomer({ name: '', code: '', contact_email: '', contact_phone: '', description: '' });
+    setNewCustomer({ name: '', code: '', contact_name: '', contact_email: '', contact_phone: '', address: '', city: '', state: '', zip: '', description: '' });
     setCodeManuallyEdited(false);
   };
 
@@ -536,6 +542,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Code</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
                     <th className="px-4 py-3 w-20" />
                   </tr>
                 </thead>
@@ -549,8 +556,18 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                         <span className="text-xs font-mono text-gray-500">{cust.organizations?.code}</span>
                       </td>
                       <td className="px-4 py-3">
+                        <div className="space-y-0.5">
+                          {cust.organizations?.contact_name && (
+                            <div className="text-xs font-medium text-gray-900">{cust.organizations.contact_name}</div>
+                          )}
+                          <span className="text-xs text-gray-500">
+                            {cust.organizations?.contact_email || cust.organizations?.contact_phone || '—'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
                         <span className="text-xs text-gray-500">
-                          {cust.organizations?.contact_email || cust.organizations?.contact_phone || '—'}
+                          {[cust.organizations?.city, cust.organizations?.state].filter(Boolean).join(', ') || '—'}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right">
@@ -626,6 +643,16 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                     </p>
                   </Field>
 
+                  <Field label="Contact Name">
+                    <input
+                      type="text"
+                      value={newCustomer.contact_name}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, contact_name: e.target.value })}
+                      className={inputCls}
+                      placeholder="Primary contact person"
+                    />
+                  </Field>
+
                   <div className="grid grid-cols-2 gap-4">
                     <Field label="Contact Email">
                       <input
@@ -643,6 +670,46 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                         onChange={(e) => setNewCustomer({ ...newCustomer, contact_phone: e.target.value })}
                         className={inputCls}
                         placeholder="(555) 555-1234"
+                      />
+                    </Field>
+                  </div>
+
+                  <Field label="Address">
+                    <input
+                      type="text"
+                      value={newCustomer.address}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
+                      className={inputCls}
+                      placeholder="Street address"
+                    />
+                  </Field>
+
+                  <div className="grid grid-cols-3 gap-4">
+                    <Field label="City">
+                      <input
+                        type="text"
+                        value={newCustomer.city}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, city: e.target.value })}
+                        className={inputCls}
+                        placeholder="City"
+                      />
+                    </Field>
+                    <Field label="State">
+                      <input
+                        type="text"
+                        value={newCustomer.state}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, state: e.target.value })}
+                        className={inputCls}
+                        placeholder="State"
+                      />
+                    </Field>
+                    <Field label="Zip">
+                      <input
+                        type="text"
+                        value={newCustomer.zip}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, zip: e.target.value })}
+                        className={inputCls}
+                        placeholder="Zip"
                       />
                     </Field>
                   </div>

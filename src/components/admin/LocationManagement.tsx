@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Plus, CreditCard as Edit, Trash2, Search, Building2, Mail, Phone } from 'lucide-react';
+import { MapPin, Plus, Pencil, Trash2, Search, Building2, Mail, Phone } from 'lucide-react';
 import { multiTenantService } from '@/services/multiTenant';
 import type { Location, Organization } from '@/services/supabase';
 
@@ -190,7 +190,7 @@ const LocationManagement: React.FC<LocationManagementProps> = ({ organizationId 
                   className="p-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
                   title="Edit Location"
                 >
-                  <Edit className="h-4 w-4" />
+                  <Pencil className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => handleDeleteLocation(location.id)}

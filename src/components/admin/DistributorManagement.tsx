@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Users, Building, Plus, CreditCard as Edit2, Trash2, X, Save,
+  Users, Building, Plus, Trash2, X, Save,
   TrendingUp, DollarSign, Building2, Percent, Package,
   ChevronDown, ChevronRight, UserPlus, Pencil, Upload,
 } from 'lucide-react';
@@ -1078,7 +1078,7 @@ const DistributorManagement: React.FC = () => {
                         className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                         title="Edit"
                       >
-                        <Edit2 className="h-4 w-4 text-gray-500" />
+                        <Pencil className="h-4 w-4 text-gray-500" />
                       </button>
                       <button
                         onClick={() => handleDeleteDistributor(distributor.id)}

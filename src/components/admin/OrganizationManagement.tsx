@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, Plus, CreditCard as Edit, Trash2, Search, MapPin, Users, Mail, Phone, AlertCircle, CheckCircle, Eye, Archive, ArrowLeft, Settings, DollarSign, Save, RotateCcw, UserCheck, Home } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, Search, MapPin, Users, Mail, Phone, AlertCircle, CheckCircle, Eye, Archive, ArrowLeft, Settings, DollarSign, Save, RotateCcw, UserCheck, Home } from 'lucide-react';
 import { multiTenantService } from '@/services/multiTenant';
 import { supabase } from '@/services/supabase';
 import LocationManagement from './LocationManagement';
@@ -101,10 +101,15 @@ const OrganizationManagement: React.FC = () => {
     setSelectedOrg({
       name: '',
       code: generateOrgCode(''),
+      contact_name: '',
       description: '',
       billing_address: null,
       contact_email: '',
       contact_phone: '',
+      address: '',
+      city: '',
+      state: '',
+      zip: '',
       is_active: true,
       created_at: '',
       updated_at: ''
@@ -545,7 +550,7 @@ const OrganizationManagement: React.FC = () => {
                         className="p-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
                         title="Edit Organization"
                       >
-                        <Edit className="h-4 w-4" />
+                        <Pencil className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => setSelectedOrgForSubManagement(org)}
@@ -595,6 +600,9 @@ const OrganizationManagement: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="space-y-1">
+                      {org.contact_name && (
+                        <div className="text-sm font-medium text-gray-900">{org.contact_name}</div>
+                      )}
                       {org.contact_email && (
                         <div className="flex items-center space-x-2 text-sm text-gray-600">
                           <Mail className="h-3 w-3 text-gray-400" />
@@ -607,7 +615,13 @@ const OrganizationManagement: React.FC = () => {
                           <span>{org.contact_phone}</span>
                         </div>
                       )}
-                      {!org.contact_email && !org.contact_phone && (
+                      {(org.city || org.state) && (
+                        <div className="flex items-center space-x-2 text-sm text-gray-500">
+                          <MapPin className="h-3 w-3 text-gray-400" />
+                          <span>{[org.city, org.state].filter(Boolean).join(', ')}</span>
+                        </div>
+                      )}
+                      {!org.contact_name && !org.contact_email && !org.contact_phone && (
                         <span className="text-sm text-gray-400">No contact info</span>
                       )}
                     </div>
@@ -742,40 +756,106 @@ const OrganizationManagement: React.FC = () => {
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Contact Name
+                        </label>
+                        <input
+                          type="text"
+                          value={selectedOrg.contact_name || ''}
+                          onChange={(e) => setSelectedOrg({...selectedOrg, contact_name: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          placeholder="Primary contact person"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Contact Email
+                          </label>
+                          <input
+                            type="email"
+                            value={selectedOrg.contact_email || ''}
+                            onChange={(e) => setSelectedOrg({...selectedOrg, contact_email: e.target.value})}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            placeholder="contact@organization.com"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Contact Phone
+                          </label>
+                          <input
+                            type="tel"
+                            value={selectedOrg.contact_phone || ''}
+                            onChange={(e) => setSelectedOrg({...selectedOrg, contact_phone: e.target.value})}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            placeholder="(555) 123-4567"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Address
+                        </label>
+                        <input
+                          type="text"
+                          value={selectedOrg.address || ''}
+                          onChange={(e) => setSelectedOrg({...selectedOrg, address: e.target.value})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          placeholder="Street address"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            City
+                          </label>
+                          <input
+                            type="text"
+                            value={selectedOrg.city || ''}
+                            onChange={(e) => setSelectedOrg({...selectedOrg, city: e.target.value})}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            placeholder="City"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            State
+                          </label>
+                          <input
+                            type="text"
+                            value={selectedOrg.state || ''}
+                            onChange={(e) => setSelectedOrg({...selectedOrg, state: e.target.value})}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            placeholder="State"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Zip
+                          </label>
+                          <input
+                            type="text"
+                            value={selectedOrg.zip || ''}
+                            onChange={(e) => setSelectedOrg({...selectedOrg, zip: e.target.value})}
+                            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            placeholder="Zip"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
                           Description
                         </label>
                         <textarea
                           value={selectedOrg.description || ''}
                           onChange={(e) => setSelectedOrg({...selectedOrg, description: e.target.value})}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          rows={3}
+                          rows={2}
                           placeholder="Organization description"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Contact Email
-                        </label>
-                        <input
-                          type="email"
-                          value={selectedOrg.contact_email || ''}
-                          onChange={(e) => setSelectedOrg({...selectedOrg, contact_email: e.target.value})}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          placeholder="contact@organization.com"
-                        />
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Contact Phone
-                        </label>
-                        <input
-                          type="tel"
-                          value={selectedOrg.contact_phone || ''}
-                          onChange={(e) => setSelectedOrg({...selectedOrg, contact_phone: e.target.value})}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          placeholder="+1 (555) 123-4567"
                         />
                       </div>
 
@@ -891,14 +971,23 @@ const OrganizationManagement: React.FC = () => {
                           </label>
                           <p className="text-lg font-semibold text-gray-900">{selectedOrg.name}</p>
                         </div>
-                        
+
                         <div>
                           <label className="block text-sm font-medium text-gray-500 mb-1">
                             Organization Code
                           </label>
                           <p className="text-lg font-mono text-gray-900">{selectedOrg.code}</p>
                         </div>
-                        
+
+                        {selectedOrg.contact_name && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">
+                              Contact Name
+                            </label>
+                            <p className="text-gray-900">{selectedOrg.contact_name}</p>
+                          </div>
+                        )}
+
                         {selectedOrg.description && (
                           <div>
                             <label className="block text-sm font-medium text-gray-500 mb-1">
@@ -908,7 +997,7 @@ const OrganizationManagement: React.FC = () => {
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="space-y-4">
                         {selectedOrg.contact_email && (
                           <div>
@@ -921,7 +1010,7 @@ const OrganizationManagement: React.FC = () => {
                             </div>
                           </div>
                         )}
-                        
+
                         {selectedOrg.contact_phone && (
                           <div>
                             <label className="block text-sm font-medium text-gray-500 mb-1">
@@ -933,7 +1022,27 @@ const OrganizationManagement: React.FC = () => {
                             </div>
                           </div>
                         )}
-                        
+
+                        {(selectedOrg.address || selectedOrg.city || selectedOrg.state || selectedOrg.zip) && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-500 mb-1">
+                              Address
+                            </label>
+                            <div className="flex items-start space-x-2">
+                              <MapPin className="h-4 w-4 text-gray-400 mt-0.5" />
+                              <div>
+                                {selectedOrg.address && <p className="text-gray-900">{selectedOrg.address}</p>}
+                                {(selectedOrg.city || selectedOrg.state || selectedOrg.zip) && (
+                                  <p className="text-gray-900">
+                                    {[selectedOrg.city, selectedOrg.state].filter(Boolean).join(', ')}
+                                    {selectedOrg.zip ? ` ${selectedOrg.zip}` : ''}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
                         <div>
                           <label className="block text-sm font-medium text-gray-500 mb-1">
                             Created

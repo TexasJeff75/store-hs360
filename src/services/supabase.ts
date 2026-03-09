@@ -37,10 +37,15 @@ export interface Organization {
   id: string;
   name: string;
   code: string;
+  contact_name?: string;
   description?: string;
   billing_address?: any;
   contact_email?: string;
   contact_phone?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
   is_active: boolean;
   created_at: string;
   updated_at: string;

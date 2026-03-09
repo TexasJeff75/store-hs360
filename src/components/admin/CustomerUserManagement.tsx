@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, CreditCard as Edit, Trash2, Search, User, Mail, Shield, Clock, CheckCircle, AlertCircle, Key } from 'lucide-react';
+import { Users, Plus, Pencil, Trash2, Search, User, Mail, Shield, Clock, CheckCircle, AlertCircle, Key } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import { multiTenantService } from '@/services/multiTenant';
 import type { Profile, UserOrganizationRole } from '@/services/supabase';
@@ -383,7 +383,7 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
                           }}
                           className="text-purple-600 hover:text-purple-900 p-1 rounded"
                         >
-                          <Edit className="h-4 w-4" />
+                          <Pencil className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => handleRemoveUser(user.id)}
