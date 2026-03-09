@@ -77,15 +77,18 @@ class CustomerAddressService {
    */
   async getOrganizationAddresses(organizationId: string): Promise<CustomerAddress[]> {
     try {
+      console.log('[AddressService] RPC get_organization_addresses called with:', organizationId);
       const { data, error } = await supabase.rpc('get_organization_addresses', {
         org_id: organizationId,
       });
 
       if (error) {
-        console.error('RPC get_organization_addresses error:', error);
+        console.error('[AddressService] RPC get_organization_addresses error:', error);
+        console.log('[AddressService] Falling back to direct query');
         // Fallback to direct query
         return this.getOrganizationAddressesFallback(organizationId);
       }
+      console.log('[AddressService] RPC returned', (data as any[])?.length, 'addresses');
       return (data as CustomerAddress[]) || [];
     } catch (error) {
       console.error('Error fetching organization addresses:', error);

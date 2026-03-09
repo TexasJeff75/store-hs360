@@ -32,11 +32,15 @@ const AddressSelector: React.FC<AddressSelectorProps> = ({
       try {
         let addressList: CustomerAddress[];
 
+        console.log('[AddressSelector] Fetching addresses:', { userId, organizationId, addressType });
+
         if (organizationId) {
           addressList = await customerAddressService.getOrganizationAddresses(organizationId);
         } else {
           addressList = await customerAddressService.getUserAddresses(userId);
         }
+
+        console.log('[AddressSelector] Received addresses:', addressList.length, addressList.map(a => ({ id: a.id, label: a.label, type: a.address_type })));
 
         if (cancelled) return;
 
