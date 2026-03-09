@@ -56,7 +56,6 @@ const OrderManagement: React.FC = () => {
       setSubOrders([]);
       setShowSubOrders(false);
       setSelectedOrderOrgName(null);
-      setSelectedOrderLocationName(null);
     }
   }, [selectedOrder?.id]);
 
