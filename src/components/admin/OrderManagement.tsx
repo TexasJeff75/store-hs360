@@ -1159,7 +1159,7 @@ const OrderManagement: React.FC = () => {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Orders</h2>
-            <p className="text-gray-600">Manage and view all customer orders</p>
+            <p className="text-gray-600 mt-1">Manage and view all customer orders</p>
           </div>
           <button
             onClick={fetchOrders}

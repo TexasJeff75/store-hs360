@@ -242,7 +242,7 @@ const SalesRepDashboard: React.FC = () => {
   // ── Org detail view with sub-tabs ───────────────────────────────────────
   if (selectedOrg) {
     return (
-      <div className="space-y-6">
+      <div className="p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <button
@@ -276,7 +276,7 @@ const SalesRepDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg shadow border border-gray-200">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
           <div className="border-b border-gray-200">
             <nav className="flex -mb-px">
               <button
@@ -493,7 +493,7 @@ const SalesRepDashboard: React.FC = () => {
 
   // ── Main list view ──────────────────────────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -519,7 +519,7 @@ const SalesRepDashboard: React.FC = () => {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center">
             <Building2 className="h-8 w-8 text-blue-600" />
             <div className="ml-3">
@@ -529,7 +529,7 @@ const SalesRepDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center">
             <Users className="h-8 w-8 text-green-600" />
             <div className="ml-3">
@@ -539,7 +539,7 @@ const SalesRepDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center">
             <TrendingUp className="h-8 w-8 text-purple-600" />
             <div className="ml-3">
@@ -549,7 +549,7 @@ const SalesRepDashboard: React.FC = () => {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
+        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
           <div className="flex items-center">
             <DollarSign className="h-8 w-8 text-yellow-600" />
             <div className="ml-3">
@@ -563,7 +563,7 @@ const SalesRepDashboard: React.FC = () => {
       </div>
 
       {/* Org list */}
-      <div className="bg-white rounded-lg shadow border border-gray-200">
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <h3 className="text-lg font-semibold text-gray-900">Assigned Organizations</h3>
         </div>
@@ -645,8 +645,8 @@ const SalesRepDashboard: React.FC = () => {
 
       {/* Create Org Modal */}
       {showCreateOrg && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">New Customer Organization</h3>
               <button onClick={() => { setShowCreateOrg(false); setNewOrg({ ...emptyOrg }); setCodeManuallyEdited(false); setError(null); }} className="p-1 hover:bg-gray-100 rounded-lg">
@@ -672,8 +672,8 @@ const SalesRepDashboard: React.FC = () => {
 
       {/* Edit Org Modal */}
       {editingOrg && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-xl shadow-xl max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900">Edit {editingOrg.name}</h3>
               <button onClick={() => { setEditingOrg(null); setError(null); }} className="p-1 hover:bg-gray-100 rounded-lg">
