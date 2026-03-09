@@ -23,14 +23,11 @@ INSERT INTO customer_addresses (
   is_active
 )
 SELECT
-  -- Use the first admin/manager user in the org, or any user
-  COALESCE(
-    (SELECT uor.user_id FROM user_organization_roles uor
-     WHERE uor.organization_id = l.organization_id
-     ORDER BY uor.is_primary DESC, uor.created_at ASC
-     LIMIT 1),
-    '00000000-0000-0000-0000-000000000000'
-  ) as user_id,
+  -- Use the first user in the org (ordered by primary flag, then creation date)
+  (SELECT uor.user_id FROM user_organization_roles uor
+   WHERE uor.organization_id = l.organization_id
+   ORDER BY uor.is_primary DESC, uor.created_at ASC
+   LIMIT 1) as user_id,
   l.organization_id,
   'shipping',
   l.name,
@@ -49,7 +46,11 @@ SELECT
 FROM locations l
 WHERE l.address IS NOT NULL
   AND l.address->>'address1' IS NOT NULL
-  AND l.address->>'address1' != '';
+  AND l.address->>'address1' != ''
+  AND EXISTS (
+    SELECT 1 FROM user_organization_roles uor
+    WHERE uor.organization_id = l.organization_id
+  );
 
 -- 2. Migrate organization billing_address into customer_addresses as billing type
 INSERT INTO customer_addresses (
@@ -71,13 +72,10 @@ INSERT INTO customer_addresses (
   is_active
 )
 SELECT
-  COALESCE(
-    (SELECT uor.user_id FROM user_organization_roles uor
-     WHERE uor.organization_id = o.id
-     ORDER BY uor.is_primary DESC, uor.created_at ASC
-     LIMIT 1),
-    '00000000-0000-0000-0000-000000000000'
-  ) as user_id,
+  (SELECT uor.user_id FROM user_organization_roles uor
+   WHERE uor.organization_id = o.id
+   ORDER BY uor.is_primary DESC, uor.created_at ASC
+   LIMIT 1) as user_id,
   o.id,
   'billing',
   o.name || ' - Main',
@@ -95,8 +93,12 @@ SELECT
   o.is_active
 FROM organizations o
 WHERE o.billing_address IS NOT NULL
-  AND (o.billing_address->>'address1' IS NOT NULL AND o.billing_address->>'address1' != '')
-     OR (o.billing_address->>'street' IS NOT NULL AND o.billing_address->>'street' != '');
+  AND EXISTS (
+    SELECT 1 FROM user_organization_roles uor
+    WHERE uor.organization_id = o.id
+  )
+  AND ((o.billing_address->>'address1' IS NOT NULL AND o.billing_address->>'address1' != '')
+     OR (o.billing_address->>'street' IS NOT NULL AND o.billing_address->>'street' != ''));
 
 -- 3. Drop location_id column from customer_addresses (no longer needed)
 ALTER TABLE customer_addresses DROP COLUMN IF EXISTS location_id;
