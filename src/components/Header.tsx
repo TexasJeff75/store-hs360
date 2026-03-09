@@ -105,7 +105,7 @@ const Header: React.FC<HeaderProps> = ({
               </div>
             ) : user ? (
               <div className="flex items-center space-x-4">
-                {displayRole === 'admin' && (
+                {profile?.role === 'admin' && (
                   <button
                     onClick={onSalesRepClick}
                     className="flex items-center space-x-2 text-gray-700 hover:text-pink-600 transition-colors"
