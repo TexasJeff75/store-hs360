@@ -188,15 +188,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           .eq('is_active', true)
           .order('name');
 
-        if (locations && locations.length > 1) {
-          // Multiple locations — let user choose
+        if (locations && locations.length > 0) {
+          // Show location step so user can select/confirm
           setAvailableLocations(locations);
+          if (locations.length === 1) {
+            setSelectedLocationId(locations[0].id);
+          }
           setCurrentStep('location');
-        } else if (locations && locations.length === 1) {
-          // Single location — auto-select
-          setSelectedLocationId(locations[0].id);
-          await fetchLocationAddress(locations[0].id);
-          setCurrentStep('shipping');
         } else {
           setCurrentStep('shipping');
         }
@@ -244,12 +242,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     setSelectedOrgId(selection.organizationId);
     setCustomerEmail(selection.customerEmail);
 
-    if (selection.locationId) {
-      setSelectedLocationId(selection.locationId);
-      await fetchLocationAddress(selection.locationId);
-      setCurrentStep('shipping');
-    } else if (selection.organizationId) {
-      // Org selected but no location — check if there are locations to choose from
+    if (selection.organizationId) {
+      // Always fetch locations for the org so user can select/confirm
       const { data: locations } = await supabase
         .from('locations')
         .select('id, name, code, address')
@@ -257,12 +251,19 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         .eq('is_active', true)
         .order('name');
 
-      if (locations && locations.length > 1) {
+      if (locations && locations.length > 0) {
         setAvailableLocations(locations);
+        // Pre-select if a location was already chosen or there's only one
+        if (selection.locationId) {
+          setSelectedLocationId(selection.locationId);
+        } else if (locations.length === 1) {
+          setSelectedLocationId(locations[0].id);
+        }
         setCurrentStep('location');
-      } else if (locations && locations.length === 1) {
-        setSelectedLocationId(locations[0].id);
-        await fetchLocationAddress(locations[0].id);
+      } else if (selection.locationId) {
+        // Fallback: location was passed but not found in active query
+        setSelectedLocationId(selection.locationId);
+        await fetchLocationAddress(selection.locationId);
         setCurrentStep('shipping');
       } else {
         setCurrentStep('shipping');
@@ -827,6 +828,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           );
         })}
       </div>
+
+      {selectedLocationId && (
+        <button
+          onClick={() => handleLocationSelect(selectedLocationId)}
+          className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Continue with Selected Location
+        </button>
+      )}
 
       <button
         onClick={() => {
