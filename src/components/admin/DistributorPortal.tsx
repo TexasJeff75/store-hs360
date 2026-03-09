@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Building2, Users, Plus, Trash2, X, UserPlus,
+  Building2, Users, Plus, Trash2, X, UserPlus, UserCheck,
 } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,19 +14,13 @@ interface Distributor {
   code: string;
 }
 
-interface Organization {
-  id: string;
-  name: string;
-  code: string;
-}
-
 interface DistributorCustomer {
   id: string;
   distributor_id: string;
   organization_id: string;
   is_active: boolean;
   notes?: string;
-  organizations: { name: string; code: string };
+  organizations: { name: string; code: string; contact_email?: string; contact_phone?: string };
 }
 
 interface DistributorSalesRep {
@@ -41,14 +35,17 @@ interface DistributorSalesRep {
   profiles?: { email: string; full_name?: string; phone?: string };
 }
 
-interface SalesRepOption {
+interface DistributorDelegate {
   id: string;
-  email: string;
-  full_name?: string;
+  distributor_id: string;
+  user_id: string;
+  is_active: boolean;
+  notes?: string;
+  profiles?: { email: string; full_name?: string };
 }
 
 interface DistributorPortalProps {
-  view: 'customers' | 'sales-reps';
+  view: 'customers' | 'sales-reps' | 'delegates';
 }
 
 // ── Shared Tailwind classes ──────────────────────────────────────────────────
@@ -61,28 +58,51 @@ const primaryBtnCls =
 const cancelBtnCls =
   'px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 text-sm font-medium transition-colors';
 
+// ── Auto-generate org code from name ─────────────────────────────────────────
+
+function generateOrgCode(name: string, existingCodes: string[]): string {
+  const base = name
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '')
+    .slice(0, 6) || 'ORG';
+  let code = base;
+  let i = 1;
+  while (existingCodes.includes(code)) {
+    code = `${base}${i}`;
+    i++;
+  }
+  return code;
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
   const { user, profile, isImpersonating, effectiveProfile } = useAuth();
-  const activeProfile = isImpersonating ? effectiveProfile : profile;
   const activeUserId = isImpersonating ? effectiveProfile?.id : user?.id;
 
   const [distributor, setDistributor] = useState<Distributor | null>(null);
   const [customers, setCustomers] = useState<DistributorCustomer[]>([]);
   const [salesReps, setSalesReps] = useState<DistributorSalesRep[]>([]);
-  const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [availableSalesReps, setAvailableSalesReps] = useState<SalesRepOption[]>([]);
+  const [delegates, setDelegates] = useState<DistributorDelegate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Add customer modal
+  // ── Add Customer (create new org) ──────────────────────────────────────────
   const [showAddCustomer, setShowAddCustomer] = useState(false);
-  const [selectedOrgId, setSelectedOrgId] = useState('');
+  const [newCustomer, setNewCustomer] = useState({
+    name: '', code: '', contact_email: '', contact_phone: '', description: '',
+  });
+  const [codeManuallyEdited, setCodeManuallyEdited] = useState(false);
 
-  // Add sales rep modal
+  // ── Add Sales Rep ──────────────────────────────────────────────────────────
   const [showAddSalesRep, setShowAddSalesRep] = useState(false);
+  const [showCreateRepUser, setShowCreateRepUser] = useState(false);
+  const [newRepEmail, setNewRepEmail] = useState('');
+  const [newRepPassword, setNewRepPassword] = useState('');
+  const [newRepFullName, setNewRepFullName] = useState('');
+  const [newRepPhone, setNewRepPhone] = useState('');
+  const [isCreatingRepUser, setIsCreatingRepUser] = useState(false);
   const [newSalesRep, setNewSalesRep] = useState({
     sales_rep_id: '',
     commission_split_type: 'percentage_of_distributor' as 'percentage_of_distributor' | 'fixed_with_override',
@@ -91,16 +111,17 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
     notes: '',
   });
 
-  // Inline sales rep user creation
-  const [showCreateUser, setShowCreateUser] = useState(false);
-  const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserFullName, setNewUserFullName] = useState('');
-  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  // ── Add Delegate ───────────────────────────────────────────────────────────
+  const [showAddDelegate, setShowAddDelegate] = useState(false);
+  const [showCreateDelegateUser, setShowCreateDelegateUser] = useState(false);
+  const [newDelegateEmail, setNewDelegateEmail] = useState('');
+  const [newDelegatePassword, setNewDelegatePassword] = useState('');
+  const [newDelegateFullName, setNewDelegateFullName] = useState('');
+  const [isCreatingDelegateUser, setIsCreatingDelegateUser] = useState(false);
+  const [selectedDelegateUserId, setSelectedDelegateUserId] = useState('');
+  const [delegateNotes, setDelegateNotes] = useState('');
 
-  useEffect(() => {
-    fetchData();
-  }, [activeUserId]);
+  useEffect(() => { fetchData(); }, [activeUserId]);
 
   const fetchData = async () => {
     if (!activeUserId) return;
@@ -108,7 +129,6 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       setLoading(true);
       setError(null);
 
-      // Get the distributor record for this user
       const { data: distData, error: distError } = await supabase
         .from('distributors')
         .select('id, profile_id, name, code')
@@ -124,11 +144,10 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
 
       setDistributor(distData);
 
-      // Fetch customers, sales reps, orgs, and available reps in parallel
-      const [custRes, repsRes, orgsRes, availRepsRes] = await Promise.all([
+      const [custRes, repsRes, delegatesRes] = await Promise.all([
         supabase
           .from('distributor_customers')
-          .select('*, organizations(name, code)')
+          .select('*, organizations(name, code, contact_email, contact_phone)')
           .eq('distributor_id', distData.id)
           .eq('is_active', true),
         supabase
@@ -138,21 +157,16 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
           .eq('is_active', true)
           .order('created_at', { ascending: false }),
         supabase
-          .from('organizations')
-          .select('id, name, code')
+          .from('distributor_delegates')
+          .select('*, profiles!distributor_delegates_user_id_fkey(email, full_name)')
+          .eq('distributor_id', distData.id)
           .eq('is_active', true)
-          .order('name'),
-        supabase
-          .from('profiles')
-          .select('id, email, full_name')
-          .in('role', ['sales_rep'])
-          .order('email'),
+          .order('created_at', { ascending: false }),
       ]);
 
       if (!custRes.error) setCustomers((custRes.data as DistributorCustomer[]) || []);
       if (!repsRes.error) setSalesReps((repsRes.data as DistributorSalesRep[]) || []);
-      if (!orgsRes.error) setOrganizations(orgsRes.data || []);
-      if (!availRepsRes.error) setAvailableSalesReps(availRepsRes.data || []);
+      if (!delegatesRes.error) setDelegates((delegatesRes.data as DistributorDelegate[]) || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
@@ -160,39 +174,61 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
     }
   };
 
-  const handleAddCustomer = async (e: React.FormEvent) => {
+  // ── Customer handlers ──────────────────────────────────────────────────────
+
+  const handleCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!distributor || !selectedOrgId) return;
+    if (!distributor) return;
     try {
       setError(null);
-      const { error: insertError } = await supabase
+      // 1. Create the organization
+      const { data: orgData, error: orgError } = await supabase
+        .from('organizations')
+        .insert([{
+          name: newCustomer.name,
+          code: newCustomer.code,
+          contact_email: newCustomer.contact_email || null,
+          contact_phone: newCustomer.contact_phone || null,
+          description: newCustomer.description || null,
+          is_active: true,
+        }])
+        .select('id')
+        .single();
+      if (orgError) throw orgError;
+
+      // 2. Link it as a distributor customer
+      const { error: linkError } = await supabase
         .from('distributor_customers')
-        .insert([{ distributor_id: distributor.id, organization_id: selectedOrgId, is_active: true }]);
-      if (insertError) throw insertError;
-      setSuccess('Customer added');
+        .insert([{ distributor_id: distributor.id, organization_id: orgData.id, is_active: true }]);
+      if (linkError) throw linkError;
+
+      setSuccess('Customer created and added');
       setShowAddCustomer(false);
-      setSelectedOrgId('');
+      resetNewCustomer();
       fetchData();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to add customer');
+      setError(err instanceof Error ? err.message : 'Failed to create customer');
     }
+  };
+
+  const resetNewCustomer = () => {
+    setNewCustomer({ name: '', code: '', contact_email: '', contact_phone: '', description: '' });
+    setCodeManuallyEdited(false);
   };
 
   const handleRemoveCustomer = async (id: string) => {
     if (!confirm('Remove this customer?')) return;
     try {
       setError(null);
-      const { error: delError } = await supabase
-        .from('distributor_customers')
-        .update({ is_active: false })
-        .eq('id', id);
-      if (delError) throw delError;
+      await supabase.from('distributor_customers').update({ is_active: false }).eq('id', id);
       setSuccess('Customer removed');
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to remove customer');
     }
   };
+
+  // ── Sales Rep handlers ─────────────────────────────────────────────────────
 
   const handleAddSalesRep = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,11 +251,8 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       setSuccess('Sales rep added');
       setShowAddSalesRep(false);
       setNewSalesRep({
-        sales_rep_id: '',
-        commission_split_type: 'percentage_of_distributor',
-        sales_rep_rate: 50,
-        distributor_override_rate: 0,
-        notes: '',
+        sales_rep_id: '', commission_split_type: 'percentage_of_distributor',
+        sales_rep_rate: 50, distributor_override_rate: 0, notes: '',
       });
       fetchData();
     } catch (err) {
@@ -231,11 +264,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
     if (!confirm('Remove this sales rep?')) return;
     try {
       setError(null);
-      const { error: delError } = await supabase
-        .from('distributor_sales_reps')
-        .update({ is_active: false })
-        .eq('id', id);
-      if (delError) throw delError;
+      await supabase.from('distributor_sales_reps').update({ is_active: false }).eq('id', id);
       setSuccess('Sales rep removed');
       fetchData();
     } catch (err) {
@@ -244,16 +273,17 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
   };
 
   const handleCreateSalesRepUser = async () => {
-    if (!newUserEmail.trim() || !newUserPassword.trim()) {
+    if (!newRepEmail.trim() || !newRepPassword.trim()) {
       setError('Email and password are required');
       return;
     }
-    if (newUserPassword.length < 6) {
+    if (newRepPassword.length < 6) {
       setError('Password must be at least 6 characters');
       return;
     }
+    if (!distributor) return;
     try {
-      setIsCreatingUser(true);
+      setIsCreatingRepUser(true);
       setError(null);
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No active session');
@@ -267,53 +297,164 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            email: newUserEmail,
-            password: newUserPassword,
+            email: newRepEmail,
+            password: newRepPassword,
             role: 'sales_rep',
             is_approved: true,
-            full_name: newUserFullName || undefined,
+            full_name: newRepFullName || undefined,
+            phone: newRepPhone || undefined,
           }),
         },
       );
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+        throw new Error(errorData.error || `Request failed`);
       }
 
       const result = await response.json();
       if (!result.success) throw new Error(result.error || 'User creation failed');
 
-      const createdEmail = newUserEmail.trim().toLowerCase();
-      setNewUserEmail('');
-      setNewUserPassword('');
-      setNewUserFullName('');
-      setShowCreateUser(false);
-
-      // Re-fetch available sales reps and auto-select
-      const { data: refreshed } = await supabase
-        .from('profiles')
-        .select('id, email, full_name')
-        .in('role', ['sales_rep'])
-        .order('email');
-
-      if (refreshed) {
-        setAvailableSalesReps(refreshed);
-        const newUser = refreshed.find((u: SalesRepOption) => u.email.toLowerCase() === createdEmail);
-        if (newUser) {
-          setNewSalesRep((prev) => ({ ...prev, sales_rep_id: newUser.id }));
-        }
+      // Auto-assign this new rep to the distributorship
+      if (result.user_id) {
+        await supabase.from('distributor_sales_reps').insert([{
+          distributor_id: distributor.id,
+          sales_rep_id: result.user_id,
+          commission_split_type: newSalesRep.commission_split_type,
+          sales_rep_rate: newSalesRep.sales_rep_rate,
+          distributor_override_rate: newSalesRep.commission_split_type === 'fixed_with_override'
+            ? newSalesRep.distributor_override_rate : null,
+          is_active: true,
+          notes: newSalesRep.notes || null,
+        }]);
       }
 
-      setSuccess('Sales rep user created and selected');
+      setNewRepEmail('');
+      setNewRepPassword('');
+      setNewRepFullName('');
+      setNewRepPhone('');
+      setShowCreateRepUser(false);
+      setShowAddSalesRep(false);
+      setNewSalesRep({
+        sales_rep_id: '', commission_split_type: 'percentage_of_distributor',
+        sales_rep_rate: 50, distributor_override_rate: 0, notes: '',
+      });
+      setSuccess('Sales rep created and added');
+      fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user');
     } finally {
-      setIsCreatingUser(false);
+      setIsCreatingRepUser(false);
     }
   };
 
-  // Clear success message after a delay
+  // ── Delegate handlers ──────────────────────────────────────────────────────
+
+  const handleAddDelegate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!distributor || !selectedDelegateUserId) return;
+    try {
+      setError(null);
+      const { error: insertError } = await supabase
+        .from('distributor_delegates')
+        .insert([{
+          distributor_id: distributor.id,
+          user_id: selectedDelegateUserId,
+          is_active: true,
+          notes: delegateNotes || null,
+        }]);
+      if (insertError) throw insertError;
+      setSuccess('Delegate added');
+      setShowAddDelegate(false);
+      setSelectedDelegateUserId('');
+      setDelegateNotes('');
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to add delegate');
+    }
+  };
+
+  const handleRemoveDelegate = async (id: string) => {
+    if (!confirm('Remove this delegate?')) return;
+    try {
+      setError(null);
+      await supabase.from('distributor_delegates').update({ is_active: false }).eq('id', id);
+      setSuccess('Delegate removed');
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove delegate');
+    }
+  };
+
+  const handleCreateDelegateUser = async () => {
+    if (!newDelegateEmail.trim() || !newDelegatePassword.trim()) {
+      setError('Email and password are required');
+      return;
+    }
+    if (newDelegatePassword.length < 6) {
+      setError('Password must be at least 6 characters');
+      return;
+    }
+    if (!distributor) return;
+    try {
+      setIsCreatingDelegateUser(true);
+      setError(null);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('No active session');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: newDelegateEmail,
+            password: newDelegatePassword,
+            role: 'distributor',
+            is_approved: true,
+            full_name: newDelegateFullName || undefined,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Request failed');
+      }
+
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || 'User creation failed');
+
+      // Auto-assign as delegate
+      if (result.user_id) {
+        await supabase.from('distributor_delegates').insert([{
+          distributor_id: distributor.id,
+          user_id: result.user_id,
+          is_active: true,
+          notes: delegateNotes || null,
+        }]);
+      }
+
+      setNewDelegateEmail('');
+      setNewDelegatePassword('');
+      setNewDelegateFullName('');
+      setShowCreateDelegateUser(false);
+      setShowAddDelegate(false);
+      setDelegateNotes('');
+      setSelectedDelegateUserId('');
+      setSuccess('Delegate user created and added');
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to create delegate user');
+    } finally {
+      setIsCreatingDelegateUser(false);
+    }
+  };
+
+  // Clear success message
   useEffect(() => {
     if (success) {
       const t = setTimeout(() => setSuccess(null), 3000);
@@ -339,10 +480,12 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
     );
   }
 
-  const existingOrgIds = new Set(customers.map((c) => c.organization_id));
-  const availableOrgs = organizations.filter((o) => !existingOrgIds.has(o.id));
+  // For the sales rep selector, only show reps already in this distributorship
   const existingRepIds = new Set(salesReps.map((r) => r.sales_rep_id));
-  const filteredReps = availableSalesReps.filter((r) => !existingRepIds.has(r.id));
+  // For delegate selector, show reps from this distributorship who aren't already delegates
+  const existingDelegateIds = new Set(delegates.map((d) => d.user_id));
+  // Build list of existing org codes for auto-code generation
+  const existingOrgCodes = customers.map((c) => c.organizations?.code).filter(Boolean);
 
   return (
     <div className="space-y-6">
@@ -376,15 +519,15 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors text-sm font-medium"
             >
               <Plus className="h-4 w-4" />
-              Add Customer
+              New Customer
             </button>
           </div>
 
           {customers.length === 0 ? (
             <div className="text-center py-12 text-gray-400 bg-white rounded-xl border border-gray-200">
               <Building2 className="mx-auto h-10 w-10 text-gray-300 mb-2" />
-              <p className="text-sm">No customers assigned yet.</p>
-              <p className="text-xs text-gray-400 mt-1">Add organizations as your customers to track orders and commissions.</p>
+              <p className="text-sm">No customers yet.</p>
+              <p className="text-xs text-gray-400 mt-1">Create new customer organizations to start tracking orders and commissions.</p>
             </div>
           ) : (
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
@@ -393,6 +536,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                   <tr className="bg-gray-50">
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Code</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
                     <th className="px-4 py-3 w-20" />
                   </tr>
                 </thead>
@@ -404,6 +548,11 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-xs font-mono text-gray-500">{cust.organizations?.code}</span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className="text-xs text-gray-500">
+                          {cust.organizations?.contact_email || cust.organizations?.contact_phone || '—'}
+                        </span>
                       </td>
                       <td className="px-4 py-3 text-right">
                         <button
@@ -421,31 +570,101 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
             </div>
           )}
 
-          {/* Add Customer Modal */}
+          {/* Create New Customer Modal */}
           {showAddCustomer && (
-            <Modal title="Add Customer" onClose={() => { setShowAddCustomer(false); setSelectedOrgId(''); }}>
-              <form onSubmit={handleAddCustomer}>
+            <Modal title="New Customer" onClose={() => { setShowAddCustomer(false); resetNewCustomer(); }}>
+              <form onSubmit={handleCreateCustomer}>
                 <div className="space-y-4">
-                  <Field label="Organization *">
-                    <select
+                  <Field label="Organization Name *">
+                    <input
+                      type="text"
                       required
-                      value={selectedOrgId}
-                      onChange={(e) => setSelectedOrgId(e.target.value)}
-                      className={selectCls}
-                    >
-                      <option value="">Select an organization</option>
-                      {availableOrgs.map((o) => (
-                        <option key={o.id} value={o.id}>{o.name} ({o.code})</option>
-                      ))}
-                    </select>
+                      value={newCustomer.name}
+                      onChange={(e) => {
+                        const name = e.target.value;
+                        const updates: { name: string; code?: string } = { name };
+                        if (!codeManuallyEdited) {
+                          updates.code = generateOrgCode(name, existingOrgCodes);
+                        }
+                        setNewCustomer({ ...newCustomer, ...updates });
+                      }}
+                      className={inputCls}
+                      placeholder="e.g. Smith Medical Clinic"
+                    />
+                  </Field>
+
+                  <Field label="Code *">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        required
+                        value={newCustomer.code}
+                        onChange={(e) => {
+                          setNewCustomer({ ...newCustomer, code: e.target.value.toUpperCase() });
+                          setCodeManuallyEdited(true);
+                        }}
+                        className={`${inputCls} font-mono uppercase`}
+                        placeholder="SMITH"
+                      />
+                      {codeManuallyEdited && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCodeManuallyEdited(false);
+                            setNewCustomer({
+                              ...newCustomer,
+                              code: generateOrgCode(newCustomer.name, existingOrgCodes),
+                            });
+                          }}
+                          className="text-xs text-gray-400 hover:text-gray-600 whitespace-nowrap"
+                        >
+                          Auto
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {codeManuallyEdited ? 'Manually edited' : 'Auto-generated from name'}
+                    </p>
+                  </Field>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <Field label="Contact Email">
+                      <input
+                        type="email"
+                        value={newCustomer.contact_email}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, contact_email: e.target.value })}
+                        className={inputCls}
+                        placeholder="contact@example.com"
+                      />
+                    </Field>
+                    <Field label="Contact Phone">
+                      <input
+                        type="tel"
+                        value={newCustomer.contact_phone}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, contact_phone: e.target.value })}
+                        className={inputCls}
+                        placeholder="(555) 555-1234"
+                      />
+                    </Field>
+                  </div>
+
+                  <Field label="Description">
+                    <textarea
+                      value={newCustomer.description}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, description: e.target.value })}
+                      className={inputCls}
+                      rows={2}
+                      placeholder="Optional description..."
+                    />
                   </Field>
                 </div>
+
                 <div className="mt-6 flex gap-3 justify-end border-t border-gray-100 pt-4">
-                  <button type="button" onClick={() => { setShowAddCustomer(false); setSelectedOrgId(''); }} className={cancelBtnCls}>
+                  <button type="button" onClick={() => { setShowAddCustomer(false); resetNewCustomer(); }} className={cancelBtnCls}>
                     Cancel
                   </button>
-                  <button type="submit" className={primaryBtnCls}>
-                    Add Customer
+                  <button type="submit" className={primaryBtnCls} disabled={!newCustomer.name || !newCustomer.code}>
+                    Create Customer
                   </button>
                 </div>
               </form>
@@ -476,8 +695,8 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
           {salesReps.length === 0 ? (
             <div className="text-center py-12 text-gray-400 bg-white rounded-xl border border-gray-200">
               <Users className="mx-auto h-10 w-10 text-gray-300 mb-2" />
-              <p className="text-sm">No sales representatives assigned yet.</p>
-              <p className="text-xs text-gray-400 mt-1">Add sales reps who sell on behalf of your distributorship.</p>
+              <p className="text-sm">No sales representatives yet.</p>
+              <p className="text-xs text-gray-400 mt-1">Create sales reps who sell on behalf of your distributorship.</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -516,96 +735,75 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
             </div>
           )}
 
-          {/* Add Sales Rep Modal */}
+          {/* Add Sales Rep Modal — only creates new users for this distributorship */}
           {showAddSalesRep && (
-            <Modal title="Add Sales Rep" onClose={() => { setShowAddSalesRep(false); setShowCreateUser(false); }}>
-              <form onSubmit={handleAddSalesRep}>
+            <Modal title="Add Sales Rep" onClose={() => { setShowAddSalesRep(false); setShowCreateRepUser(false); }}>
+              {!showCreateRepUser ? (
                 <div className="space-y-4">
-                  <Field label="Sales Representative *">
-                    {!showCreateUser ? (
-                      <div className="flex gap-2">
-                        <select
-                          required
-                          value={newSalesRep.sales_rep_id}
-                          onChange={(e) => setNewSalesRep({ ...newSalesRep, sales_rep_id: e.target.value })}
-                          className={`${selectCls} flex-1`}
-                        >
-                          <option value="">Select a sales rep</option>
-                          {filteredReps.map((rep) => (
-                            <option key={rep.id} value={rep.id}>
-                              {rep.full_name ? `${rep.full_name} (${rep.email})` : rep.email}
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => setShowCreateUser(true)}
-                          className="inline-flex items-center gap-1 px-3 py-2 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg whitespace-nowrap"
-                        >
-                          <UserPlus className="h-4 w-4" />
-                          New
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="border border-purple-200 bg-purple-50 rounded-lg p-3 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-medium text-purple-700">Create New Sales Rep</span>
-                          <button
-                            type="button"
-                            onClick={() => { setShowCreateUser(false); setNewUserEmail(''); setNewUserPassword(''); setNewUserFullName(''); }}
-                            className="text-gray-400 hover:text-gray-600"
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
-                        </div>
-                        <input
-                          type="text"
-                          value={newUserFullName}
-                          onChange={(e) => setNewUserFullName(e.target.value)}
-                          className={inputCls}
-                          placeholder="Full name"
-                        />
-                        <input
-                          type="email"
-                          value={newUserEmail}
-                          onChange={(e) => setNewUserEmail(e.target.value)}
-                          className={inputCls}
-                          placeholder="Email address"
-                        />
-                        <input
-                          type="password"
-                          value={newUserPassword}
-                          onChange={(e) => setNewUserPassword(e.target.value)}
-                          className={inputCls}
-                          placeholder="Password (min 6 characters)"
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={handleCreateSalesRepUser}
-                            disabled={isCreatingUser}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg disabled:opacity-50"
-                          >
-                            {isCreatingUser ? 'Creating...' : 'Create & Select'}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setShowCreateUser(false); setNewUserEmail(''); setNewUserPassword(''); setNewUserFullName(''); }}
-                            className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                        <p className="text-xs text-gray-500">
-                          User will be created with the <strong>sales_rep</strong> role.
-                        </p>
-                      </div>
-                    )}
-                  </Field>
+                  <p className="text-sm text-gray-600">
+                    Create a new sales rep user to add to your distributorship.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateRepUser(true)}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Create New Sales Rep
+                  </button>
+                  <div className="mt-4 flex justify-end">
+                    <button type="button" onClick={() => setShowAddSalesRep(false)} className={cancelBtnCls}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="border border-purple-200 bg-purple-50 rounded-lg p-4 space-y-3">
+                    <h4 className="text-sm font-medium text-purple-700">New Sales Rep Details</h4>
+                    <Field label="Full Name *">
+                      <input
+                        type="text"
+                        required
+                        value={newRepFullName}
+                        onChange={(e) => setNewRepFullName(e.target.value)}
+                        className={inputCls}
+                        placeholder="John Smith"
+                      />
+                    </Field>
+                    <Field label="Email *">
+                      <input
+                        type="email"
+                        required
+                        value={newRepEmail}
+                        onChange={(e) => setNewRepEmail(e.target.value)}
+                        className={inputCls}
+                        placeholder="john@example.com"
+                      />
+                    </Field>
+                    <Field label="Phone">
+                      <input
+                        type="tel"
+                        value={newRepPhone}
+                        onChange={(e) => setNewRepPhone(e.target.value)}
+                        className={inputCls}
+                        placeholder="(555) 555-1234"
+                      />
+                    </Field>
+                    <Field label="Password *">
+                      <input
+                        type="password"
+                        required
+                        value={newRepPassword}
+                        onChange={(e) => setNewRepPassword(e.target.value)}
+                        className={inputCls}
+                        placeholder="Min 6 characters"
+                      />
+                    </Field>
+                  </div>
 
-                  <Field label="Commission Split Type *">
+                  <Field label="Commission Split Type">
                     <select
-                      required
                       value={newSalesRep.commission_split_type}
                       onChange={(e) =>
                         setNewSalesRep({
@@ -618,30 +816,18 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                       <option value="percentage_of_distributor">% of Distributor Commission</option>
                       <option value="fixed_with_override">Fixed Rate with Override</option>
                     </select>
-                    <p className="text-xs text-gray-400 mt-1">
-                      {newSalesRep.commission_split_type === 'percentage_of_distributor'
-                        ? "Sales rep receives a percentage of your commission"
-                        : "Sales rep earns their own rate; you earn an additional override"}
-                    </p>
                   </Field>
 
                   <Field
                     label={
                       newSalesRep.commission_split_type === 'percentage_of_distributor'
-                        ? "Rep's Share (%)"
-                        : "Rep's Rate (%)"
+                        ? "Rep's Share (%)" : "Rep's Rate (%)"
                     }
                   >
                     <input
-                      type="number"
-                      required
-                      min="0"
-                      max="100"
-                      step="0.01"
+                      type="number" min="0" max="100" step="0.01"
                       value={newSalesRep.sales_rep_rate}
-                      onChange={(e) =>
-                        setNewSalesRep({ ...newSalesRep, sales_rep_rate: parseFloat(e.target.value) })
-                      }
+                      onChange={(e) => setNewSalesRep({ ...newSalesRep, sales_rep_rate: parseFloat(e.target.value) })}
                       className={inputCls}
                     />
                   </Field>
@@ -649,20 +835,11 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                   {newSalesRep.commission_split_type === 'fixed_with_override' && (
                     <Field label="Your Override Rate (%)">
                       <input
-                        type="number"
-                        required
-                        min="0"
-                        max="100"
-                        step="0.01"
+                        type="number" min="0" max="100" step="0.01"
                         value={newSalesRep.distributor_override_rate}
-                        onChange={(e) =>
-                          setNewSalesRep({ ...newSalesRep, distributor_override_rate: parseFloat(e.target.value) })
-                        }
+                        onChange={(e) => setNewSalesRep({ ...newSalesRep, distributor_override_rate: parseFloat(e.target.value) })}
                         className={inputCls}
                       />
-                      <p className="text-xs text-gray-400 mt-1">
-                        Additional commission you earn on top of the rep's rate
-                      </p>
                     </Field>
                   )}
 
@@ -670,22 +847,183 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                     <textarea
                       value={newSalesRep.notes}
                       onChange={(e) => setNewSalesRep({ ...newSalesRep, notes: e.target.value })}
-                      className={inputCls}
-                      rows={2}
-                      placeholder="Optional notes..."
+                      className={inputCls} rows={2} placeholder="Optional notes..."
                     />
                   </Field>
-                </div>
 
-                <div className="mt-6 flex gap-3 justify-end border-t border-gray-100 pt-4">
-                  <button type="button" onClick={() => setShowAddSalesRep(false)} className={cancelBtnCls}>
-                    Cancel
-                  </button>
-                  <button type="submit" className={primaryBtnCls}>
-                    Add Sales Rep
+                  <div className="flex gap-3 justify-end border-t border-gray-100 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreateRepUser(false);
+                        setNewRepEmail(''); setNewRepPassword(''); setNewRepFullName(''); setNewRepPhone('');
+                      }}
+                      className={cancelBtnCls}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCreateSalesRepUser}
+                      disabled={isCreatingRepUser || !newRepEmail || !newRepPassword || !newRepFullName}
+                      className={`${primaryBtnCls} disabled:opacity-50`}
+                    >
+                      {isCreatingRepUser ? 'Creating...' : 'Create & Add Sales Rep'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </Modal>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* DELEGATES VIEW                                                        */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {view === 'delegates' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                <UserCheck className="h-5 w-5 text-indigo-500" />
+                Delegates
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">
+                Delegates can manage your customers, sales reps, and orders on your behalf.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAddDelegate(true)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors text-sm font-medium"
+            >
+              <Plus className="h-4 w-4" />
+              Add Delegate
+            </button>
+          </div>
+
+          {delegates.length === 0 ? (
+            <div className="text-center py-12 text-gray-400 bg-white rounded-xl border border-gray-200">
+              <UserCheck className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+              <p className="text-sm">No delegates yet.</p>
+              <p className="text-xs text-gray-400 mt-1">Add users who can manage your distributorship on your behalf.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {delegates.map((del) => (
+                <div key={del.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl hover:shadow-sm transition-shadow">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {del.profiles?.full_name || del.profiles?.email}
+                    </p>
+                    {del.profiles?.full_name && (
+                      <p className="text-xs text-gray-500">{del.profiles.email}</p>
+                    )}
+                    {del.notes && (
+                      <p className="text-xs text-gray-400 mt-0.5">{del.notes}</p>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => handleRemoveDelegate(del.id)}
+                    className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Remove delegate"
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-              </form>
+              ))}
+            </div>
+          )}
+
+          {/* Add Delegate Modal */}
+          {showAddDelegate && (
+            <Modal title="Add Delegate" onClose={() => { setShowAddDelegate(false); setShowCreateDelegateUser(false); }}>
+              {!showCreateDelegateUser ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-gray-600">
+                    Create a new user who can manage your distributorship — they'll be able to add customers, manage sales reps, and view orders.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateDelegateUser(true)}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    Create New Delegate User
+                  </button>
+                  <div className="mt-4 flex justify-end">
+                    <button type="button" onClick={() => setShowAddDelegate(false)} className={cancelBtnCls}>
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={(e) => { e.preventDefault(); handleCreateDelegateUser(); }}>
+                  <div className="space-y-4">
+                    <div className="border border-indigo-200 bg-indigo-50 rounded-lg p-4 space-y-3">
+                      <h4 className="text-sm font-medium text-indigo-700">New Delegate Details</h4>
+                      <Field label="Full Name *">
+                        <input
+                          type="text"
+                          required
+                          value={newDelegateFullName}
+                          onChange={(e) => setNewDelegateFullName(e.target.value)}
+                          className={inputCls}
+                          placeholder="Jane Doe"
+                        />
+                      </Field>
+                      <Field label="Email *">
+                        <input
+                          type="email"
+                          required
+                          value={newDelegateEmail}
+                          onChange={(e) => setNewDelegateEmail(e.target.value)}
+                          className={inputCls}
+                          placeholder="jane@example.com"
+                        />
+                      </Field>
+                      <Field label="Password *">
+                        <input
+                          type="password"
+                          required
+                          value={newDelegatePassword}
+                          onChange={(e) => setNewDelegatePassword(e.target.value)}
+                          className={inputCls}
+                          placeholder="Min 6 characters"
+                        />
+                      </Field>
+                    </div>
+
+                    <Field label="Notes">
+                      <textarea
+                        value={delegateNotes}
+                        onChange={(e) => setDelegateNotes(e.target.value)}
+                        className={inputCls} rows={2} placeholder="e.g. Office manager, handles daily operations"
+                      />
+                    </Field>
+                  </div>
+
+                  <div className="mt-6 flex gap-3 justify-end border-t border-gray-100 pt-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowCreateDelegateUser(false);
+                        setNewDelegateEmail(''); setNewDelegatePassword(''); setNewDelegateFullName('');
+                      }}
+                      className={cancelBtnCls}
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isCreatingDelegateUser || !newDelegateEmail || !newDelegatePassword || !newDelegateFullName}
+                      className={`${primaryBtnCls} disabled:opacity-50`}
+                    >
+                      {isCreatingDelegateUser ? 'Creating...' : 'Create & Add Delegate'}
+                    </button>
+                  </div>
+                </form>
+              )}
             </Modal>
           )}
         </div>
