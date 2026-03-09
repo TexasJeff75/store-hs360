@@ -16,12 +16,12 @@ interface ProductPricingGridProps {
   products: ProductOption[];
   entries: EnrichedPricingEntry[];
   orgId: string;
-  pricingType: 'organization' | 'location';
+  pricingType: 'organization';
   onSavePrice: (params: {
     id?: string;
     entityId: string;
     productId: number;
-    pricingType: 'organization' | 'location';
+    pricingType: 'organization';
     contractPrice?: number;
     minQuantity: number;
   }) => Promise<{ success: boolean; error?: string }>;

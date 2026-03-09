@@ -11,7 +11,7 @@ import AdminHome, { type ActiveTab, type PendingUser } from './AdminHome';
 import SidebarNav, { type SidebarGroup } from './SidebarNav';
 import UserManagement from './UserManagement';
 import OrganizationManagement from './OrganizationManagement';
-import LocationManagement from './LocationManagement';
+import AddressManagement from './AddressManagement';
 import ProductsManagement from './products/ProductsManagement';
 import PricingManagement from './PricingManagement';
 import OrderManagement from './OrderManagement';
@@ -150,7 +150,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
       items: [
         { id: 'orders', label: 'My Orders', icon: ShoppingCart, roles: ['customer'] },
         { id: 'my-recurring-orders', label: 'Recurring Orders', icon: Repeat, roles: ['customer'] },
-        { id: 'locations', label: 'Locations', icon: MapPin, roles: ['customer'] },
+        { id: 'addresses', label: 'Addresses', icon: MapPin, roles: ['customer'] },
         { id: 'payments', label: 'Payment Methods', icon: CreditCard, roles: ['customer'] },
         { id: 'my-orgs', label: 'My Organizations', icon: Building2, roles: ['sales_rep'] },
         { id: 'my-customers', label: 'My Customers', icon: Building2, roles: ['distributor'] },
@@ -272,8 +272,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
         return <DistributorPortal view="sales-reps" />;
       case 'my-delegates':
         return <DistributorPortal view="delegates" />;
-      case 'locations':
-        return <LocationManagement organizationId={isCustomer ? userOrgId : undefined} />;
+      case 'addresses':
+        return <AddressManagement organizationId={isCustomer ? userOrgId : undefined} />;
       case 'payments':
         return <CustomerPaymentMethods organizationId={isCustomer ? userOrgId : undefined} />;
       case 'my-recurring-orders':

@@ -69,19 +69,7 @@ export const quickbooksInvoices = {
 
       let customerId: string;
 
-      if (order.location_id) {
-        const { data: location } = await supabase
-          .from('locations')
-          .select('quickbooks_customer_id')
-          .eq('id', order.location_id)
-          .single();
-
-        if (location?.quickbooks_customer_id) {
-          customerId = location.quickbooks_customer_id;
-        } else {
-          customerId = await quickbooksCustomers.syncLocation(order.location_id);
-        }
-      } else if (order.organization_id) {
+      if (order.organization_id) {
         const { data: org } = await supabase
           .from('organizations')
           .select('quickbooks_customer_id')
@@ -94,7 +82,7 @@ export const quickbooksInvoices = {
           customerId = await quickbooksCustomers.syncOrganization(order.organization_id);
         }
       } else {
-        throw new Error('Order must have either organization_id or location_id');
+        throw new Error('Order must have an organization_id');
       }
 
       const invoiceLines: QBInvoiceLine[] = [];

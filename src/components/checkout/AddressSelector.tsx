@@ -1,12 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Plus, Check, Pencil, Trash2 } from 'lucide-react';
+import { MapPin, Plus, Check } from 'lucide-react';
 import { customerAddressService, CustomerAddress } from '@/services/customerAddresses';
-import { supabase } from '@/services/supabase';
 
 interface AddressSelectorProps {
   userId: string;
   organizationId?: string;
-  locationId?: string;
   addressType: 'shipping' | 'billing';
   onSelect: (address: CustomerAddress | 'new') => void;
   onAddNew?: () => void;
@@ -15,7 +13,6 @@ interface AddressSelectorProps {
 const AddressSelector: React.FC<AddressSelectorProps> = ({
   userId,
   organizationId,
-  locationId,
   addressType,
   onSelect,
   onAddNew
@@ -26,29 +23,17 @@ const AddressSelector: React.FC<AddressSelectorProps> = ({
 
   useEffect(() => {
     fetchAddresses();
-  }, [userId, organizationId, locationId, addressType]);
+  }, [userId, organizationId, addressType]);
 
   const fetchAddresses = async () => {
     setLoading(true);
     try {
       let addressList: CustomerAddress[] = [];
 
-      if (locationId) {
-        addressList = await customerAddressService.getLocationAddresses(locationId, addressType);
-      } else if (organizationId) {
+      if (organizationId) {
         addressList = await customerAddressService.getOrganizationAddresses(organizationId, addressType);
       } else {
         addressList = await customerAddressService.getUserAddresses(userId, addressType);
-      }
-
-      // Also fetch location addresses from the locations table for this org
-      if (organizationId && addressType === 'shipping') {
-        const locationAddresses = await fetchLocationAddresses(organizationId);
-        // Merge: saved customer_addresses first, then location-derived addresses
-        // Avoid duplicates by checking if a customer_address already references this location
-        const existingLocationIds = new Set(addressList.filter(a => a.location_id).map(a => a.location_id));
-        const newLocationAddresses = locationAddresses.filter(a => !existingLocationIds.has(a.id));
-        addressList = [...addressList, ...newLocationAddresses];
       }
 
       setAddresses(addressList);
@@ -62,52 +47,6 @@ const AddressSelector: React.FC<AddressSelectorProps> = ({
       console.error('Error fetching addresses:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  /** Convert locations table entries into CustomerAddress-compatible objects */
-  const fetchLocationAddresses = async (orgId: string): Promise<CustomerAddress[]> => {
-    try {
-      const { data: locations, error } = await supabase
-        .from('locations')
-        .select('id, name, code, address, organization_id')
-        .eq('organization_id', orgId)
-        .eq('is_active', true)
-        .order('name');
-
-      if (error || !locations) return [];
-
-      return locations
-        .filter(loc => loc.address && (loc.address as any).address1)
-        .map(loc => {
-          const addr = loc.address as any;
-          return {
-            id: loc.id, // use location ID as a synthetic address ID
-            user_id: '',
-            organization_id: orgId,
-            location_id: loc.id,
-            address_type: 'shipping' as const,
-            label: `${loc.name} (Location)`,
-            first_name: addr.firstName || addr.first_name || '',
-            last_name: addr.lastName || addr.last_name || '',
-            company: addr.company || loc.name || '',
-            address1: addr.address1 || addr.street || '',
-            address2: addr.address2 || '',
-            city: addr.city || '',
-            state_or_province: addr.state || addr.state_or_province || '',
-            postal_code: addr.postalCode || addr.postal_code || addr.zip || '',
-            country_code: addr.country || addr.country_code || 'US',
-            phone: addr.phone || '',
-            email: addr.email || '',
-            is_default: false,
-            is_active: true,
-            created_at: '',
-            updated_at: '',
-          };
-        });
-    } catch (error) {
-      console.error('Error fetching location addresses:', error);
-      return [];
     }
   };
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Building2, User, MapPin } from 'lucide-react';
+import { Search, Building2, User } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -7,13 +7,6 @@ interface Organization {
   id: string;
   name: string;
   code: string;
-}
-
-interface Location {
-  id: string;
-  name: string;
-  code: string;
-  organization_id: string;
 }
 
 interface Customer {
@@ -26,7 +19,6 @@ interface CustomerSelectorProps {
   onSelect: (selection: {
     customerId: string;
     organizationId?: string;
-    locationId?: string;
     customerEmail: string;
   }) => void;
   currentUserId: string;
@@ -36,10 +28,8 @@ interface CustomerSelectorProps {
 const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUserId, preSelectedOrganizationId }) => {
   const { profile } = useAuth();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedOrg, setSelectedOrg] = useState<string>('');
-  const [selectedLocation, setSelectedLocation] = useState<string>('');
   const [selectedCustomer, setSelectedCustomer] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [orderingFor, setOrderingFor] = useState<'self' | 'organization' | 'customer'>('self');
@@ -57,7 +47,6 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
 
   useEffect(() => {
     if (selectedOrg) {
-      fetchLocations(selectedOrg);
       fetchOrganizationCustomers(selectedOrg);
     }
   }, [selectedOrg]);
@@ -97,21 +86,6 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
       }
     } catch (error) {
       console.error('Error fetching organizations:', error);
-    }
-  };
-
-  const fetchLocations = async (orgId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('organization_id', orgId)
-        .eq('is_active', true);
-
-      if (error) throw error;
-      setLocations(data || []);
-    } catch (error) {
-      console.error('Error fetching locations:', error);
     }
   };
 
@@ -161,18 +135,12 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
       return;
     }
 
-    if (!selectedLocation && locations.length > 0) {
-      alert('Please select a shipping location');
-      return;
-    }
-
     const org = organizations.find(o => o.id === selectedOrg);
     if (!org) return;
 
     onSelect({
       customerId: currentUserId,
       organizationId: selectedOrg,
-      locationId: selectedLocation || undefined,
       customerEmail: `${org.code}@organization.local`
     });
   };
@@ -186,7 +154,6 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
     onSelect({
       customerId: selectedCustomer,
       organizationId: selectedOrg,
-      locationId: selectedLocation || undefined,
       customerEmail: customer.email
     });
   };
@@ -267,10 +234,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
             </label>
             <select
               value={selectedOrg}
-              onChange={(e) => {
-                setSelectedOrg(e.target.value);
-                setSelectedLocation('');
-              }}
+              onChange={(e) => setSelectedOrg(e.target.value)}
               className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             >
@@ -286,33 +250,9 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
             </p>
           </div>
 
-          {selectedOrg && locations.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center space-x-2">
-                <MapPin className="h-4 w-4" />
-                <span>Shipping Destination *</span>
-              </label>
-              <select
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">Select shipping location...</option>
-                {locations.map(loc => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name} ({loc.code})
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                The location's stored address will be used for shipping
-              </p>
-            </div>
-          )}
-
           <button
             onClick={handleOrganizationOrder}
-            disabled={!selectedOrg || (locations.length > 0 && !selectedLocation)}
+            disabled={!selectedOrg}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
             Continue with Organization Order
@@ -331,7 +271,6 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
               value={selectedOrg}
               onChange={(e) => {
                 setSelectedOrg(e.target.value);
-                setSelectedLocation('');
                 setSelectedCustomer('');
               }}
               className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
@@ -371,31 +310,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
                 ))}
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                The location's stored address will be used for shipping
-              </p>
-            </div>
-          )}
-
-          {selectedOrg && locations.length > 0 && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center space-x-2">
-                <MapPin className="h-4 w-4" />
-                <span>Select Location (Optional)</span>
-              </label>
-              <select
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
-              >
-                <option value="">No specific location</option>
-                {locations.map(loc => (
-                  <option key={loc.id} value={loc.id}>
-                    {loc.name} ({loc.code})
-                  </option>
-                ))}
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                The location's stored address will be used for shipping
+                Shipping address will be selected during checkout
               </p>
             </div>
           )}

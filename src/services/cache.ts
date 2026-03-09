@@ -219,7 +219,6 @@ export const CacheKeys = {
   contractPricing: (userId: string, productId: number) => `pricing_${userId}_${productId}`,
   userPricing: (userId: string) => `user_pricing_${userId}`,
   organizationPricing: (orgId: string) => `org_pricing_${orgId}`,
-  locationPricing: (locationId: string) => `location_pricing_${locationId}`,
   effectivePrice: (userId: string, productId: number, quantity?: number) => 
     `effective_price_${userId}_${productId}_${quantity || 1}`,
 } as const;

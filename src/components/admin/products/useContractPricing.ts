@@ -4,11 +4,10 @@ import { useAuth } from '@/contexts/AuthContext';
 
 export interface ContractPricingInfo {
   organization_name: string;
-  location_name?: string;
   contract_price: number;
   min_quantity?: number;
   max_quantity?: number;
-  pricing_type: 'individual' | 'organization' | 'location';
+  pricing_type: 'individual' | 'organization';
 }
 
 export function useContractPricing() {
@@ -24,10 +23,9 @@ export function useContractPricing() {
       const counts: Record<number, number> = {};
 
       if (profile.role === 'admin') {
-        const [individualRes, orgRes, locationRes] = await Promise.all([
+        const [individualRes, orgRes] = await Promise.all([
           supabase.from('contract_pricing').select('product_id').not('user_id', 'is', null),
           supabase.from('organization_pricing').select('product_id'),
-          supabase.from('location_pricing').select('product_id')
         ]);
 
         individualRes.data?.forEach(item => {
@@ -35,10 +33,6 @@ export function useContractPricing() {
         });
 
         orgRes.data?.forEach(item => {
-          counts[item.product_id] = (counts[item.product_id] || 0) + 1;
-        });
-
-        locationRes.data?.forEach(item => {
           counts[item.product_id] = (counts[item.product_id] || 0) + 1;
         });
 
@@ -59,23 +53,6 @@ export function useContractPricing() {
           orgPricing?.forEach(item => {
             counts[item.product_id] = (counts[item.product_id] || 0) + 1;
           });
-
-          const { data: locations } = await supabase
-            .from('locations')
-            .select('id')
-            .in('organization_id', orgIds);
-
-          if (locations && locations.length > 0) {
-            const locationIds = locations.map(l => l.id);
-            const { data: locationPricing } = await supabase
-              .from('location_pricing')
-              .select('product_id')
-              .in('location_id', locationIds);
-
-            locationPricing?.forEach(item => {
-              counts[item.product_id] = (counts[item.product_id] || 0) + 1;
-            });
-          }
         }
       } else if (profile.role === 'customer') {
         const { data } = await supabase
@@ -102,7 +79,7 @@ export function useContractPricing() {
       const allPricing: ContractPricingInfo[] = [];
 
       if (profile.role === 'admin') {
-        const [individualRes, orgRes, locationRes] = await Promise.all([
+        const [individualRes, orgRes] = await Promise.all([
           supabase
             .from('contract_pricing')
             .select(`
@@ -122,15 +99,6 @@ export function useContractPricing() {
               organizations!inner(name)
             `)
             .eq('product_id', productId),
-          supabase
-            .from('location_pricing')
-            .select(`
-              contract_price,
-              min_quantity,
-              max_quantity,
-              locations!inner(name, organization_id, organizations!inner(name))
-            `)
-            .eq('product_id', productId)
         ]);
 
         individualRes.data?.forEach((item: any) => {
@@ -150,17 +118,6 @@ export function useContractPricing() {
             min_quantity: item.min_quantity,
             max_quantity: item.max_quantity,
             pricing_type: 'organization'
-          });
-        });
-
-        locationRes.data?.forEach((item: any) => {
-          allPricing.push({
-            organization_name: item.locations.organizations.name,
-            location_name: item.locations.name,
-            contract_price: item.contract_price,
-            min_quantity: item.min_quantity,
-            max_quantity: item.max_quantity,
-            pricing_type: 'location'
           });
         });
       }

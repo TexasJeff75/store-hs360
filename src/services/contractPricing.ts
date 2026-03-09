@@ -1,7 +1,7 @@
 import { supabase, ContractPricing } from './supabase';
 import { cacheService, CacheKeys, CacheTTL } from './cache';
 
-type PricingType = 'individual' | 'organization' | 'location';
+type PricingType = 'individual' | 'organization';
 
 export interface ContractPrice {
   id: string;
@@ -265,29 +265,23 @@ class ContractPricingService {
 
       const profileIds = data.filter(p => p.pricing_type === 'individual').map(p => p.entity_id);
       const orgIds = data.filter(p => p.pricing_type === 'organization').map(p => p.entity_id);
-      const locationIds = data.filter(p => p.pricing_type === 'location').map(p => p.entity_id);
 
-      const [profiles, organizations, locations] = await Promise.all([
+      const [profiles, organizations] = await Promise.all([
         profileIds.length > 0
           ? supabase.from('profiles').select('id, email, role').in('id', profileIds)
           : Promise.resolve({ data: [] }),
         orgIds.length > 0
           ? supabase.from('organizations').select('id, name, code').in('id', orgIds)
           : Promise.resolve({ data: [] }),
-        locationIds.length > 0
-          ? supabase.from('locations').select('id, name, code').in('id', locationIds)
-          : Promise.resolve({ data: [] })
       ]);
 
       const profileMap = new Map((profiles.data || []).map(p => [p.id, p]));
       const orgMap = new Map((organizations.data || []).map(o => [o.id, o]));
-      const locationMap = new Map((locations.data || []).map(l => [l.id, l]));
 
       return data.map(pricing => ({
         ...pricing,
         profiles: pricing.pricing_type === 'individual' ? profileMap.get(pricing.entity_id) : undefined,
         organizations: pricing.pricing_type === 'organization' ? orgMap.get(pricing.entity_id) : undefined,
-        locations: pricing.pricing_type === 'location' ? locationMap.get(pricing.entity_id) : undefined
       }));
     } catch (error) {
       console.error('Error fetching product contract prices:', error);
@@ -299,14 +293,14 @@ class ContractPricingService {
    * Calculate the effective price for a user considering all pricing levels
    */
   async getEffectivePrice(
-    userId: string, 
-    productId: number, 
+    userId: string,
+    productId: number,
     userRole?: string,
     quantity?: number
-  ): Promise<{ price: number; source: 'regular' | 'individual' | 'organization' | 'location' } | null> {
+  ): Promise<{ price: number; source: 'regular' | 'individual' | 'organization' } | null> {
     // Try cache first
     const cacheKey = CacheKeys.effectivePrice(userId, productId, quantity);
-    const cached = cacheService.get<{ price: number; source: 'regular' | 'individual' | 'organization' | 'location' } | null>(cacheKey);
+    const cached = cacheService.get<{ price: number; source: 'regular' | 'individual' | 'organization' } | null>(cacheKey);
     if (cached !== null) {
       return cached;
     }
@@ -317,21 +311,7 @@ class ContractPricingService {
     }
 
     try {
-      // Check for location-specific pricing first (highest priority)
-      const locationPrice = await this.getLocationPrice(userId, productId, quantity);
-      if (locationPrice) {
-        const finalPrice = locationPrice.markup_price || locationPrice.contract_price;
-        if (finalPrice !== null && finalPrice !== undefined) {
-          const result = {
-            price: finalPrice,
-            source: 'location' as const
-          };
-          cacheService.set(cacheKey, result, CacheTTL.effectivePrice);
-          return result;
-        }
-      }
-
-      // Check for organization-level pricing
+      // Check for organization-level pricing first (higher priority)
       const organizationPrice = await this.getOrganizationPrice(userId, productId, quantity);
       if (organizationPrice) {
         const finalPrice = organizationPrice.markup_price || organizationPrice.contract_price;
@@ -345,7 +325,7 @@ class ContractPricingService {
         }
       }
 
-      // Check for individual contract pricing (lowest priority)
+      // Check for individual contract pricing
       const contractPrice = await this.getContractPrice(userId, productId, 'individual');
 
       if (contractPrice) {
@@ -394,76 +374,6 @@ class ContractPricingService {
     // This is a simple implementation - in a more sophisticated system,
     // we might track cache keys by category
     cacheService.clear();
-  }
-
-  /**
-   * Get location-specific pricing for a user and product (now uses unified table)
-   */
-  async getLocationPrice(userId: string, productId: number, quantity?: number): Promise<any | null> {
-    // Try cache first
-    const cacheKey = `location_price_${userId}_${productId}_${quantity || 1}`;
-    const cached = cacheService.get<any | null>(cacheKey);
-    if (cached !== null) {
-      return cached;
-    }
-
-    try {
-      // Get user's locations through organization roles
-      const { data: userRoles, error: rolesError } = await supabase
-        .from('user_organization_roles')
-        .select(`
-          location_id,
-          locations(id, name)
-        `)
-        .eq('user_id', userId)
-        .not('location_id', 'is', null);
-
-      if (rolesError || !userRoles?.length) {
-        cacheService.set(cacheKey, null, CacheTTL.pricing);
-        return null;
-      }
-
-      const locationIds = userRoles.map(role => role.location_id).filter(Boolean);
-      
-      // Return null immediately if no location IDs found
-      if (locationIds.length === 0) {
-        cacheService.set(cacheKey, null, CacheTTL.pricing);
-        return null;
-      }
-
-      let query = supabase
-        .from('contract_pricing')
-        .select('*')
-        .eq('pricing_type', 'location')
-        .in('entity_id', locationIds)
-        .eq('product_id', productId)
-        .lte('effective_date', new Date().toISOString())
-        .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString());
-      
-      // Add quantity filtering if provided
-      if (quantity !== undefined) {
-        query = query
-          .lte('min_quantity', quantity)
-          .or('max_quantity.is.null,max_quantity.gte.' + quantity);
-      }
-      
-      const { data, error } = await query
-        .order('contract_price', { ascending: true }) // Get lowest price first
-        .order('effective_date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        throw error;
-      }
-
-      // Cache the result
-      cacheService.set(cacheKey, data, CacheTTL.pricing);
-      return data;
-    } catch (error) {
-      console.error('Error fetching location price:', error);
-      return null;
-    }
   }
 
   /**
@@ -568,38 +478,6 @@ class ContractPricingService {
   }
 
   /**
-   * Legacy method - now uses unified setContractPrice
-   */
-  async setLocationPrice(
-    locationId: string,
-    productId: number,
-    contractPrice: number,
-    minQuantity?: number,
-    maxQuantity?: number,
-    effectiveDate?: string,
-    expiryDate?: string
-  ): Promise<{ success: boolean; error?: string }> {
-    try {
-      return await this.setContractPrice(
-        locationId,
-        productId,
-        contractPrice,
-        'location',
-        minQuantity,
-        maxQuantity,
-        effectiveDate,
-        expiryDate
-      );
-    } catch (error) {
-      console.error('Error setting location price:', error);
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error occurred' 
-      };
-    }
-  }
-
-  /**
    * Legacy method - now uses unified removeContractPrice
    */
   async removeOrganizationPrice(
@@ -608,17 +486,6 @@ class ContractPricingService {
     effectiveDate?: string
   ): Promise<{ success: boolean; error?: string }> {
     return await this.removeContractPrice(organizationId, productId, 'organization', effectiveDate);
-  }
-
-  /**
-   * Legacy method - now uses unified removeContractPrice
-   */
-  async removeLocationPrice(
-    locationId: string,
-    productId: number,
-    effectiveDate?: string
-  ): Promise<{ success: boolean; error?: string }> {
-    return await this.removeContractPrice(locationId, productId, 'location', effectiveDate);
   }
 
   /**
@@ -641,29 +508,23 @@ class ContractPricingService {
 
       const profileIds = data.filter(p => p.pricing_type === 'individual').map(p => p.entity_id);
       const orgIds = data.filter(p => p.pricing_type === 'organization').map(p => p.entity_id);
-      const locationIds = data.filter(p => p.pricing_type === 'location').map(p => p.entity_id);
 
-      const [profiles, organizations, locations] = await Promise.all([
+      const [profiles, organizations] = await Promise.all([
         profileIds.length > 0
           ? supabase.from('profiles').select('id, email').in('id', profileIds)
           : Promise.resolve({ data: [] }),
         orgIds.length > 0
           ? supabase.from('organizations').select('id, name, code').in('id', orgIds)
           : Promise.resolve({ data: [] }),
-        locationIds.length > 0
-          ? supabase.from('locations').select('id, name, code').in('id', locationIds)
-          : Promise.resolve({ data: [] })
       ]);
 
       const profileMap = new Map((profiles.data || []).map(p => [p.id, p]));
       const orgMap = new Map((organizations.data || []).map(o => [o.id, o]));
-      const locationMap = new Map((locations.data || []).map(l => [l.id, l]));
 
       return data.map(pricing => ({
         ...pricing,
         profiles: pricing.pricing_type === 'individual' ? profileMap.get(pricing.entity_id) : undefined,
         organizations: pricing.pricing_type === 'organization' ? orgMap.get(pricing.entity_id) : undefined,
-        locations: pricing.pricing_type === 'location' ? locationMap.get(pricing.entity_id) : undefined
       }));
     } catch (error) {
       console.error('Error fetching all pricing entries:', error);
@@ -672,7 +533,7 @@ class ContractPricingService {
   }
 
   /**
-   * Get pricing entries for a specific organization (including its locations)
+   * Get pricing entries for a specific organization
    */
   async getOrganizationPricingEntries(organizationId: string): Promise<ContractPrice[]> {
     try {
@@ -684,46 +545,19 @@ class ContractPricingService {
 
       if (orgError) throw orgError;
 
-      const { data: locations, error: locError } = await supabase
-        .from('locations')
-        .select('id')
-        .eq('organization_id', organizationId);
-
-      if (locError) throw locError;
-
-      const locationIds = locations?.map(loc => loc.id) || [];
-
-      let locationPricing: any[] = [];
-      if (locationIds.length > 0) {
-        const { data: locPricing, error: locPricingError } = await supabase
-          .from('contract_pricing')
-          .select('*')
-          .eq('pricing_type', 'location')
-          .in('entity_id', locationIds);
-
-        if (locPricingError) throw locPricingError;
-        locationPricing = locPricing || [];
-      }
-
-      const allPricing = [...(orgPricing || []), ...locationPricing];
-
-      if (allPricing.length === 0) {
+      if (!orgPricing || orgPricing.length === 0) {
         return [];
       }
 
-      const [orgData, locationData] = await Promise.all([
-        supabase.from('organizations').select('id, name, code').eq('id', organizationId).maybeSingle(),
-        locationIds.length > 0
-          ? supabase.from('locations').select('id, name, code').in('id', locationIds)
-          : Promise.resolve({ data: [] })
-      ]);
+      const orgData = await supabase
+        .from('organizations')
+        .select('id, name, code')
+        .eq('id', organizationId)
+        .maybeSingle();
 
-      const locationMap = new Map((locationData.data || []).map(l => [l.id, l]));
-
-      return allPricing.map(pricing => ({
+      return orgPricing.map(pricing => ({
         ...pricing,
-        organizations: pricing.pricing_type === 'organization' ? orgData.data : undefined,
-        locations: pricing.pricing_type === 'location' ? locationMap.get(pricing.entity_id) : undefined
+        organizations: orgData.data || undefined,
       }));
     } catch (error) {
       console.error('Error fetching organization pricing entries:', error);
@@ -744,18 +578,7 @@ class ContractPricingService {
       if (userId) {
         query = query.eq('pricing_type', 'individual').eq('entity_id', userId);
       } else if (organizationId) {
-        const { data: locations } = await supabase
-          .from('locations')
-          .select('id')
-          .eq('organization_id', organizationId);
-
-        const locationIds = locations?.map(loc => loc.id) || [];
-
-        if (locationIds.length > 0) {
-          query = query.or(`and(pricing_type.eq.organization,entity_id.eq.${organizationId}),and(pricing_type.eq.location,entity_id.in.(${locationIds.join(',')}))`);
-        } else {
-          query = query.eq('pricing_type', 'organization').eq('entity_id', organizationId);
-        }
+        query = query.eq('pricing_type', 'organization').eq('entity_id', organizationId);
       }
 
       const { data, error } = await query;

@@ -21,14 +21,6 @@ interface OrganizationOption {
   code: string;
 }
 
-interface LocationOption {
-  id: string;
-  name: string;
-  code: string;
-  organization_id: string;
-  organization_name?: string;
-}
-
 interface UserOption {
   id: string;
   email: string;
@@ -40,7 +32,6 @@ export function usePricingData() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [organizations, setOrganizations] = useState<OrganizationOption[]>([]);
-  const [locations, setLocations] = useState<LocationOption[]>([]);
   const [users, setUsers] = useState<UserOption[]>([]);
   const [products, setProducts] = useState<ProductOption[]>([]);
   const [saving, setSaving] = useState(false);
@@ -60,9 +51,6 @@ export function usePricingData() {
         } else if (entry.pricing_type === 'organization' && entry.organizations) {
           entity_name = entry.organizations.name || 'Unknown Org';
           entity_detail = entry.organizations.code;
-        } else if (entry.pricing_type === 'location' && entry.locations) {
-          entity_name = entry.locations.name || 'Unknown Location';
-          entity_detail = entry.locations.code;
         }
 
         return {
@@ -96,15 +84,10 @@ export function usePricingData() {
 
   const fetchEntityOptions = useCallback(async () => {
     try {
-      const [orgsRes, locsRes, usersRes] = await Promise.all([
+      const [orgsRes, usersRes] = await Promise.all([
         supabase
           .from('organizations')
           .select('id, name, code')
-          .eq('is_active', true)
-          .order('name'),
-        supabase
-          .from('locations')
-          .select('id, name, code, organization_id, organizations!inner(name)')
           .eq('is_active', true)
           .order('name'),
         supabase
@@ -115,14 +98,6 @@ export function usePricingData() {
       ]);
 
       if (orgsRes.data) setOrganizations(orgsRes.data);
-      if (locsRes.data) {
-        setLocations(
-          locsRes.data.map((l: any) => ({
-            ...l,
-            organization_name: l.organizations?.name,
-          }))
-        );
-      }
       if (usersRes.data) setUsers(usersRes.data);
     } catch (err) {
       console.error('Error fetching entity options:', err);
@@ -139,7 +114,7 @@ export function usePricingData() {
     id?: string;
     entityId: string;
     productId: number;
-    pricingType: 'individual' | 'organization' | 'location';
+    pricingType: 'individual' | 'organization';
     contractPrice?: number;
     markupPrice?: number;
     minQuantity: number;
@@ -190,7 +165,6 @@ export function usePricingData() {
     error,
     saving,
     organizations,
-    locations,
     users,
     products,
     fetchPricingData,

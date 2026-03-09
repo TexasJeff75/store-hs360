@@ -4,7 +4,7 @@ import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import CustomerUserManagement from './CustomerUserManagement';
 import PricingManagement from './PricingManagement';
-import LocationManagement from './LocationManagement';
+import AddressManagement from './AddressManagement';
 
 interface AssignedOrganization {
   id: string;
@@ -22,7 +22,7 @@ interface AssignedOrganization {
   is_active: boolean;
 }
 
-type SubTab = 'customers' | 'pricing' | 'locations';
+type SubTab = 'customers' | 'pricing' | 'addresses';
 
 const emptyOrg = {
   name: '', code: '', contact_name: '', contact_email: '', contact_phone: '',
@@ -302,15 +302,15 @@ const SalesRepDashboard: React.FC = () => {
                 Pricing
               </button>
               <button
-                onClick={() => setActiveSubTab('locations')}
+                onClick={() => setActiveSubTab('addresses')}
                 className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  activeSubTab === 'locations'
+                  activeSubTab === 'addresses'
                     ? 'border-blue-500 text-blue-600'
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                 }`}
               >
                 <MapPin className="inline h-4 w-4 mr-2" />
-                Locations
+                Addresses
               </button>
             </nav>
           </div>
@@ -322,8 +322,8 @@ const SalesRepDashboard: React.FC = () => {
             {activeSubTab === 'pricing' && (
               <PricingManagement organizationId={selectedOrg.id} />
             )}
-            {activeSubTab === 'locations' && (
-              <LocationManagement organizationId={selectedOrg.id} />
+            {activeSubTab === 'addresses' && (
+              <AddressManagement organizationId={selectedOrg.id} />
             )}
           </div>
         </div>

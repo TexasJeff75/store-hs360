@@ -21,7 +21,6 @@ const OrderManagement: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showAddShipment, setShowAddShipment] = useState(false);
   const [canManageOrders, setCanManageOrders] = useState(false);
-  const [locationNames, setLocationNames] = useState<Record<string, string>>({});
   const [organizationNames, setOrganizationNames] = useState<Record<string, string>>({});
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [showBackorderModal, setShowBackorderModal] = useState(false);
@@ -35,7 +34,6 @@ const OrderManagement: React.FC = () => {
   const [showDebugModal, setShowDebugModal] = useState(false);
   const [debugOrder, setDebugOrder] = useState<Order | null>(null);
   const [selectedOrderOrgName, setSelectedOrderOrgName] = useState<string | null>(null);
-  const [selectedOrderLocationName, setSelectedOrderLocationName] = useState<string | null>(null);
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -82,24 +80,6 @@ const OrderManagement: React.FC = () => {
       setSelectedOrderOrgName(null);
     }
 
-    if (order.location_id) {
-      const cached = locationNames[order.location_id];
-      if (cached) {
-        setSelectedOrderLocationName(cached);
-      } else {
-        const { data } = await supabase
-          .from('locations')
-          .select('name')
-          .eq('id', order.location_id)
-          .maybeSingle();
-        setSelectedOrderLocationName(data?.name || null);
-        if (data?.name) {
-          setLocationNames(prev => ({ ...prev, [order.location_id!]: data.name }));
-        }
-      }
-    } else {
-      setSelectedOrderLocationName(null);
-    }
   };
 
   const checkManagementPermissions = async () => {
@@ -174,22 +154,6 @@ const OrderManagement: React.FC = () => {
 
       if (error) throw error;
       setOrders(data || []);
-
-      const locationIds = [...new Set(data?.map(o => o.location_id).filter(Boolean))];
-      if (locationIds.length > 0) {
-        const { data: locations, error: locErr } = await supabase
-          .from('locations')
-          .select('id, name')
-          .in('id', locationIds);
-
-        if (locErr) {
-          console.error('Failed to fetch location names:', locErr);
-        } else if (locations) {
-          const names: Record<string, string> = {};
-          locations.forEach(loc => { names[loc.id] = loc.name; });
-          setLocationNames(names);
-        }
-      }
 
       const organizationIds = [...new Set(data?.map(o => o.organization_id).filter(Boolean))];
       if (organizationIds.length > 0) {
@@ -526,8 +490,7 @@ const OrderManagement: React.FC = () => {
         order.customer_email.toLowerCase().includes(lowerSearch) ||
         order.id.toLowerCase().includes(lowerSearch) ||
         order.order_number?.toLowerCase().includes(lowerSearch) ||
-        (order.organization_id && organizationNames[order.organization_id]?.toLowerCase().includes(lowerSearch)) ||
-        (order.location_id && locationNames[order.location_id]?.toLowerCase().includes(lowerSearch));
+        (order.organization_id && organizationNames[order.organization_id]?.toLowerCase().includes(lowerSearch));
 
       const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
 
@@ -731,17 +694,6 @@ const OrderManagement: React.FC = () => {
                       <p className="font-medium flex items-center mt-1">
                         <Building2 className="h-3 w-3 mr-1 text-green-600" />
                         {selectedOrderOrgName || organizationNames[order.organization_id] || (
-                          <span className="text-gray-400 italic text-xs">Loading…</span>
-                        )}
-                      </p>
-                    </div>
-                  )}
-                  {order.location_id && (
-                    <div>
-                      <span className="text-gray-600">Shipping Location:</span>
-                      <p className="font-medium flex items-center mt-1">
-                        <MapPin className="h-3 w-3 mr-1 text-blue-600" />
-                        {selectedOrderLocationName || locationNames[order.location_id] || (
                           <span className="text-gray-400 italic text-xs">Loading…</span>
                         )}
                       </p>
@@ -1371,17 +1323,6 @@ const OrderManagement: React.FC = () => {
                             <p className="text-sm text-gray-900 flex items-center">
                               <Building2 className="h-3 w-3 mr-1 text-green-600" />
                               {organizationNames[parent.organization_id] || <span className="text-gray-400 italic text-xs">Resolving…</span>}
-                            </p>
-                          ) : (
-                            <p className="text-sm text-gray-400">—</p>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500 mb-1">Location</p>
-                          {parent.location_id ? (
-                            <p className="text-sm text-gray-900 flex items-center">
-                              <MapPin className="h-3 w-3 mr-1 text-blue-600" />
-                              {locationNames[parent.location_id] || <span className="text-gray-400 italic text-xs">Resolving…</span>}
                             </p>
                           ) : (
                             <p className="text-sm text-gray-400">—</p>

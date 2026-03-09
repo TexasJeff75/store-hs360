@@ -372,7 +372,6 @@ export const quickbooksPayments = {
 
   async savePaymentMethod(params: {
     organizationId: string;
-    locationId?: string;
     userId: string;
     label: string;
     paymentType: 'credit_card' | 'debit_card' | 'bank_account' | 'ach';
@@ -389,7 +388,6 @@ export const quickbooksPayments = {
       .from('payment_methods')
       .insert({
         organization_id: params.organizationId,
-        location_id: params.locationId || null,
         user_id: params.userId,
         label: params.label,
         payment_type: params.paymentType,
