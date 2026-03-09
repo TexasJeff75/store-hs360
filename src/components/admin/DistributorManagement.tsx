@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import {
   Users, Building, Plus, CreditCard as Edit2, Trash2, X, Save,
   TrendingUp, DollarSign, Building2, Percent, Package,
-  ChevronDown, UserPlus, Pencil, Upload,
+  ChevronDown, ChevronRight, UserPlus, Pencil, Upload,
 } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import DistributorPricingImport from './DistributorPricingImport';
+import WholesalePricingGrid from './WholesalePricingGrid';
 
 // ── Commission type config ───────────────────────────────────────────────────
 
@@ -227,6 +228,7 @@ const DistributorManagement: React.FC = () => {
   const [showAddPricing, setShowAddPricing] = useState<string | null>(null); // distributor id
   const [showPricingImport, setShowPricingImport] = useState<{ distributorId: string; distributorName: string } | null>(null);
   const [newPricing, setNewPricing] = useState({ product_id: '', wholesale_price: 0, notes: '' });
+  const [expandedPricing, setExpandedPricing] = useState<Set<string>>(new Set());
 
   // Inline user creation state
   const [showCreateUser, setShowCreateUser] = useState(false);
@@ -1193,12 +1195,25 @@ const DistributorManagement: React.FC = () => {
                   {/* Wholesale Product Pricing — only for wholesale distributors */}
                   {(distributor.pricing_model) === 'wholesale' && (
                   <div className="pt-4 border-t border-gray-200 mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+                    <div className="flex items-center justify-between">
+                      <button
+                        onClick={() => setExpandedPricing((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(distributor.id)) next.delete(distributor.id);
+                          else next.add(distributor.id);
+                          return next;
+                        })}
+                        className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
+                      >
+                        {expandedPricing.has(distributor.id) ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
                         <DollarSign className="h-4 w-4" />
                         Wholesale Product Pricing ({getDistributorPricing(distributor.id).length})
-                      </h4>
-                      <div className="flex gap-2">
+                      </button>
+                      {expandedPricing.has(distributor.id) && (
                         <button
                           onClick={() => setShowPricingImport({ distributorId: distributor.id, distributorName: distributor.name })}
                           className="text-sm px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1"
@@ -1206,50 +1221,17 @@ const DistributorManagement: React.FC = () => {
                           <Upload className="h-3.5 w-3.5" />
                           Import CSV
                         </button>
-                        <button
-                          onClick={() => setShowAddPricing(distributor.id)}
-                          className="text-sm px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
-                        >
-                          Add Price
-                        </button>
-                      </div>
+                      )}
                     </div>
 
-                    {getDistributorPricing(distributor.id).length === 0 ? (
-                      <p className="text-sm text-gray-400 italic">
-                        No wholesale prices set — add per-product prices the distributor pays you
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {getDistributorPricing(distributor.id).map((pp) => {
-                          const product = products.find((p) => p.id === pp.product_id);
-                          return (
-                            <div key={pp.id} className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg">
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  <span className="inline-flex items-center gap-1">
-                                    <Package className="h-3.5 w-3.5 text-emerald-500" />
-                                    {product?.name ?? `Product #${pp.product_id}`}
-                                  </span>
-                                  {product?.sku && (
-                                    <span className="ml-2 text-xs text-gray-400">{product.sku}</span>
-                                  )}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  Wholesale: <span className="font-medium text-emerald-700">${pp.wholesale_price.toFixed(2)}</span>
-                                  {pp.notes && <span className="ml-2 text-gray-400">{pp.notes}</span>}
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => handleDeleteProductPricing(pp.id)}
-                                className="p-1 hover:bg-red-100 rounded transition-colors"
-                                title="Remove"
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </button>
-                            </div>
-                          );
-                        })}
+                    {expandedPricing.has(distributor.id) && (
+                      <div className="mt-3">
+                        <WholesalePricingGrid
+                          products={products}
+                          pricing={getDistributorPricing(distributor.id)}
+                          distributorId={distributor.id}
+                          onRefresh={fetchData}
+                        />
                       </div>
                     )}
                   </div>
