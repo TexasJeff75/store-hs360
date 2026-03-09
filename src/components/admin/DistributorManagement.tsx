@@ -141,6 +141,12 @@ interface Distributor {
   notes?: string;
   company_rep_id?: string | null;
   company_rep_rate: number;
+  contact_name?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  phone?: string;
   created_at: string;
   profiles?: { email: string };
 }
@@ -166,6 +172,7 @@ interface DistributorCustomer {
 interface SalesRep {
   id: string;
   email: string;
+  full_name?: string;
   role: string;
 }
 
@@ -178,7 +185,7 @@ interface DistributorSalesRep {
   distributor_override_rate?: number;
   is_active: boolean;
   notes?: string;
-  profiles?: { email: string };
+  profiles?: { email: string; full_name?: string; phone?: string };
 }
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -221,6 +228,12 @@ const DistributorManagement: React.FC = () => {
     commission_type: 'percent_margin' as CommissionType,
     pricing_model: 'margin_split' as 'margin_split' | 'wholesale',
     notes: '',
+    contact_name: '',
+    address: '',
+    city: '',
+    state: '',
+    zip: '',
+    phone: '',
   });
 
   // Wholesale product pricing state
@@ -280,12 +293,12 @@ const DistributorManagement: React.FC = () => {
           .order('email'),
         supabase
           .from('profiles')
-          .select('id, email, role')
+          .select('id, email, full_name, role')
           .in('role', ['sales_rep', 'distributor'])
           .order('email'),
         supabase
           .from('distributor_sales_reps')
-          .select('*, profiles!distributor_sales_reps_sales_rep_id_fkey(email)')
+          .select('*, profiles!distributor_sales_reps_sales_rep_id_fkey(email, full_name, phone)')
           .order('created_at', { ascending: false }),
         supabase
           .from('distributor_customers')
@@ -364,6 +377,12 @@ const DistributorManagement: React.FC = () => {
         commission_type: 'percent_margin',
         pricing_model: 'margin_split',
         notes: '',
+        contact_name: '',
+        address: '',
+        city: '',
+        state: '',
+        zip: '',
+        phone: '',
       });
       setCodeManuallyEdited(false);
       setShowCommissionFields(false);
@@ -998,6 +1017,21 @@ const DistributorManagement: React.FC = () => {
                           );
                         })()}
 
+                        {(distributor.contact_name || distributor.phone) && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            {distributor.contact_name && <span>{distributor.contact_name}</span>}
+                            {distributor.contact_name && distributor.phone && <span> · </span>}
+                            {distributor.phone && <span>{distributor.phone}</span>}
+                          </p>
+                        )}
+                        {distributor.address && (
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {distributor.address}
+                            {distributor.city && `, ${distributor.city}`}
+                            {distributor.state && `, ${distributor.state}`}
+                            {distributor.zip && ` ${distributor.zip}`}
+                          </p>
+                        )}
                         {distributor.notes && (
                           <p className="text-sm text-gray-500 mt-1">{distributor.notes}</p>
                         )}
@@ -1264,11 +1298,19 @@ const DistributorManagement: React.FC = () => {
                           return (
                             <div key={dsr.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                               <div>
-                                <p className="text-sm font-medium text-gray-900">{dsr.profiles?.email}</p>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {dsr.profiles?.full_name || dsr.profiles?.email}
+                                </p>
+                                {dsr.profiles?.full_name && (
+                                  <p className="text-xs text-gray-500">{dsr.profiles.email}</p>
+                                )}
                                 <p className="text-xs text-gray-500 mt-0.5">
                                   Split: <span className="font-medium text-gray-700">{splitLabel}</span>
                                   {dsr.notes && <span className="ml-2 text-gray-400">{dsr.notes}</span>}
                                 </p>
+                                {dsr.profiles?.phone && (
+                                  <p className="text-xs text-gray-400 mt-0.5">Phone: {dsr.profiles.phone}</p>
+                                )}
                               </div>
                               <button
                                 onClick={() => handleRemoveSalesRepFromDistributor(dsr.id)}
@@ -1431,6 +1473,64 @@ const DistributorManagement: React.FC = () => {
                 <p className="text-xs text-gray-400 mt-1">
                   {codeManuallyEdited ? 'Manually editing code' : 'Auto-generated from name'}
                 </p>
+              </div>
+
+              {/* ── Contact Name & Address ── */}
+              <Field label="Contact Name">
+                <input
+                  type="text"
+                  value={newDistributor.contact_name}
+                  onChange={(e) => setNewDistributor({ ...newDistributor, contact_name: e.target.value })}
+                  className={inputCls}
+                  placeholder="Primary contact name"
+                />
+              </Field>
+              <Field label="Phone">
+                <input
+                  type="tel"
+                  value={newDistributor.phone}
+                  onChange={(e) => setNewDistributor({ ...newDistributor, phone: e.target.value })}
+                  className={inputCls}
+                  placeholder="(555) 555-1234"
+                />
+              </Field>
+              <Field label="Address">
+                <input
+                  type="text"
+                  value={newDistributor.address}
+                  onChange={(e) => setNewDistributor({ ...newDistributor, address: e.target.value })}
+                  className={inputCls}
+                  placeholder="Street address"
+                />
+              </Field>
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="City">
+                  <input
+                    type="text"
+                    value={newDistributor.city}
+                    onChange={(e) => setNewDistributor({ ...newDistributor, city: e.target.value })}
+                    className={inputCls}
+                    placeholder="City"
+                  />
+                </Field>
+                <Field label="State">
+                  <input
+                    type="text"
+                    value={newDistributor.state}
+                    onChange={(e) => setNewDistributor({ ...newDistributor, state: e.target.value })}
+                    className={inputCls}
+                    placeholder="TX"
+                  />
+                </Field>
+                <Field label="ZIP">
+                  <input
+                    type="text"
+                    value={newDistributor.zip}
+                    onChange={(e) => setNewDistributor({ ...newDistributor, zip: e.target.value })}
+                    className={inputCls}
+                    placeholder="75001"
+                  />
+                </Field>
               </div>
 
               {/* ── Pricing Model ── */}
@@ -2052,6 +2152,63 @@ const EditDistributorForm: React.FC<EditDistributorFormProps> = ({
             type="text"
             value={distributor.code}
             onChange={(e) => onChange({ ...distributor, code: e.target.value })}
+            className={inputCls}
+          />
+        </Field>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Field label="Contact Name">
+          <input
+            type="text"
+            value={distributor.contact_name ?? ''}
+            onChange={(e) => onChange({ ...distributor, contact_name: e.target.value })}
+            className={inputCls}
+            placeholder="Primary contact"
+          />
+        </Field>
+        <Field label="Phone">
+          <input
+            type="tel"
+            value={distributor.phone ?? ''}
+            onChange={(e) => onChange({ ...distributor, phone: e.target.value })}
+            className={inputCls}
+            placeholder="(555) 555-1234"
+          />
+        </Field>
+      </div>
+
+      <Field label="Address">
+        <input
+          type="text"
+          value={distributor.address ?? ''}
+          onChange={(e) => onChange({ ...distributor, address: e.target.value })}
+          className={inputCls}
+          placeholder="Street address"
+        />
+      </Field>
+      <div className="grid grid-cols-3 gap-3">
+        <Field label="City">
+          <input
+            type="text"
+            value={distributor.city ?? ''}
+            onChange={(e) => onChange({ ...distributor, city: e.target.value })}
+            className={inputCls}
+          />
+        </Field>
+        <Field label="State">
+          <input
+            type="text"
+            value={distributor.state ?? ''}
+            onChange={(e) => onChange({ ...distributor, state: e.target.value })}
+            className={inputCls}
+          />
+        </Field>
+        <Field label="ZIP">
+          <input
+            type="text"
+            value={distributor.zip ?? ''}
+            onChange={(e) => onChange({ ...distributor, zip: e.target.value })}
             className={inputCls}
           />
         </Field>

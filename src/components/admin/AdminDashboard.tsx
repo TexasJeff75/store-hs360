@@ -22,6 +22,7 @@ import Analytics from './Analytics';
 import RecurringOrderManagement from './RecurringOrderManagement';
 import MyRecurringOrders from '../MyRecurringOrders';
 import DistributorManagement from './DistributorManagement';
+import DistributorPortal from './DistributorPortal';
 import HelpSection from './HelpSection';
 import ProfitReport from './ProfitReport';
 import CostAdminManagement from './CostAdminManagement';
@@ -79,7 +80,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
     if (isAdmin) return 'home';
     if (isCustomer) return 'orders';
     if (isSalesRep) return 'my-orgs';
-    if (isDistributor) return 'commissions';
+    if (isDistributor) return 'my-customers';
     return 'home';
   };
 
@@ -152,6 +153,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
         { id: 'locations', label: 'Locations', icon: MapPin, roles: ['customer'] },
         { id: 'payments', label: 'Payment Methods', icon: CreditCard, roles: ['customer'] },
         { id: 'my-orgs', label: 'My Organizations', icon: Building2, roles: ['sales_rep'] },
+        { id: 'my-customers', label: 'My Customers', icon: Building2, roles: ['distributor'] },
+        { id: 'my-sales-reps', label: 'My Sales Reps', icon: Users, roles: ['distributor'] },
+        { id: 'orders', label: 'Orders', icon: ShoppingCart, roles: ['distributor'] },
         { id: 'commissions', label: 'Commissions', icon: TrendingUp, roles: ['distributor'] },
       ],
     },
@@ -261,6 +265,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
         return <SiteSettingsManagement />;
       case 'my-orgs':
         return <SalesRepDashboard />;
+      case 'my-customers':
+        return <DistributorPortal view="customers" />;
+      case 'my-sales-reps':
+        return <DistributorPortal view="sales-reps" />;
       case 'locations':
         return <LocationManagement organizationId={isCustomer ? userOrgId : undefined} />;
       case 'payments':

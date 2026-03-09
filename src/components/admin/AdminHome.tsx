@@ -9,6 +9,7 @@ import { supabase } from '@/services/supabase';
 export type ActiveTab =
   | 'home' | 'users' | 'orders' | 'commissions' | 'help'
   | 'my-orgs' | 'my-recurring-orders' | 'locations' | 'payments'
+  | 'my-customers' | 'my-sales-reps'
   | 'quickbooks' | 'support'
   | 'organizations' | 'pricing' | 'products' | 'categories'
   | 'recurring-orders' | 'distributors' | 'salesreps'
