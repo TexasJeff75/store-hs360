@@ -188,6 +188,14 @@ interface DistributorSalesRep {
   profiles?: { email: string; full_name?: string; phone?: string };
 }
 
+interface RepCustomerLink {
+  id: string;
+  distributor_id: string;
+  sales_rep_id: string;
+  organization_id: string;
+  is_active: boolean;
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 const DistributorManagement: React.FC = () => {
@@ -197,6 +205,7 @@ const DistributorManagement: React.FC = () => {
   const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
   const [distributorCustomers, setDistributorCustomers] = useState<DistributorCustomer[]>([]);
   const [distributorSalesReps, setDistributorSalesReps] = useState<DistributorSalesRep[]>([]);
+  const [repCustomerLinks, setRepCustomerLinks] = useState<RepCustomerLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddDistributor, setShowAddDistributor] = useState(false);
   const [showAddSalesRep, setShowAddSalesRep] = useState(false);
@@ -275,7 +284,7 @@ const DistributorManagement: React.FC = () => {
     try {
       setLoading(true);
 
-      const [distributorsRes, orgsRes, allUsersRes, salesRepsRes, distSalesRepsRes, distCustomersRes, productsRes, categoriesRes, rulesRes, pricingRes] = await Promise.all([
+      const [distributorsRes, orgsRes, allUsersRes, salesRepsRes, distSalesRepsRes, distCustomersRes, productsRes, categoriesRes, rulesRes, pricingRes, repCustRes] = await Promise.all([
         supabase
           .from('distributors')
           .select('*, profiles!distributors_profile_id_fkey(email)')
@@ -324,6 +333,10 @@ const DistributorManagement: React.FC = () => {
           .select('*')
           .eq('is_active', true)
           .order('created_at', { ascending: false }),
+        supabase
+          .from('distributor_rep_customers')
+          .select('*')
+          .eq('is_active', true),
       ]);
 
       if (distributorsRes.error) throw distributorsRes.error;
@@ -337,6 +350,7 @@ const DistributorManagement: React.FC = () => {
       if (!categoriesRes.error) setCategories(categoriesRes.data || []);
       if (!rulesRes.error) setCommissionRules((rulesRes.data as CommissionRule[]) || []);
       if (!pricingRes.error) setDistributorProductPricing((pricingRes.data as DistributorProductPrice[]) || []);
+      if (!repCustRes.error) setRepCustomerLinks((repCustRes.data as RepCustomerLink[]) || []);
 
       const distData = (distributorsRes.data as Distributor[]) || [];
       setDistributors(distData);
@@ -881,6 +895,38 @@ const DistributorManagement: React.FC = () => {
     }
   };
 
+  const getRepCustomerLinks = (distributorId: string, salesRepId: string) =>
+    repCustomerLinks.filter((rc) => rc.distributor_id === distributorId && rc.sales_rep_id === salesRepId);
+
+  const handleAddRepCustomer = async (distributorId: string, salesRepId: string, organizationId: string) => {
+    try {
+      setError(null);
+      const { error: insertError } = await supabase.from('distributor_rep_customers').insert([{
+        distributor_id: distributorId,
+        sales_rep_id: salesRepId,
+        organization_id: organizationId,
+      }]);
+      if (insertError) throw insertError;
+      setSuccess('Customer assigned to rep');
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to assign customer to rep');
+    }
+  };
+
+  const handleRemoveRepCustomer = async (id: string) => {
+    if (!confirm('Remove this customer assignment from the rep?')) return;
+    try {
+      setError(null);
+      const { error: deleteError } = await supabase.from('distributor_rep_customers').delete().eq('id', id);
+      if (deleteError) throw deleteError;
+      setSuccess('Customer removed from rep');
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove customer from rep');
+    }
+  };
+
   const handleRemoveCustomerOrg = async (id: string) => {
     if (!confirm('Remove this customer organization from the distributor?')) return;
     try {
@@ -1289,36 +1335,88 @@ const DistributorManagement: React.FC = () => {
                     {reps.length === 0 ? (
                       <p className="text-sm text-gray-400 italic">No sales representatives assigned</p>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {reps.map((dsr) => {
                           const splitLabel =
                             dsr.commission_split_type === 'percentage_of_distributor'
                               ? `${dsr.sales_rep_rate}% of distributor commission`
                               : `Fixed ${dsr.sales_rep_rate}${typeConfig.isFlat ? '$' : '%'} + ${dsr.distributor_override_rate ?? 0}${typeConfig.isFlat ? '$' : '%'} override`;
+                          const repCustLinks = getRepCustomerLinks(distributor.id, dsr.sales_rep_id);
+                          const assignedOrgIds = new Set(repCustLinks.map(rc => rc.organization_id));
+                          const custOrgs = getDistributorCustomerOrgs(distributor.id);
+                          const availableCustOrgs = custOrgs.filter(dc => !assignedOrgIds.has(dc.organization_id));
                           return (
-                            <div key={dsr.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {dsr.profiles?.full_name || dsr.profiles?.email}
-                                </p>
-                                {dsr.profiles?.full_name && (
-                                  <p className="text-xs text-gray-500">{dsr.profiles.email}</p>
-                                )}
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  Split: <span className="font-medium text-gray-700">{splitLabel}</span>
-                                  {dsr.notes && <span className="ml-2 text-gray-400">{dsr.notes}</span>}
-                                </p>
-                                {dsr.profiles?.phone && (
-                                  <p className="text-xs text-gray-400 mt-0.5">Phone: {dsr.profiles.phone}</p>
-                                )}
+                            <div key={dsr.id} className="p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {dsr.profiles?.full_name || dsr.profiles?.email}
+                                  </p>
+                                  {dsr.profiles?.full_name && (
+                                    <p className="text-xs text-gray-500">{dsr.profiles.email}</p>
+                                  )}
+                                  <p className="text-xs text-gray-500 mt-0.5">
+                                    Split: <span className="font-medium text-gray-700">{splitLabel}</span>
+                                    {dsr.notes && <span className="ml-2 text-gray-400">{dsr.notes}</span>}
+                                  </p>
+                                  {dsr.profiles?.phone && (
+                                    <p className="text-xs text-gray-400 mt-0.5">Phone: {dsr.profiles.phone}</p>
+                                  )}
+                                </div>
+                                <button
+                                  onClick={() => handleRemoveSalesRepFromDistributor(dsr.id)}
+                                  className="p-1 hover:bg-red-100 rounded transition-colors"
+                                  title="Remove"
+                                >
+                                  <Trash2 className="h-4 w-4 text-red-500" />
+                                </button>
                               </div>
-                              <button
-                                onClick={() => handleRemoveSalesRepFromDistributor(dsr.id)}
-                                className="p-1 hover:bg-red-100 rounded transition-colors"
-                                title="Remove"
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </button>
+                              {/* Rep → Customer assignments */}
+                              <div className="mt-2 ml-1 pt-2 border-t border-gray-200">
+                                <div className="flex items-center gap-1.5 mb-1.5 text-xs font-medium text-gray-500">
+                                  <Building2 className="h-3 w-3" />
+                                  Assigned Customers ({repCustLinks.length})
+                                </div>
+                                {repCustLinks.length > 0 && (
+                                  <div className="flex flex-wrap gap-1.5 mb-1.5">
+                                    {repCustLinks.map((rc) => {
+                                      const org = organizations.find(o => o.id === rc.organization_id);
+                                      return (
+                                        <span key={rc.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 rounded-full text-xs">
+                                          {org?.name ?? 'Unknown'}
+                                          <button
+                                            onClick={() => handleRemoveRepCustomer(rc.id)}
+                                            className="ml-0.5 hover:bg-green-200 rounded-full p-0.5 transition-colors"
+                                            title="Remove"
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </button>
+                                        </span>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                                {availableCustOrgs.length > 0 ? (
+                                  <select
+                                    className="text-xs px-2 py-1 border border-gray-200 rounded-lg text-gray-600 bg-white"
+                                    value=""
+                                    onChange={(e) => {
+                                      if (e.target.value) handleAddRepCustomer(distributor.id, dsr.sales_rep_id, e.target.value);
+                                    }}
+                                  >
+                                    <option value="">+ Assign customer...</option>
+                                    {availableCustOrgs.map((dc) => (
+                                      <option key={dc.organization_id} value={dc.organization_id}>
+                                        {dc.organizations.name} ({dc.organizations.code})
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : custOrgs.length === 0 ? (
+                                  <p className="text-xs text-gray-400 italic">Add customers to the distributor first</p>
+                                ) : repCustLinks.length === custOrgs.length ? (
+                                  <p className="text-xs text-gray-400 italic">All customers assigned</p>
+                                ) : null}
+                              </div>
                             </div>
                           );
                         })}
