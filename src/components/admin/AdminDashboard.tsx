@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart,
   TrendingUp, CreditCard, Repeat, Building, HelpCircle, PieChart,
-  Shield, ChevronLeft, ChevronRight, DollarSign, FolderTree, MessageSquare,
+  Shield, ChevronLeft, ChevronRight, DollarSign, FolderTree, MessageSquare, UserCheck,
   LayoutDashboard, ArrowLeft, Eye, EyeOff, Menu, X, BookOpen
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -155,6 +155,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
         { id: 'my-orgs', label: 'My Organizations', icon: Building2, roles: ['sales_rep'] },
         { id: 'my-customers', label: 'My Customers', icon: Building2, roles: ['distributor'] },
         { id: 'my-sales-reps', label: 'My Sales Reps', icon: Users, roles: ['distributor'] },
+        { id: 'my-delegates', label: 'Delegates', icon: UserCheck, roles: ['distributor'] },
         { id: 'orders', label: 'Orders', icon: ShoppingCart, roles: ['distributor'] },
         { id: 'commissions', label: 'Commissions', icon: TrendingUp, roles: ['distributor'] },
       ],
@@ -269,6 +270,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
         return <DistributorPortal view="customers" />;
       case 'my-sales-reps':
         return <DistributorPortal view="sales-reps" />;
+      case 'my-delegates':
+        return <DistributorPortal view="delegates" />;
       case 'locations':
         return <LocationManagement organizationId={isCustomer ? userOrgId : undefined} />;
       case 'payments':

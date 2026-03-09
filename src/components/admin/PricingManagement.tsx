@@ -10,7 +10,11 @@ import { useAuth } from '@/contexts/AuthContext';
 
 type ViewMode = 'grid' | 'rules';
 
-const PricingManagement: React.FC = () => {
+interface PricingManagementProps {
+  organizationId?: string;
+}
+
+const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId }) => {
   const { user } = useAuth();
   const {
     entries,
@@ -30,8 +34,9 @@ const PricingManagement: React.FC = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [editEntry, setEditEntry] = useState<EnrichedPricingEntry | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
-  const [selectedOrgId, setSelectedOrgId] = useState('');
+  const [selectedOrgId, setSelectedOrgId] = useState(organizationId || '');
   const [selectedEntityType, setSelectedEntityType] = useState<'organization' | 'location'>('organization');
+  const isScoped = !!organizationId;
 
   const selectedOrgName = useMemo(() => {
     if (!selectedOrgId) return '';
@@ -129,135 +134,174 @@ const PricingManagement: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="p-2.5 bg-teal-50 rounded-xl">
-            <DollarSign className="h-6 w-6 text-teal-600" />
-          </div>
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">Contract Pricing</h2>
-            <p className="text-sm text-gray-500">
-              Set and manage pricing rules for organizations, locations, and users
-            </p>
-          </div>
-        </div>
+    <div className={isScoped ? 'space-y-4' : 'p-6 space-y-6'}>
+      {/* Header — hidden when scoped to a specific org */}
+      {!isScoped && (
+        <>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 bg-teal-50 rounded-xl">
+                <DollarSign className="h-6 w-6 text-teal-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Contract Pricing</h2>
+                <p className="text-sm text-gray-500">
+                  Set and manage pricing rules for organizations, locations, and users
+                </p>
+              </div>
+            </div>
 
-        <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={fetchPricingData}
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <RefreshCw className="h-4 w-4 mr-1.5" />
+                Refresh
+              </button>
+              <button
+                onClick={handleAdd}
+                className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                Add Rule
+              </button>
+            </div>
+          </div>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+              {error}
+            </div>
+          )}
+
+          {/* Stats */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Total Rules</div>
+              <div className="text-2xl font-bold text-gray-900">{entries.length}</div>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Unique Organizations</div>
+              <div className="text-2xl font-bold text-emerald-600">
+                {new Set(entries.filter((e) => e.pricing_type === 'organization').map((e) => e.entity_id)).size}
+              </div>
+            </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-4">
+              <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Unique Products</div>
+              <div className="text-2xl font-bold text-sky-600">
+                {new Set(entries.map((e) => e.product_id)).size}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* View Mode Tabs — hidden when scoped to a specific org */}
+      {!isScoped && (
+        <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
           <button
-            onClick={fetchPricingData}
-            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            onClick={() => setViewMode('grid')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'grid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
           >
-            <RefreshCw className="h-4 w-4 mr-1.5" />
-            Refresh
+            <LayoutGrid className="h-4 w-4" />
+            All Products
           </button>
           <button
-            onClick={handleAdd}
-            className="inline-flex items-center px-4 py-2 text-sm font-medium text-white bg-teal-600 rounded-lg hover:bg-teal-700 transition-colors shadow-sm"
+            onClick={() => setViewMode('rules')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'rules' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
           >
-            <Plus className="h-4 w-4 mr-1.5" />
-            Add Rule
+            <List className="h-4 w-4" />
+            Pricing Rules
           </button>
-        </div>
-      </div>
-
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
-          {error}
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Total Rules</div>
-          <div className="text-2xl font-bold text-gray-900">{entries.length}</div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Unique Organizations</div>
-          <div className="text-2xl font-bold text-emerald-600">
-            {new Set(entries.filter((e) => e.pricing_type === 'organization').map((e) => e.entity_id)).size}
-          </div>
-        </div>
-        <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Unique Products</div>
-          <div className="text-2xl font-bold text-sky-600">
-            {new Set(entries.map((e) => e.product_id)).size}
-          </div>
-        </div>
-      </div>
-
-      {/* View Mode Tabs */}
-      <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-1 w-fit">
-        <button
-          onClick={() => setViewMode('grid')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            viewMode === 'grid' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          <LayoutGrid className="h-4 w-4" />
-          All Products
-        </button>
-        <button
-          onClick={() => setViewMode('rules')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-            viewMode === 'rules' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-          }`}
-        >
-          <List className="h-4 w-4" />
-          Pricing Rules
-        </button>
-      </div>
-
       {/* All Products view */}
-      {viewMode === 'grid' && (
+      {(isScoped || viewMode === 'grid') && (
         <div className="space-y-4">
           {/* Org selector + actions */}
           <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
-            <h3 className="text-sm font-semibold text-gray-700">Set Pricing For</h3>
-            <div className="flex flex-wrap gap-3">
-              <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
-                <button
-                  onClick={() => { setSelectedEntityType('organization'); setSelectedOrgId(''); }}
-                  className={`px-3 py-2 font-medium transition-colors ${
-                    selectedEntityType === 'organization' ? 'bg-teal-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  Organization
-                </button>
-                <button
-                  onClick={() => { setSelectedEntityType('location'); setSelectedOrgId(''); }}
-                  className={`px-3 py-2 font-medium transition-colors ${
-                    selectedEntityType === 'location' ? 'bg-teal-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  Location
-                </button>
-              </div>
+            {!isScoped && (
+              <>
+                <h3 className="text-sm font-semibold text-gray-700">Set Pricing For</h3>
+                <div className="flex flex-wrap gap-3">
+                  <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
+                    <button
+                      onClick={() => { setSelectedEntityType('organization'); setSelectedOrgId(''); }}
+                      className={`px-3 py-2 font-medium transition-colors ${
+                        selectedEntityType === 'organization' ? 'bg-teal-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      Organization
+                    </button>
+                    <button
+                      onClick={() => { setSelectedEntityType('location'); setSelectedOrgId(''); }}
+                      className={`px-3 py-2 font-medium transition-colors ${
+                        selectedEntityType === 'location' ? 'bg-teal-600 text-white' : 'text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      Location
+                    </button>
+                  </div>
 
-              <select
-                value={selectedOrgId}
-                onChange={(e) => setSelectedOrgId(e.target.value)}
-                className="flex-1 min-w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
-              >
-                <option value="">
-                  {selectedEntityType === 'organization' ? '— Select an organization —' : '— Select a location —'}
-                </option>
-                {selectedEntityType === 'organization'
-                  ? organizations.map((o) => (
-                      <option key={o.id} value={o.id}>
-                        {o.name} {o.code ? `(${o.code})` : ''}
-                      </option>
-                    ))
-                  : locations.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name} {l.organization_name ? `— ${l.organization_name}` : ''}
-                      </option>
-                    ))}
-              </select>
+                  <select
+                    value={selectedOrgId}
+                    onChange={(e) => setSelectedOrgId(e.target.value)}
+                    className="flex-1 min-w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
+                  >
+                    <option value="">
+                      {selectedEntityType === 'organization' ? '— Select an organization —' : '— Select a location —'}
+                    </option>
+                    {selectedEntityType === 'organization'
+                      ? organizations.map((o) => (
+                          <option key={o.id} value={o.id}>
+                            {o.name} {o.code ? `(${o.code})` : ''}
+                          </option>
+                        ))
+                      : locations.map((l) => (
+                          <option key={l.id} value={l.id}>
+                            {l.name} {l.organization_name ? `— ${l.organization_name}` : ''}
+                          </option>
+                        ))}
+                  </select>
 
-              {selectedOrgId && (
+                  {selectedOrgId && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleDownloadTemplate}
+                        disabled={products.length === 0}
+                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                        title="Download CSV template pre-populated with all products"
+                      >
+                        <Download className="h-4 w-4 mr-1.5" />
+                        Template
+                      </button>
+                      <button
+                        onClick={() => setIsImportOpen(true)}
+                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-teal-600 border border-teal-600 rounded-lg hover:bg-teal-700 transition-colors"
+                      >
+                        <Upload className="h-4 w-4 mr-1.5" />
+                        Import CSV
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {!selectedOrgId && (
+                  <p className="text-xs text-gray-400">
+                    Select an organization or location above to view and edit product prices inline. You can also download a pre-filled CSV template and import bulk changes.
+                  </p>
+                )}
+              </>
+            )}
+
+            {isScoped && selectedOrgId && (
+              <div className="flex flex-wrap items-center gap-3">
                 <div className="flex gap-2">
                   <button
                     onClick={handleDownloadTemplate}
@@ -276,13 +320,7 @@ const PricingManagement: React.FC = () => {
                     Import CSV
                   </button>
                 </div>
-              )}
-            </div>
-
-            {!selectedOrgId && (
-              <p className="text-xs text-gray-400">
-                Select an organization or location above to view and edit product prices inline. You can also download a pre-filled CSV template and import bulk changes.
-              </p>
+              </div>
             )}
           </div>
 
@@ -307,7 +345,7 @@ const PricingManagement: React.FC = () => {
       )}
 
       {/* Pricing Rules view */}
-      {viewMode === 'rules' && (
+      {!isScoped && viewMode === 'rules' && (
         <div className="space-y-4">
           <div className="flex justify-end">
             <button
