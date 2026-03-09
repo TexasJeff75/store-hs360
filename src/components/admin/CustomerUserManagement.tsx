@@ -7,7 +7,6 @@ import type { Profile, UserOrganizationRole } from '@/services/supabase';
 interface UserWithRole extends Profile {
   user_organization_roles?: UserOrganizationRole[];
   organizationRole?: string;
-  locationName?: string;
 }
 
 interface CustomerUserManagementProps {
@@ -17,7 +16,6 @@ interface CustomerUserManagementProps {
 const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organizationId }) => {
   const [users, setUsers] = useState<UserWithRole[]>([]);
   const [allUsers, setAllUsers] = useState<Profile[]>([]);
-  const [locations, setLocations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,27 +58,19 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
       
       if (allProfilesError) throw allProfilesError;
       
-      // Fetch locations for this organization
-      const locationsData = await multiTenantService.getLocations(organizationId);
-      
       // Combine user data with their organization roles
       const usersWithRoles: UserWithRole[] = (profiles || []).map(profile => {
         const userRole = orgUserRoles.find(role => role.user_id === profile.id);
-        const location = userRole?.location_id 
-          ? locationsData.find(loc => loc.id === userRole.location_id)
-          : null;
-        
+
         return {
           ...profile,
           user_organization_roles: orgUserRoles.filter(role => role.user_id === profile.id),
           organizationRole: userRole?.role || 'member',
-          locationName: location?.name || 'All Locations'
         };
       });
-      
+
       setUsers(usersWithRoles);
       setAllUsers(allProfiles || []);
-      setLocations(locationsData);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch data');
     } finally {
@@ -148,12 +138,11 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
     }
   };
 
-  const handleAssignExistingUser = async (userId: string, role: string, locationId?: string) => {
+  const handleAssignExistingUser = async (userId: string, role: string) => {
     try {
       await multiTenantService.assignUserToOrganization({
         user_id: userId,
         organization_id: organizationId,
-        location_id: locationId || null,
         role: role as any,
         is_primary: false
       });
@@ -166,13 +155,12 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
     }
   };
 
-  const handleUpdateUserRole = async (userId: string, newRole: string, locationId?: string) => {
+  const handleUpdateUserRole = async (userId: string, newRole: string) => {
     try {
       const userRole = users.find(u => u.id === userId)?.user_organization_roles?.[0];
       if (userRole) {
         await multiTenantService.updateUserOrganizationRole(userRole.id, {
           role: newRole as any,
-          location_id: locationId || null
         });
         
         fetchData(); // Refresh data
@@ -327,9 +315,6 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
                   Organization Role
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Location
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -362,9 +347,6 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
                           {user.organizationRole || 'viewer'}
                         </span>
                       </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {user.locationName}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -605,19 +587,6 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
                         </div>
                       </div>
                       
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Location (Optional)
-                        </label>
-                        <select
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                        >
-                          <option value="">All Locations</option>
-                          {locations.map(location => (
-                            <option key={location.id} value={location.id}>{location.name}</option>
-                          ))}
-                        </select>
-                      </div>
 
                       {/* Password Reset Section for editing */}
                       {isEditing && selectedUser && (

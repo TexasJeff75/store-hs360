@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Building2, Plus, Pencil, Trash2, Search, MapPin, Users, Mail, Phone, AlertCircle, CheckCircle, Eye, Archive, ArrowLeft, Settings, DollarSign, Save, RotateCcw, UserCheck, Home } from 'lucide-react';
 import { multiTenantService } from '@/services/multiTenant';
 import { supabase } from '@/services/supabase';
-import LocationManagement from './LocationManagement';
+import AddressManagement from './AddressManagement';
 import PricingManagement from './PricingManagement';
 import CustomerUserManagement from './CustomerUserManagement';
 import type { Organization } from '@/services/supabase';
 
-type SubManagementTab = 'locations' | 'pricing' | 'users';
+type SubManagementTab = 'addresses' | 'pricing' | 'users';
 
 interface SalesRep {
   id: string;
@@ -25,9 +25,9 @@ const OrganizationManagement: React.FC = () => {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [orgStats, setOrgStats] = useState<{ [key: string]: { locations: number; users: number } }>({});
+  const [orgStats, setOrgStats] = useState<{ [key: string]: { addresses: number; users: number } }>({});
   const [selectedOrgForSubManagement, setSelectedOrgForSubManagement] = useState<Organization | null>(null);
-  const [activeSubTab, setActiveSubTab] = useState<SubManagementTab>('locations');
+  const [activeSubTab, setActiveSubTab] = useState<SubManagementTab>('addresses');
   const [pendingChanges, setPendingChanges] = useState<{ [key: string]: Partial<Organization> }>({});
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -53,28 +53,28 @@ const OrganizationManagement: React.FC = () => {
 
   const fetchOrgStats = async () => {
     try {
-      const [locations, userRoles] = await Promise.all([
-        multiTenantService.getLocations(),
-        multiTenantService.getUserOrganizationRoles()
-      ]);
+      const userRoles = await multiTenantService.getUserOrganizationRoles();
 
-      const stats: { [key: string]: { locations: number; users: number } } = {};
-
-      // Count locations per organization
-      locations.forEach(location => {
-        if (!stats[location.organization_id]) {
-          stats[location.organization_id] = { locations: 0, users: 0 };
-        }
-        stats[location.organization_id].locations++;
-      });
+      const stats: { [key: string]: { addresses: number; users: number } } = {};
 
       // Count users per organization
       userRoles.forEach(role => {
         if (!stats[role.organization_id]) {
-          stats[role.organization_id] = { locations: 0, users: 0 };
+          stats[role.organization_id] = { addresses: 0, users: 0 };
         }
         stats[role.organization_id].users++;
       });
+
+      // Count addresses per organization
+      const orgs = Object.keys(stats);
+      for (const orgId of orgs) {
+        try {
+          const addresses = await multiTenantService.getOrganizationAddresses(orgId);
+          stats[orgId].addresses = addresses.length;
+        } catch {
+          // Ignore errors for individual org address counts
+        }
+      }
 
       setOrgStats(stats);
     } catch (err) {
@@ -276,7 +276,7 @@ const OrganizationManagement: React.FC = () => {
   // If we're in sub-management mode, render that instead
   if (selectedOrgForSubManagement) {
     const subTabs = [
-      { id: 'locations' as SubManagementTab, label: 'Locations', icon: MapPin },
+      { id: 'addresses' as SubManagementTab, label: 'Addresses', icon: MapPin },
       { id: 'pricing' as SubManagementTab, label: 'Contract Pricing', icon: DollarSign },
       { id: 'users' as SubManagementTab, label: 'Users', icon: Users },
     ];
@@ -289,7 +289,7 @@ const OrganizationManagement: React.FC = () => {
             <button
               onClick={() => {
                 setSelectedOrgForSubManagement(null);
-                setActiveSubTab('locations');
+                setActiveSubTab('addresses');
               }}
               className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
             >
@@ -305,7 +305,7 @@ const OrganizationManagement: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-gray-900">{selectedOrgForSubManagement.name}</h2>
               <p className="text-gray-600">Code: {selectedOrgForSubManagement.code}</p>
-              <p className="text-gray-600">Manage locations and pricing for this organization</p>
+              <p className="text-gray-600">Manage addresses and pricing for this organization</p>
             </div>
           </div>
         </div>
@@ -335,8 +335,8 @@ const OrganizationManagement: React.FC = () => {
 
         {/* Sub-tab content */}
         <div>
-          {activeSubTab === 'locations' && (
-            <LocationManagement organizationId={selectedOrgForSubManagement.id} />
+          {activeSubTab === 'addresses' && (
+            <AddressManagement organizationId={selectedOrgForSubManagement.id} />
           )}
           {activeSubTab === 'pricing' && (
             <PricingManagement organizationId={selectedOrgForSubManagement.id} />
@@ -501,9 +501,9 @@ const OrganizationManagement: React.FC = () => {
           <div className="flex items-center">
             <MapPin className="h-8 w-8 text-blue-600" />
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Total Locations</p>
+              <p className="text-sm font-medium text-gray-500">Total Addresses</p>
               <p className="text-2xl font-semibold text-gray-900">
-                {Object.values(orgStats).reduce((sum, stat) => sum + stat.locations, 0)}
+                {Object.values(orgStats).reduce((sum, stat) => sum + stat.addresses, 0)}
               </p>
             </div>
           </div>
@@ -555,7 +555,7 @@ const OrganizationManagement: React.FC = () => {
                       <button
                         onClick={() => setSelectedOrgForSubManagement(org)}
                         className="p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
-                        title="Manage Locations & Pricing"
+                        title="Manage Addresses & Pricing"
                       >
                         <Settings className="h-4 w-4" />
                       </button>
@@ -631,7 +631,7 @@ const OrganizationManagement: React.FC = () => {
                       <div className="flex items-center space-x-1">
                         <MapPin className="h-4 w-4 text-blue-600" />
                         <span className="text-sm font-medium text-gray-900">
-                          {orgStats[org.id]?.locations || 0}
+                          {orgStats[org.id]?.addresses || 0}
                         </span>
                       </div>
                       <div className="flex items-center space-x-1">
@@ -1068,10 +1068,10 @@ const OrganizationManagement: React.FC = () => {
                           <div className="flex items-center justify-center space-x-2 mb-2">
                             <MapPin className="h-5 w-5 text-blue-600" />
                             <span className="text-2xl font-bold text-gray-900">
-                              {orgStats[selectedOrg.id]?.locations || 0}
+                              {orgStats[selectedOrg.id]?.addresses || 0}
                             </span>
                           </div>
-                          <p className="text-sm text-gray-600">Locations</p>
+                          <p className="text-sm text-gray-600">Addresses</p>
                         </div>
                         <div className="bg-gray-50 p-4 rounded-lg text-center">
                           <div className="flex items-center justify-center space-x-2 mb-2">

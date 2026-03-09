@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Building2, MapPin, Search, CreditCard } from 'lucide-react';
 import { multiTenantService } from '@/services/multiTenant';
+import { customerAddressService } from '@/services/customerAddresses';
 import { useAuth } from '@/contexts/AuthContext';
-import { supabase } from '@/services/supabase';
 import type { Organization } from '@/services/supabase';
 
 interface FirstTimeSetupProps {
@@ -11,20 +11,23 @@ interface FirstTimeSetupProps {
 
 const FirstTimeSetup: React.FC<FirstTimeSetupProps> = ({ onComplete }) => {
   const { user } = useAuth();
-  const [step, setStep] = useState<'welcome' | 'select-org' | 'location' | 'payment'>('welcome');
+  const [step, setStep] = useState<'welcome' | 'select-org' | 'address' | 'payment'>('welcome');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrg, setSelectedOrg] = useState<Organization | null>(null);
 
-  const [locationData, setLocationData] = useState({
-    name: '',
-    code: '',
-    address: '',
+  const [addressData, setAddressData] = useState({
+    label: '',
+    first_name: '',
+    last_name: '',
+    company: '',
+    address1: '',
+    address2: '',
     city: '',
     state: '',
-    zip_code: ''
+    postal_code: ''
   });
 
   useEffect(() => {
@@ -61,7 +64,7 @@ const FirstTimeSetup: React.FC<FirstTimeSetupProps> = ({ onComplete }) => {
       });
 
       setSelectedOrg(org);
-      setStep('location');
+      setStep('address');
     } catch (err) {
       console.error('Error assigning to organization:', err);
       setError(err instanceof Error ? err.message : 'Failed to join organization');
@@ -70,33 +73,39 @@ const FirstTimeSetup: React.FC<FirstTimeSetupProps> = ({ onComplete }) => {
     }
   };
 
-  const handleSkipLocation = () => {
+  const handleSkipAddress = () => {
     setStep('payment');
   };
 
-  const handleCreateLocation = async (e: React.FormEvent) => {
+  const handleCreateAddress = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedOrg) return;
+    if (!selectedOrg || !user) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      await multiTenantService.createLocation({
+      await customerAddressService.createAddress({
+        user_id: user.id,
         organization_id: selectedOrg.id,
-        name: locationData.name,
-        code: locationData.code || undefined,
-        address: locationData.address || undefined,
-        city: locationData.city || undefined,
-        state: locationData.state || undefined,
-        zip_code: locationData.zip_code || undefined,
-        is_active: true
+        address_type: 'shipping',
+        label: addressData.label || `${addressData.city} Office`,
+        first_name: addressData.first_name,
+        last_name: addressData.last_name,
+        company: addressData.company || selectedOrg.name,
+        address1: addressData.address1,
+        address2: addressData.address2,
+        city: addressData.city,
+        state_or_province: addressData.state,
+        postal_code: addressData.postal_code,
+        country_code: 'US',
+        is_default: true,
       });
 
       setStep('payment');
     } catch (err) {
-      console.error('Error creating location:', err);
-      setError(err instanceof Error ? err.message : 'Failed to create location');
+      console.error('Error creating address:', err);
+      setError(err instanceof Error ? err.message : 'Failed to create address');
     } finally {
       setLoading(false);
     }
@@ -136,7 +145,7 @@ const FirstTimeSetup: React.FC<FirstTimeSetupProps> = ({ onComplete }) => {
             <ul className="mt-2 space-y-1 text-sm text-blue-700">
               <li className="flex items-start">
                 <span className="mr-2">•</span>
-                <span>Add locations for delivery</span>
+                <span>Add shipping addresses</span>
               </li>
               <li className="flex items-start">
                 <span className="mr-2">•</span>
@@ -248,7 +257,7 @@ const FirstTimeSetup: React.FC<FirstTimeSetupProps> = ({ onComplete }) => {
     );
   }
 
-  if (step === 'location') {
+  if (step === 'address') {
     return (
       <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-4 overflow-y-auto">
         <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-8 my-8">
@@ -256,9 +265,9 @@ const FirstTimeSetup: React.FC<FirstTimeSetupProps> = ({ onComplete }) => {
             <div className="w-16 h-16 bg-gradient-to-r from-pink-500 to-orange-500 rounded-full flex items-center justify-center mx-auto mb-4">
               <MapPin className="w-8 h-8 text-white" />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Add a Location</h2>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Add a Shipping Address</h2>
             <p className="text-gray-600">
-              Set up your first delivery location (optional)
+              Set up your first delivery address (optional)
             </p>
           </div>
 
@@ -268,99 +277,144 @@ const FirstTimeSetup: React.FC<FirstTimeSetupProps> = ({ onComplete }) => {
             </div>
           )}
 
-          <form onSubmit={handleCreateLocation} className="space-y-6">
+          <form onSubmit={handleCreateAddress} className="space-y-6">
             <div>
-              <label htmlFor="location-name" className="block text-sm font-medium text-gray-700 mb-2">
-                Location Name <span className="text-red-500">*</span>
+              <label htmlFor="address-label" className="block text-sm font-medium text-gray-700 mb-2">
+                Address Label <span className="text-red-500">*</span>
               </label>
               <input
-                id="location-name"
+                id="address-label"
                 type="text"
                 required
-                value={locationData.name}
-                onChange={(e) => setLocationData({ ...locationData, name: e.target.value })}
+                value={addressData.label}
+                onChange={(e) => setAddressData({ ...addressData, label: e.target.value })}
                 placeholder="e.g., Main Office, Downtown Clinic"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="location-code" className="block text-sm font-medium text-gray-700 mb-2">
-                Location Code
-              </label>
-              <input
-                id="location-code"
-                type="text"
-                value={locationData.code}
-                onChange={(e) => setLocationData({ ...locationData, code: e.target.value.toUpperCase() })}
-                placeholder="e.g., MAIN, DTC"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent uppercase"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="location-address" className="block text-sm font-medium text-gray-700 mb-2">
-                Street Address
-              </label>
-              <input
-                id="location-address"
-                type="text"
-                value={locationData.address}
-                onChange={(e) => setLocationData({ ...locationData, address: e.target.value })}
-                placeholder="123 Main Street"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label htmlFor="location-city" className="block text-sm font-medium text-gray-700 mb-2">
-                  City
+                <label htmlFor="first-name" className="block text-sm font-medium text-gray-700 mb-2">
+                  First Name <span className="text-red-500">*</span>
                 </label>
                 <input
-                  id="location-city"
+                  id="first-name"
                   type="text"
-                  value={locationData.city}
-                  onChange={(e) => setLocationData({ ...locationData, city: e.target.value })}
-                  placeholder="City"
+                  required
+                  value={addressData.first_name}
+                  onChange={(e) => setAddressData({ ...addressData, first_name: e.target.value })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                 />
               </div>
-
               <div>
-                <label htmlFor="location-state" className="block text-sm font-medium text-gray-700 mb-2">
-                  State
+                <label htmlFor="last-name" className="block text-sm font-medium text-gray-700 mb-2">
+                  Last Name <span className="text-red-500">*</span>
                 </label>
                 <input
-                  id="location-state"
+                  id="last-name"
                   type="text"
-                  value={locationData.state}
-                  onChange={(e) => setLocationData({ ...locationData, state: e.target.value.toUpperCase() })}
-                  placeholder="CA"
-                  maxLength={2}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent uppercase"
+                  required
+                  value={addressData.last_name}
+                  onChange={(e) => setAddressData({ ...addressData, last_name: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
                 />
               </div>
             </div>
 
             <div>
-              <label htmlFor="location-zip" className="block text-sm font-medium text-gray-700 mb-2">
-                ZIP Code
+              <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-2">
+                Company
               </label>
               <input
-                id="location-zip"
+                id="company"
                 type="text"
-                value={locationData.zip_code}
-                onChange={(e) => setLocationData({ ...locationData, zip_code: e.target.value })}
-                placeholder="90210"
+                value={addressData.company}
+                onChange={(e) => setAddressData({ ...addressData, company: e.target.value })}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
               />
+            </div>
+
+            <div>
+              <label htmlFor="address1" className="block text-sm font-medium text-gray-700 mb-2">
+                Street Address <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="address1"
+                type="text"
+                required
+                value={addressData.address1}
+                onChange={(e) => setAddressData({ ...addressData, address1: e.target.value })}
+                placeholder="123 Main Street"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="address2" className="block text-sm font-medium text-gray-700 mb-2">
+                Address Line 2
+              </label>
+              <input
+                id="address2"
+                type="text"
+                value={addressData.address2}
+                onChange={(e) => setAddressData({ ...addressData, address2: e.target.value })}
+                placeholder="Suite, Unit, etc."
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-2">
+                  City <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="city"
+                  type="text"
+                  required
+                  value={addressData.city}
+                  onChange={(e) => setAddressData({ ...addressData, city: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-2">
+                  State <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="state"
+                  type="text"
+                  required
+                  value={addressData.state}
+                  onChange={(e) => setAddressData({ ...addressData, state: e.target.value.toUpperCase() })}
+                  placeholder="CA"
+                  maxLength={2}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent uppercase"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="zip" className="block text-sm font-medium text-gray-700 mb-2">
+                  ZIP Code <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="zip"
+                  type="text"
+                  required
+                  value={addressData.postal_code}
+                  onChange={(e) => setAddressData({ ...addressData, postal_code: e.target.value })}
+                  placeholder="90210"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                />
+              </div>
             </div>
 
             <div className="flex gap-4">
               <button
                 type="button"
-                onClick={handleSkipLocation}
+                onClick={handleSkipAddress}
                 disabled={loading}
                 className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -371,7 +425,7 @@ const FirstTimeSetup: React.FC<FirstTimeSetupProps> = ({ onComplete }) => {
                 disabled={loading}
                 className="flex-1 bg-gradient-to-r from-pink-500 to-orange-500 text-white py-3 px-6 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {loading ? 'Creating...' : 'Add Location'}
+                {loading ? 'Saving...' : 'Add Address'}
               </button>
             </div>
           </form>
@@ -397,7 +451,7 @@ const FirstTimeSetup: React.FC<FirstTimeSetupProps> = ({ onComplete }) => {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
             <h3 className="font-semibold text-blue-900 mb-2">All Set!</h3>
             <p className="text-sm text-blue-700">
-              Your account is ready. You can add payment methods and additional locations from your profile settings at any time.
+              Your account is ready. You can add payment methods and additional addresses from your profile settings at any time.
             </p>
           </div>
 

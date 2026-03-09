@@ -51,24 +51,10 @@ export interface Organization {
   updated_at: string;
 }
 
-export interface Location {
-  id: string;
-  organization_id: string;
-  name: string;
-  code: string;
-  address?: any;
-  contact_email?: string;
-  contact_phone?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface UserOrganizationRole {
   id: string;
   user_id: string;
   organization_id: string;
-  location_id?: string;
   role: 'admin' | 'manager' | 'member' | 'viewer';
   is_primary: boolean;
   created_at: string;

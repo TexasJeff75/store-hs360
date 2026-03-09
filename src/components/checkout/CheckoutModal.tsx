@@ -50,14 +50,7 @@ interface BillingAddress extends ShippingAddress {
   email: string;
 }
 
-type CheckoutStep = 'customer' | 'location' | 'shipping' | 'billing' | 'payment' | 'review' | 'processing' | 'confirmation';
-
-interface OrgLocation {
-  id: string;
-  name: string;
-  code: string;
-  address?: any;
-}
+type CheckoutStep = 'customer' | 'shipping' | 'billing' | 'payment' | 'review' | 'processing' | 'confirmation';
 
 const CheckoutModal: React.FC<CheckoutModalProps> = ({
   isOpen,
@@ -70,9 +63,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [currentStep, setCurrentStep] = useState<CheckoutStep>('customer');
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
   const [selectedOrgId, setSelectedOrgId] = useState<string | undefined>();
-  const [selectedLocationId, setSelectedLocationId] = useState<string | undefined>();
   const [customerEmail, setCustomerEmail] = useState<string>('');
-  const [availableLocations, setAvailableLocations] = useState<OrgLocation[]>([]);
   const [showAddressSelector, setShowAddressSelector] = useState(true);
   const [showBillingAddressSelector, setShowBillingAddressSelector] = useState(true);
   const [useManualAddress, setUseManualAddress] = useState(false);
@@ -175,47 +166,14 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       setSelectedCustomerId(user.id);
       setCustomerEmail(user.email || '');
 
-      // Find user's organization and locations
       const orgId = organizationId || await getUserOrganizationId(user.id);
-
       if (orgId) {
         setSelectedOrgId(orgId);
-
-        const { data: locations } = await supabase
-          .from('locations')
-          .select('id, name, code, address')
-          .eq('organization_id', orgId)
-          .eq('is_active', true)
-          .order('name');
-
-        if (locations && locations.length > 0) {
-          // Show location step so user can select/confirm
-          setAvailableLocations(locations);
-          if (locations.length === 1) {
-            setSelectedLocationId(locations[0].id);
-          }
-          setCurrentStep('location');
-        } else {
-          setCurrentStep('shipping');
-        }
-      } else {
-        setCurrentStep('shipping');
       }
+      setCurrentStep('shipping');
     } else {
-      // Admin flow — if org pre-selected, fetch its locations for CustomerSelector
       if (organizationId) {
         setSelectedOrgId(organizationId);
-
-        const { data: locations } = await supabase
-          .from('locations')
-          .select('id, name, code, address')
-          .eq('organization_id', organizationId)
-          .eq('is_active', true)
-          .order('name');
-
-        if (locations && locations.length > 0) {
-          setAvailableLocations(locations);
-        }
       }
       setCurrentStep('customer');
     }
@@ -235,75 +193,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const handleCustomerSelection = async (selection: {
     customerId: string;
     organizationId?: string;
-    locationId?: string;
     customerEmail: string;
   }) => {
     setSelectedCustomerId(selection.customerId);
     setSelectedOrgId(selection.organizationId);
     setCustomerEmail(selection.customerEmail);
-
-    if (selection.organizationId) {
-      // Always fetch locations for the org so user can select/confirm
-      const { data: locations } = await supabase
-        .from('locations')
-        .select('id, name, code, address')
-        .eq('organization_id', selection.organizationId)
-        .eq('is_active', true)
-        .order('name');
-
-      if (locations && locations.length > 0) {
-        setAvailableLocations(locations);
-        // Pre-select if a location was already chosen or there's only one
-        if (selection.locationId) {
-          setSelectedLocationId(selection.locationId);
-        } else if (locations.length === 1) {
-          setSelectedLocationId(locations[0].id);
-        }
-        setCurrentStep('location');
-      } else if (selection.locationId) {
-        // Fallback: location was passed but not found in active query
-        setSelectedLocationId(selection.locationId);
-        await fetchLocationAddress(selection.locationId);
-        setCurrentStep('shipping');
-      } else {
-        setCurrentStep('shipping');
-      }
-    } else {
-      setCurrentStep('shipping');
-    }
+    setCurrentStep('shipping');
   };
-
-  const fetchLocationAddress = async (locationId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('locations')
-        .select('address, name')
-        .eq('id', locationId)
-        .single();
-
-      if (error) throw error;
-
-      if (data?.address) {
-        const addr = data.address as any;
-        setShippingAddress({
-          firstName: addr.firstName || addr.first_name || '',
-          lastName: addr.lastName || addr.last_name || '',
-          company: addr.company || data.name || '',
-          address1: addr.address1 || addr.street || '',
-          address2: addr.address2 || '',
-          city: addr.city || '',
-          state: addr.state || addr.state_or_province || '',
-          postalCode: addr.postalCode || addr.postal_code || addr.zip || '',
-          country: addr.country || addr.country_code || 'US',
-          phone: addr.phone || ''
-        });
-        setShowAddressSelector(false);
-      }
-    } catch (error) {
-      console.error('Error fetching location address:', error);
-    }
-  };
-
 
   useEffect(() => {
     if (sameAsShipping) {
@@ -339,8 +235,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       const sessionResult = await restCheckoutService.createCheckoutSession(
         user.id,
         cartItems,
-        selectedOrgId,
-        selectedLocationId
+        selectedOrgId
       );
 
       if (!sessionResult.success || !sessionResult.sessionId) {
@@ -412,7 +307,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       const addressToSave = {
         user_id: user.id,
         organization_id: selectedOrgId,
-        location_id: selectedLocationId,
         address_type: addressType,
         label: label.trim(),
         first_name: addressData.firstName,
@@ -524,7 +418,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         }
       }
 
-      const steps: CheckoutStep[] = ['customer', 'location', 'shipping', 'billing', 'payment', 'review'];
+      const steps: CheckoutStep[] = ['customer', 'shipping', 'billing', 'payment', 'review'];
       const currentIndex = steps.indexOf(currentStep);
       if (currentIndex < steps.length - 1) {
         setCurrentStep(steps[currentIndex + 1]);
@@ -556,13 +450,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       return;
     }
 
-    // If going back from shipping and there are multiple locations, go to location step
-    if (currentStep === 'shipping' && availableLocations.length > 1) {
-      setCurrentStep('location');
-      return;
-    }
-
-    const steps: CheckoutStep[] = ['customer', 'location', 'shipping', 'billing', 'payment', 'review'];
+    const steps: CheckoutStep[] = ['customer', 'shipping', 'billing', 'payment', 'review'];
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex > 0) {
       setCurrentStep(steps[currentIndex - 1]);
@@ -606,7 +494,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           try {
             await quickbooksPayments.savePaymentMethod({
               organizationId: selectedOrgId,
-              locationId: selectedLocationId,
               userId: user.id,
               label: paymentData.paymentMethodLabel || `Card ****${paymentLastFour}`,
               paymentType: 'credit_card',
@@ -645,7 +532,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             const acctTypeLower = paymentData.accountType.toLowerCase();
             await quickbooksPayments.savePaymentMethod({
               organizationId: selectedOrgId,
-              locationId: selectedLocationId,
               userId: user.id,
               label: paymentData.paymentMethodLabel || `Bank ****${paymentLastFour}`,
               paymentType: 'ach',
@@ -781,75 +667,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleLocationSelect = async (locationId: string) => {
-    setSelectedLocationId(locationId);
-    await fetchLocationAddress(locationId);
-    setCurrentStep('shipping');
-  };
-
-  const renderLocationStep = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-2 flex items-center space-x-2">
-          <MapPin className="h-5 w-5 text-blue-600" />
-          <span>Select Shipping Location</span>
-        </h3>
-        <p className="text-sm text-gray-600 mb-4">
-          Choose which location this order should be shipped to
-        </p>
-      </div>
-
-      <div className="space-y-3">
-        {availableLocations.map((loc) => {
-          const addr = loc.address;
-          const addrLine = addr
-            ? [addr.address1 || addr.street, addr.city, addr.state || addr.state_or_province].filter(Boolean).join(', ')
-            : null;
-
-          return (
-            <button
-              key={loc.id}
-              onClick={() => handleLocationSelect(loc.id)}
-              className={`w-full text-left p-4 border-2 rounded-lg transition-colors hover:border-blue-500 hover:bg-blue-50 ${
-                selectedLocationId === loc.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'
-              }`}
-            >
-              <div className="flex items-start gap-3">
-                <MapPin className="h-5 w-5 text-gray-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="font-medium text-gray-900">{loc.name}</p>
-                  <p className="text-sm text-gray-500">{loc.code}</p>
-                  {addrLine && (
-                    <p className="text-sm text-gray-600 mt-1">{addrLine}</p>
-                  )}
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {selectedLocationId && (
-        <button
-          onClick={() => handleLocationSelect(selectedLocationId)}
-          className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors"
-        >
-          Continue with Selected Location
-        </button>
-      )}
-
-      <button
-        onClick={() => {
-          setSelectedLocationId(undefined);
-          setCurrentStep('shipping');
-        }}
-        className="w-full text-center text-sm text-gray-500 hover:text-gray-700 py-2"
-      >
-        Ship to a different address instead
-      </button>
-    </div>
-  );
-
   const renderCustomerStep = () => (
     <div className="space-y-6">
       <CustomerSelector
@@ -861,16 +678,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   );
 
   const renderShippingStep = () => {
-    // If a location is selected and address is populated, skip AddressSelector
-    const hasLocationAddress = selectedLocationId && shippingAddress.address1;
-
-    if (!useManualAddress && showAddressSelector && !hasLocationAddress) {
+    if (!useManualAddress && showAddressSelector) {
       return (
         <div className="space-y-6">
           <AddressSelector
             userId={selectedCustomerId}
             organizationId={selectedOrgId}
-            locationId={selectedLocationId}
             addressType="shipping"
             onSelect={(addr) => handleAddressSelect(addr, 'shipping')}
             onAddNew={() => setUseManualAddress(true)}
@@ -886,21 +699,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <Truck className="h-5 w-5 text-pink-600" />
           <h3 className="text-lg font-semibold">Shipping Address</h3>
         </div>
-        {selectedLocationId && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
-              {availableLocations.find(l => l.id === selectedLocationId)?.name || 'Location Address'}
-            </span>
-            {availableLocations.length > 1 && (
-              <button
-                onClick={() => setCurrentStep('location')}
-                className="text-sm text-blue-600 hover:text-blue-800 underline"
-              >
-                Change
-              </button>
-            )}
-          </div>
-        )}
       </div>
       
       <div className="grid grid-cols-2 gap-4">
@@ -1083,7 +881,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <AddressSelector
             userId={selectedCustomerId}
             organizationId={selectedOrgId}
-            locationId={selectedLocationId}
             addressType="billing"
             onSelect={(addr) => handleAddressSelect(addr, 'billing')}
             onAddNew={() => setUseManualBillingAddress(true)}
@@ -1247,7 +1044,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         billingAddress={billingAddress}
         total={total}
         organizationId={selectedOrgId}
-        locationId={selectedLocationId}
       />
     </div>
   );
@@ -1531,7 +1327,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             )}
 
             {!loading && !error && currentStep === 'customer' && renderCustomerStep()}
-            {!loading && !error && currentStep === 'location' && renderLocationStep()}
+
             {!loading && !error && currentStep === 'shipping' && renderShippingStep()}
             {!loading && !error && currentStep === 'billing' && renderBillingStep()}
             {!loading && !error && currentStep === 'payment' && renderPaymentStep()}
@@ -1540,7 +1336,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           </div>
 
           {/* Footer Navigation */}
-          {!loading && !error && currentStep !== 'customer' && currentStep !== 'location' && currentStep !== 'confirmation' && (
+          {!loading && !error && currentStep !== 'customer' && currentStep !== 'confirmation' && (
             <div className="border-t border-gray-200 p-6 bg-gray-50">
               <div className="flex items-center justify-between">
                 <button

@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { EnrichedPricingEntry } from './usePricingData';
 
-type PricingTypeFilter = 'all' | 'organization' | 'location' | 'individual';
+type PricingTypeFilter = 'all' | 'organization' | 'individual';
 type SortField = 'entity_name' | 'product_id' | 'contract_price' | 'pricing_type' | 'min_quantity' | 'effective_date';
 type SortDir = 'asc' | 'desc';
 
@@ -123,8 +123,6 @@ const PricingTable: React.FC<PricingTableProps> = ({
     switch (type) {
       case 'organization':
         return <Building2 className="h-3.5 w-3.5" />;
-      case 'location':
-        return <MapPin className="h-3.5 w-3.5" />;
       case 'individual':
         return <User className="h-3.5 w-3.5" />;
       default:
@@ -136,8 +134,6 @@ const PricingTable: React.FC<PricingTableProps> = ({
     switch (type) {
       case 'organization':
         return 'bg-emerald-50 text-emerald-700 border-emerald-200';
-      case 'location':
-        return 'bg-sky-50 text-sky-700 border-sky-200';
       case 'individual':
         return 'bg-amber-50 text-amber-700 border-amber-200';
       default:
@@ -174,7 +170,6 @@ const PricingTable: React.FC<PricingTableProps> = ({
             [
               { key: 'all', label: 'All' },
               { key: 'organization', label: 'Org' },
-              { key: 'location', label: 'Location' },
               { key: 'individual', label: 'User' },
             ] as { key: PricingTypeFilter; label: string }[]
           ).map((opt) => (

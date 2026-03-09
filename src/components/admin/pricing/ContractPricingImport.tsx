@@ -13,7 +13,7 @@ type Step = 'upload' | 'preview' | 'importing' | 'complete';
 
 interface ImportRow {
   rowNum: number;
-  pricing_type: 'organization' | 'location' | 'individual';
+  pricing_type: 'organization' | 'individual';
   entity_identifier: string; // name, code, or email
   entity_id?: string; // resolved after lookup
   entity_display?: string; // resolved display name
@@ -87,7 +87,6 @@ function normalizeHeader(h: string): string {
     entity_name: 'entity',
     entity_identifier: 'entity',
     organization: 'entity',
-    location: 'entity',
     user: 'entity',
     email: 'entity',
     product_id: 'product_id',
@@ -138,12 +137,10 @@ const ContractPricingImport: React.FC<ContractPricingImportProps> = ({ isOpen, o
 
   const buildEntityMaps = async (): Promise<{
     orgMap: EntityMap;
-    locMap: EntityMap;
     userMap: EntityMap;
   }> => {
-    const [orgsRes, locsRes, usersRes] = await Promise.all([
+    const [orgsRes, usersRes] = await Promise.all([
       supabase.from('organizations').select('id, name, code').eq('is_active', true),
-      supabase.from('locations').select('id, name, code').eq('is_active', true),
       supabase.from('profiles').select('id, email, full_name').eq('approved', true),
     ]);
 
@@ -154,13 +151,6 @@ const ContractPricingImport: React.FC<ContractPricingImportProps> = ({ isOpen, o
       orgMap.set(o.id.toLowerCase(), { id: o.id, display: o.name });
     }
 
-    const locMap: EntityMap = new Map();
-    for (const l of locsRes.data || []) {
-      locMap.set(l.name.toLowerCase(), { id: l.id, display: l.name });
-      if (l.code) locMap.set(l.code.toLowerCase(), { id: l.id, display: l.name });
-      locMap.set(l.id.toLowerCase(), { id: l.id, display: l.name });
-    }
-
     const userMap: EntityMap = new Map();
     for (const u of usersRes.data || []) {
       userMap.set(u.email.toLowerCase(), { id: u.id, display: u.email });
@@ -168,7 +158,7 @@ const ContractPricingImport: React.FC<ContractPricingImportProps> = ({ isOpen, o
       userMap.set(u.id.toLowerCase(), { id: u.id, display: u.email });
     }
 
-    return { orgMap, locMap, userMap };
+    return { orgMap, userMap };
   };
 
   const processFile = async (file: File) => {
@@ -204,7 +194,7 @@ const ContractPricingImport: React.FC<ContractPricingImportProps> = ({ isOpen, o
     const errors: ValidationError[] = [];
 
     if (typeIdx === -1) errors.push({ row: 0, field: 'header', message: 'Missing required column: pricing_type (or "Type")' });
-    if (entityIdx === -1) errors.push({ row: 0, field: 'header', message: 'Missing required column: entity (or "Entity", "Organization", "Location", "Email")' });
+    if (entityIdx === -1) errors.push({ row: 0, field: 'header', message: 'Missing required column: entity (or "Entity", "Organization", "Email")' });
     if (productIdx === -1) errors.push({ row: 0, field: 'header', message: 'Missing required column: product_id (or "Product ID")' });
     if (priceIdx === -1 && markupIdx === -1) errors.push({ row: 0, field: 'header', message: 'Must have at least one of: contract_price, markup_price' });
 
@@ -216,7 +206,7 @@ const ContractPricingImport: React.FC<ContractPricingImportProps> = ({ isOpen, o
     }
 
     // Build entity lookup maps
-    const { orgMap, locMap, userMap } = await buildEntityMaps();
+    const { orgMap, userMap } = await buildEntityMaps();
 
     const parsed: ImportRow[] = [];
 
@@ -226,8 +216,8 @@ const ContractPricingImport: React.FC<ContractPricingImportProps> = ({ isOpen, o
 
       const rawType = (row[typeIdx] || '').toLowerCase().trim();
       const pricingType = rawType === 'org' ? 'organization' : rawType as ImportRow['pricing_type'];
-      if (!['organization', 'location', 'individual'].includes(pricingType)) {
-        errors.push({ row: rowNum, field: 'pricing_type', message: `Invalid type "${row[typeIdx]}". Must be organization, location, or individual.` });
+      if (!['organization', 'individual'].includes(pricingType)) {
+        errors.push({ row: rowNum, field: 'pricing_type', message: `Invalid type "${row[typeIdx]}". Must be organization or individual.` });
         continue;
       }
 
@@ -270,7 +260,6 @@ const ContractPricingImport: React.FC<ContractPricingImportProps> = ({ isOpen, o
       const lookupKey = entityVal.toLowerCase();
       let resolved: { id: string; display: string } | undefined;
       if (pricingType === 'organization') resolved = orgMap.get(lookupKey);
-      else if (pricingType === 'location') resolved = locMap.get(lookupKey);
       else resolved = userMap.get(lookupKey);
 
       if (!resolved) {
@@ -355,10 +344,9 @@ const ContractPricingImport: React.FC<ContractPricingImportProps> = ({ isOpen, o
   const handleDownloadTemplate = () => {
     const headers = ['Type', 'Entity', 'Product ID', 'Contract Price', 'Markup Price', 'Min Qty', 'Max Qty', 'Effective Date', 'Expiry Date'];
     const example1 = ['organization', 'Acme Corp', '1001', '49.99', '', '1', '', '', ''];
-    const example2 = ['location', 'Dallas Warehouse', '1001', '44.99', '', '10', '50', '', ''];
-    const example3 = ['individual', 'user@example.com', '1002', '', '59.99', '1', '', '2026-01-01', '2026-12-31'];
+    const example2 = ['individual', 'user@example.com', '1002', '', '59.99', '1', '', '2026-01-01', '2026-12-31'];
 
-    const csv = [headers, example1, example2, example3]
+    const csv = [headers, example1, example2]
       .map(row => row.map(cell => `"${cell}"`).join(','))
       .join('\n');
 
@@ -396,7 +384,7 @@ const ContractPricingImport: React.FC<ContractPricingImportProps> = ({ isOpen, o
                 <div className="text-sm text-teal-800">
                   <p className="font-medium mb-1">CSV Format</p>
                   <p>
-                    Required columns: <span className="font-medium">Type</span> (organization, location, individual),{' '}
+                    Required columns: <span className="font-medium">Type</span> (organization, individual),{' '}
                     <span className="font-medium">Entity</span> (name, code, or email),{' '}
                     <span className="font-medium">Product ID</span>, and at least one of{' '}
                     <span className="font-medium">Contract Price</span> or <span className="font-medium">Markup Price</span>.
@@ -513,8 +501,6 @@ const ContractPricingImport: React.FC<ContractPricingImportProps> = ({ isOpen, o
                               <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                                 row.pricing_type === 'organization'
                                   ? 'bg-emerald-100 text-emerald-700'
-                                  : row.pricing_type === 'location'
-                                  ? 'bg-blue-100 text-blue-700'
                                   : 'bg-purple-100 text-purple-700'
                               }`}>
                                 {row.pricing_type}

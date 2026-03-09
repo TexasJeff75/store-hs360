@@ -4,7 +4,6 @@ export interface CustomerAddress {
   id: string;
   user_id: string;
   organization_id?: string;
-  location_id?: string;
   address_type: 'shipping' | 'billing';
   label: string;
   first_name: string;
@@ -27,7 +26,6 @@ export interface CustomerAddress {
 interface CreateAddressData {
   user_id: string;
   organization_id?: string;
-  location_id?: string;
   address_type: 'shipping' | 'billing';
   label: string;
   first_name: string;
@@ -47,13 +45,11 @@ interface CreateAddressData {
 class CustomerAddressService {
   async getUserAddresses(userId: string, addressType?: 'shipping' | 'billing'): Promise<CustomerAddress[]> {
     try {
-
       let query = supabase
         .from('customer_addresses')
         .select('*')
         .eq('user_id', userId)
         .is('organization_id', null)
-        .is('location_id', null)
         .eq('is_active', true)
         .order('is_default', { ascending: false })
         .order('created_at', { ascending: false });
@@ -98,33 +94,6 @@ class CustomerAddressService {
       return data || [];
     } catch (error) {
       console.error('Error fetching organization addresses:', error);
-      return [];
-    }
-  }
-
-  async getLocationAddresses(
-    locationId: string,
-    addressType?: 'shipping' | 'billing'
-  ): Promise<CustomerAddress[]> {
-    try {
-      let query = supabase
-        .from('customer_addresses')
-        .select('*')
-        .eq('location_id', locationId)
-        .eq('is_active', true)
-        .order('is_default', { ascending: false })
-        .order('created_at', { ascending: false });
-
-      if (addressType) {
-        query = query.eq('address_type', addressType);
-      }
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching location addresses:', error);
       return [];
     }
   }

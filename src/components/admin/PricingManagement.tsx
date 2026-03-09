@@ -22,7 +22,6 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     error,
     saving,
     organizations,
-    locations,
     users,
     products,
     fetchPricingData,
@@ -35,16 +34,13 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
   const [editEntry, setEditEntry] = useState<EnrichedPricingEntry | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [selectedOrgId, setSelectedOrgId] = useState(organizationId || '');
-  const [selectedEntityType, setSelectedEntityType] = useState<'organization' | 'location'>('organization');
+  const [selectedEntityType] = useState<'organization'>('organization');
   const isScoped = !!organizationId;
 
   const selectedOrgName = useMemo(() => {
     if (!selectedOrgId) return '';
-    if (selectedEntityType === 'organization') {
-      return organizations.find((o) => o.id === selectedOrgId)?.name || selectedOrgId;
-    }
-    return locations.find((l) => l.id === selectedOrgId)?.name || selectedOrgId;
-  }, [selectedOrgId, selectedEntityType, organizations, locations]);
+    return organizations.find((o) => o.id === selectedOrgId)?.name || selectedOrgId;
+  }, [selectedOrgId, organizations]);
 
   const handleAdd = () => {
     setEditEntry(null);
@@ -146,7 +142,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Contract Pricing</h2>
                 <p className="text-sm text-gray-500">
-                  Set and manage pricing rules for organizations, locations, and users
+                  Set and manage pricing rules for organizations and users
                 </p>
               </div>
             </div>
@@ -228,46 +224,19 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
           <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
             {!isScoped && (
               <>
-                <h3 className="text-sm font-semibold text-gray-700">Set Pricing For</h3>
+                <h3 className="text-sm font-semibold text-gray-700">Set Pricing For Organization</h3>
                 <div className="flex flex-wrap gap-3">
-                  <div className="flex rounded-lg border border-gray-300 overflow-hidden text-sm">
-                    <button
-                      onClick={() => { setSelectedEntityType('organization'); setSelectedOrgId(''); }}
-                      className={`px-3 py-2 font-medium transition-colors ${
-                        selectedEntityType === 'organization' ? 'bg-teal-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      Organization
-                    </button>
-                    <button
-                      onClick={() => { setSelectedEntityType('location'); setSelectedOrgId(''); }}
-                      className={`px-3 py-2 font-medium transition-colors ${
-                        selectedEntityType === 'location' ? 'bg-teal-600 text-white' : 'text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      Location
-                    </button>
-                  </div>
-
                   <select
                     value={selectedOrgId}
                     onChange={(e) => setSelectedOrgId(e.target.value)}
                     className="flex-1 min-w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   >
-                    <option value="">
-                      {selectedEntityType === 'organization' ? '— Select an organization —' : '— Select a location —'}
-                    </option>
-                    {selectedEntityType === 'organization'
-                      ? organizations.map((o) => (
-                          <option key={o.id} value={o.id}>
-                            {o.name} {o.code ? `(${o.code})` : ''}
-                          </option>
-                        ))
-                      : locations.map((l) => (
-                          <option key={l.id} value={l.id}>
-                            {l.name} {l.organization_name ? `— ${l.organization_name}` : ''}
-                          </option>
-                        ))}
+                    <option value="">— Select an organization —</option>
+                    {organizations.map((o) => (
+                      <option key={o.id} value={o.id}>
+                        {o.name} {o.code ? `(${o.code})` : ''}
+                      </option>
+                    ))}
                   </select>
 
                   {selectedOrgId && (
@@ -294,7 +263,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
 
                 {!selectedOrgId && (
                   <p className="text-xs text-gray-400">
-                    Select an organization or location above to view and edit product prices inline. You can also download a pre-filled CSV template and import bulk changes.
+                    Select an organization above to view and edit product prices inline. You can also download a pre-filled CSV template and import bulk changes.
                   </p>
                 )}
               </>
@@ -373,7 +342,6 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
         onSave={handleSavePricing}
         saving={saving}
         organizations={organizations}
-        locations={locations}
         users={users}
         editEntry={editEntry}
       />

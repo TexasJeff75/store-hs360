@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
-import type { Organization, Location, UserOrganizationRole } from './supabase';
+import type { Organization, UserOrganizationRole } from './supabase';
+import type { CustomerAddress } from './customerAddresses';
 
 export const multiTenantService = {
   // Organization management
@@ -9,7 +10,7 @@ export const multiTenantService = {
       .select('*')
       .eq('is_active', true)
       .order('name');
-    
+
     if (error) throw error;
     return data;
   },
@@ -20,7 +21,7 @@ export const multiTenantService = {
       .insert(organization)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -49,63 +50,72 @@ export const multiTenantService = {
     return data;
   },
 
-  // Location management
-  async getLocations(organizationId?: string) {
+  // Organization address management (uses customer_addresses table)
+  async getOrganizationAddresses(organizationId: string, addressType?: 'shipping' | 'billing') {
     let query = supabase
-      .from('locations')
-      .select('*, organizations(name)')
-      .eq('is_active', true);
-    
-    if (organizationId) {
-      query = query.eq('organization_id', organizationId);
+      .from('customer_addresses')
+      .select('*')
+      .eq('organization_id', organizationId)
+      .eq('is_active', true)
+      .order('is_default', { ascending: false })
+      .order('created_at', { ascending: false });
+
+    if (addressType) {
+      query = query.eq('address_type', addressType);
     }
-    
-    const { data, error } = await query.order('name');
-    
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
+  async createOrganizationAddress(address: {
+    user_id: string;
+    organization_id: string;
+    address_type: 'shipping' | 'billing';
+    label: string;
+    first_name: string;
+    last_name: string;
+    company?: string;
+    address1: string;
+    address2?: string;
+    city: string;
+    state_or_province: string;
+    postal_code: string;
+    country_code?: string;
+    phone?: string;
+    email?: string;
+    is_default?: boolean;
+  }) {
+    const { data, error } = await supabase
+      .from('customer_addresses')
+      .insert({ ...address, country_code: address.country_code || 'US' })
+      .select()
+      .single();
+
     if (error) throw error;
     return data;
   },
 
-  async createLocation(location: Omit<Location, 'id' | 'created_at' | 'updated_at'>) {
+  async updateOrganizationAddress(id: string, updates: Partial<CustomerAddress>) {
     const { data, error } = await supabase
-      .from('locations')
-      .insert(location)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Supabase error creating location:', error);
-      throw new Error(`Failed to create location: ${error.message} (Code: ${error.code})`);
-    }
-
-    // Fetch with org join separately to avoid schema cache issues on INSERT
-    const { data: withOrg } = await supabase
-      .from('locations')
-      .select('*, organizations(name)')
-      .eq('id', data.id)
-      .single();
-
-    return withOrg || data;
-  },
-
-  async updateLocation(id: string, updates: Partial<Location>) {
-    const { data, error } = await supabase
-      .from('locations')
+      .from('customer_addresses')
       .update(updates)
       .eq('id', id)
       .select()
       .single();
 
     if (error) throw error;
+    return data;
+  },
 
-    // Fetch with org join separately to avoid schema cache issues on PATCH
-    const { data: withOrg } = await supabase
-      .from('locations')
-      .select('*, organizations(name)')
-      .eq('id', id)
-      .single();
+  async deleteOrganizationAddress(id: string) {
+    const { error } = await supabase
+      .from('customer_addresses')
+      .update({ is_active: false })
+      .eq('id', id);
 
-    return withOrg || data;
+    if (error) throw error;
   },
 
   // User organization role management
@@ -115,16 +125,15 @@ export const multiTenantService = {
       .select(`
         *,
         organizations(name, code),
-        locations(name, code),
         profiles(email)
       `);
-    
+
     if (userId) {
       query = query.eq('user_id', userId);
     }
-    
+
     const { data, error } = await query.order('created_at', { ascending: false });
-    
+
     if (error) throw error;
     return data;
   },
@@ -135,7 +144,7 @@ export const multiTenantService = {
       .insert(assignment)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -147,7 +156,7 @@ export const multiTenantService = {
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) throw error;
     return data;
   },
@@ -157,7 +166,7 @@ export const multiTenantService = {
       .from('user_organization_roles')
       .delete()
       .eq('id', id);
-    
+
     if (error) throw error;
   }
 };

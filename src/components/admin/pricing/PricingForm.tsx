@@ -1,21 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { X, DollarSign, Building2, MapPin, User, Calendar, Hash } from 'lucide-react';
+import { X, DollarSign, Building2, User, Calendar, Hash } from 'lucide-react';
 import { EnrichedPricingEntry } from './usePricingData';
 
-type PricingType = 'individual' | 'organization' | 'location';
+type PricingType = 'individual' | 'organization';
 
 interface OrganizationOption {
   id: string;
   name: string;
   code: string;
-}
-
-interface LocationOption {
-  id: string;
-  name: string;
-  code: string;
-  organization_id: string;
-  organization_name?: string;
 }
 
 interface UserOption {
@@ -41,7 +33,6 @@ interface PricingFormProps {
   }) => Promise<{ success: boolean; error?: string }>;
   saving: boolean;
   organizations: OrganizationOption[];
-  locations: LocationOption[];
   users: UserOption[];
   editEntry?: EnrichedPricingEntry | null;
   preselectedProductId?: number;
@@ -53,7 +44,6 @@ const PricingForm: React.FC<PricingFormProps> = ({
   onSave,
   saving,
   organizations,
-  locations,
   users,
   editEntry,
   preselectedProductId,
@@ -110,14 +100,6 @@ const PricingForm: React.FC<PricingFormProps> = ({
           o.code.toLowerCase().includes(term)
       );
     }
-    if (pricingType === 'location') {
-      return locations.filter(
-        (l) =>
-          l.name.toLowerCase().includes(term) ||
-          l.code.toLowerCase().includes(term) ||
-          (l.organization_name || '').toLowerCase().includes(term)
-      );
-    }
     return users.filter(
       (u) =>
         u.email.toLowerCase().includes(term) ||
@@ -168,7 +150,6 @@ const PricingForm: React.FC<PricingFormProps> = ({
 
   const typeIcons = {
     organization: <Building2 className="h-4 w-4" />,
-    location: <MapPin className="h-4 w-4" />,
     individual: <User className="h-4 w-4" />,
   };
 
@@ -208,8 +189,8 @@ const PricingForm: React.FC<PricingFormProps> = ({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Pricing Type
               </label>
-              <div className="grid grid-cols-3 gap-2">
-                {(['organization', 'location', 'individual'] as PricingType[]).map((type) => (
+              <div className="grid grid-cols-2 gap-2">
+                {(['organization', 'individual'] as PricingType[]).map((type) => (
                   <button
                     key={type}
                     type="button"
@@ -234,11 +215,7 @@ const PricingForm: React.FC<PricingFormProps> = ({
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {pricingType === 'organization'
-                  ? 'Organization'
-                  : pricingType === 'location'
-                  ? 'Location'
-                  : 'User'}
+                {pricingType === 'organization' ? 'Organization' : 'User'}
               </label>
               <input
                 type="text"
