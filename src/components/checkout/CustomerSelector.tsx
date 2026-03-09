@@ -130,9 +130,12 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
         .limit(1)
         .maybeSingle();
 
+      const resolvedOrgId = orgRole?.organization_id || preSelectedOrganizationId;
+      console.log('[CustomerSelector] Self order - orgRole:', orgRole?.organization_id, 'preSelected:', preSelectedOrganizationId, 'resolved:', resolvedOrgId);
+
       onSelect({
         customerId: currentUserId,
-        organizationId: orgRole?.organization_id,
+        organizationId: resolvedOrgId,
         customerEmail: profileData.email
       });
     }
