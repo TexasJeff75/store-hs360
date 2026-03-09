@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Shield, Clock, CheckCircle, CreditCard as Edit, Trash2, Search, Filter, Key, AlertCircle, Save, RotateCcw, Plus, XCircle, Eye } from 'lucide-react';
+import { User, Mail, Shield, Clock, CheckCircle, Pencil, Trash2, Search, Filter, Key, AlertCircle, Save, RotateCcw, Plus, XCircle, Eye } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import type { Profile } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -771,7 +771,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                           className="p-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
                           title="Edit User"
                         >
-                          <Edit className="h-4 w-4" />
+                          <Pencil className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => deleteUser(user.id)}

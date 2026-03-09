@@ -1,5 +1,5 @@
 import React from 'react';
-import { Hash, Lock, CreditCard as Edit2, CheckCircle2, XCircle, Building2, Pencil, Trash2 } from 'lucide-react';
+import { Hash, Lock, CheckCircle2, XCircle, Building2, Pencil, Trash2 } from 'lucide-react';
 import { Product } from '@/services/productService';
 import { SecretCostMap } from '@/services/secretCostService';
 import { ContractPricingInfo } from './useContractPricing';
@@ -165,7 +165,7 @@ export const ProductDetailsModal: React.FC<ProductDetailsModalProps> = ({
                               onClick={() => onEditSecretCost(product.id, secretCosts[product.id]?.secret_cost)}
                               className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
                             >
-                              <Edit2 className="h-4 w-4 inline mr-1" />
+                              <Pencil className="h-4 w-4 inline mr-1" />
                               Edit
                             </button>
                           </div>

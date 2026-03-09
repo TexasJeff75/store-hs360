@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { MapPin, Plus, Check, CreditCard as Edit, Trash2 } from 'lucide-react';
+import { MapPin, Plus, Check, Pencil, Trash2 } from 'lucide-react';
 import { customerAddressService, CustomerAddress } from '@/services/customerAddresses';
 
 interface AddressSelectorProps {
