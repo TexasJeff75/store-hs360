@@ -493,7 +493,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
   const existingOrgCodes = customers.map((c) => c.organizations?.code).filter(Boolean);
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Status messages */}
       {error && (
         <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-center justify-between">
@@ -515,10 +515,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       {view === 'customers' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-orange-500" />
-              My Customers
-            </h2>
+            <h2 className="text-2xl font-bold text-gray-900">My Customers</h2>
             <button
               onClick={() => setShowAddCustomer(true)}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors text-sm font-medium"
@@ -529,13 +526,13 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
           </div>
 
           {customers.length === 0 ? (
-            <div className="text-center py-12 text-gray-400 bg-white rounded-xl border border-gray-200">
+            <div className="text-center py-12 text-gray-400 bg-white rounded-lg border border-gray-200">
               <Building2 className="mx-auto h-10 w-10 text-gray-300 mb-2" />
               <p className="text-sm">No customers yet.</p>
               <p className="text-xs text-gray-400 mt-1">Create new customer organizations to start tracking orders and commissions.</p>
             </div>
           ) : (
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead>
                   <tr className="bg-gray-50">
@@ -546,7 +543,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                     <th className="px-4 py-3 w-20" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-200">
                   {customers.map((cust) => (
                     <tr key={cust.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
@@ -745,10 +742,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       {view === 'sales-reps' && (
         <div>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Users className="h-5 w-5 text-pink-500" />
-              My Sales Representatives
-            </h2>
+            <h2 className="text-2xl font-bold text-gray-900">My Sales Representatives</h2>
             <button
               onClick={() => setShowAddSalesRep(true)}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition-colors text-sm font-medium"
@@ -759,7 +753,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
           </div>
 
           {salesReps.length === 0 ? (
-            <div className="text-center py-12 text-gray-400 bg-white rounded-xl border border-gray-200">
+            <div className="text-center py-12 text-gray-400 bg-white rounded-lg border border-gray-200">
               <Users className="mx-auto h-10 w-10 text-gray-300 mb-2" />
               <p className="text-sm">No sales representatives yet.</p>
               <p className="text-xs text-gray-400 mt-1">Create sales reps who sell on behalf of your distributorship.</p>
@@ -772,7 +766,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                     ? `${dsr.sales_rep_rate}% of distributor commission`
                     : `Fixed ${dsr.sales_rep_rate}% + ${dsr.distributor_override_rate ?? 0}% override`;
                 return (
-                  <div key={dsr.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl hover:shadow-sm transition-shadow">
+                  <div key={dsr.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
                     <div>
                       <p className="text-sm font-medium text-gray-900">
                         {dsr.profiles?.full_name || dsr.profiles?.email}
@@ -951,10 +945,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
         <div>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <UserCheck className="h-5 w-5 text-indigo-500" />
-                Delegates
-              </h2>
+              <h2 className="text-2xl font-bold text-gray-900">Delegates</h2>
               <p className="text-xs text-gray-500 mt-1">
                 Delegates can manage your customers, sales reps, and orders on your behalf.
               </p>
@@ -969,7 +960,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
           </div>
 
           {delegates.length === 0 ? (
-            <div className="text-center py-12 text-gray-400 bg-white rounded-xl border border-gray-200">
+            <div className="text-center py-12 text-gray-400 bg-white rounded-lg border border-gray-200">
               <UserCheck className="mx-auto h-10 w-10 text-gray-300 mb-2" />
               <p className="text-sm">No delegates yet.</p>
               <p className="text-xs text-gray-400 mt-1">Add users who can manage your distributorship on your behalf.</p>
@@ -977,7 +968,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
           ) : (
             <div className="space-y-3">
               {delegates.map((del) => (
-                <div key={del.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-xl hover:shadow-sm transition-shadow">
+                <div key={del.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
                   <div>
                     <p className="text-sm font-medium text-gray-900">
                       {del.profiles?.full_name || del.profiles?.email}
@@ -1106,7 +1097,7 @@ const Modal: React.FC<{ title: string; onClose: () => void; children: React.Reac
   <div className="fixed inset-0 z-50 overflow-y-auto">
     <div className="flex items-center justify-center min-h-screen px-4 py-8">
       <div className="fixed inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg">
+      <div className="relative bg-white rounded-lg shadow-lg w-full max-w-lg">
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
           <button onClick={onClose} className="p-1.5 hover:bg-gray-100 rounded-full transition-colors">
