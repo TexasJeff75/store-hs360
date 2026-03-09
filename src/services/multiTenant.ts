@@ -70,14 +70,22 @@ export const multiTenantService = {
     const { data, error } = await supabase
       .from('locations')
       .insert(location)
-      .select('*, organizations(name)')
+      .select()
       .single();
 
     if (error) {
       console.error('Supabase error creating location:', error);
       throw new Error(`Failed to create location: ${error.message} (Code: ${error.code})`);
     }
-    return data;
+
+    // Fetch with org join separately to avoid schema cache issues on INSERT
+    const { data: withOrg } = await supabase
+      .from('locations')
+      .select('*, organizations(name)')
+      .eq('id', data.id)
+      .single();
+
+    return withOrg || data;
   },
 
   async updateLocation(id: string, updates: Partial<Location>) {
@@ -85,11 +93,19 @@ export const multiTenantService = {
       .from('locations')
       .update(updates)
       .eq('id', id)
-      .select('*, organizations(name)')
+      .select()
       .single();
 
     if (error) throw error;
-    return data;
+
+    // Fetch with org join separately to avoid schema cache issues on PATCH
+    const { data: withOrg } = await supabase
+      .from('locations')
+      .select('*, organizations(name)')
+      .eq('id', id)
+      .single();
+
+    return withOrg || data;
   },
 
   // User organization role management
