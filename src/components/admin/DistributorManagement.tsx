@@ -470,6 +470,9 @@ const DistributorManagement: React.FC = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('No active session');
 
+      const createdEmail = newSalesRepEmail.trim().toLowerCase();
+      let userAlreadyExisted = false;
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
         {
@@ -488,19 +491,24 @@ const DistributorManagement: React.FC = () => {
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Request failed with status ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        const errorMsg = errorData.error || errorData.message || '';
+        // If user already exists, try to find and select them instead of failing
+        if (errorMsg.toLowerCase().includes('already') || errorMsg.toLowerCase().includes('exists') || errorMsg.toLowerCase().includes('duplicate') || response.status === 400) {
+          userAlreadyExisted = true;
+        } else {
+          throw new Error(errorMsg || `Request failed with status ${response.status}`);
+        }
+      } else {
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error || 'User creation failed');
       }
 
-      const result = await response.json();
-      if (!result.success) throw new Error(result.error || 'User creation failed');
-
-      const createdEmail = newSalesRepEmail.trim().toLowerCase();
       setNewSalesRepEmail('');
       setNewSalesRepPassword('');
       setShowCreateSalesRepUser(false);
 
-      // Re-fetch sales reps to include the new user
+      // Re-fetch sales reps to include the new or existing user
       const salesRepsRes = await supabase
         .from('profiles')
         .select('id, email, role')
@@ -509,13 +517,31 @@ const DistributorManagement: React.FC = () => {
 
       if (!salesRepsRes.error) {
         setSalesReps(salesRepsRes.data || []);
-        const newUser = (salesRepsRes.data || []).find(u => u.email.toLowerCase() === createdEmail);
-        if (newUser) {
-          setNewDistributorSalesRep(prev => ({ ...prev, sales_rep_id: newUser.id }));
+        const matchedUser = (salesRepsRes.data || []).find(u => u.email.toLowerCase() === createdEmail);
+        if (matchedUser) {
+          setNewDistributorSalesRep(prev => ({ ...prev, sales_rep_id: matchedUser.id }));
+          setSuccess(userAlreadyExisted ? 'Existing user found and selected' : 'Sales rep user created and selected');
+        } else {
+          // User might exist with a different role — search all profiles
+          const { data: allProfiles } = await supabase
+            .from('profiles')
+            .select('id, email, role')
+            .ilike('email', createdEmail)
+            .limit(1);
+          if (allProfiles && allProfiles.length > 0) {
+            // Update their role to sales_rep if needed
+            const existingUser = allProfiles[0];
+            if (existingUser.role !== 'sales_rep' && existingUser.role !== 'distributor') {
+              await supabase.from('profiles').update({ role: 'sales_rep' }).eq('id', existingUser.id);
+            }
+            setSalesReps(prev => [...prev.filter(r => r.id !== existingUser.id), existingUser]);
+            setNewDistributorSalesRep(prev => ({ ...prev, sales_rep_id: existingUser.id }));
+            setSuccess('Existing user found and selected');
+          } else {
+            throw new Error('User could not be found after creation. Please try again.');
+          }
         }
       }
-
-      setSuccess('Sales rep user created and selected');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user');
     } finally {
@@ -570,16 +596,24 @@ const DistributorManagement: React.FC = () => {
   const handleAddSalesRepToDistributor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedDistributor) return;
+    if (!newDistributorSalesRep.sales_rep_id) {
+      setError('Please select a sales representative first');
+      return;
+    }
     try {
       setError(null);
-      const { error: insertError } = await supabase.from('distributor_sales_reps').insert([{
+      const payload = {
         distributor_id: selectedDistributor,
-        ...newDistributorSalesRep,
+        sales_rep_id: newDistributorSalesRep.sales_rep_id,
+        commission_split_type: newDistributorSalesRep.commission_split_type,
+        sales_rep_rate: newDistributorSalesRep.sales_rep_rate,
         distributor_override_rate:
           newDistributorSalesRep.commission_split_type === 'fixed_with_override'
             ? newDistributorSalesRep.distributor_override_rate
             : null,
-      }]);
+        notes: newDistributorSalesRep.notes || null,
+      };
+      const { error: insertError } = await supabase.from('distributor_sales_reps').insert(payload);
 
       if (insertError) throw insertError;
 
