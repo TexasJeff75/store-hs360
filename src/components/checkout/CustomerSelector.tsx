@@ -71,63 +71,57 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
         if (error) throw error;
         setOrganizations(data || []);
       } else if (isRepOrDistributor) {
-        // Fetch organizations assigned to this rep via distributor_customers
-        // First find distributor records where this user is the profile owner or a delegate
-        const { data: distributorIds } = await supabase
-          .from('distributors')
-          .select('id')
-          .eq('profile_id', currentUserId);
-
-        const { data: delegateIds } = await supabase
-          .from('distributor_delegates')
-          .select('distributor_id')
-          .eq('user_id', currentUserId)
-          .eq('is_active', true);
-
-        const allDistributorIds = [
-          ...(distributorIds?.map(d => d.id) || []),
-          ...(delegateIds?.map(d => d.distributor_id) || []),
-        ];
-
-        // Also check if this user is a sales rep under a distributor
-        const { data: salesRepLinks } = await supabase
-          .from('distributor_sales_reps')
-          .select('distributor_id')
+        // 1. Check for specific rep→customer assignments via distributor_rep_customers
+        const { data: repCustLinks } = await supabase
+          .from('distributor_rep_customers')
+          .select('organization_id, organizations!inner(id, name, code)')
           .eq('sales_rep_id', currentUserId)
           .eq('is_active', true);
 
-        const repDistributorIds = salesRepLinks?.map(d => d.distributor_id) || [];
-        const combinedIds = [...new Set([...allDistributorIds, ...repDistributorIds])];
-
-        if (combinedIds.length > 0) {
-          const { data: customers, error } = await supabase
-            .from('distributor_customers')
-            .select('organization_id, organizations!inner(id, name, code)')
-            .in('distributor_id', combinedIds)
-            .eq('is_active', true);
-
-          if (error) throw error;
-
-          const orgs = customers?.map((item: any) => item.organizations) || [];
-          // Deduplicate by id
+        if (repCustLinks && repCustLinks.length > 0) {
+          const orgs = repCustLinks.map((item: any) => item.organizations);
           const uniqueOrgs = orgs.filter((org: any, i: number, arr: any[]) =>
             arr.findIndex((o: any) => o.id === org.id) === i
           );
           setOrganizations(uniqueOrgs);
-          console.log('[CustomerSelector] Rep/distributor orgs:', uniqueOrgs.length);
+          console.log('[CustomerSelector] Rep assigned customers:', uniqueOrgs.length);
         } else {
-          // Fallback: check organization_sales_reps for direct rep assignments
-          const { data: repOrgs, error } = await supabase
-            .from('organization_sales_reps')
-            .select('organization_id, organizations!inner(id, name, code)')
-            .eq('sales_rep_id', currentUserId)
+          // 2. Distributor owners/delegates see all distributor customers
+          const { data: distributorIds } = await supabase
+            .from('distributors')
+            .select('id')
+            .eq('profile_id', currentUserId);
+
+          const { data: delegateIds } = await supabase
+            .from('distributor_delegates')
+            .select('distributor_id')
+            .eq('user_id', currentUserId)
             .eq('is_active', true);
 
-          if (error) throw error;
+          const allDistributorIds = [
+            ...(distributorIds?.map(d => d.id) || []),
+            ...(delegateIds?.map(d => d.distributor_id) || []),
+          ];
 
-          const orgs = repOrgs?.map((item: any) => item.organizations) || [];
-          setOrganizations(orgs);
-          console.log('[CustomerSelector] Sales rep direct orgs:', orgs.length);
+          if (allDistributorIds.length > 0) {
+            const { data: customers, error } = await supabase
+              .from('distributor_customers')
+              .select('organization_id, organizations!inner(id, name, code)')
+              .in('distributor_id', allDistributorIds)
+              .eq('is_active', true);
+
+            if (error) throw error;
+
+            const orgs = customers?.map((item: any) => item.organizations) || [];
+            const uniqueOrgs = orgs.filter((org: any, i: number, arr: any[]) =>
+              arr.findIndex((o: any) => o.id === org.id) === i
+            );
+            setOrganizations(uniqueOrgs);
+            console.log('[CustomerSelector] Distributor owner customers:', uniqueOrgs.length);
+          } else {
+            setOrganizations([]);
+            console.log('[CustomerSelector] No customer assignments found for rep');
+          }
         }
       } else {
         const { data, error } = await supabase
