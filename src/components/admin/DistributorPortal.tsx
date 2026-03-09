@@ -3,7 +3,16 @@ import {
   Building2, Users, Plus, Trash2, X, UserPlus, UserCheck,
 } from 'lucide-react';
 import { supabase } from '@/services/supabase';
+import { createClient } from '@supabase/supabase-js';
 import { useAuth } from '@/contexts/AuthContext';
+import { ENV } from '@/config/env';
+
+// Secondary client for signUp calls — avoids replacing the current user's session
+const signUpClient = createClient(
+  ENV.SUPABASE_URL.replace(/\/$/, ''),
+  ENV.SUPABASE_ANON_KEY,
+  { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } },
+);
 
 // ── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -285,49 +294,37 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
     try {
       setIsCreatingRepUser(true);
       setError(null);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No active session');
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: newRepEmail,
-            password: newRepPassword,
-            role: 'sales_rep',
-            is_approved: true,
-            full_name: newRepFullName || undefined,
-            phone: newRepPhone || undefined,
-          }),
-        },
-      );
+      // 1. Create auth user via signUp on a disposable client (won't affect current session)
+      const { data: signUpData, error: signUpError } = await signUpClient.auth.signUp({
+        email: newRepEmail,
+        password: newRepPassword,
+      });
+      if (signUpError) throw new Error(signUpError.message);
+      const newUserId = signUpData.user?.id;
+      if (!newUserId) throw new Error('User creation failed — no user ID returned');
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Request failed`);
-      }
+      // 2. Call DB function to set role, name, phone (SECURITY DEFINER, bypasses RLS)
+      const { data: setupResult, error: setupError } = await supabase.rpc('distributor_setup_user', {
+        p_user_id: newUserId,
+        p_role: 'sales_rep',
+        p_full_name: newRepFullName || null,
+        p_phone: newRepPhone || null,
+      });
+      if (setupError) throw new Error(setupError.message);
+      if (setupResult && !setupResult.success) throw new Error(setupResult.error || 'Failed to set up user profile');
 
-      const result = await response.json();
-      if (!result.success) throw new Error(result.error || 'User creation failed');
-
-      // Auto-assign this new rep to the distributorship
-      if (result.user_id) {
-        await supabase.from('distributor_sales_reps').insert([{
-          distributor_id: distributor.id,
-          sales_rep_id: result.user_id,
-          commission_split_type: newSalesRep.commission_split_type,
-          sales_rep_rate: newSalesRep.sales_rep_rate,
-          distributor_override_rate: newSalesRep.commission_split_type === 'fixed_with_override'
-            ? newSalesRep.distributor_override_rate : null,
-          is_active: true,
-          notes: newSalesRep.notes || null,
-        }]);
-      }
+      // 3. Auto-assign this new rep to the distributorship
+      await supabase.from('distributor_sales_reps').insert([{
+        distributor_id: distributor.id,
+        sales_rep_id: newUserId,
+        commission_split_type: newSalesRep.commission_split_type,
+        sales_rep_rate: newSalesRep.sales_rep_rate,
+        distributor_override_rate: newSalesRep.commission_split_type === 'fixed_with_override'
+          ? newSalesRep.distributor_override_rate : null,
+        is_active: true,
+        notes: newSalesRep.notes || null,
+      }]);
 
       setNewRepEmail('');
       setNewRepPassword('');
@@ -399,44 +396,33 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
     try {
       setIsCreatingDelegateUser(true);
       setError(null);
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error('No active session');
 
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: newDelegateEmail,
-            password: newDelegatePassword,
-            role: 'distributor',
-            is_approved: true,
-            full_name: newDelegateFullName || undefined,
-          }),
-        },
-      );
+      // 1. Create auth user via signUp on a disposable client
+      const { data: signUpData, error: signUpError } = await signUpClient.auth.signUp({
+        email: newDelegateEmail,
+        password: newDelegatePassword,
+      });
+      if (signUpError) throw new Error(signUpError.message);
+      const newUserId = signUpData.user?.id;
+      if (!newUserId) throw new Error('User creation failed — no user ID returned');
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Request failed');
-      }
+      // 2. Set role to distributor via DB function
+      const { data: setupResult, error: setupError } = await supabase.rpc('distributor_setup_user', {
+        p_user_id: newUserId,
+        p_role: 'distributor',
+        p_full_name: newDelegateFullName || null,
+        p_phone: null,
+      });
+      if (setupError) throw new Error(setupError.message);
+      if (setupResult && !setupResult.success) throw new Error(setupResult.error || 'Failed to set up user profile');
 
-      const result = await response.json();
-      if (!result.success) throw new Error(result.error || 'User creation failed');
-
-      // Auto-assign as delegate
-      if (result.user_id) {
-        await supabase.from('distributor_delegates').insert([{
-          distributor_id: distributor.id,
-          user_id: result.user_id,
-          is_active: true,
-          notes: delegateNotes || null,
-        }]);
-      }
+      // 3. Auto-assign as delegate
+      await supabase.from('distributor_delegates').insert([{
+        distributor_id: distributor.id,
+        user_id: newUserId,
+        is_active: true,
+        notes: delegateNotes || null,
+      }]);
 
       setNewDelegateEmail('');
       setNewDelegatePassword('');
