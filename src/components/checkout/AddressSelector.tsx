@@ -31,9 +31,9 @@ const AddressSelector: React.FC<AddressSelectorProps> = ({
       let addressList: CustomerAddress[] = [];
 
       if (organizationId) {
-        addressList = await customerAddressService.getOrganizationAddresses(organizationId, addressType);
+        addressList = await customerAddressService.getOrganizationAddresses(organizationId);
       } else {
-        addressList = await customerAddressService.getUserAddresses(userId, addressType);
+        addressList = await customerAddressService.getUserAddresses(userId);
       }
 
       setAddresses(addressList);
