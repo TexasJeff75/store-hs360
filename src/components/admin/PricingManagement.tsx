@@ -175,13 +175,13 @@ const PricingManagement: React.FC = () => {
           <div className="text-2xl font-bold text-gray-900">{entries.length}</div>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Organizations</div>
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Unique Organizations</div>
           <div className="text-2xl font-bold text-emerald-600">
-            {entries.filter((e) => e.pricing_type === 'organization').length}
+            {new Set(entries.filter((e) => e.pricing_type === 'organization').map((e) => e.entity_id)).size}
           </div>
         </div>
         <div className="bg-white border border-gray-200 rounded-xl p-4">
-          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Products Covered</div>
+          <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Unique Products</div>
           <div className="text-2xl font-bold text-sky-600">
             {new Set(entries.map((e) => e.product_id)).size}
           </div>

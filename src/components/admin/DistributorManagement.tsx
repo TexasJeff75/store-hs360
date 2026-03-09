@@ -5,6 +5,7 @@ import {
   ChevronDown, UserPlus, Pencil, Upload,
 } from 'lucide-react';
 import { supabase } from '@/services/supabase';
+import DistributorPricingImport from './DistributorPricingImport';
 
 // ── Commission type config ───────────────────────────────────────────────────
 
@@ -104,6 +105,7 @@ interface SimpleProduct {
   name: string;
   sku: string | null;
   category_id: string | null;
+  price: number;
 }
 
 interface SimpleCategory {
@@ -223,6 +225,7 @@ const DistributorManagement: React.FC = () => {
   // Wholesale product pricing state
   const [distributorProductPricing, setDistributorProductPricing] = useState<DistributorProductPrice[]>([]);
   const [showAddPricing, setShowAddPricing] = useState<string | null>(null); // distributor id
+  const [showPricingImport, setShowPricingImport] = useState<{ distributorId: string; distributorName: string } | null>(null);
   const [newPricing, setNewPricing] = useState({ product_id: '', wholesale_price: 0, notes: '' });
 
   // Inline user creation state
@@ -288,7 +291,7 @@ const DistributorManagement: React.FC = () => {
           .eq('is_active', true),
         supabase
           .from('products')
-          .select('id, name, sku, category_id')
+          .select('id, name, sku, category_id, price')
           .eq('is_active', true)
           .order('name'),
         supabase
@@ -1162,20 +1165,13 @@ const DistributorManagement: React.FC = () => {
                         Wholesale Product Pricing ({getDistributorPricing(distributor.id).length})
                       </h4>
                       <div className="flex gap-2">
-                        <label className="text-sm px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer flex items-center gap-1">
+                        <button
+                          onClick={() => setShowPricingImport({ distributorId: distributor.id, distributorName: distributor.name })}
+                          className="text-sm px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1"
+                        >
                           <Upload className="h-3.5 w-3.5" />
-                          Upload CSV
-                          <input
-                            type="file"
-                            accept=".csv"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) handleCsvUploadPricing(distributor.id, file);
-                              e.target.value = '';
-                            }}
-                          />
-                        </label>
+                          Import CSV
+                        </button>
                         <button
                           onClick={() => setShowAddPricing(distributor.id)}
                           className="text-sm px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-colors"
@@ -1184,10 +1180,6 @@ const DistributorManagement: React.FC = () => {
                         </button>
                       </div>
                     </div>
-
-                    <p className="text-xs text-gray-400 mb-3">
-                      CSV format: columns <code className="bg-gray-100 px-1 rounded">sku</code> (or <code className="bg-gray-100 px-1 rounded">product_id</code>) and <code className="bg-gray-100 px-1 rounded">wholesale_price</code>. Optional: <code className="bg-gray-100 px-1 rounded">notes</code>.
-                    </p>
 
                     {getDistributorPricing(distributor.id).length === 0 ? (
                       <p className="text-sm text-gray-400 italic">
@@ -1990,6 +1982,26 @@ const DistributorManagement: React.FC = () => {
           </Modal>
         );
       })()}
+
+      {showPricingImport && (
+        <DistributorPricingImport
+          isOpen={true}
+          onClose={() => setShowPricingImport(null)}
+          onImportComplete={() => fetchData()}
+          distributorId={showPricingImport.distributorId}
+          distributorName={showPricingImport.distributorName}
+          products={products}
+          existingPricing={distributorProductPricing
+            .filter((p) => p.distributor_id === showPricingImport.distributorId)
+            .map((p) => ({
+              id: p.id,
+              product_id: p.product_id,
+              wholesale_price: p.wholesale_price,
+              notes: p.notes ?? null,
+            }))
+          }
+        />
+      )}
     </div>
   );
 };
