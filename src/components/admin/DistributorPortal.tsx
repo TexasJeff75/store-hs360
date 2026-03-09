@@ -303,8 +303,15 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       if (signUpError) throw new Error(signUpError.message);
       const newUserId = signUpData.user?.id;
       if (!newUserId) throw new Error('User creation failed — no user ID returned');
+      // Supabase returns identities:[] when the email already exists (no error thrown)
+      if (!signUpData.user?.identities?.length) {
+        throw new Error('A user with this email already exists');
+      }
 
-      // 2. Call DB function to set role, name, phone (SECURITY DEFINER, bypasses RLS)
+      // 2. Brief wait to ensure the handle_new_user trigger has committed the profile
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 3. Call DB function to set role, name, phone (SECURITY DEFINER, bypasses RLS)
       const { data: setupResult, error: setupError } = await supabase.rpc('distributor_setup_user', {
         p_user_id: newUserId,
         p_role: 'sales_rep',
@@ -405,8 +412,14 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       if (signUpError) throw new Error(signUpError.message);
       const newUserId = signUpData.user?.id;
       if (!newUserId) throw new Error('User creation failed — no user ID returned');
+      if (!signUpData.user?.identities?.length) {
+        throw new Error('A user with this email already exists');
+      }
 
-      // 2. Set role to distributor via DB function
+      // 2. Brief wait to ensure the handle_new_user trigger has committed the profile
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 3. Set role to distributor via DB function
       const { data: setupResult, error: setupError } = await supabase.rpc('distributor_setup_user', {
         p_user_id: newUserId,
         p_role: 'distributor',
