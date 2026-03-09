@@ -145,10 +145,11 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     if (!user?.id) return;
 
     const isSystemAdmin = profile?.role === 'admin';
+    const isRepOrDistributor = profile?.role === 'sales_rep' || profile?.role === 'distributor';
 
     let isAdmin = isSystemAdmin;
 
-    if (!isAdmin) {
+    if (!isAdmin && !isRepOrDistributor) {
       const { data } = await supabase
         .from('user_organization_roles')
         .select('role')
@@ -160,9 +161,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       isAdmin = !!data;
     }
 
-    setIsAdminOrManager(isAdmin);
+    const canOrderForOthers = isAdmin || isRepOrDistributor;
+    setIsAdminOrManager(canOrderForOthers);
 
-    if (!isAdmin) {
+    if (!canOrderForOthers) {
       setSelectedCustomerId(user.id);
       setCustomerEmail(user.email || '');
 
