@@ -246,7 +246,6 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     organizationId={organizationId}
                     className="text-lg"
                   />
-                  <p className="text-xs text-gray-500 mt-2">+ tax</p>
                 </div>
 
                 {/* Contract Pricing Options */}
