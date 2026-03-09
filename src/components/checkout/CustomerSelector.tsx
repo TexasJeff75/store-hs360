@@ -115,16 +115,25 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
   };
 
   const handleSelfOrder = async () => {
-    const { data: profile } = await supabase
+    const { data: profileData } = await supabase
       .from('profiles')
       .select('email')
       .eq('id', currentUserId)
       .single();
 
-    if (profile) {
+    if (profileData) {
+      // Look up the user's organization so org addresses are found during checkout
+      const { data: orgRole } = await supabase
+        .from('user_organization_roles')
+        .select('organization_id')
+        .eq('user_id', currentUserId)
+        .limit(1)
+        .maybeSingle();
+
       onSelect({
         customerId: currentUserId,
-        customerEmail: profile.email
+        organizationId: orgRole?.organization_id,
+        customerEmail: profileData.email
       });
     }
   };
