@@ -103,9 +103,9 @@ WHERE o.billing_address IS NOT NULL
 -- 3. Drop location_id column from customer_addresses (no longer needed)
 ALTER TABLE customer_addresses DROP COLUMN IF EXISTS location_id;
 
--- 4. Drop location_id from user_organization_roles
+-- 4. Drop location_id from user_organization_roles (CASCADE to drop dependent RLS policies)
 ALTER TABLE user_organization_roles DROP CONSTRAINT IF EXISTS user_organization_roles_user_id_organization_id_location_id_key;
-ALTER TABLE user_organization_roles DROP COLUMN IF EXISTS location_id;
+ALTER TABLE user_organization_roles DROP COLUMN IF EXISTS location_id CASCADE;
 -- Re-add unique constraint without location_id
 ALTER TABLE user_organization_roles ADD CONSTRAINT user_organization_roles_user_id_organization_id_key
   UNIQUE (user_id, organization_id);
