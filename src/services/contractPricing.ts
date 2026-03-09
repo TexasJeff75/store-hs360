@@ -751,7 +751,11 @@ class ContractPricingService {
 
         const locationIds = locations?.map(loc => loc.id) || [];
 
-        query = query.or(`and(pricing_type.eq.organization,entity_id.eq.${organizationId}),and(pricing_type.eq.location,entity_id.in.(${locationIds.join(',')}))`);
+        if (locationIds.length > 0) {
+          query = query.or(`and(pricing_type.eq.organization,entity_id.eq.${organizationId}),and(pricing_type.eq.location,entity_id.in.(${locationIds.join(',')}))`);
+        } else {
+          query = query.eq('pricing_type', 'organization').eq('entity_id', organizationId);
+        }
       }
 
       const { data, error } = await query;
