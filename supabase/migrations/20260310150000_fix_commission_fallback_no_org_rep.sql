@@ -77,6 +77,8 @@ DECLARE
   v_company_rep_rate      numeric(5,2);
   v_company_rep_commission numeric(10,2) := 0;
   v_your_margin           numeric(10,2) := 0;
+  -- per-item details
+  v_margin_details        jsonb := '[]'::jsonb;
   -- fallback distributor lookup
   v_fallback_distributor_id uuid;
   v_fallback_dist_rate    numeric(5,2);
@@ -285,6 +287,19 @@ BEGIN
         END IF;
         v_total_margin := v_total_margin + v_base_margin;
         v_commission_amount := v_commission_amount + v_item_commission;
+
+        -- Store per-item details for transparency
+        v_margin_details := v_margin_details || jsonb_build_object(
+          'productId', v_item->>'productId',
+          'name', v_item->>'name',
+          'price', v_item_price,
+          'cost', v_item_cost,
+          'quantity', v_item_quantity,
+          'margin', v_base_margin,
+          'wholesalePrice', COALESCE(v_wholesale_price, 0),
+          'spread', v_item_commission,
+          'totalCommission', v_item_commission
+        );
       END LOOP;
 
     -- ════════════════════════════════════════════════════════════════════════
@@ -415,6 +430,20 @@ BEGIN
         END IF;
 
         v_commission_amount := v_commission_amount + v_item_commission;
+
+        -- Store per-item details for transparency
+        v_margin_details := v_margin_details || jsonb_build_object(
+          'productId', v_item->>'productId',
+          'name', v_item->>'name',
+          'price', v_item_price,
+          'cost', v_item_cost,
+          'quantity', v_item_quantity,
+          'margin', v_base_margin,
+          'ruleType', v_rule_type,
+          'ruleRate', v_rule_rate,
+          'commission', v_item_commission,
+          'totalCommission', v_item_commission
+        );
       END LOOP;
 
       -- Handle flat_per_order
@@ -480,13 +509,13 @@ BEGIN
     -- Create or update commission record using the resolved sales rep
     INSERT INTO commissions (
       order_id, sales_rep_id, organization_id, distributor_id,
-      order_total, product_margin, commission_rate,
+      order_total, product_margin, margin_details, commission_rate,
       commission_amount, sales_rep_commission, distributor_commission,
       company_rep_commission, company_rep_id,
       commission_split_type, status
     ) VALUES (
       NEW.id, v_resolved_sales_rep_id, NEW.organization_id, v_distributor_id,
-      NEW.total, v_total_margin, v_commission_rate,
+      NEW.total, v_total_margin, v_margin_details, v_commission_rate,
       v_commission_amount, v_sales_rep_commission, v_distributor_commission,
       v_company_rep_commission, v_company_rep_id,
       v_commission_split_type, 'pending'
@@ -497,6 +526,7 @@ BEGIN
       commission_rate        = EXCLUDED.commission_rate,
       commission_amount      = EXCLUDED.commission_amount,
       product_margin         = EXCLUDED.product_margin,
+      margin_details         = EXCLUDED.margin_details,
       sales_rep_commission   = EXCLUDED.sales_rep_commission,
       distributor_commission = EXCLUDED.distributor_commission,
       company_rep_commission = EXCLUDED.company_rep_commission,

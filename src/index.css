@@ -1,3 +1,31 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@media print {
+  /* Hide everything except the modal content */
+  body > *:not(#root) { display: none !important; }
+  .print\:hidden { display: none !important; }
+  .print\:shadow-none { box-shadow: none !important; }
+  .print\:max-w-none { max-width: none !important; }
+  .print\:rounded-none { border-radius: 0 !important; }
+
+  /* Hide the backdrop and other page content when printing */
+  .fixed.inset-0.bg-black { display: none !important; }
+
+  /* Make the modal take full page */
+  .fixed.inset-0.z-50 {
+    position: static !important;
+    overflow: visible !important;
+  }
+  .fixed.inset-0.z-50 > div {
+    min-height: auto !important;
+    padding: 0 !important;
+  }
+  .fixed.inset-0.z-50 .relative {
+    position: static !important;
+    max-width: 100% !important;
+    box-shadow: none !important;
+    padding: 1rem !important;
+  }
+}
