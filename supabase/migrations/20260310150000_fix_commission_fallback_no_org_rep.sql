@@ -433,9 +433,9 @@ BEGIN
     -- ════════════════════════════════════════════════════════════════════════
     IF v_distributor_id IS NOT NULL THEN
       IF v_pricing_model = 'wholesale' THEN
-        v_distributor_commission := v_commission_amount;
-        v_sales_rep_commission   := v_total_margin * (v_sales_rep_rate / 100);
-        v_commission_amount      := v_distributor_commission + v_sales_rep_commission;
+        -- Sales rep earns a percentage of the distributor's spread
+        v_sales_rep_commission   := v_commission_amount * (v_sales_rep_rate / 100);
+        v_distributor_commission := v_commission_amount - v_sales_rep_commission;
       ELSIF v_commission_split_type = 'percentage_of_distributor' THEN
         v_sales_rep_commission  := v_commission_amount * (v_sales_rep_rate / 100);
         v_distributor_commission := v_commission_amount - v_sales_rep_commission;
