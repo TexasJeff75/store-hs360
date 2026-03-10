@@ -8,7 +8,7 @@ import { normalizeAddress } from './orders/types';
 import { activityLogService } from '../../services/activityLog';
 
 const OrderManagement: React.FC = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, effectiveProfile } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -963,7 +963,7 @@ const OrderManagement: React.FC = () => {
             )}
 
             {/* Commission Status — never visible to customer users */}
-            {canManageOrders && profile?.role !== 'customer' && (
+            {canManageOrders && (effectiveProfile?.role ?? profile?.role) !== 'customer' && (
               <div className={`border rounded-lg p-4 ${
                 orderCommission ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
               }`}>
