@@ -1068,8 +1068,8 @@ const OrderManagement: React.FC = () => {
                         <p className="font-medium">No commission generated for this completed order.</p>
                         <p className="text-xs mt-1">Possible reasons:</p>
                         <ul className="text-xs list-disc list-inside mt-1 space-y-0.5">
-                          {!order.sales_rep_id && <li className="text-red-600 font-medium">No sales rep assigned to this order</li>}
-                          {order.sales_rep_id && <li>No active organization_sales_reps record for this sales rep + organization</li>}
+                          {!order.organization_id && <li className="text-red-600 font-medium">No organization linked to this order</li>}
+                          <li>No active sales rep assigned to this organization in Organization Sales Reps</li>
                           <li>Commission trigger may not have fired (check database triggers)</li>
                           <li>Commission rate may be set to 0%</li>
                         </ul>
@@ -1077,7 +1077,7 @@ const OrderManagement: React.FC = () => {
                     ) : (
                       <p className="text-gray-500 italic">
                         Commission will be generated when the order is marked as completed
-                        {!order.sales_rep_id && <span className="text-amber-600 font-medium"> (Warning: No sales rep assigned)</span>}
+                        {!order.organization_id && <span className="text-amber-600 font-medium"> (Warning: No organization linked)</span>}
                       </p>
                     )}
                   </div>
