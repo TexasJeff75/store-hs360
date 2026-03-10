@@ -1095,7 +1095,7 @@ const OrderManagement: React.FC = () => {
               );
             })()}
 
-            {canManageOrders && order.status !== 'completed' && order.status !== 'cancelled' && order.order_type !== 'backorder' && (
+            {profile?.role === 'admin' && order.status !== 'completed' && order.status !== 'cancelled' && order.order_type !== 'backorder' && (
               <div className="space-y-3">
                 <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                   <div className="flex items-center justify-between">
