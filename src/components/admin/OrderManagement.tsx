@@ -995,7 +995,7 @@ const OrderManagement: React.FC = () => {
                         </span>
                         <span className="font-semibold text-green-700">
                           ${isOrderSalesRep
-                            ? Number(orderCommission.sales_rep_commission ?? orderCommission.commission_amount).toFixed(2)
+                            ? Number(orderCommission.sales_rep_commission || 0).toFixed(2)
                             : Number(orderCommission.commission_amount).toFixed(2)
                           }
                         </span>

@@ -106,26 +106,12 @@ class OrderService {
               salesRepId = salesRepData.sales_rep_id;
             }
           } else {
-            // Ensure organization_sales_reps record exists for the default rep
-            // so the commission trigger can look up rate/structure.
-            // Only insert if no record exists — never overwrite distributor-linked records.
-            const { data: existingOsr } = await supabase
-              .from('organization_sales_reps')
-              .select('id')
-              .eq('organization_id', data.organizationId)
-              .eq('sales_rep_id', salesRepId)
-              .maybeSingle();
-
-            if (!existingOsr) {
-              await supabase
-                .from('organization_sales_reps')
-                .insert({
-                  organization_id: data.organizationId,
-                  sales_rep_id: salesRepId,
-                  commission_rate: 5.00,
-                  is_active: true,
-                });
-            }
+            // The organization has a default_sales_rep_id set.
+            // Do NOT auto-create an organization_sales_reps record with a
+            // made-up rate. The sales rep must be explicitly assigned with
+            // a commission rate through the Sales Rep Assignment UI.
+            // The commission trigger will log to commission_audit_log if
+            // no org-rep config is found for this order.
           }
         }
       }

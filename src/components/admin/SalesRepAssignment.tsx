@@ -40,7 +40,7 @@ const SalesRepAssignment: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [selectedOrg, setSelectedOrg] = useState<string>('');
   const [selectedRep, setSelectedRep] = useState<string>('');
-  const [commissionRate, setCommissionRate] = useState<number>(5.0);
+  const [commissionRate, setCommissionRate] = useState<number | ''>('');
   const [showAddForm, setShowAddForm] = useState(false);
 
   useEffect(() => {
@@ -82,10 +82,15 @@ const SalesRepAssignment: React.FC = () => {
       return;
     }
 
+    if (commissionRate === '' || isNaN(Number(commissionRate)) || Number(commissionRate) < 0 || Number(commissionRate) > 100) {
+      alert('Please enter a valid commission rate between 0 and 100');
+      return;
+    }
+
     const result = await commissionService.assignSalesRepToOrganization(
       selectedOrg,
       selectedRep,
-      commissionRate
+      Number(commissionRate)
     );
 
     if (result.success) {
@@ -93,7 +98,7 @@ const SalesRepAssignment: React.FC = () => {
       setShowAddForm(false);
       setSelectedOrg('');
       setSelectedRep('');
-      setCommissionRate(5.0);
+      setCommissionRate('');
       fetchData();
     } else {
       alert(`Failed to assign: ${result.error}`);
@@ -209,9 +214,14 @@ const SalesRepAssignment: React.FC = () => {
                 max="100"
                 step="0.1"
                 value={commissionRate}
-                onChange={(e) => setCommissionRate(parseFloat(e.target.value))}
-                className="w-full p-2 border border-gray-300 rounded-lg"
+                onChange={(e) => setCommissionRate(e.target.value === '' ? '' : parseFloat(e.target.value))}
+                placeholder="Enter rate (required)"
+                required
+                className={`w-full p-2 border rounded-lg ${commissionRate === '' ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
               />
+              {commissionRate === '' && (
+                <p className="text-xs text-red-600 mt-1">Commission rate is required</p>
+              )}
             </div>
           </div>
 
@@ -221,7 +231,7 @@ const SalesRepAssignment: React.FC = () => {
                 setShowAddForm(false);
                 setSelectedOrg('');
                 setSelectedRep('');
-                setCommissionRate(5.0);
+                setCommissionRate('');
               }}
               className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
             >

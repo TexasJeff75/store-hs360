@@ -233,7 +233,7 @@ const DistributorManagement: React.FC = () => {
     profile_id: '',
     name: '',
     code: '',
-    commission_rate: 45,
+    commission_rate: '' as number | '',
     commission_type: 'percent_margin' as CommissionType,
     pricing_model: 'margin_split' as 'margin_split' | 'wholesale',
     notes: '',
@@ -271,7 +271,7 @@ const DistributorManagement: React.FC = () => {
   const [newDistributorSalesRep, setNewDistributorSalesRep] = useState({
     sales_rep_id: '',
     commission_split_type: 'percentage_of_distributor' as 'percentage_of_distributor' | 'fixed_with_override',
-    sales_rep_rate: 50,
+    sales_rep_rate: '' as number | '',
     distributor_override_rate: 0,
     notes: '',
   });
@@ -372,10 +372,15 @@ const DistributorManagement: React.FC = () => {
 
   const handleCreateDistributor = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (newDistributor.commission_rate === '' || isNaN(Number(newDistributor.commission_rate))) {
+      setError('Commission rate is required');
+      return;
+    }
     try {
       setError(null);
       const payload = {
         ...newDistributor,
+        commission_rate: Number(newDistributor.commission_rate),
         user_id: newDistributor.profile_id,
       };
       const { error: insertError } = await supabase.from('distributors').insert([payload]);
@@ -387,7 +392,7 @@ const DistributorManagement: React.FC = () => {
         profile_id: '',
         name: '',
         code: '',
-        commission_rate: 45,
+        commission_rate: '',
         commission_type: 'percent_margin',
         pricing_model: 'margin_split',
         notes: '',
@@ -635,13 +640,17 @@ const DistributorManagement: React.FC = () => {
       setError('Please select a sales representative first');
       return;
     }
+    if (newDistributorSalesRep.sales_rep_rate === '' || isNaN(Number(newDistributorSalesRep.sales_rep_rate))) {
+      setError('Sales rep rate is required');
+      return;
+    }
     try {
       setError(null);
       const payload = {
         distributor_id: selectedDistributor,
         sales_rep_id: newDistributorSalesRep.sales_rep_id,
         commission_split_type: newDistributorSalesRep.commission_split_type,
-        sales_rep_rate: newDistributorSalesRep.sales_rep_rate,
+        sales_rep_rate: Number(newDistributorSalesRep.sales_rep_rate),
         distributor_override_rate:
           newDistributorSalesRep.commission_split_type === 'fixed_with_override'
             ? newDistributorSalesRep.distributor_override_rate
@@ -657,7 +666,7 @@ const DistributorManagement: React.FC = () => {
       setNewDistributorSalesRep({
         sales_rep_id: '',
         commission_split_type: 'percentage_of_distributor',
-        sales_rep_rate: 50,
+        sales_rep_rate: '',
         distributor_override_rate: 0,
         notes: '',
       });

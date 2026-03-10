@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter, AlertTriangle, ChevronDown, ChevronRight, Printer, ExternalLink } from 'lucide-react';
-import { commissionService, Commission } from '../../services/commissionService';
+import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter, AlertTriangle, ChevronDown, ChevronRight, Printer, ExternalLink, FileText } from 'lucide-react';
+import { commissionService, Commission, CommissionLineItem } from '../../services/commissionService';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
 
@@ -38,6 +38,9 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
   const [error, setError] = useState<string | null>(null);
   const [diagnostics, setDiagnostics] = useState<DiagnosticData | null>(null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
+  const [lineItems, setLineItems] = useState<CommissionLineItem[]>([]);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loadingLineItems, setLoadingLineItems] = useState(false);
 
   // Use effective identity for data fetching & display (supports impersonation)
   // Use real profile for admin-only actions (approve, pay, diagnostics)
@@ -215,8 +218,22 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
   useEffect(() => {
     if (selectedCommission?.order_id) {
       fetchOrderItems(selectedCommission.order_id);
+      // Load line items from the new commission_line_items table
+      setLoadingLineItems(true);
+      commissionService.getCommissionLineItems(selectedCommission.id).then(({ lineItems: items }) => {
+        setLineItems(items);
+        setLoadingLineItems(false);
+      });
+      // Load audit log for admins
+      if (profile?.role === 'admin') {
+        commissionService.getCommissionAuditLog(selectedCommission.order_id).then(({ logs }) => {
+          setAuditLogs(logs);
+        });
+      }
     } else {
       setOrderItems([]);
+      setLineItems([]);
+      setAuditLogs([]);
     }
   }, [selectedCommission?.order_id]);
 
@@ -606,8 +623,8 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
 
             // Helper to get the role-appropriate commission amount for a commission record
             const getMyAmount = (c: any) => {
-              if (isSalesRep) return Number(c.sales_rep_commission ?? c.commission_amount);
-              if (isDistributorRole) return Number(c.distributor_commission ?? c.commission_amount);
+              if (isSalesRep) return Number(c.sales_rep_commission || 0);
+              if (isDistributorRole) return Number(c.distributor_commission || 0);
               return Number(c.commission_amount);
             };
 
@@ -713,7 +730,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
                           {isSalesRep ? (
                             <div className="text-green-600">
-                              ${Number(commission.sales_rep_commission ?? commission.commission_amount).toFixed(2)}
+                              ${Number(commission.sales_rep_commission || 0).toFixed(2)}
                             </div>
                           ) : isDistributorRole ? (
                             <div className="space-y-1">
@@ -881,7 +898,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                     </label>
                     <div>
                       {isSalesRep ? (
-                        <p className="font-bold text-green-600 text-lg">${Number(selectedCommission.sales_rep_commission || selectedCommission.commission_amount).toFixed(2)}</p>
+                        <p className="font-bold text-green-600 text-lg">${Number(selectedCommission.sales_rep_commission || 0).toFixed(2)}</p>
                       ) : isDistributorUser ? (
                         <>
                           <p className="font-bold text-green-600 text-lg">${Number(selectedCommission.commission_amount).toFixed(2)}</p>
@@ -924,10 +941,13 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                   </div>
                 </div>
 
-                {/* Line Item Details — visible to admin, company rep, and distributor */}
-                {canSeeDistributor && selectedCommission.margin_details && selectedCommission.margin_details.length > 0 && (
+                {/* Line Item Details — from commission_line_items table */}
+                {canSeeDistributor && lineItems.length > 0 && (
                   <div className="mt-4">
-                    <label className="text-sm font-semibold text-gray-700 mb-2 block">Line Item Commission Details</label>
+                    <label className="text-sm font-semibold text-gray-700 mb-2 block flex items-center gap-1">
+                      <FileText className="h-4 w-4" />
+                      Line Item Commission Details
+                    </label>
                     <div className="bg-gray-50 rounded-lg overflow-hidden">
                       <table className="w-full text-sm">
                         <thead>
@@ -937,56 +957,140 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                             {canSeeAll && <th className="px-3 py-2 text-right">Cost</th>}
                             <th className="px-3 py-2 text-right">Price</th>
                             {canSeeAll && <th className="px-3 py-2 text-right">Margin</th>}
-                            {selectedCommission.margin_details[0]?.wholesalePrice !== undefined && (
+                            {lineItems[0]?.wholesale_price != null && (
                               <th className="px-3 py-2 text-right">Wholesale</th>
                             )}
-                            {selectedCommission.margin_details[0]?.wholesalePrice !== undefined && (
+                            {lineItems[0]?.spread != null && (
                               <th className="px-3 py-2 text-right">Spread</th>
                             )}
                             <th className="px-3 py-2 text-right">Commission</th>
+                            {canSeeAll && <th className="px-3 py-2">Rule</th>}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
-                          {selectedCommission.margin_details.map((item: any, index: number) => {
-                            const isWholesale = item.wholesalePrice !== undefined;
-                            const spread = isWholesale ? Number(item.spread || 0) : 0;
-                            const itemCommission = Number(item.totalCommission || item.commission || item.margin || 0);
+                          {lineItems.map((item, index) => {
+                            const ruleLabel: Record<string, string> = {
+                              'customer_product': 'Cust+Prod',
+                              'customer_category': 'Cust+Cat',
+                              'product': 'Product',
+                              'category': 'Category',
+                              'distributor_default': 'Dist Default',
+                              'org_default': 'Org Default',
+                              'wholesale': 'Wholesale',
+                            };
                             return (
-                              <tr key={index} className="text-xs">
-                                <td className="px-3 py-2 font-medium">{item.name}</td>
+                              <tr key={item.id || index} className="text-xs">
+                                <td className="px-3 py-2 font-medium">{item.product_name}</td>
                                 <td className="px-3 py-2 text-right">{item.quantity}</td>
-                                {canSeeAll && <td className="px-3 py-2 text-right">${Number(item.cost).toFixed(2)}</td>}
-                                <td className="px-3 py-2 text-right">${Number(item.price).toFixed(2)}</td>
-                                {canSeeAll && <td className="px-3 py-2 text-right text-blue-600">${Number(item.margin).toFixed(2)}</td>}
-                                {isWholesale && (
-                                  <td className="px-3 py-2 text-right">${Number(item.wholesalePrice).toFixed(2)}</td>
+                                {canSeeAll && <td className="px-3 py-2 text-right">${Number(item.unit_cost).toFixed(2)}</td>}
+                                <td className="px-3 py-2 text-right">${Number(item.unit_price).toFixed(2)}</td>
+                                {canSeeAll && <td className="px-3 py-2 text-right text-blue-600">${Number(item.base_margin).toFixed(2)}</td>}
+                                {lineItems[0]?.wholesale_price != null && (
+                                  <td className="px-3 py-2 text-right">${Number(item.wholesale_price || 0).toFixed(2)}</td>
                                 )}
-                                {isWholesale && (
-                                  <td className="px-3 py-2 text-right text-orange-600">${spread.toFixed(2)}</td>
+                                {lineItems[0]?.spread != null && (
+                                  <td className="px-3 py-2 text-right text-orange-600">${Number(item.spread || 0).toFixed(2)}</td>
                                 )}
-                                <td className="px-3 py-2 text-right font-semibold text-green-600">${itemCommission.toFixed(2)}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-green-600">${Number(item.item_commission).toFixed(2)}</td>
+                                {canSeeAll && (
+                                  <td className="px-3 py-2">
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800" title={`${item.commission_type} @ ${item.commission_rate}${item.commission_type?.startsWith('flat') ? '' : '%'}`}>
+                                      {ruleLabel[item.rule_source] || item.rule_source}
+                                    </span>
+                                  </td>
+                                )}
                               </tr>
                             );
                           })}
                         </tbody>
                         <tfoot>
                           <tr className="bg-gray-100 font-semibold text-xs">
-                            <td className="px-3 py-2" colSpan={canSeeAll ? (selectedCommission.margin_details[0]?.wholesalePrice !== undefined ? 6 : 4) : (selectedCommission.margin_details[0]?.wholesalePrice !== undefined ? 4 : 2)}>
+                            <td className="px-3 py-2" colSpan={canSeeAll ? (lineItems[0]?.wholesale_price != null ? 6 : 4) : (lineItems[0]?.wholesale_price != null ? 4 : 2)}>
                               Totals
                             </td>
-                            {canSeeAll && selectedCommission.margin_details[0]?.wholesalePrice === undefined && (
-                              <td className="px-3 py-2 text-right text-blue-600">${Number(selectedCommission.product_margin).toFixed(2)}</td>
+                            {canSeeAll && lineItems[0]?.wholesale_price == null && (
+                              <td className="px-3 py-2 text-right text-blue-600">
+                                ${lineItems.reduce((sum, i) => sum + Number(i.base_margin), 0).toFixed(2)}
+                              </td>
                             )}
-                            {selectedCommission.margin_details[0]?.wholesalePrice !== undefined && (
+                            {lineItems[0]?.spread != null && (
                               <td className="px-3 py-2 text-right text-orange-600">
-                                ${selectedCommission.margin_details.reduce((sum: number, i: any) => sum + Number(i.spread || 0), 0).toFixed(2)}
+                                ${lineItems.reduce((sum, i) => sum + Number(i.spread || 0), 0).toFixed(2)}
                               </td>
                             )}
                             <td className="px-3 py-2 text-right text-green-600">${Number(selectedCommission.commission_amount).toFixed(2)}</td>
+                            {canSeeAll && <td></td>}
                           </tr>
                         </tfoot>
                       </table>
                     </div>
+                  </div>
+                )}
+                {/* Fallback: show margin_details if no line items yet (legacy data) */}
+                {canSeeDistributor && lineItems.length === 0 && !loadingLineItems && selectedCommission.margin_details && selectedCommission.margin_details.length > 0 && (
+                  <div className="mt-4">
+                    <label className="text-sm font-semibold text-gray-700 mb-2 block">Line Item Details (legacy)</label>
+                    <div className="bg-gray-50 rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-100 text-left text-xs text-gray-600">
+                            <th className="px-3 py-2">Product</th>
+                            <th className="px-3 py-2 text-right">Qty</th>
+                            {canSeeAll && <th className="px-3 py-2 text-right">Cost</th>}
+                            <th className="px-3 py-2 text-right">Price</th>
+                            {canSeeAll && <th className="px-3 py-2 text-right">Margin</th>}
+                            <th className="px-3 py-2 text-right">Commission</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {selectedCommission.margin_details.map((item: any, index: number) => (
+                            <tr key={index} className="text-xs">
+                              <td className="px-3 py-2 font-medium">{item.name}</td>
+                              <td className="px-3 py-2 text-right">{item.quantity}</td>
+                              {canSeeAll && <td className="px-3 py-2 text-right">${Number(item.cost).toFixed(2)}</td>}
+                              <td className="px-3 py-2 text-right">${Number(item.price).toFixed(2)}</td>
+                              {canSeeAll && <td className="px-3 py-2 text-right text-blue-600">${Number(item.margin).toFixed(2)}</td>}
+                              <td className="px-3 py-2 text-right font-semibold text-green-600">
+                                ${Number(item.totalCommission || item.commission || 0).toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Audit Log — admin only */}
+                {isAdmin && auditLogs.length > 0 && (
+                  <div className="mt-4">
+                    <details>
+                      <summary className="text-sm font-semibold text-gray-700 cursor-pointer hover:text-gray-900 flex items-center gap-1">
+                        Commission Audit Log ({auditLogs.length} entries)
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        {auditLogs.map((log: any) => (
+                          <div key={log.id} className="bg-gray-50 rounded border border-gray-200 p-3 text-xs">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className={`px-2 py-0.5 rounded font-medium ${
+                                log.event === 'calculated' ? 'bg-green-100 text-green-800' :
+                                log.event === 'skipped' ? 'bg-yellow-100 text-yellow-800' :
+                                log.event === 'fallback_used' ? 'bg-orange-100 text-orange-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                                {log.event}
+                              </span>
+                              <span className="text-gray-500">{new Date(log.created_at).toLocaleString()}</span>
+                            </div>
+                            {log.details && (
+                              <pre className="text-[10px] text-gray-600 mt-1 overflow-x-auto whitespace-pre-wrap">
+                                {JSON.stringify(log.details, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </details>
                   </div>
                 )}
 
