@@ -11,6 +11,31 @@ interface OrganizationSalesRep {
   updated_at: string;
 }
 
+export interface CommissionLineItem {
+  id: string;
+  commission_id: string;
+  order_id: string;
+  product_id?: number;
+  product_name?: string;
+  category_id?: string;
+  quantity: number;
+  unit_price: number;
+  unit_cost: number;
+  retail_price?: number;
+  markup: number;
+  base_margin: number;
+  item_commission: number;
+  rule_source: string;
+  rule_id?: string;
+  commission_type: string;
+  commission_rate: number;
+  use_customer_price: boolean;
+  effective_price?: number;
+  wholesale_price?: number;
+  spread?: number;
+  created_at: string;
+}
+
 export interface Commission {
   id: string;
   order_id: string;
@@ -25,9 +50,26 @@ export interface Commission {
     cost: number;
     quantity: number;
     margin: number;
+    ruleType?: string;
+    ruleRate?: number;
+    ruleSource?: string;
+    ruleId?: string;
+    totalCommission?: number;
+    commission?: number;
+    effectivePrice?: number;
+    useCustomerPrice?: boolean;
+    wholesalePrice?: number;
+    spread?: number;
+    markup?: number;
   }>;
   commission_rate: number;
   commission_amount: number;
+  sales_rep_commission?: number;
+  distributor_commission?: number;
+  company_rep_commission?: number;
+  company_rep_id?: string;
+  distributor_id?: string;
+  commission_split_type?: string;
   status: 'pending' | 'approved' | 'paid' | 'cancelled';
   notes?: string;
   approved_by?: string;
@@ -36,6 +78,8 @@ export interface Commission {
   payment_reference?: string;
   created_at: string;
   updated_at: string;
+  // Joined relations
+  line_items?: CommissionLineItem[];
 }
 
 interface CommissionSummary {
@@ -50,7 +94,7 @@ class CommissionService {
   async assignSalesRepToOrganization(
     organizationId: string,
     salesRepId: string,
-    commissionRate: number = 5.0,
+    commissionRate: number,
     distributorId?: string
   ): Promise<{ success: boolean; error?: string; data?: OrganizationSalesRep }> {
     try {
@@ -246,7 +290,7 @@ class CommissionService {
 
       data?.forEach(commission => {
         // Sales reps should only see their share, not distributor's
-        const amount = Number(commission.sales_rep_commission ?? commission.commission_amount);
+        const amount = Number(commission.sales_rep_commission || 0);
         summary.total_commissions += amount;
 
         switch (commission.status) {
@@ -579,6 +623,48 @@ class CommissionService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to update commission rate'
+      };
+    }
+  }
+
+  async getCommissionLineItems(
+    commissionId: string
+  ): Promise<{ lineItems: CommissionLineItem[]; error?: string }> {
+    try {
+      const { data, error } = await supabase
+        .from('commission_line_items')
+        .select('*')
+        .eq('commission_id', commissionId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      return { lineItems: data || [] };
+    } catch (error) {
+      console.error('Error fetching commission line items:', error);
+      return {
+        lineItems: [],
+        error: error instanceof Error ? error.message : 'Failed to fetch line items'
+      };
+    }
+  }
+
+  async getCommissionAuditLog(
+    orderId: string
+  ): Promise<{ logs: any[]; error?: string }> {
+    try {
+      const { data, error } = await supabase
+        .from('commission_audit_log')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return { logs: data || [] };
+    } catch (error) {
+      console.error('Error fetching commission audit log:', error);
+      return {
+        logs: [],
+        error: error instanceof Error ? error.message : 'Failed to fetch audit log'
       };
     }
   }
