@@ -963,7 +963,11 @@ const OrderManagement: React.FC = () => {
             )}
 
             {/* Commission Status — never visible to customer users */}
-            {canManageOrders && (effectiveProfile?.role ?? profile?.role) !== 'customer' && (
+            {canManageOrders && (effectiveProfile?.role ?? profile?.role) !== 'customer' && (() => {
+              const orderViewRole = effectiveProfile?.role ?? profile?.role;
+              const isOrderSalesRep = orderViewRole === 'sales_rep';
+              const isOrderAdmin = orderViewRole === 'admin' || orderViewRole === 'company_rep';
+              return (
               <div className={`border rounded-lg p-4 ${
                 orderCommission ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
               }`}>
@@ -986,23 +990,32 @@ const OrderManagement: React.FC = () => {
                         </span>
                       </div>
                       <div>
-                        <span className="text-gray-600 block text-xs">Commission Amount</span>
-                        <span className="font-semibold text-green-700">${Number(orderCommission.commission_amount).toFixed(2)}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600 block text-xs">Sales Rep</span>
-                        <span className="font-medium">
-                          {orderCommission.profiles?.full_name || orderCommission.profiles?.email || 'Unknown'}
+                        <span className="text-gray-600 block text-xs">
+                          {isOrderSalesRep ? 'Your Commission' : 'Commission Amount'}
+                        </span>
+                        <span className="font-semibold text-green-700">
+                          ${isOrderSalesRep
+                            ? Number(orderCommission.sales_rep_commission ?? orderCommission.commission_amount).toFixed(2)
+                            : Number(orderCommission.commission_amount).toFixed(2)
+                          }
                         </span>
                       </div>
+                      {!isOrderSalesRep && (
+                        <div>
+                          <span className="text-gray-600 block text-xs">Sales Rep</span>
+                          <span className="font-medium">
+                            {orderCommission.profiles?.full_name || orderCommission.profiles?.email || 'Unknown'}
+                          </span>
+                        </div>
+                      )}
                     </div>
-                    {orderCommission.product_margin != null && (
+                    {!isOrderSalesRep && orderCommission.product_margin != null && (
                       <div className="text-sm">
                         <span className="text-gray-600">Product Margin:</span>
                         <span className="font-medium ml-1">${Number(orderCommission.product_margin).toFixed(2)}</span>
                       </div>
                     )}
-                    {orderCommission.sales_rep_commission != null && orderCommission.distributor_commission != null && (
+                    {!isOrderSalesRep && orderCommission.sales_rep_commission != null && orderCommission.distributor_commission != null && (
                       <div className="grid grid-cols-2 gap-3 text-sm bg-white rounded p-2 border border-green-200">
                         <div>
                           <span className="text-gray-600 text-xs block">Sales Rep Share</span>
@@ -1014,7 +1027,7 @@ const OrderManagement: React.FC = () => {
                         </div>
                       </div>
                     )}
-                    {orderCommission.margin_details && orderCommission.margin_details.length > 0 && (
+                    {!isOrderSalesRep && orderCommission.margin_details && orderCommission.margin_details.length > 0 && (
                       <details className="text-xs">
                         <summary className="cursor-pointer text-gray-600 hover:text-gray-900 font-medium">
                           View margin breakdown ({orderCommission.margin_details.length} items)
@@ -1079,7 +1092,8 @@ const OrderManagement: React.FC = () => {
                   </div>
                 )}
               </div>
-            )}
+              );
+            })()}
 
             {canManageOrders && order.status !== 'completed' && order.status !== 'cancelled' && order.order_type !== 'backorder' && (
               <div className="space-y-3">
