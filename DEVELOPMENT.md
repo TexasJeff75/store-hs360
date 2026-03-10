@@ -42,7 +42,10 @@ Navigate to http://localhost:8888 (Netlify Dev proxy)
 ```
 Browser → Netlify Dev (8888) → Vite Dev Server (5173) → React App
               ↓
-        Netlify Functions (BigCommerce REST API)
+        Netlify Functions
+              ├── BigCommerce REST API
+              ├── QuickBooks OAuth (quickbooks-oauth.cjs)
+              └── QuickBooks API Proxy (quickbooks-api.cjs)
               ↓
        Express Server (4000) → BigCommerce GraphQL API
 ```
@@ -55,6 +58,10 @@ Browser → Netlify Dev (8888) → Vite Dev Server (5173) → React App
    - `/api/gql` → Express server (4000) → BigCommerce GraphQL
 3. All environment variables are injected by Netlify Dev
 4. Matches production behavior exactly
+
+**QuickBooks API Flow:**
+- OAuth flow: Browser → `/.netlify/functions/quickbooks-oauth` → QuickBooks OAuth servers
+- API calls: Browser → QB client service → `/.netlify/functions/quickbooks-api` → QuickBooks Online API
 
 ### Production Mode (Netlify)
 ```
@@ -198,22 +205,49 @@ See `ENV_SETUP.md` for complete documentation on environment variables.
 - `VITE_SUPABASE_ANON_KEY` - Supabase anonymous key
 - `VITE_API_BASE` - API base path (use `/.netlify/functions`)
 
+### QuickBooks Integration (Optional)
+- `VITE_QB_CLIENT_ID` - QuickBooks OAuth Client ID
+- `VITE_QB_ENVIRONMENT` - `sandbox` or `production`
+- `VITE_QB_REDIRECT_URI` - OAuth callback URL (dev)
+- `VITE_QB_REDIRECT_URI_PROD` - OAuth callback URL (prod)
+- `QB_CLIENT_ID` - Server-side Client ID
+- `QB_CLIENT_SECRET` - Server-side Client Secret (never use VITE_ prefix)
+- `QB_REDIRECT_URI` - Server-side redirect URI
+
+See [QUICKBOOKS_SETUP_GUIDE.md](./QUICKBOOKS_SETUP_GUIDE.md) for full setup instructions.
+
 ## Project Structure
 
 ```
 project/
 ├── src/
-│   ├── components/     # React components
-│   ├── services/       # API service modules
+│   ├── components/
+│   │   ├── admin/
+│   │   │   └── QuickBooksManagement.tsx  # QB admin dashboard tab
+│   │   ├── checkout/
+│   │   │   └── PaymentForm.tsx           # QB payment integration
+│   │   └── QuickBooksCallback.tsx        # OAuth callback handler
+│   ├── services/
+│   │   └── quickbooks/                   # QuickBooks service layer
+│   │       ├── client.ts                 # API client & sync logging
+│   │       ├── oauth.ts                  # OAuth 2.0 authentication
+│   │       ├── customers.ts              # Organization ↔ QB customer sync
+│   │       ├── invoices.ts               # Order → QB invoice creation
+│   │       ├── payments.ts               # Card/ACH tokenization & charges
+│   │       └── index.ts                  # Public exports
 │   ├── config/         # Configuration (including env.ts)
 │   ├── contexts/       # React contexts
 │   └── hooks/          # Custom React hooks
 ├── server/
 │   └── gql.cjs        # Local development API server
 ├── netlify/
-│   └── functions/     # Netlify serverless functions
+│   └── functions/
+│       ├── quickbooks-oauth.cjs          # Server-side OAuth handler
+│       ├── quickbooks-api.cjs            # QB API proxy with rate limiting
+│       └── ...                           # Other Netlify functions
 ├── supabase/
 │   └── migrations/    # Database migrations
+├── quickbooks_migration.sql              # QB schema migration
 └── dist/              # Production build output
 ```
 
@@ -237,5 +271,8 @@ The `dist` folder contains the production-ready static files.
 
 - [ENV_SETUP.md](./ENV_SETUP.md) - Complete environment variable setup guide
 - [README.md](./README.md) - Project overview
+- [QUICKBOOKS_FEATURES.md](./QUICKBOOKS_FEATURES.md) - QuickBooks features overview
+- [QUICKBOOKS_INTEGRATION.md](./QUICKBOOKS_INTEGRATION.md) - QuickBooks technical integration guide
+- [QUICKBOOKS_SETUP_GUIDE.md](./QUICKBOOKS_SETUP_GUIDE.md) - QuickBooks setup & testing
 - [BigCommerce API Docs](https://developer.bigcommerce.com/api-docs)
 - [Supabase Docs](https://supabase.com/docs)

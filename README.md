@@ -52,6 +52,11 @@ npm run dev
 - [NETLIFY_DEPLOYMENT.md](./NETLIFY_DEPLOYMENT.md) - Netlify deployment guide & troubleshooting
 - [NETLIFY_FUNCTIONS_DIAGNOSTIC.md](./NETLIFY_FUNCTIONS_DIAGNOSTIC.md) - Fix 404 errors on Netlify Functions
 
+### QuickBooks Integration
+- [QUICKBOOKS_FEATURES.md](./QUICKBOOKS_FEATURES.md) - QuickBooks features overview
+- [QUICKBOOKS_INTEGRATION.md](./QUICKBOOKS_INTEGRATION.md) - Technical integration guide
+- [QUICKBOOKS_SETUP_GUIDE.md](./QUICKBOOKS_SETUP_GUIDE.md) - Setup & testing walkthrough
+
 ### Reference
 - [BIGCOMMERCE_SCOPES.md](./BIGCOMMERCE_SCOPES.md) - API token scopes
 - [PCI_COMPLIANCE.md](./PCI_COMPLIANCE.md) - Payment security
