@@ -622,6 +622,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
         const savedResult = await savedResponse.json();
         if (!savedResponse.ok || savedResult.error) {
+          if (savedResult.invalidPaymentMethod) {
+            // Token is expired/invalid — auto-delete the bad method and prompt re-entry
+            try {
+              await quickbooksPayments.deletePaymentMethod(paymentData.paymentMethodId);
+            } catch (delErr) {
+              console.warn('Failed to auto-delete invalid payment method:', delErr);
+            }
+            setError('This saved payment method is no longer valid and has been removed. Please enter your payment details again.');
+            setCurrentStep('payment');
+            setLoading(false);
+            return;
+          }
           if (savedResult.status === 'DECLINED') {
             setError('Your payment was declined. Please try a different payment method.');
             setCurrentStep('payment');
