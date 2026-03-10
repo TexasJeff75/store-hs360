@@ -301,6 +301,19 @@ exports.handler = async (event) => {
         || responseData?.message
         || 'Payment processing failed';
 
+      // Detect expired/invalid token errors and give a clear message
+      const isInvalidToken = qbResponse.status === 400 && (
+        /invalid.*token/i.test(errorMsg) ||
+        /token.*invalid/i.test(errorMsg) ||
+        /card.*not found/i.test(errorMsg) ||
+        /account.*not found/i.test(errorMsg) ||
+        /invalid.*card/i.test(errorMsg)
+      );
+
+      const userMessage = isInvalidToken
+        ? 'This saved payment method is no longer valid. Please remove it and add a new one.'
+        : errorMsg;
+
       // Log failed payment
       await supabase.from('quickbooks_sync_log').insert({
         entity_type: isACH ? 'payment_ach' : 'payment_charge',
@@ -316,8 +329,9 @@ exports.handler = async (event) => {
         statusCode: qbResponse.status >= 400 && qbResponse.status < 500 ? qbResponse.status : 502,
         headers: corsHeaders,
         body: JSON.stringify({
-          error: errorMsg,
-          status: responseData?.status || 'FAILED',
+          error: userMessage,
+          status: isInvalidToken ? 'INVALID_TOKEN' : (responseData?.status || 'FAILED'),
+          invalidPaymentMethod: isInvalidToken,
         })
       };
     }
