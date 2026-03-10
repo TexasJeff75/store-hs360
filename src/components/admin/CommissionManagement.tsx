@@ -16,7 +16,7 @@ interface DiagnosticData {
 }
 
 const CommissionManagement: React.FC = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, effectiveUserId, effectiveProfile, isImpersonating } = useAuth();
   const [commissions, setCommissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -35,9 +35,14 @@ const CommissionManagement: React.FC = () => {
   const [diagnostics, setDiagnostics] = useState<DiagnosticData | null>(null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
+  // Use effective identity for data fetching & display (supports impersonation)
+  // Use real profile for admin-only actions (approve, pay, diagnostics)
+  const viewRole = effectiveProfile?.role ?? profile?.role;
+  const viewUserId = effectiveUserId ?? user?.id;
+
   useEffect(() => {
     fetchCommissions();
-  }, [statusFilter, user]);
+  }, [statusFilter, user, effectiveUserId]);
 
   const fetchCommissions = async () => {
     if (!user) return;
@@ -46,12 +51,12 @@ const CommissionManagement: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      if (profile?.role === 'distributor') {
-        // Get distributor ID for this user
+      if (viewRole === 'distributor') {
+        // Get distributor ID for the effective user
         const { data: distributorData } = await supabase
           .from('distributors')
           .select('id')
-          .eq('user_id', user.id)
+          .eq('user_id', viewUserId!)
           .eq('is_active', true)
           .maybeSingle();
 
@@ -75,15 +80,15 @@ const CommissionManagement: React.FC = () => {
         } else {
           setError('Distributor record not found');
         }
-      } else if (profile?.role === 'sales_rep') {
+      } else if (viewRole === 'sales_rep') {
         setIsDistributor(false);
         const { commissions: data } = await commissionService.getSalesRepCommissions(
-          user.id,
+          viewUserId!,
           statusFilter !== 'all' ? statusFilter : undefined
         );
         setCommissions(data);
 
-        const { summary: summaryData } = await commissionService.getSalesRepCommissionSummary(user.id);
+        const { summary: summaryData } = await commissionService.getSalesRepCommissionSummary(viewUserId!);
         if (summaryData) {
           setSummary({
             total: summaryData.total_commissions,
@@ -92,7 +97,7 @@ const CommissionManagement: React.FC = () => {
             paid: summaryData.paid_amount
           });
         }
-      } else if (profile?.role === 'admin') {
+      } else if (viewRole === 'admin') {
         const { commissions: data, error: fetchError } = await commissionService.getAllCommissions({
           status: statusFilter !== 'all' ? statusFilter : undefined
         });
@@ -263,7 +268,7 @@ const CommissionManagement: React.FC = () => {
       const salesRepName = commission.sales_rep?.email || 'Unknown';
       const monthYear = date.toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
 
-      const key = profile?.role === 'admin'
+      const key = viewRole === 'admin'
         ? `${salesRepName}|${monthYear}`
         : monthYear;
 
@@ -324,10 +329,10 @@ const CommissionManagement: React.FC = () => {
     <div className="p-6">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          {profile?.role === 'sales_rep' ? 'My Commissions' : 'Commission Management'}
+          {viewRole === 'sales_rep' ? 'My Commissions' : 'Commission Management'}
         </h2>
         <p className="text-gray-600">
-          {profile?.role === 'sales_rep'
+          {viewRole === 'sales_rep'
             ? 'View your earnings from completed orders'
             : 'Track and manage sales commissions'
           }
@@ -454,7 +459,7 @@ const CommissionManagement: React.FC = () => {
 
       {!loading && commissions.length === 0 && !error && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
-          {profile?.role === 'sales_rep' ? (
+          {viewRole === 'sales_rep' ? (
             <>
               <h3 className="font-semibold text-blue-900 mb-3">No Commissions Yet</h3>
               <div className="text-blue-800 text-sm space-y-2">
@@ -493,7 +498,7 @@ const CommissionManagement: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">
-                {profile?.role === 'sales_rep' ? 'Total Earned' : 'Total Commissions'}
+                {viewRole === 'sales_rep' ? 'Total Earned' : 'Total Commissions'}
               </p>
               <p className="text-2xl font-bold text-gray-900">${summary.total.toFixed(2)}</p>
             </div>
@@ -505,10 +510,10 @@ const CommissionManagement: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-yellow-700">
-                {profile?.role === 'sales_rep' ? 'Under Review' : 'Pending'}
+                {viewRole === 'sales_rep' ? 'Under Review' : 'Pending'}
               </p>
               <p className="text-2xl font-bold text-yellow-900">${summary.pending.toFixed(2)}</p>
-              {profile?.role === 'sales_rep' && (
+              {viewRole === 'sales_rep' && (
                 <p className="text-xs text-yellow-600 mt-1">Awaiting approval</p>
               )}
             </div>
@@ -520,10 +525,10 @@ const CommissionManagement: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-blue-700">
-                {profile?.role === 'sales_rep' ? 'Ready to Pay' : 'Approved'}
+                {viewRole === 'sales_rep' ? 'Ready to Pay' : 'Approved'}
               </p>
               <p className="text-2xl font-bold text-blue-900">${summary.approved.toFixed(2)}</p>
-              {profile?.role === 'sales_rep' && (
+              {viewRole === 'sales_rep' && (
                 <p className="text-xs text-blue-600 mt-1">Payment pending</p>
               )}
             </div>
@@ -535,10 +540,10 @@ const CommissionManagement: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-green-700">
-                {profile?.role === 'sales_rep' ? 'Already Paid' : 'Paid'}
+                {viewRole === 'sales_rep' ? 'Already Paid' : 'Paid'}
               </p>
               <p className="text-2xl font-bold text-green-900">${summary.paid.toFixed(2)}</p>
-              {profile?.role === 'sales_rep' && (
+              {viewRole === 'sales_rep' && (
                 <p className="text-xs text-green-600 mt-1">Received</p>
               )}
             </div>
@@ -588,9 +593,10 @@ const CommissionManagement: React.FC = () => {
 
         <div className="overflow-x-auto">
           {(() => {
-            const isAdmin = profile?.role === 'admin';
-            const isSalesRep = profile?.role === 'sales_rep';
-            const isDistributorRole = profile?.role === 'distributor';
+            const isAdmin = viewRole === 'admin';
+            const isSalesRep = viewRole === 'sales_rep';
+            const isDistributorRole = viewRole === 'distributor';
+            const isRealAdmin = profile?.role === 'admin';
             // Column count per role: Order, [SalesRep], Org, [OrderTotal], [Margin], Commission, [CoRep], Status, Date, Actions
             const colCount = isAdmin ? 10 : isDistributorRole ? 7 : isSalesRep ? 5 : 7;
 
@@ -624,7 +630,7 @@ const CommissionManagement: React.FC = () => {
                 )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{isAdmin ? 'Actions' : ''}</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{isRealAdmin ? 'Actions' : ''}</th>
               </tr>
             </thead>
             <tbody className="bg-white">
@@ -748,7 +754,7 @@ const CommissionManagement: React.FC = () => {
                             >
                               <Eye className="h-4 w-4" />
                             </button>
-                            {isAdmin && commission.status === 'pending' && (
+                            {isRealAdmin && commission.status === 'pending' && (
                               <button
                                 onClick={() => handleApproveCommission(commission.id)}
                                 className="text-green-600 hover:text-green-900"
@@ -756,7 +762,7 @@ const CommissionManagement: React.FC = () => {
                                 <CheckCircle className="h-4 w-4" />
                               </button>
                             )}
-                            {isAdmin && commission.status === 'approved' && (
+                            {isRealAdmin && commission.status === 'approved' && (
                               <button
                                 onClick={() => handleMarkPaid(commission.id)}
                                 className="text-blue-600 hover:text-blue-900"
@@ -779,10 +785,11 @@ const CommissionManagement: React.FC = () => {
       </div>
 
       {selectedCommission && (() => {
-        const isAdmin = profile?.role === 'admin';
-        const isCompanyRep = selectedCommission.company_rep_id === user?.id;
-        const isSalesRep = profile?.role === 'sales_rep';
-        const isDistributorUser = profile?.role === 'distributor';
+        const isAdmin = viewRole === 'admin';
+        const isRealAdmin = profile?.role === 'admin';
+        const isCompanyRep = selectedCommission.company_rep_id === viewUserId;
+        const isSalesRep = viewRole === 'sales_rep';
+        const isDistributorUser = viewRole === 'distributor';
         const canSeeAll = isAdmin || isCompanyRep;
         const canSeeDistributor = canSeeAll || isDistributorUser;
 
@@ -978,7 +985,7 @@ const CommissionManagement: React.FC = () => {
                   >
                     Close
                   </button>
-                  {profile?.role === 'admin' && selectedCommission.status === 'pending' && (
+                  {isRealAdmin && selectedCommission.status === 'pending' && (
                     <button
                       onClick={() => handleApproveCommission(selectedCommission.id)}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -986,7 +993,7 @@ const CommissionManagement: React.FC = () => {
                       Approve Commission
                     </button>
                   )}
-                  {profile?.role === 'admin' && selectedCommission.status === 'approved' && (
+                  {isRealAdmin && selectedCommission.status === 'approved' && (
                     <button
                       onClick={() => handleMarkPaid(selectedCommission.id)}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
