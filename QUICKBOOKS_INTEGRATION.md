@@ -1,5 +1,9 @@
 # QuickBooks Online Integration Guide
 
+Technical integration guide for the QuickBooks Online API. For a features overview, see [QUICKBOOKS_FEATURES.md](./QUICKBOOKS_FEATURES.md). For setup instructions, see [QUICKBOOKS_SETUP_GUIDE.md](./QUICKBOOKS_SETUP_GUIDE.md).
+
+---
+
 ## Overview
 
 This application integrates with QuickBooks Online to provide:
@@ -9,11 +13,15 @@ This application integrates with QuickBooks Online to provide:
 - **Payment capture on shipment** - Authorize at checkout, capture when order ships
 - **Comprehensive sync logging** - Track all synchronization events and errors
 
+---
+
 ## Prerequisites
 
 1. **QuickBooks Online Account** with QuickBooks Payments enabled
 2. **QuickBooks Developer Account** at developer.intuit.com
 3. **OAuth 2.0 Credentials** (Client ID and Client Secret)
+
+---
 
 ## Setup Instructions
 
@@ -84,24 +92,26 @@ The migration SQL is stored in `/tmp/qb_migration.sql` and needs to be applied t
 4. Authorize the app
 5. You'll be redirected back with an active connection
 
+---
+
 ## Features
 
-### 1. Customer Synchronization
+### Customer Synchronization
 
-**Organizations → QuickBooks Customers**
+**Organizations to QuickBooks Customers**
 
 Organizations in your database are synced to QuickBooks as customers:
 - Company name, billing address, contact info
 - Automatic sync on order creation
 - Manual batch sync available in admin panel
 
-**Locations → QuickBooks Customers**
+**Locations to QuickBooks Customers**
 
 Locations can be synced as separate customers:
 - Formatted as "Organization Name - Location Name"
 - Maintains separate invoicing and payment methods per location
 
-### 2. Invoice Creation
+### Invoice Creation
 
 **Automatic Invoice Generation**
 
@@ -119,11 +129,12 @@ When an order is created:
 - Custom notes and order references
 - PDF generation and download
 
-### 3. Payment Processing
+### Payment Processing
 
 **Card Tokenization**
 
 Credit cards are tokenized using QuickBooks Payments API:
+
 ```typescript
 import { quickbooksPayments } from './services/quickbooks';
 
@@ -171,7 +182,7 @@ const token = await quickbooksPayments.tokenizeCard({
    );
    ```
 
-### 4. Stored Payment Methods
+### Stored Payment Methods
 
 Customers can save payment methods for future use:
 - Securely tokenized in QuickBooks Payments
@@ -179,7 +190,7 @@ Customers can save payment methods for future use:
 - Set default payment method per organization/location
 - Expiration date tracking and validation
 
-### 5. Sync Logging
+### Sync Logging
 
 All synchronization events are logged:
 - Entity type (customer, invoice, payment, etc.)
@@ -187,6 +198,8 @@ All synchronization events are logged:
 - Status (pending, success, failed, retry)
 - Full request and response data
 - Error messages for troubleshooting
+
+---
 
 ## Usage Examples
 
@@ -228,29 +241,38 @@ import { quickbooksPayments } from './services/quickbooks';
 await quickbooksPayments.captureOrderPayment(orderId);
 ```
 
+---
+
 ## Admin Panel Features
 
 ### Connection Tab
+
 - View connection status
 - Connect/disconnect QuickBooks account
 - View OAuth token expiration
 - Manual token refresh
 
 ### Sync Operations Tab
+
 - Batch sync all organizations
 - Create invoices for pending orders
 - View sync progress and results
 
 ### Sync Logs Tab
+
 - Real-time sync event monitoring
 - Filter by status (success, failed, pending)
 - View error messages
 - Export logs for troubleshooting
 
+---
+
 ## Database Schema
 
 ### quickbooks_credentials
+
 Stores OAuth tokens and connection information:
+
 ```sql
 - id (uuid)
 - realm_id (text) - QuickBooks company ID
@@ -264,7 +286,9 @@ Stores OAuth tokens and connection information:
 ```
 
 ### quickbooks_sync_log
+
 Tracks all synchronization events:
+
 ```sql
 - id (uuid)
 - entity_type (text) - customer, invoice, payment, etc.
@@ -280,15 +304,19 @@ Tracks all synchronization events:
 ```
 
 ### Extended Fields
+
 Added to existing tables:
 - **organizations**: `quickbooks_customer_id`, `last_synced_at`
 - **locations**: `quickbooks_customer_id`, `last_synced_at`
 - **orders**: `quickbooks_invoice_id`, `quickbooks_payment_id`, `sync_status`, `last_synced_at`
 - **payment_methods**: `quickbooks_payment_method_id`, `last_synced_at`
 
+---
+
 ## API Endpoints
 
 ### QuickBooks Online Accounting API
+
 Base URL (Sandbox): `https://sandbox-quickbooks.api.intuit.com/v3/company/{realmId}`
 
 **Customers**
@@ -306,6 +334,7 @@ Base URL (Sandbox): `https://sandbox-quickbooks.api.intuit.com/v3/company/{realm
 - `POST /payment` - Record payment to invoice
 
 ### QuickBooks Payments API
+
 Base URL (Sandbox): `https://sandbox.api.intuit.com/quickbooks/v4`
 
 **Tokenization**
@@ -315,6 +344,8 @@ Base URL (Sandbox): `https://sandbox.api.intuit.com/quickbooks/v4`
 - `POST /payments/charges` - Create charge (authorize or capture)
 - `POST /payments/charges/{id}/capture` - Capture authorized charge
 - `POST /payments/charges/{id}/refunds` - Refund or void charge
+
+---
 
 ## Security Best Practices
 
@@ -334,6 +365,8 @@ Base URL (Sandbox): `https://sandbox.api.intuit.com/quickbooks/v4`
    - All API calls use HTTPS
    - OAuth 2.0 bearer token authentication
    - Request/response logging for audit trail
+
+---
 
 ## Troubleshooting
 
@@ -378,6 +411,8 @@ Common error messages and solutions:
 | "Invoice not found" | Invoice deleted in QB | Recreate invoice from order |
 | "Token expired" | OAuth token needs refresh | Automatic refresh should trigger |
 
+---
+
 ## Testing
 
 ### Sandbox Environment
@@ -412,6 +447,8 @@ Test Data:
 - [ ] Payment recorded to invoice in QuickBooks
 - [ ] Sync logs show successful operations
 - [ ] Error handling works for failed operations
+
+---
 
 ## Production Deployment
 
@@ -451,12 +488,7 @@ Test Data:
 - Update QuickBooks API client if changes announced
 - Keep payment method tokens current (re-tokenize expired cards)
 
-## Support Resources
-
-- [QuickBooks API Documentation](https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer)
-- [QuickBooks Payments API](https://developer.intuit.com/app/developer/qbpayments/docs/api/resources/all-entities/charges)
-- [OAuth 2.0 Guide](https://developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization/oauth-2.0)
-- [Sandbox Test Data](https://developer.intuit.com/app/developer/qbo/docs/develop/sandboxes)
+---
 
 ## Appendix: Migration SQL
 
@@ -470,3 +502,15 @@ Key fields added:
 - Organizations, Locations: `quickbooks_customer_id`, `last_synced_at`
 - Orders: `quickbooks_invoice_id`, `quickbooks_payment_id`, `sync_status`, `last_synced_at`
 - Payment Methods: `quickbooks_payment_method_id`, `last_synced_at`
+
+---
+
+## Related Documentation
+
+- [QUICKBOOKS_FEATURES.md](./QUICKBOOKS_FEATURES.md) - QuickBooks features overview
+- [QUICKBOOKS_SETUP_GUIDE.md](./QUICKBOOKS_SETUP_GUIDE.md) - Setup and testing walkthrough
+- [PCI_COMPLIANCE.md](./PCI_COMPLIANCE.md) - Payment security compliance
+- [QuickBooks API Documentation](https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer)
+- [QuickBooks Payments API](https://developer.intuit.com/app/developer/qbpayments/docs/api/resources/all-entities/charges)
+- [OAuth 2.0 Guide](https://developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization/oauth-2.0)
+- [Sandbox Test Data](https://developer.intuit.com/app/developer/qbo/docs/develop/sandboxes)

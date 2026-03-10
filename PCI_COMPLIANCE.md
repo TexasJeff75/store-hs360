@@ -1,6 +1,8 @@
 # PCI Compliance Guide
 
-This document explains how payment methods are handled in a PCI DSS compliant manner.
+How payment methods are handled in a PCI DSS compliant manner using tokenization. For QuickBooks payment integration, see [QUICKBOOKS_FEATURES.md](./QUICKBOOKS_FEATURES.md). For quick start, see [PAYMENT_METHODS_QUICK_START.md](./PAYMENT_METHODS_QUICK_START.md).
+
+---
 
 ## Critical Security Rules
 
@@ -23,6 +25,8 @@ According to PCI DSS, you may store:
 - Card expiration date
 - Service code
 - Payment processor tokens (our primary method)
+
+---
 
 ## Our PCI Compliance Strategy
 
@@ -60,6 +64,8 @@ We use **tokenization** to achieve PCI compliance:
 │ - Name      │
 └─────────────┘
 ```
+
+---
 
 ## Implementation Details
 
@@ -105,6 +111,8 @@ RLS policies ensure:
 - Users can only view payment methods for their organizations
 - Only organization admins can add/update/delete payment methods
 - Payment tokens are never exposed unnecessarily
+
+---
 
 ## Integration Guide
 
@@ -230,6 +238,8 @@ async function processPayment(organizationId, amount) {
 }
 ```
 
+---
+
 ## Bank Accounts (ACH)
 
 For bank accounts, follow the same tokenization process:
@@ -270,6 +280,8 @@ await addPaymentMethod({
 });
 ```
 
+---
+
 ## Security Checklist
 
 - [ ] All payment data tokenized before reaching server
@@ -282,6 +294,8 @@ await addPaymentMethod({
 - [ ] Payment tokens stored securely
 - [ ] Access restricted to authorized users only
 - [ ] Regular security audits performed
+
+---
 
 ## Testing
 
@@ -306,6 +320,8 @@ Routing Number: 110000000
 Account Number: 000123456789
 Account Type: checking
 ```
+
+---
 
 ## Common Mistakes to Avoid
 
@@ -348,19 +364,14 @@ await supabase.from('payment_methods').insert({
 });
 ```
 
-## Resources
+---
 
+## Related Documentation
+
+- [PAYMENT_METHODS_QUICK_START.md](./PAYMENT_METHODS_QUICK_START.md) - Payment methods quick start guide
+- [QUICKBOOKS_FEATURES.md](./QUICKBOOKS_FEATURES.md) - QuickBooks features overview
+- [QUICKBOOKS_INTEGRATION.md](./QUICKBOOKS_INTEGRATION.md) - QuickBooks technical integration
 - [PCI DSS Quick Reference Guide](https://www.pcisecuritystandards.org/document_library)
 - [BigCommerce Payments API](https://developer.bigcommerce.com/api-docs/payments/payments-api-overview)
 - [Stripe Security Best Practices](https://stripe.com/docs/security/guide)
 - [PCI Tokenization Guidelines](https://www.pcisecuritystandards.org/documents/Tokenization_Guidelines_Info_Supplement.pdf)
-
-## Support
-
-If you have questions about PCI compliance:
-1. Consult with your payment processor's support team
-2. Review PCI DSS documentation
-3. Consider hiring a PCI compliance consultant
-4. Perform regular security audits
-
-**Remember: When in doubt, tokenize and let the payment processor handle sensitive data.**

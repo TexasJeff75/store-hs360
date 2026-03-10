@@ -1,6 +1,8 @@
 # REST API Checkout Flow
 
-This document describes the headless checkout implementation using BigCommerce REST APIs without redirects to hosted checkout pages.
+Headless checkout implementation using BigCommerce REST APIs without redirects to hosted checkout pages. For payment methods, see [PAYMENT_METHODS_QUICK_START.md](./PAYMENT_METHODS_QUICK_START.md). For PCI compliance, see [PCI_COMPLIANCE.md](./PCI_COMPLIANCE.md).
+
+---
 
 ## Overview
 

@@ -1,5 +1,9 @@
 # Netlify Functions Troubleshooting Guide
 
+Troubleshooting guide for Netlify Functions deployment issues. For diagnostics, see [NETLIFY_FUNCTIONS_DIAGNOSTIC.md](./NETLIFY_FUNCTIONS_DIAGNOSTIC.md). For general deployment, see [NETLIFY_DEPLOYMENT.md](./NETLIFY_DEPLOYMENT.md).
+
+---
+
 ## Issue: 404 Error on `/.netlify/functions/bigcommerce-cart` in Production
 
 If you're seeing a 404 error with HTML content in production, follow these steps:

@@ -1,8 +1,14 @@
 # Production Deployment Checklist
 
+Checklist for diagnosing and fixing production deployment issues, primarily 404 errors with Netlify Functions. For general development setup, see [DEVELOPMENT.md](./DEVELOPMENT.md). For Netlify deployment, see [NETLIFY_DEPLOYMENT.md](./NETLIFY_DEPLOYMENT.md).
+
+---
+
 ## The 404 Error: Root Cause
 
 When you see a 404 error with HTML content (instead of JSON), it means the Netlify Function is not being reached. The SPA fallback is returning the `index.html` page.
+
+---
 
 ## Required Steps to Fix
 
@@ -129,6 +135,8 @@ cat .gitignore | grep "netlify/functions"
 
 If it returns anything, remove that line from `.gitignore`.
 
+---
+
 ## Common Issues
 
 ### Issue: "Module not found" or "Cannot find module"
@@ -146,6 +154,8 @@ If it returns anything, remove that line from `.gitignore`.
 ### Issue: CORS errors in browser
 **Solution:** Function must return proper CORS headers (already implemented in `bigcommerce-cart.cjs`).
 
+---
+
 ## Quick Debug Steps
 
 **Step 1:** Visit `https://YOUR-SITE.netlify.app/.netlify/functions/bigcommerce-cart`
@@ -160,6 +170,8 @@ If it returns anything, remove that line from `.gitignore`.
 **Step 4:** Redeploy with cache cleared
 
 **Step 5:** Check function logs during checkout attempt
+
+---
 
 ## Still Not Working?
 
@@ -179,3 +191,12 @@ curl -X GET \
 ```
 
 If this curl command doesn't work, your token is invalid or has insufficient scopes.
+
+---
+
+## Related Documentation
+
+- [DEVELOPMENT.md](./DEVELOPMENT.md) - Development workflow and architecture
+- [NETLIFY_DEPLOYMENT.md](./NETLIFY_DEPLOYMENT.md) - Netlify deployment guide
+- [NETLIFY_FUNCTIONS_DIAGNOSTIC.md](./NETLIFY_FUNCTIONS_DIAGNOSTIC.md) - Netlify functions diagnostics
+- [ENV_SETUP.md](./ENV_SETUP.md) - Environment variable setup

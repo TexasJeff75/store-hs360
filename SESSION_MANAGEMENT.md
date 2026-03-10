@@ -1,6 +1,8 @@
 # Session Management & Security
 
-This document explains how user sessions are tracked, managed, and secured in the application.
+How user sessions are tracked, managed, and secured in the application, including automatic expiration, audit trails, and compliance features.
+
+---
 
 ## Overview
 
@@ -10,6 +12,8 @@ The application implements comprehensive session tracking to:
 - Track legitimate logouts vs. browser closures
 - Identify security risks from orphaned sessions
 - Provide audit trails for compliance
+
+---
 
 ## Session Lifecycle
 
@@ -47,6 +51,8 @@ When session times out due to inactivity:
 - Session is recorded as ended
 - User is redirected with `?session_expired=true` parameter
 
+---
+
 ## Database Schema
 
 ### login_audit Table
@@ -65,6 +71,8 @@ When session times out due to inactivity:
 - session_ended (boolean): True if explicit logout, false if browser close
 - created_at (timestamptz): Record creation time
 ```
+
+---
 
 ## Security Features
 
@@ -96,6 +104,8 @@ This function:
 - Uses `navigator.sendBeacon()` for reliable tracking even during page unload
 - Marks session as not explicitly ended (security audit flag)
 
+---
+
 ## API Reference
 
 ### sessionTrackingService
@@ -123,6 +133,8 @@ const timeRemaining = sessionTrackingService.getTimeUntilTimeout();
 await sessionTrackingService.cleanupOrphanedSessions();
 ```
 
+---
+
 ## Configuration
 
 ### Session Timeout
@@ -143,6 +155,8 @@ Configure in your Supabase dashboard under Authentication > Settings:
 - Refresh token expiry: Recommended 24 hours
 - Refresh token rotation: Enabled
 
+---
+
 ## Security Best Practices
 
 ### ✅ Implemented
@@ -161,6 +175,8 @@ Configure in your Supabase dashboard under Authentication > Settings:
 - [ ] Session revocation (admin force logout)
 - [ ] Concurrent session limits
 - [ ] Geographic location tracking
+
+---
 
 ## Monitoring & Auditing
 
@@ -209,6 +225,8 @@ GROUP BY email
 HAVING SUM(CASE WHEN session_ended = true THEN 1 ELSE 0 END) = 0;
 ```
 
+---
+
 ## Troubleshooting
 
 ### Session Expired Unexpectedly
@@ -228,6 +246,8 @@ Run the migration manually:
 psql -U postgres -d your_database -f supabase/migrations/20251128000000_add_session_tracking.sql
 ```
 
+---
+
 ## Compliance Notes
 
 ### GDPR
@@ -244,3 +264,11 @@ psql -U postgres -d your_database -f supabase/migrations/20251128000000_add_sess
 - 2-hour timeout meets typical requirements
 - Session logs provide required audit trail
 - Consider shorter timeout for high-security areas
+
+---
+
+## Related Documentation
+
+- [PRIVACY_COMPLIANCE_REPORT.md](./PRIVACY_COMPLIANCE_REPORT.md) - Privacy compliance assessment
+- [SECURITY_FIX_SUMMARY.md](./SECURITY_FIX_SUMMARY.md) - Security fix summary
+- [PCI_COMPLIANCE.md](./PCI_COMPLIANCE.md) - PCI compliance guide
