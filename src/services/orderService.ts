@@ -160,6 +160,42 @@ class OrderService {
     }
   }
 
+  async cancelOrder(orderId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Only allow cancellation of pending orders
+      const { order, error: fetchError } = await this.getOrderById(orderId);
+      if (fetchError || !order) {
+        return { success: false, error: fetchError || 'Order not found' };
+      }
+
+      if (order.status !== 'pending') {
+        return { success: false, error: 'Only pending orders can be cancelled' };
+      }
+
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          status: 'cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+        .eq('status', 'pending'); // Extra safety: only cancel if still pending
+
+      if (error) {
+        console.error('Error cancelling order:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to cancel order'
+      };
+    }
+  }
+
   async updateOrderStatus(
     orderId: string,
     status: string,

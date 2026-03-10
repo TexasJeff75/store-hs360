@@ -87,7 +87,7 @@ const OrderManagement: React.FC = () => {
       return;
     }
 
-    if (profile?.role === 'admin' || profile?.role === 'sales_rep') {
+    if (profile?.role === 'admin') {
       setCanManageOrders(true);
       return;
     }
@@ -173,6 +173,54 @@ const OrderManagement: React.FC = () => {
       console.error('Error fetching orders:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const canCancelOrder = (order: Order): boolean => {
+    if (canManageOrders) return true; // Admins can always cancel
+    return order.status === 'pending'; // Non-admins can only cancel pending orders
+  };
+
+  const handleCancelOrder = async (orderId: string) => {
+    const order = orders.find(o => o.id === orderId);
+    if (!order || order.status !== 'pending') {
+      alert('Only pending orders can be cancelled.');
+      return;
+    }
+
+    if (!confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const result = await orderService.cancelOrder(orderId);
+      if (!result.success) {
+        alert(`Failed to cancel order: ${result.error}`);
+        return;
+      }
+
+      if (user) {
+        activityLogService.logAction({
+          userId: user.id,
+          action: 'order_cancelled',
+          resourceType: 'order',
+          resourceId: orderId,
+          details: {
+            old_status: order.status,
+            new_status: 'cancelled',
+            customer_email: order.customer_email,
+            organization_id: order.organization_id,
+          },
+        });
+      }
+
+      await fetchOrders();
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder({ ...selectedOrder, status: 'cancelled' });
+      }
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      alert('Failed to cancel order. Please try again.');
     }
   };
 
@@ -681,9 +729,19 @@ const OrderManagement: React.FC = () => {
                           <option value="refunded">Refunded</option>
                         </select>
                       ) : (
-                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getStatusColor(order.status)}`}>
-                          {order.status}
-                        </span>
+                        <div className="flex items-center space-x-2">
+                          <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getStatusColor(order.status)}`}>
+                            {order.status}
+                          </span>
+                          {canCancelOrder(order) && order.status === 'pending' && (
+                            <button
+                              onClick={() => handleCancelOrder(order.id)}
+                              className="px-3 py-1 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded-full hover:bg-red-100 transition-colors"
+                            >
+                              Cancel Order
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
