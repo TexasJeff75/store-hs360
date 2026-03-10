@@ -241,7 +241,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
       case 'orders':
         return <OrderManagement />;
       case 'commissions':
-        return <CommissionManagement />;
+        return <CommissionManagement onNavigate={setActiveTab} />;
       case 'quickbooks':
         return <QuickBooksManagement />;
       case 'organizations':

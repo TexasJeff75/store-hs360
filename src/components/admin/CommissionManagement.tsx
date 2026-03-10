@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter, AlertTriangle, ChevronDown, ChevronRight, Printer } from 'lucide-react';
+import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter, AlertTriangle, ChevronDown, ChevronRight, Printer, ExternalLink } from 'lucide-react';
 import { commissionService, Commission } from '../../services/commissionService';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
@@ -15,7 +15,11 @@ interface DiagnosticData {
   ordersWithoutCommission: { id: string; status: string; sales_rep_id: string | null; organization_id: string | null; total: number; created_at: string }[];
 }
 
-const CommissionManagement: React.FC = () => {
+interface CommissionManagementProps {
+  onNavigate?: (tab: string) => void;
+}
+
+const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate }) => {
   const { user, profile, effectiveUserId, effectiveProfile, isImpersonating } = useAuth();
   const [commissions, setCommissions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -669,7 +673,18 @@ const CommissionManagement: React.FC = () => {
                     {group.commissions.map((commission) => (
                       <tr key={commission.id} className="hover:bg-gray-50 border-b border-gray-200">
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                          {commission.order_id.slice(0, 8)}...
+                          {onNavigate ? (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onNavigate('orders'); }}
+                              className="text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+                              title="View order"
+                            >
+                              {commission.order_id.slice(0, 8)}...
+                              <ExternalLink className="h-3 w-3" />
+                            </button>
+                          ) : (
+                            <>{commission.order_id.slice(0, 8)}...</>
+                          )}
                         </td>
                         {!isSalesRep && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -814,7 +829,18 @@ const CommissionManagement: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm text-gray-600">Order ID</label>
-                    <p className="font-medium text-xs break-all">{selectedCommission.order_id}</p>
+                    {onNavigate ? (
+                      <button
+                        onClick={() => { setSelectedCommission(null); onNavigate('orders'); }}
+                        className="font-medium text-xs break-all text-blue-600 hover:text-blue-800 hover:underline inline-flex items-center gap-1"
+                        title="View order details"
+                      >
+                        {selectedCommission.order_id}
+                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
+                      </button>
+                    ) : (
+                      <p className="font-medium text-xs break-all">{selectedCommission.order_id}</p>
+                    )}
                   </div>
                   {canSeeAll && (
                     <div>
