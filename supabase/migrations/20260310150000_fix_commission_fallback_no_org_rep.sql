@@ -1,19 +1,38 @@
 -- ══════════════════════════════════════════════════════════════════════════════
--- Fix: Commission trigger falls back to default 5% when order has sales_rep_id
--- but no organization_sales_reps record exists.
+-- Fix: Commission trigger properly resolves distributor chain when
+-- organization_sales_reps record is missing or incomplete.
 --
 -- Root cause: orders.sales_rep_id can be set from organizations.default_sales_rep_id
 -- without a corresponding organization_sales_reps row. The commission structure
 -- lookup (which joins organization_sales_reps) then returns NULL, and no
--- commission is created even though the rep is valid.
+-- commission is created — or worse, a bare 5% default is used instead of the
+-- correct distributor/wholesale configuration.
 --
 -- Fix approach:
---   1. Trigger: after the org_sales_reps lookup fails, fall back to a simple
---      5% margin-based commission with no distributor.
---   2. Also auto-create the missing organization_sales_reps record so the
---      data stays consistent for future orders.
+--   1. Trigger: after org_sales_reps lookup fails, look up through
+--      distributor_rep_customers to find the proper distributor config.
+--      Auto-create the missing organization_sales_reps record WITH the
+--      correct distributor_id, then re-run the structure lookup.
+--      Only fall back to default 5% if truly no distributor is configured.
+--   2. Re-sync any corrupted organization_sales_reps records by re-running
+--      the distributor_rep_customers → organization_sales_reps sync.
 -- ══════════════════════════════════════════════════════════════════════════════
 
+-- First: re-sync all distributor_rep_customers → organization_sales_reps
+-- This fixes any records that were corrupted by a previous migration
+UPDATE organization_sales_reps osr
+SET
+  distributor_id = drc.distributor_id,
+  commission_rate = COALESCE(d.commission_rate, osr.commission_rate),
+  updated_at = now()
+FROM distributor_rep_customers drc
+JOIN distributors d ON d.id = drc.distributor_id AND d.is_active = true
+WHERE osr.organization_id = drc.organization_id
+  AND osr.sales_rep_id = drc.sales_rep_id
+  AND drc.is_active = true
+  AND (osr.distributor_id IS NULL OR osr.distributor_id != drc.distributor_id);
+
+-- Now recreate the commission trigger
 DROP TRIGGER IF EXISTS trigger_calculate_commission ON orders;
 DROP FUNCTION IF EXISTS calculate_commission_for_order();
 
@@ -58,6 +77,9 @@ DECLARE
   v_company_rep_rate      numeric(5,2);
   v_company_rep_commission numeric(10,2) := 0;
   v_your_margin           numeric(10,2) := 0;
+  -- fallback distributor lookup
+  v_fallback_distributor_id uuid;
+  v_fallback_dist_rate    numeric(5,2);
 BEGIN
   -- Only calculate commission for completed orders
   IF NEW.status != 'completed' THEN
@@ -128,28 +150,91 @@ BEGIN
 
   -- ══════════════════════════════════════════════════════════════════════════
   -- FALLBACK: No organization_sales_reps record found.
-  -- This happens when an org has default_sales_rep_id set but no matching
-  -- organization_sales_reps row. Use default 5% margin-based commission
-  -- and auto-create the missing org-rep link for consistency.
+  -- Before defaulting to bare 5%, check if this rep is assigned through
+  -- distributor_rep_customers. If so, create the proper org-rep link with
+  -- the distributor_id and re-run the structure lookup.
   -- ══════════════════════════════════════════════════════════════════════════
   IF v_commission_rate IS NULL AND NEW.organization_id IS NOT NULL THEN
-    v_commission_rate       := 5.00;
-    v_distributor_id        := NULL;
-    v_commission_split_type := 'none';
-    v_sales_rep_rate        := 100;
-    v_distributor_override_rate := 0;
-    v_base_distributor_rate := 5.00;
-    v_base_dist_type        := 'percent_margin';
-    v_use_customer_price    := false;
-    v_pricing_model         := 'margin_split';
-    v_company_rep_id        := NULL;
-    v_company_rep_rate      := 0;
 
-    -- Auto-create the missing organization_sales_reps record
-    INSERT INTO organization_sales_reps (organization_id, sales_rep_id, commission_rate, is_active)
-    VALUES (NEW.organization_id, v_resolved_sales_rep_id, 5.00, true)
-    ON CONFLICT (organization_id, sales_rep_id) DO UPDATE
-    SET is_active = true, updated_at = now();
+    -- Try to find the distributor assignment
+    SELECT drc.distributor_id, COALESCE(d.commission_rate, 0)
+    INTO v_fallback_distributor_id, v_fallback_dist_rate
+    FROM distributor_rep_customers drc
+    JOIN distributors d ON d.id = drc.distributor_id AND d.is_active = true
+    WHERE drc.organization_id = NEW.organization_id
+      AND drc.sales_rep_id = v_resolved_sales_rep_id
+      AND drc.is_active = true
+    LIMIT 1;
+
+    IF v_fallback_distributor_id IS NOT NULL THEN
+      -- Create the missing org-rep record with proper distributor link
+      INSERT INTO organization_sales_reps (
+        organization_id, sales_rep_id, distributor_id, commission_rate, is_active
+      ) VALUES (
+        NEW.organization_id, v_resolved_sales_rep_id,
+        v_fallback_distributor_id, v_fallback_dist_rate, true
+      )
+      ON CONFLICT (organization_id, sales_rep_id) DO UPDATE
+      SET
+        distributor_id = v_fallback_distributor_id,
+        commission_rate = v_fallback_dist_rate,
+        is_active = true,
+        updated_at = now();
+
+      -- Re-run the full structure lookup now that the record exists
+      SELECT
+        osr.commission_rate,
+        osr.distributor_id,
+        COALESCE(dsr.commission_split_type, 'none'),
+        COALESCE(dsr.sales_rep_rate, 100),
+        COALESCE(dsr.distributor_override_rate, 0),
+        COALESCE(d.commission_rate, osr.commission_rate),
+        COALESCE(d.commission_type, 'percent_margin'),
+        COALESCE(d.use_customer_price, false),
+        COALESCE(d.pricing_model, 'margin_split'),
+        d.company_rep_id,
+        COALESCE(d.company_rep_rate, 0)
+      INTO
+        v_commission_rate,
+        v_distributor_id,
+        v_commission_split_type,
+        v_sales_rep_rate,
+        v_distributor_override_rate,
+        v_base_distributor_rate,
+        v_base_dist_type,
+        v_use_customer_price,
+        v_pricing_model,
+        v_company_rep_id,
+        v_company_rep_rate
+      FROM organization_sales_reps osr
+      LEFT JOIN distributors d ON d.id = osr.distributor_id AND d.is_active = true
+      LEFT JOIN distributor_sales_reps dsr ON dsr.distributor_id = osr.distributor_id
+        AND dsr.sales_rep_id = osr.sales_rep_id
+        AND dsr.is_active = true
+      WHERE osr.organization_id = NEW.organization_id
+        AND osr.sales_rep_id = v_resolved_sales_rep_id
+        AND osr.is_active = true
+      LIMIT 1;
+
+    ELSE
+      -- No distributor found at all — true fallback to default 5% margin-based
+      v_commission_rate       := 5.00;
+      v_distributor_id        := NULL;
+      v_commission_split_type := 'none';
+      v_sales_rep_rate        := 100;
+      v_distributor_override_rate := 0;
+      v_base_distributor_rate := 5.00;
+      v_base_dist_type        := 'percent_margin';
+      v_use_customer_price    := false;
+      v_pricing_model         := 'margin_split';
+      v_company_rep_id        := NULL;
+      v_company_rep_rate      := 0;
+
+      -- Create the bare org-rep record (no distributor)
+      INSERT INTO organization_sales_reps (organization_id, sales_rep_id, commission_rate, is_active)
+      VALUES (NEW.organization_id, v_resolved_sales_rep_id, 5.00, true)
+      ON CONFLICT (organization_id, sales_rep_id) DO NOTHING;
+    END IF;
   END IF;
 
   IF v_commission_rate IS NOT NULL AND NEW.items IS NOT NULL THEN
@@ -434,5 +519,5 @@ CREATE TRIGGER trigger_calculate_commission
 
 COMMENT ON FUNCTION calculate_commission_for_order() IS
   'Calculates commission when an order is completed. Resolves sales rep from '
-  'order or organization_sales_reps. Falls back to default 5% margin-based '
-  'commission if no org-rep assignment exists, and auto-creates the missing link.';
+  'order or organization_sales_reps. Falls back through distributor_rep_customers '
+  'chain before defaulting to 5%, auto-creates missing org-rep links.';
