@@ -107,15 +107,25 @@ class OrderService {
             }
           } else {
             // Ensure organization_sales_reps record exists for the default rep
-            // so the commission trigger can look up rate/structure
-            await supabase
+            // so the commission trigger can look up rate/structure.
+            // Only insert if no record exists — never overwrite distributor-linked records.
+            const { data: existingOsr } = await supabase
               .from('organization_sales_reps')
-              .upsert({
-                organization_id: data.organizationId,
-                sales_rep_id: salesRepId,
-                commission_rate: 5.00,
-                is_active: true,
-              }, { onConflict: 'organization_id,sales_rep_id' });
+              .select('id')
+              .eq('organization_id', data.organizationId)
+              .eq('sales_rep_id', salesRepId)
+              .maybeSingle();
+
+            if (!existingOsr) {
+              await supabase
+                .from('organization_sales_reps')
+                .insert({
+                  organization_id: data.organizationId,
+                  sales_rep_id: salesRepId,
+                  commission_rate: 5.00,
+                  is_active: true,
+                });
+            }
           }
         }
       }
