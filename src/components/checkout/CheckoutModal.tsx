@@ -474,12 +474,60 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       let paymentStatus = 'authorized';
 
       if (paymentData.type === 'card') {
-        const authResponse = await quickbooksPayments.authorizeCard(
-          total,
-          paymentData.token,
-          'USD',
-          `Order from checkout session ${sessionId}`
-        );
+        let authResponse;
+
+        if (paymentData.savePaymentMethod && selectedOrgId && user?.id) {
+          // Vault the card first to get a reusable token, then charge with it.
+          // Vaulting consumes the single-use token, so we must vault BEFORE charging.
+          try {
+            const { data: { session: authSession } } = await supabase.auth.getSession();
+            const vaultResponse = await fetch('/api/vault-payment-method', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${authSession?.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                token: paymentData.token,
+                organizationId: selectedOrgId,
+                paymentType: 'credit_card',
+                label: paymentData.paymentMethodLabel || `Card ****${paymentData.lastFour}`,
+                lastFour: paymentData.lastFour,
+                expiryMonth: parseInt(paymentData.expiryMonth),
+                expiryYear: parseInt('20' + paymentData.expiryYear),
+                accountHolderName: paymentData.cardholderName,
+              }),
+            });
+
+            const vaultResult = await vaultResponse.json();
+            if (!vaultResponse.ok || vaultResult.error) {
+              console.warn('Failed to vault card, falling back to single-use token:', vaultResult.error);
+              // Fall back to single-use token charge (card won't be saved for reuse)
+              authResponse = await quickbooksPayments.authorizeCard(
+                total, paymentData.token, 'USD',
+                `Order from checkout session ${sessionId}`
+              );
+            } else {
+              // Charge using the reusable card-on-file ID
+              authResponse = await quickbooksPayments.authorizeCardOnFile(
+                total, vaultResult.reusableToken, 'USD',
+                `Order from checkout session ${sessionId}`
+              );
+            }
+          } catch (vaultErr) {
+            console.warn('Vault error, falling back to single-use token:', vaultErr);
+            authResponse = await quickbooksPayments.authorizeCard(
+              total, paymentData.token, 'USD',
+              `Order from checkout session ${sessionId}`
+            );
+          }
+        } else {
+          // No save requested — use single-use token directly
+          authResponse = await quickbooksPayments.authorizeCard(
+            total, paymentData.token, 'USD',
+            `Order from checkout session ${sessionId}`
+          );
+        }
 
         if (authResponse.status === 'DECLINED') {
           console.warn('Card payment declined:', { sessionId, lastFour: paymentData.lastFour });
@@ -491,31 +539,58 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
         paymentAuthId = authResponse.id;
         paymentLastFour = paymentData.lastFour;
+      } else if (paymentData.type === 'ach') {
+        let achResponse;
 
         if (paymentData.savePaymentMethod && selectedOrgId && user?.id) {
+          // Vault the bank account first, then charge with the reusable ID
           try {
-            await quickbooksPayments.savePaymentMethod({
-              organizationId: selectedOrgId,
-              userId: user.id,
-              label: paymentData.paymentMethodLabel || `Card ****${paymentLastFour}`,
-              paymentType: 'credit_card',
-              lastFour: paymentLastFour,
-              expiryMonth: parseInt(paymentData.expiryMonth),
-              expiryYear: parseInt('20' + paymentData.expiryYear),
-              accountHolderName: paymentData.cardholderName,
-              token: paymentData.token,
+            const { data: { session: authSession } } = await supabase.auth.getSession();
+            const acctTypeLower = paymentData.accountType.toLowerCase();
+            const vaultResponse = await fetch('/api/vault-payment-method', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${authSession?.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                token: paymentData.token,
+                organizationId: selectedOrgId,
+                paymentType: 'ach',
+                label: paymentData.paymentMethodLabel || `Bank ****${paymentData.lastFour}`,
+                lastFour: paymentData.lastFour,
+                accountHolderName: paymentData.accountHolderName,
+                accountType: acctTypeLower.includes('checking') ? 'checking' : 'savings',
+              }),
             });
-          } catch (saveErr) {
-            console.warn('Failed to save card payment method:', saveErr);
+
+            const vaultResult = await vaultResponse.json();
+            if (!vaultResponse.ok || vaultResult.error) {
+              console.warn('Failed to vault bank account, falling back to single-use token:', vaultResult.error);
+              achResponse = await quickbooksPayments.processACHWithToken(
+                total, paymentData.token, 'USD',
+                `Order from checkout session ${sessionId}`
+              );
+            } else {
+              // Charge using the reusable bank-on-file ID
+              achResponse = await quickbooksPayments.processACHWithToken(
+                total, vaultResult.reusableToken, 'USD',
+                `Order from checkout session ${sessionId}`
+              );
+            }
+          } catch (vaultErr) {
+            console.warn('Vault error, falling back to single-use token:', vaultErr);
+            achResponse = await quickbooksPayments.processACHWithToken(
+              total, paymentData.token, 'USD',
+              `Order from checkout session ${sessionId}`
+            );
           }
+        } else {
+          achResponse = await quickbooksPayments.processACHWithToken(
+            total, paymentData.token, 'USD',
+            `Order from checkout session ${sessionId}`
+          );
         }
-      } else if (paymentData.type === 'ach') {
-        const achResponse = await quickbooksPayments.processACHWithToken(
-          total,
-          paymentData.token,
-          'USD',
-          `Order from checkout session ${sessionId}`
-        );
 
         if (achResponse.status === 'DECLINED') {
           console.warn('ACH payment declined:', { sessionId, lastFour: paymentData.lastFour });
@@ -528,24 +603,6 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         paymentAuthId = achResponse.id;
         paymentLastFour = paymentData.lastFour;
         paymentStatus = 'pending';
-
-        if (paymentData.savePaymentMethod && selectedOrgId && user?.id) {
-          try {
-            const acctTypeLower = paymentData.accountType.toLowerCase();
-            await quickbooksPayments.savePaymentMethod({
-              organizationId: selectedOrgId,
-              userId: user.id,
-              label: paymentData.paymentMethodLabel || `Bank ****${paymentLastFour}`,
-              paymentType: 'ach',
-              lastFour: paymentLastFour,
-              accountHolderName: paymentData.accountHolderName,
-              accountType: acctTypeLower.includes('checking') ? 'checking' : 'savings',
-              token: paymentData.token,
-            });
-          } catch (saveErr) {
-            console.warn('Failed to save ACH payment method:', saveErr);
-          }
-        }
       } else if (paymentData.type === 'saved') {
         const { data: { session: authSession } } = await supabase.auth.getSession();
 

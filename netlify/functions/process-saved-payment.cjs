@@ -258,7 +258,7 @@ exports.handler = async (event) => {
       requestBody = {
         amount: amount.toFixed(2),
         currency: currency || 'USD',
-        token: token,
+        cardOnFile: token,
         capture: false,
         description: description || 'Saved payment method authorization',
         context: { mobile: false, isEcommerce: true },
