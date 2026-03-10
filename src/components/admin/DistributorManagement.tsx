@@ -1147,7 +1147,7 @@ const DistributorManagement: React.FC = () => {
                             {' · '}
                             <strong>Sales person splits your margin:</strong>{' '}
                             {reps.map((dsr) =>
-                              `${dsr.profiles?.email?.split('@')[0]} → ${dsr.sales_rep_rate}% of your margin`
+                              `${dsr.profiles?.email?.split('@')[0]} → ${dsr.sales_rep_rate}% of distributor spread`
                             ).join(', ')}
                           </>
                         )}
