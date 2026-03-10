@@ -962,8 +962,8 @@ const OrderManagement: React.FC = () => {
               </div>
             )}
 
-            {/* Commission Status */}
-            {canManageOrders && (
+            {/* Commission Status — never visible to customer users */}
+            {canManageOrders && profile?.role !== 'customer' && (
               <div className={`border rounded-lg p-4 ${
                 orderCommission ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
               }`}>
@@ -988,10 +988,6 @@ const OrderManagement: React.FC = () => {
                       <div>
                         <span className="text-gray-600 block text-xs">Commission Amount</span>
                         <span className="font-semibold text-green-700">${Number(orderCommission.commission_amount).toFixed(2)}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600 block text-xs">Rate</span>
-                        <span className="font-medium">{Number(orderCommission.commission_rate).toFixed(1)}%</span>
                       </div>
                       <div>
                         <span className="text-gray-600 block text-xs">Sales Rep</span>

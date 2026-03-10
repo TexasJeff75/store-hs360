@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter, AlertTriangle, ChevronDown, ChevronRight } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter, AlertTriangle, ChevronDown, ChevronRight, Printer } from 'lucide-react';
 import { commissionService, Commission } from '../../services/commissionService';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
@@ -744,24 +744,43 @@ const CommissionManagement: React.FC = () => {
         </div>
       </div>
 
-      {selectedCommission && (
+      {selectedCommission && (() => {
+        const isAdmin = profile?.role === 'admin';
+        const isCompanyRep = selectedCommission.company_rep_id === user?.id;
+        const isSalesRep = profile?.role === 'sales_rep';
+        const isDistributorUser = profile?.role === 'distributor';
+        const canSeeAll = isAdmin || isCompanyRep;
+        const canSeeDistributor = canSeeAll || isDistributorUser;
+
+        return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20">
-            <div className="fixed inset-0 bg-black bg-opacity-50"></div>
+            <div className="fixed inset-0 bg-black bg-opacity-50 print:hidden" onClick={() => setSelectedCommission(null)}></div>
 
-            <div className="relative bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Commission Details</h3>
+            <div className="relative bg-white rounded-lg shadow-xl max-w-3xl w-full p-6 print:shadow-none print:max-w-none print:rounded-none">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-900">Commission Details</h3>
+                <button
+                  onClick={() => window.print()}
+                  className="print:hidden text-gray-500 hover:text-gray-700 flex items-center space-x-1 text-sm"
+                >
+                  <Printer className="h-4 w-4" />
+                  <span>Print</span>
+                </button>
+              </div>
 
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm text-gray-600">Order ID</label>
-                    <p className="font-medium">{selectedCommission.order_id}</p>
+                    <p className="font-medium text-xs break-all">{selectedCommission.order_id}</p>
                   </div>
-                  <div>
-                    <label className="text-sm text-gray-600">Sales Rep</label>
-                    <p className="font-medium">{selectedCommission.sales_rep?.email}</p>
-                  </div>
+                  {canSeeAll && (
+                    <div>
+                      <label className="text-sm text-gray-600">Sales Rep</label>
+                      <p className="font-medium">{selectedCommission.sales_rep?.email}</p>
+                    </div>
+                  )}
                   <div>
                     <label className="text-sm text-gray-600">Organization</label>
                     <p className="font-medium">{selectedCommission.organization?.name || 'N/A'}</p>
@@ -773,43 +792,62 @@ const CommissionManagement: React.FC = () => {
                       <span>{selectedCommission.status}</span>
                     </span>
                   </div>
-                  <div>
-                    <label className="text-sm text-gray-600">Order Total</label>
-                    <p className="font-medium">${Number(selectedCommission.order_total).toFixed(2)}</p>
-                  </div>
-                  <div>
-                    <label className="text-sm text-gray-600">Product Margin</label>
-                    <p className="font-medium text-blue-600">
-                      {selectedCommission.product_margin
-                        ? `$${Number(selectedCommission.product_margin).toFixed(2)}`
-                        : 'No cost data'}
-                    </p>
-                  </div>
-                  <div>
-                    <label className="text-sm text-gray-600">Commission Rate</label>
-                    <p className="font-medium">{Number(selectedCommission.commission_rate).toFixed(2)}%</p>
-                  </div>
-                  <div>
-                    <label className="text-sm text-gray-600">Commission Amount</label>
+                  {canSeeAll && (
                     <div>
-                      <p className="font-bold text-green-600 text-lg">${Number(selectedCommission.commission_amount).toFixed(2)}</p>
-                      {selectedCommission.distributor_id && (
-                        <div className="mt-2 text-sm space-y-1">
-                          <p className="text-gray-700">
-                            Sales Rep Commission: <span className="font-semibold text-green-600">${Number(selectedCommission.sales_rep_commission || 0).toFixed(2)}</span>
-                          </p>
-                          <p className="text-gray-700">
-                            Distributor Commission: <span className="font-semibold text-blue-600">${Number(selectedCommission.distributor_commission || 0).toFixed(2)}</span>
-                          </p>
-                          {Number(selectedCommission.company_rep_commission || 0) > 0 && (
-                            <p className="text-gray-700">
-                              Company Rep Commission: <span className="font-semibold text-indigo-600">${Number(selectedCommission.company_rep_commission).toFixed(2)}</span>
-                            </p>
+                      <label className="text-sm text-gray-600">Order Total</label>
+                      <p className="font-medium">${Number(selectedCommission.order_total).toFixed(2)}</p>
+                    </div>
+                  )}
+                  {canSeeAll && (
+                    <div>
+                      <label className="text-sm text-gray-600">Product Margin</label>
+                      <p className="font-medium text-blue-600">
+                        {selectedCommission.product_margin
+                          ? `$${Number(selectedCommission.product_margin).toFixed(2)}`
+                          : 'No cost data'}
+                      </p>
+                    </div>
+                  )}
+                  <div>
+                    <label className="text-sm text-gray-600">
+                      {isSalesRep ? 'Your Commission' : isDistributorUser ? 'Commission Amount' : 'Commission Amount'}
+                    </label>
+                    <div>
+                      {isSalesRep ? (
+                        <p className="font-bold text-green-600 text-lg">${Number(selectedCommission.sales_rep_commission || selectedCommission.commission_amount).toFixed(2)}</p>
+                      ) : isDistributorUser ? (
+                        <>
+                          <p className="font-bold text-green-600 text-lg">${Number(selectedCommission.commission_amount).toFixed(2)}</p>
+                          {selectedCommission.distributor_id && (
+                            <div className="mt-2 text-sm space-y-1">
+                              <p className="text-gray-700">
+                                Sales Rep: <span className="font-semibold text-green-600">${Number(selectedCommission.sales_rep_commission || 0).toFixed(2)}</span>
+                              </p>
+                              <p className="text-gray-700">
+                                Distributor: <span className="font-semibold text-blue-600">${Number(selectedCommission.distributor_commission || 0).toFixed(2)}</span>
+                              </p>
+                            </div>
                           )}
-                          <p className="text-xs text-gray-500 italic mt-1">
-                            Split Type: {selectedCommission.commission_split_type === 'percentage_of_distributor' ? 'Percentage of Distributor' : selectedCommission.commission_split_type === 'none' ? 'Direct' : 'Fixed with Override'}
-                          </p>
-                        </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-bold text-green-600 text-lg">${Number(selectedCommission.commission_amount).toFixed(2)}</p>
+                          {selectedCommission.distributor_id && (
+                            <div className="mt-2 text-sm space-y-1">
+                              <p className="text-gray-700">
+                                Sales Rep: <span className="font-semibold text-green-600">${Number(selectedCommission.sales_rep_commission || 0).toFixed(2)}</span>
+                              </p>
+                              <p className="text-gray-700">
+                                Distributor: <span className="font-semibold text-blue-600">${Number(selectedCommission.distributor_commission || 0).toFixed(2)}</span>
+                              </p>
+                              {Number(selectedCommission.company_rep_commission || 0) > 0 && (
+                                <p className="text-gray-700">
+                                  Company Rep: <span className="font-semibold text-indigo-600">${Number(selectedCommission.company_rep_commission).toFixed(2)}</span>
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -819,103 +857,70 @@ const CommissionManagement: React.FC = () => {
                   </div>
                 </div>
 
-                {selectedCommission.margin_details && selectedCommission.margin_details.length > 0 && (
-                  <>
-                    <div className="mt-4">
-                      <label className="text-sm font-semibold text-gray-700 mb-2 block">Margin Breakdown</label>
-                      <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                        {selectedCommission.margin_details.map((item: any, index: number) => (
-                          <div key={index} className="flex justify-between items-center text-sm">
-                            <div className="flex-1">
-                              <p className="font-medium">{item.name}</p>
-                              <p className="text-xs text-gray-500">
-                                ${Number(item.price).toFixed(2)} - ${Number(item.cost).toFixed(2)} = ${(Number(item.price) - Number(item.cost)).toFixed(2)} × {item.quantity}
-                              </p>
-                            </div>
-                            <p className="font-semibold text-blue-600">${Number(item.margin).toFixed(2)}</p>
-                          </div>
-                        ))}
-                        <div className="border-t pt-2 mt-2 flex justify-between font-semibold">
-                          <span>Total Product Margin:</span>
-                          <span className="text-blue-600">${Number(selectedCommission.product_margin).toFixed(2)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <label className="text-sm font-semibold text-gray-700 mb-2 block">Commission Breakdown</label>
-                      <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-                        {orderItems.length > 0 ? orderItems.map((item: any, index: number) => {
-                          const cost = Number(item.cost || 0);
-                          const price = Number(item.price || 0);
-                          const quantity = Number(item.quantity || 1);
-                          const markup = Number(item.markup || 0);
-                          const hasMarkup = markup > 0;
-
-                          const margin = (price - cost) * quantity;
-                          const effectiveRate = hasMarkup ? 100 : Number(selectedCommission.commission_rate);
-                          const commission = hasMarkup ? margin : (margin * effectiveRate / 100);
-
-                          return (
-                            <div key={index} className="text-sm border-b border-gray-200 pb-2 last:border-b-0 last:pb-0">
-                              <div className="flex justify-between items-start mb-1">
-                                <p className="font-medium">{item.name}</p>
-                                <p className="font-semibold text-green-600">${commission.toFixed(2)}</p>
-                              </div>
-                              <div className="ml-2 space-y-0.5">
-                                <div className="flex justify-between text-xs text-gray-600">
-                                  <span>Base Commission ({effectiveRate.toFixed(2)}% of ${margin.toFixed(2)})</span>
-                                  <span className="text-green-600">${commission.toFixed(2)}</span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        }) : selectedCommission.margin_details?.map((item: any, index: number) => {
-                          const hasMarkup = item.hasMarkup || false;
-                          const baseCommission = Number(item.baseCommission || 0);
-                          const markupCommission = Number(item.markupCommission || 0);
-                          const totalCommission = Number(item.totalCommission || 0);
-                          const baseMargin = Number(item.baseMargin || 0);
-                          const markupAmount = Number(item.markupAmount || 0);
-                          const margin = Number(item.margin || 0);
-
-                          // For items with markup, the commission is 100% of the total margin
-                          const effectiveRate = hasMarkup ? 100 : Number(selectedCommission.commission_rate);
-                          const displayMargin = hasMarkup ? margin : baseMargin;
-
-                          return (
-                            <div key={index} className="text-sm border-b border-gray-200 pb-2 last:border-b-0 last:pb-0">
-                              <div className="flex justify-between items-start mb-1">
-                                <p className="font-medium">{item.name}</p>
-                                <p className="font-semibold text-green-600">${totalCommission.toFixed(2)}</p>
-                              </div>
-                              <div className="ml-2 space-y-0.5">
-                                <div className="flex justify-between text-xs text-gray-600">
-                                  <span>Base Commission ({effectiveRate.toFixed(2)}% of ${displayMargin.toFixed(2)})</span>
-                                  <span className="text-green-600">${totalCommission.toFixed(2)}</span>
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                        <div className="border-t pt-2 mt-2 flex justify-between font-semibold">
-                          <span>Total Commission:</span>
-                          <div>
-                            <span className="text-green-600 font-semibold">${Number(selectedCommission.commission_amount).toFixed(2)}</span>
-                            {selectedCommission.distributor_id && (
-                              <div className="mt-1 text-xs text-gray-600 space-y-0.5">
-                                <div>Rep: ${Number(selectedCommission.sales_rep_commission || 0).toFixed(2)}</div>
-                                <div>Dist: ${Number(selectedCommission.distributor_commission || 0).toFixed(2)}</div>
-                                {Number(selectedCommission.company_rep_commission || 0) > 0 && (
-                                  <div className="text-indigo-600">Co Rep: ${Number(selectedCommission.company_rep_commission).toFixed(2)}</div>
-                                )}
-                              </div>
+                {/* Line Item Details — visible to admin, company rep, and distributor */}
+                {canSeeDistributor && selectedCommission.margin_details && selectedCommission.margin_details.length > 0 && (
+                  <div className="mt-4">
+                    <label className="text-sm font-semibold text-gray-700 mb-2 block">Line Item Commission Details</label>
+                    <div className="bg-gray-50 rounded-lg overflow-hidden">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="bg-gray-100 text-left text-xs text-gray-600">
+                            <th className="px-3 py-2">Product</th>
+                            <th className="px-3 py-2 text-right">Qty</th>
+                            {canSeeAll && <th className="px-3 py-2 text-right">Cost</th>}
+                            <th className="px-3 py-2 text-right">Price</th>
+                            {canSeeAll && <th className="px-3 py-2 text-right">Margin</th>}
+                            {selectedCommission.margin_details[0]?.wholesalePrice !== undefined && (
+                              <th className="px-3 py-2 text-right">Wholesale</th>
                             )}
-                          </div>
-                        </div>
-                      </div>
+                            {selectedCommission.margin_details[0]?.wholesalePrice !== undefined && (
+                              <th className="px-3 py-2 text-right">Spread</th>
+                            )}
+                            <th className="px-3 py-2 text-right">Commission</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {selectedCommission.margin_details.map((item: any, index: number) => {
+                            const isWholesale = item.wholesalePrice !== undefined;
+                            const spread = isWholesale ? Number(item.spread || 0) : 0;
+                            const itemCommission = Number(item.totalCommission || item.commission || item.margin || 0);
+                            return (
+                              <tr key={index} className="text-xs">
+                                <td className="px-3 py-2 font-medium">{item.name}</td>
+                                <td className="px-3 py-2 text-right">{item.quantity}</td>
+                                {canSeeAll && <td className="px-3 py-2 text-right">${Number(item.cost).toFixed(2)}</td>}
+                                <td className="px-3 py-2 text-right">${Number(item.price).toFixed(2)}</td>
+                                {canSeeAll && <td className="px-3 py-2 text-right text-blue-600">${Number(item.margin).toFixed(2)}</td>}
+                                {isWholesale && (
+                                  <td className="px-3 py-2 text-right">${Number(item.wholesalePrice).toFixed(2)}</td>
+                                )}
+                                {isWholesale && (
+                                  <td className="px-3 py-2 text-right text-orange-600">${spread.toFixed(2)}</td>
+                                )}
+                                <td className="px-3 py-2 text-right font-semibold text-green-600">${itemCommission.toFixed(2)}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-gray-100 font-semibold text-xs">
+                            <td className="px-3 py-2" colSpan={canSeeAll ? (selectedCommission.margin_details[0]?.wholesalePrice !== undefined ? 6 : 4) : (selectedCommission.margin_details[0]?.wholesalePrice !== undefined ? 4 : 2)}>
+                              Totals
+                            </td>
+                            {canSeeAll && selectedCommission.margin_details[0]?.wholesalePrice === undefined && (
+                              <td className="px-3 py-2 text-right text-blue-600">${Number(selectedCommission.product_margin).toFixed(2)}</td>
+                            )}
+                            {selectedCommission.margin_details[0]?.wholesalePrice !== undefined && (
+                              <td className="px-3 py-2 text-right text-orange-600">
+                                ${selectedCommission.margin_details.reduce((sum: number, i: any) => sum + Number(i.spread || 0), 0).toFixed(2)}
+                              </td>
+                            )}
+                            <td className="px-3 py-2 text-right text-green-600">${Number(selectedCommission.commission_amount).toFixed(2)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
                     </div>
-                  </>
+                  </div>
                 )}
 
                 {selectedCommission.notes && (
@@ -932,7 +937,7 @@ const CommissionManagement: React.FC = () => {
                   </div>
                 )}
 
-                <div className="flex justify-end space-x-3 mt-6">
+                <div className="flex justify-end space-x-3 mt-6 print:hidden">
                   <button
                     onClick={() => setSelectedCommission(null)}
                     className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -960,7 +965,8 @@ const CommissionManagement: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 };
