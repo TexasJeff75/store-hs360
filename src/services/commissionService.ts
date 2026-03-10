@@ -231,7 +231,7 @@ class CommissionService {
     try {
       const { data, error } = await supabase
         .from('commissions')
-        .select('commission_amount, status')
+        .select('commission_amount, sales_rep_commission, status')
         .eq('sales_rep_id', salesRepId);
 
       if (error) throw error;
@@ -245,7 +245,8 @@ class CommissionService {
       };
 
       data?.forEach(commission => {
-        const amount = Number(commission.commission_amount);
+        // Sales reps should only see their share, not distributor's
+        const amount = Number(commission.sales_rep_commission ?? commission.commission_amount);
         summary.total_commissions += amount;
 
         switch (commission.status) {

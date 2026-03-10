@@ -587,30 +587,50 @@ const CommissionManagement: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
+          {(() => {
+            const isAdmin = profile?.role === 'admin';
+            const isSalesRep = profile?.role === 'sales_rep';
+            const isDistributorRole = profile?.role === 'distributor';
+            // Column count per role: Order, [SalesRep], Org, [OrderTotal], [Margin], Commission, [CoRep], Status, Date, Actions
+            const colCount = isAdmin ? 10 : isDistributorRole ? 7 : isSalesRep ? 5 : 7;
+
+            // Helper to get the role-appropriate commission amount for a commission record
+            const getMyAmount = (c: any) => {
+              if (isSalesRep) return Number(c.sales_rep_commission ?? c.commission_amount);
+              if (isDistributorRole) return Number(c.distributor_commission ?? c.commission_amount);
+              return Number(c.commission_amount);
+            };
+
+            return (
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sales Rep</th>
-                {(profile?.role === 'admin' || profile?.role === 'distributor') && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
+                {!isSalesRep && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sales Rep</th>
                 )}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product Margin</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rate</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
-                {profile?.role === 'admin' && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
+                {!isSalesRep && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Total</th>
+                )}
+                {isAdmin && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product Margin</th>
+                )}
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  {isSalesRep ? 'My Commission' : isDistributorRole ? 'Commission' : 'Commission'}
+                </th>
+                {isAdmin && (
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Co Rep</th>
                 )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{isAdmin ? 'Actions' : ''}</th>
               </tr>
             </thead>
             <tbody className="bg-white">
               {filteredCommissions.length === 0 ? (
                 <tr>
-                  <td colSpan={profile?.role === 'admin' ? 11 : profile?.role === 'distributor' ? 10 : 9} className="px-6 py-12 text-center text-gray-500">
+                  <td colSpan={colCount} className="px-6 py-12 text-center text-gray-500">
                     <DollarSign className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                     <p>No commissions found</p>
                   </td>
@@ -620,11 +640,11 @@ const CommissionManagement: React.FC = () => {
                   <React.Fragment key={group.key}>
                     {groupByMonth && (
                       <tr className="bg-gray-100 border-y-2 border-gray-300">
-                        <td colSpan={profile?.role === 'admin' ? 11 : profile?.role === 'distributor' ? 10 : 9} className="px-6 py-3">
+                        <td colSpan={colCount} className="px-6 py-3">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center space-x-3">
                               <span className="font-bold text-gray-900 text-sm">
-                                {profile?.role === 'admin'
+                                {isAdmin
                                   ? group.key.split('|')[0] + ' - ' + group.key.split('|')[1]
                                   : group.key
                                 }
@@ -634,7 +654,7 @@ const CommissionManagement: React.FC = () => {
                               </span>
                             </div>
                             <div className="text-sm font-bold text-green-600">
-                              Total: ${group.commissions.reduce((sum, c) => sum + Number(c.commission_amount), 0).toFixed(2)}
+                              Total: ${group.commissions.reduce((sum, c) => sum + getMyAmount(c), 0).toFixed(2)}
                             </div>
                           </div>
                         </td>
@@ -645,33 +665,45 @@ const CommissionManagement: React.FC = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
                           {commission.order_id.slice(0, 8)}...
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {commission.sales_rep?.email || 'N/A'}
-                        </td>
-                        {(profile?.role === 'admin' || profile?.role === 'distributor') && (
+                        {!isSalesRep && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {commission.organization?.name || 'N/A'}
+                            {commission.sales_rep?.email || 'N/A'}
                           </td>
                         )}
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          ${Number(commission.order_total).toFixed(2)}
+                          {commission.organization?.name || 'N/A'}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {commission.product_margin ? (
-                            <span className="font-semibold text-blue-600">
-                              ${Number(commission.product_margin).toFixed(2)}
-                            </span>
-                          ) : (
-                            <span className="text-gray-400 text-xs">No cost data</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {Number(commission.commission_rate).toFixed(2)}%
-                        </td>
+                        {!isSalesRep && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            ${Number(commission.order_total).toFixed(2)}
+                          </td>
+                        )}
+                        {isAdmin && (
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {commission.product_margin ? (
+                              <span className="font-semibold text-blue-600">
+                                ${Number(commission.product_margin).toFixed(2)}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-xs">No cost data</span>
+                            )}
+                          </td>
+                        )}
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold">
-                          {isDistributor ? (
-                            <div className="text-blue-600">
-                              ${Number(commission.distributor_commission || 0).toFixed(2)}
+                          {isSalesRep ? (
+                            <div className="text-green-600">
+                              ${Number(commission.sales_rep_commission ?? commission.commission_amount).toFixed(2)}
+                            </div>
+                          ) : isDistributorRole ? (
+                            <div className="space-y-1">
+                              <div className="text-blue-600">
+                                ${Number(commission.distributor_commission || 0).toFixed(2)}
+                              </div>
+                              {commission.sales_rep_commission != null && (
+                                <div className="text-xs text-gray-600">
+                                  Rep: ${Number(commission.sales_rep_commission).toFixed(2)}
+                                </div>
+                              )}
                             </div>
                           ) : commission.distributor_id ? (
                             <div className="space-y-1">
@@ -691,7 +723,7 @@ const CommissionManagement: React.FC = () => {
                             </div>
                           )}
                         </td>
-                        {profile?.role === 'admin' && (
+                        {isAdmin && (
                           <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-indigo-600">
                             {Number(commission.company_rep_commission || 0) > 0
                               ? `$${Number(commission.company_rep_commission).toFixed(2)}`
@@ -716,7 +748,7 @@ const CommissionManagement: React.FC = () => {
                             >
                               <Eye className="h-4 w-4" />
                             </button>
-                            {profile?.role === 'admin' && commission.status === 'pending' && (
+                            {isAdmin && commission.status === 'pending' && (
                               <button
                                 onClick={() => handleApproveCommission(commission.id)}
                                 className="text-green-600 hover:text-green-900"
@@ -724,7 +756,7 @@ const CommissionManagement: React.FC = () => {
                                 <CheckCircle className="h-4 w-4" />
                               </button>
                             )}
-                            {profile?.role === 'admin' && commission.status === 'approved' && (
+                            {isAdmin && commission.status === 'approved' && (
                               <button
                                 onClick={() => handleMarkPaid(commission.id)}
                                 className="text-blue-600 hover:text-blue-900"
@@ -741,6 +773,8 @@ const CommissionManagement: React.FC = () => {
               )}
             </tbody>
           </table>
+            );
+          })()}
         </div>
       </div>
 
