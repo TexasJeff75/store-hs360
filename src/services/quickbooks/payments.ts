@@ -123,7 +123,7 @@ export interface QBVoidRequest {
 
 function sanitizeForLog(data: any): any {
   if (!data) return data;
-  const allowedKeys = ['amount', 'currency', 'capture', 'description', 'paymentMode', 'checkNumber'];
+  const allowedKeys = ['amount', 'currency', 'capture', 'description', 'paymentMode', 'checkNumber', 'cardOnFile', 'bankAccountOnFile'];
   const sanitized: Record<string, any> = {};
   for (const key of allowedKeys) {
     if (data[key] !== undefined) {
@@ -190,6 +190,32 @@ export const quickbooksPayments = {
       description,
     };
     const logId = `auth_${Date.now()}`;
+    try {
+      await qbClient.logSync('payment_authorize', logId, 'create', 'pending', undefined, sanitizeForLog(chargeData));
+      const response = await qbClient.post<QBChargeResponse>('payments/charges', chargeData, true);
+      await qbClient.logSync('payment_authorize', logId, 'create', 'success', response.id, sanitizeForLog(chargeData), sanitizeResponseForLog(response));
+      return response;
+    } catch (error: any) {
+      await qbClient.logSync('payment_authorize', logId, 'create', 'failed', undefined, sanitizeForLog(chargeData), undefined, error.message);
+      throw error;
+    }
+  },
+
+  async authorizeCardOnFile(
+    amount: number,
+    cardOnFileId: string,
+    currency = 'USD',
+    description?: string
+  ): Promise<QBChargeResponse> {
+    const chargeData = {
+      amount: amount.toFixed(2),
+      currency,
+      cardOnFile: cardOnFileId,
+      capture: false,
+      context: { mobile: false, isEcommerce: true },
+      description,
+    };
+    const logId = `auth_cof_${Date.now()}`;
     try {
       await qbClient.logSync('payment_authorize', logId, 'create', 'pending', undefined, sanitizeForLog(chargeData));
       const response = await qbClient.post<QBChargeResponse>('payments/charges', chargeData, true);
