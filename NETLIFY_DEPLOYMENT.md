@@ -1,5 +1,9 @@
 # Netlify Deployment Guide
 
+Guide for deploying the application to Netlify, including environment variables, build configuration, and troubleshooting. For development setup, see [DEVELOPMENT.md](./DEVELOPMENT.md).
+
+---
+
 ## Pre-Deployment Checklist
 
 ### 1. Environment Variables in Netlify Dashboard

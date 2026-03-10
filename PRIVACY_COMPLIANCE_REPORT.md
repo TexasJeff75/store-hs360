@@ -1,5 +1,7 @@
 # Privacy Compliance Assessment Report
 
+GDPR and CCPA compliance assessment for the HealthSpan360 B2B E-Commerce Platform. For session security, see [SESSION_MANAGEMENT.md](./SESSION_MANAGEMENT.md). For PCI compliance, see [PCI_COMPLIANCE.md](./PCI_COMPLIANCE.md).
+
 **Assessment Date:** November 28, 2025
 **Application:** HealthSpan360 B2B E-Commerce Platform
 **Frameworks Evaluated:** GDPR, CCPA

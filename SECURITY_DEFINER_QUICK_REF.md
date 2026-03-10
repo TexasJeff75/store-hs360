@@ -1,5 +1,9 @@
 # Security Definer - Quick Reference
 
+Quick reference for the SECURITY DEFINER changes. For full details, see [SECURITY_DEFINER_FIX.md](./SECURITY_DEFINER_FIX.md). For executive summary, see [SECURITY_FIX_SUMMARY.md](./SECURITY_FIX_SUMMARY.md).
+
+---
+
 ## What Changed?
 
 | Old (Insecure) | New (Secure) | Who Can Access |

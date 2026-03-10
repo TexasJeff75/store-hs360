@@ -1,5 +1,9 @@
 # Fixing 404 Errors in Development
 
+Guide for resolving 404 errors during local development. For production 404 issues, see [PRODUCTION_CHECKLIST.md](./PRODUCTION_CHECKLIST.md). For development setup, see [DEVELOPMENT.md](./DEVELOPMENT.md).
+
+---
+
 ## The Problem
 
 You see this error in the browser console:

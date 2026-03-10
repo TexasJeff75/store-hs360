@@ -1,6 +1,8 @@
 # Environment Variables Setup Guide
 
-This document explains how environment variables are configured in this project and ensures consistency across all environments.
+How environment variables are configured in this project across development, staging, and production environments. For development workflow, see [DEVELOPMENT.md](./DEVELOPMENT.md).
+
+---
 
 ## Overview
 

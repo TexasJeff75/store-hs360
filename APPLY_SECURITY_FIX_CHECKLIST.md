@@ -1,5 +1,9 @@
 # Security Fix Application Checklist
 
+Step-by-step checklist for applying the SECURITY DEFINER migration. For technical details, see [SECURITY_DEFINER_FIX.md](./SECURITY_DEFINER_FIX.md). For summary, see [SECURITY_FIX_SUMMARY.md](./SECURITY_FIX_SUMMARY.md).
+
+---
+
 ## Pre-Application Review
 
 - [x] Migration file created: `supabase/migrations/20260224000000_fix_security_definer_views.sql`

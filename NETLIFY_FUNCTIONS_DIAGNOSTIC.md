@@ -1,5 +1,9 @@
 # Netlify Functions Diagnostic Guide
 
+Step-by-step diagnostic guide for fixing 404 errors on Netlify Functions in production. For general deployment, see [NETLIFY_DEPLOYMENT.md](./NETLIFY_DEPLOYMENT.md). For additional troubleshooting, see [NETLIFY_FUNCTIONS_TROUBLESHOOTING.md](./NETLIFY_FUNCTIONS_TROUBLESHOOTING.md).
+
+---
+
 ## Current Issue
 
 Your deployed Netlify site shows this error on the Secret Cost Management page:

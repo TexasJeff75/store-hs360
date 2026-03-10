@@ -1,8 +1,14 @@
 # Payment Methods Quick Start Guide
 
+Quick start guide for integrating payment methods using PCI-compliant tokenization. For full PCI compliance details, see [PCI_COMPLIANCE.md](./PCI_COMPLIANCE.md). For QuickBooks payment processing, see [QUICKBOOKS_FEATURES.md](./QUICKBOOKS_FEATURES.md).
+
+---
+
 ## Overview
 
 This system stores payment methods (credit cards, debit cards, bank accounts) in a **PCI-compliant** manner using tokenization.
+
+---
 
 ## Key Principles
 
@@ -18,6 +24,8 @@ This system stores payment methods (credit cards, debit cards, bank accounts) in
 - Full bank account numbers
 - Magnetic stripe data
 - PINs
+
+---
 
 ## Quick Integration
 
@@ -104,6 +112,8 @@ async function processPayment(organizationId, amount) {
 }
 ```
 
+---
+
 ## Supported Payment Types
 
 ### Credit/Debit Cards
@@ -134,6 +144,8 @@ async function processPayment(organizationId, amount) {
 }
 ```
 
+---
+
 ## Available Functions
 
 ### `getPaymentMethods(organizationId, locationId?)`
@@ -160,6 +172,8 @@ Format payment method for display
 ### `isPaymentMethodExpired(method)`
 Check if a card is expired
 
+---
+
 ## Security Notes
 
 ### ✅ DO:
@@ -176,6 +190,8 @@ Check if a card is expired
 - Log payment data
 - Transmit sensitive data over HTTP
 
+---
+
 ## Test Cards
 
 For development:
@@ -189,6 +205,8 @@ Expiry: Any future date
 CVV: Any 3 digits (4 for Amex)
 ```
 
+---
+
 ## Row Level Security
 
 The database automatically enforces:
@@ -196,6 +214,10 @@ The database automatically enforces:
 - Only organization admins can add/edit/delete
 - Tokens are protected by RLS policies
 
-## Need More Details?
+---
 
-See `PCI_COMPLIANCE.md` for complete documentation.
+## Related Documentation
+
+- [PCI_COMPLIANCE.md](./PCI_COMPLIANCE.md) - Full PCI compliance documentation
+- [QUICKBOOKS_FEATURES.md](./QUICKBOOKS_FEATURES.md) - QuickBooks payment features
+- [QUICKBOOKS_INTEGRATION.md](./QUICKBOOKS_INTEGRATION.md) - QuickBooks technical integration

@@ -1,10 +1,10 @@
 # QuickBooks Integration Setup & Testing Guide
 
-## Setup Complete! ✓
+Step-by-step guide for setting up and testing the QuickBooks Online integration. For a features overview, see [QUICKBOOKS_FEATURES.md](./QUICKBOOKS_FEATURES.md). For technical API details, see [QUICKBOOKS_INTEGRATION.md](./QUICKBOOKS_INTEGRATION.md).
 
-Your QuickBooks integration is now fully configured and ready to test. Here's what has been set up:
+---
 
-### What's Been Configured
+## What's Been Configured
 
 1. **Environment Variables** (`.env` file)
    - QuickBooks Client ID and Secret configured
@@ -181,20 +181,23 @@ All test cards:
 
 The QuickBooks tab in Admin Dashboard provides three sub-sections:
 
-### 1. Connection Status
+### Connection Status
+
 - Shows connection state (Connected/Disconnected)
 - Displays Realm ID
 - Shows token expiration time
 - "Connect to QuickBooks" / "Disconnect" buttons
 - Token refresh status
 
-### 2. Sync Operations
+### Sync Operations
+
 - **Sync Organizations Now** - Syncs all organizations to QB customers
 - **Create Invoices** - Creates invoices from pending orders
 - Shows sync statistics (success/failure counts)
 - Real-time sync status updates
 
-### 3. Sync Logs
+### Sync Logs
+
 - Complete audit trail of all QB operations
 - Filterable by entity type (customer, invoice, payment)
 - Shows success/failure status
@@ -207,12 +210,14 @@ The QuickBooks tab in Admin Dashboard provides three sub-sections:
 ## Troubleshooting
 
 ### Issue: "No active QuickBooks connection found"
+
 **Solution**:
 - Go to Admin Dashboard > QuickBooks tab
 - Click "Connect to QuickBooks"
 - Complete OAuth flow
 
 ### Issue: OAuth redirect fails
+
 **Solution**:
 - Verify redirect URI in QuickBooks app settings matches exactly: `http://localhost:3000/quickbooks/callback`
 - Check browser console for errors
@@ -220,6 +225,7 @@ The QuickBooks tab in Admin Dashboard provides three sub-sections:
 - Verify environment variables are set correctly
 
 ### Issue: Customer sync fails
+
 **Solution**:
 - Ensure organization has required fields (name, email)
 - Check sync logs for specific error message
@@ -227,6 +233,7 @@ The QuickBooks tab in Admin Dashboard provides three sub-sections:
 - Try refreshing the connection
 
 ### Issue: Invoice creation fails
+
 **Solution**:
 - Ensure organization is synced to QuickBooks first (has `quickbooks_customer_id`)
 - Verify order exists in database
@@ -234,6 +241,7 @@ The QuickBooks tab in Admin Dashboard provides three sub-sections:
 - Review sync logs for detailed error message
 
 ### Issue: Token expired
+
 **Solution**:
 - The system should auto-refresh tokens
 - If manual refresh needed, disconnect and reconnect
@@ -244,7 +252,9 @@ The QuickBooks tab in Admin Dashboard provides three sub-sections:
 ## Database Schema
 
 ### `quickbooks_credentials`
+
 Stores OAuth tokens and connection info:
+
 ```sql
 - id (uuid)
 - access_token (text) - encrypted
@@ -257,7 +267,9 @@ Stores OAuth tokens and connection info:
 ```
 
 ### `quickbooks_sync_log`
+
 Audit trail of all sync operations:
+
 ```sql
 - id (uuid)
 - entity_type (text) - 'customer', 'invoice', 'payment'
@@ -324,38 +336,24 @@ Before deploying to production:
 
 ## Next Steps
 
-1. ✅ Apply the database migration
-2. ✅ Start the dev server
-3. ✅ Connect QuickBooks
-4. ✅ Sync an organization
-5. ✅ Create a test order
-6. ✅ Generate an invoice
-7. 🔄 Integrate payment processing into checkout
-8. 🔄 Add automated invoice creation on order placement
-9. 🔄 Set up payment capture on shipment
-10. 🔄 Test in production environment
+1. Apply the database migration
+2. Start the dev server
+3. Connect QuickBooks
+4. Sync an organization
+5. Create a test order
+6. Generate an invoice
+7. Integrate payment processing into checkout
+8. Add automated invoice creation on order placement
+9. Set up payment capture on shipment
+10. Test in production environment
 
 ---
 
-## Support & Documentation
+## Related Documentation
 
-- **QuickBooks API Docs**: https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer
-- **OAuth 2.0 Guide**: https://developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization/oauth-2.0
-- **Payments API**: https://developer.intuit.com/app/developer/qbpayments/docs/get-started
-
----
-
-## Summary
-
-Your QuickBooks integration is production-ready! The complete system includes:
-
-✅ OAuth 2.0 authentication with automatic token refresh
-✅ Customer management (organizations → QB customers)
-✅ Invoice creation (orders → QB invoices)
-✅ Payment processing (credit card tokenization, charge, capture)
-✅ Comprehensive sync logging and error handling
-✅ Admin dashboard UI for easy management
-✅ Secure database schema with RLS policies
-✅ Sandbox testing environment configured
-
-**Just apply the migration and start testing!**
+- [QUICKBOOKS_FEATURES.md](./QUICKBOOKS_FEATURES.md) - QuickBooks features overview
+- [QUICKBOOKS_INTEGRATION.md](./QUICKBOOKS_INTEGRATION.md) - Technical integration guide
+- [PCI_COMPLIANCE.md](./PCI_COMPLIANCE.md) - Payment security compliance
+- [QuickBooks API Docs](https://developer.intuit.com/app/developer/qbo/docs/api/accounting/all-entities/customer)
+- [OAuth 2.0 Guide](https://developer.intuit.com/app/developer/qbo/docs/develop/authentication-and-authorization/oauth-2.0)
+- [Payments API](https://developer.intuit.com/app/developer/qbpayments/docs/get-started)

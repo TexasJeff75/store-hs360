@@ -1,7 +1,14 @@
 # Security Definer Views - Fixed
 
+Detailed technical documentation of the SECURITY DEFINER vulnerability fix. For executive summary, see [SECURITY_FIX_SUMMARY.md](./SECURITY_FIX_SUMMARY.md). For quick reference, see [SECURITY_DEFINER_QUICK_REF.md](./SECURITY_DEFINER_QUICK_REF.md).
+
+---
+
 ## Issue Summary
+
 Your database had SECURITY DEFINER views and functions that could bypass Row Level Security (RLS) policies, potentially exposing data to unauthorized users.
+
+---
 
 ## What Was Fixed
 
