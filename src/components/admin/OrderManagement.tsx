@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { orderService } from '../../services/orderService';
-import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle } from 'lucide-react';
+import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle, DollarSign, FileText, Activity } from 'lucide-react';
 import type { Order, OrderItem, Shipment } from './orders/types';
 import { normalizeAddress } from './orders/types';
 import { activityLogService } from '../../services/activityLog';
@@ -34,6 +34,8 @@ const OrderManagement: React.FC = () => {
   const [showDebugModal, setShowDebugModal] = useState(false);
   const [debugOrder, setDebugOrder] = useState<Order | null>(null);
   const [selectedOrderOrgName, setSelectedOrderOrgName] = useState<string | null>(null);
+  const [orderCommission, setOrderCommission] = useState<any>(null);
+  const [paymentLogs, setPaymentLogs] = useState<any[]>([]);
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -52,10 +54,14 @@ const OrderManagement: React.FC = () => {
     if (selectedOrder) {
       loadSubOrders(selectedOrder.id);
       resolveSelectedOrderNames(selectedOrder);
+      fetchOrderCommission(selectedOrder.id);
+      fetchPaymentLogs(selectedOrder.id);
     } else {
       setSubOrders([]);
       setShowSubOrders(false);
       setSelectedOrderOrgName(null);
+      setOrderCommission(null);
+      setPaymentLogs([]);
     }
   }, [selectedOrder?.id]);
 
@@ -79,6 +85,47 @@ const OrderManagement: React.FC = () => {
       setSelectedOrderOrgName(null);
     }
 
+  };
+
+  const fetchOrderCommission = async (orderId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('commissions')
+        .select('*, profiles:sales_rep_id(full_name, email)')
+        .eq('order_id', orderId)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching commission:', error);
+        setOrderCommission(null);
+      } else {
+        setOrderCommission(data);
+      }
+    } catch (error) {
+      console.error('Error fetching commission:', error);
+      setOrderCommission(null);
+    }
+  };
+
+  const fetchPaymentLogs = async (orderId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('quickbooks_sync_log')
+        .select('*')
+        .or(`entity_id.eq.${orderId},entity_id.ilike.%${orderId.slice(0, 8)}%`)
+        .in('entity_type', ['payment_authorize', 'payment_charge', 'payment_capture', 'payment_refund', 'payment_token', 'payment_ach', 'payment_void', 'invoice'])
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching payment logs:', error);
+        setPaymentLogs([]);
+      } else {
+        setPaymentLogs(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching payment logs:', error);
+      setPaymentLogs([]);
+    }
   };
 
   const checkManagementPermissions = async () => {
@@ -266,7 +313,17 @@ const OrderManagement: React.FC = () => {
 
       if (error) throw error;
 
-      // Log the status change
+      // Log the status change as a payment event for visibility
+      await orderService.logPaymentEvent(orderId, {
+        event: `status_changed_to_${newStatus}`,
+        status: newStatus,
+        method: 'Admin action',
+        lastFour: '----',
+        transactionId: `status_${order?.status || 'unknown'}_to_${newStatus}`,
+        amount: order?.total || 0,
+      });
+
+      // Log the status change to activity log
       if (user) {
         const order2 = orders.find(o => o.id === orderId);
         activityLogService.logAction({
@@ -286,6 +343,9 @@ const OrderManagement: React.FC = () => {
       await fetchOrders();
       if (selectedOrder?.id === orderId) {
         setSelectedOrder({ ...selectedOrder, status: newStatus });
+        // Refresh commission and payment logs after status change
+        fetchOrderCommission(orderId);
+        fetchPaymentLogs(orderId);
       }
     } catch (error) {
       console.error('Error updating order status:', error);
@@ -804,10 +864,224 @@ const OrderManagement: React.FC = () => {
               </div>
             </div>
 
-            {order.notes && (
+            {/* Payment Processing Log */}
+            {canManageOrders && (
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                  <Activity className="h-4 w-4 mr-2 text-indigo-600" />
+                  Payment Processing Log
+                </h4>
+                {order.notes && order.notes.includes('[') ? (
+                  <div className="space-y-2">
+                    {order.notes.split('\n').filter((line: string) => line.trim()).map((line: string, idx: number) => {
+                      const isSuccess = line.includes('captured') || line.includes('authorized') || line.includes('success');
+                      const isFailed = line.includes('failed') || line.includes('error');
+                      const isSkipped = line.includes('skipped');
+                      return (
+                        <div key={idx} className={`flex items-start space-x-2 p-2 rounded text-xs font-mono ${
+                          isFailed ? 'bg-red-50 border border-red-200' :
+                          isSkipped ? 'bg-yellow-50 border border-yellow-200' :
+                          isSuccess ? 'bg-green-50 border border-green-200' :
+                          'bg-white border border-gray-200'
+                        }`}>
+                          <span className={`mt-0.5 flex-shrink-0 h-2 w-2 rounded-full ${
+                            isFailed ? 'bg-red-500' :
+                            isSkipped ? 'bg-yellow-500' :
+                            isSuccess ? 'bg-green-500' :
+                            'bg-blue-500'
+                          }`} />
+                          <span className="break-all">{line}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500 italic">No payment events logged yet</p>
+                )}
+
+                {/* QuickBooks API Logs */}
+                {paymentLogs.length > 0 && (
+                  <div className="mt-4">
+                    <h5 className="text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                      <FileText className="h-3.5 w-3.5 mr-1.5 text-gray-500" />
+                      QuickBooks API Activity
+                    </h5>
+                    <div className="space-y-1.5">
+                      {paymentLogs.map((log: any) => (
+                        <div key={log.id} className={`flex items-center justify-between p-2 rounded text-xs border ${
+                          log.status === 'success' ? 'bg-green-50 border-green-200' :
+                          log.status === 'failed' ? 'bg-red-50 border-red-200' :
+                          log.status === 'pending' ? 'bg-yellow-50 border-yellow-200' :
+                          'bg-gray-50 border-gray-200'
+                        }`}>
+                          <div className="flex items-center space-x-2">
+                            <span className={`h-2 w-2 rounded-full flex-shrink-0 ${
+                              log.status === 'success' ? 'bg-green-500' :
+                              log.status === 'failed' ? 'bg-red-500' :
+                              log.status === 'pending' ? 'bg-yellow-500' :
+                              'bg-gray-500'
+                            }`} />
+                            <span className="font-medium">{log.entity_type?.replace('payment_', '').replace('_', ' ').toUpperCase()}</span>
+                            <span className="text-gray-500">{log.sync_type}</span>
+                            {log.quickbooks_id && <span className="text-gray-400 font-mono">QB: {log.quickbooks_id}</span>}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-1.5 py-0.5 rounded font-medium ${
+                              log.status === 'success' ? 'text-green-700' :
+                              log.status === 'failed' ? 'text-red-700' :
+                              'text-gray-700'
+                            }`}>{log.status}</span>
+                            <span className="text-gray-400">{new Date(log.created_at).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {paymentLogs.some((log: any) => log.error_message) && (
+                      <div className="mt-2 space-y-1">
+                        {paymentLogs.filter((log: any) => log.error_message).map((log: any) => (
+                          <div key={`err-${log.id}`} className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                            <span className="font-medium">Error ({log.entity_type}):</span> {log.error_message}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {paymentLogs.length === 0 && !order.notes && (
+                  <p className="text-sm text-gray-500 italic mt-2">No QuickBooks API activity for this order</p>
+                )}
+              </div>
+            )}
+
+            {/* Notes (non-payment) */}
+            {order.notes && !order.notes.includes('[') && (
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-semibold text-blue-900 mb-2">Notes</h4>
                 <p className="text-sm text-blue-800">{order.notes}</p>
+              </div>
+            )}
+
+            {/* Commission Status */}
+            {canManageOrders && (
+              <div className={`border rounded-lg p-4 ${
+                orderCommission ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+              }`}>
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                  <DollarSign className="h-4 w-4 mr-2 text-green-600" />
+                  Commission Status
+                </h4>
+                {orderCommission ? (
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                      <div>
+                        <span className="text-gray-600 block text-xs">Status</span>
+                        <span className={`px-2 py-0.5 inline-flex text-xs font-semibold rounded-full ${
+                          orderCommission.status === 'paid' ? 'bg-green-100 text-green-800' :
+                          orderCommission.status === 'approved' ? 'bg-blue-100 text-blue-800' :
+                          orderCommission.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {orderCommission.status}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 block text-xs">Commission Amount</span>
+                        <span className="font-semibold text-green-700">${Number(orderCommission.commission_amount).toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 block text-xs">Rate</span>
+                        <span className="font-medium">{Number(orderCommission.commission_rate).toFixed(1)}%</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-600 block text-xs">Sales Rep</span>
+                        <span className="font-medium">
+                          {orderCommission.profiles?.full_name || orderCommission.profiles?.email || 'Unknown'}
+                        </span>
+                      </div>
+                    </div>
+                    {orderCommission.product_margin != null && (
+                      <div className="text-sm">
+                        <span className="text-gray-600">Product Margin:</span>
+                        <span className="font-medium ml-1">${Number(orderCommission.product_margin).toFixed(2)}</span>
+                      </div>
+                    )}
+                    {orderCommission.sales_rep_commission != null && orderCommission.distributor_commission != null && (
+                      <div className="grid grid-cols-2 gap-3 text-sm bg-white rounded p-2 border border-green-200">
+                        <div>
+                          <span className="text-gray-600 text-xs block">Sales Rep Share</span>
+                          <span className="font-semibold">${Number(orderCommission.sales_rep_commission).toFixed(2)}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600 text-xs block">Distributor Share</span>
+                          <span className="font-semibold">${Number(orderCommission.distributor_commission).toFixed(2)}</span>
+                        </div>
+                      </div>
+                    )}
+                    {orderCommission.margin_details && orderCommission.margin_details.length > 0 && (
+                      <details className="text-xs">
+                        <summary className="cursor-pointer text-gray-600 hover:text-gray-900 font-medium">
+                          View margin breakdown ({orderCommission.margin_details.length} items)
+                        </summary>
+                        <div className="mt-2 bg-white rounded border border-green-200 overflow-hidden">
+                          <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-3 py-1.5 text-left text-xs font-medium text-gray-500">Product</th>
+                                <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-500">Price</th>
+                                <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-500">Cost</th>
+                                <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-500">Qty</th>
+                                <th className="px-3 py-1.5 text-right text-xs font-medium text-gray-500">Margin</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                              {orderCommission.margin_details.map((item: any, idx: number) => (
+                                <tr key={idx}>
+                                  <td className="px-3 py-1.5 text-gray-900">{item.name}</td>
+                                  <td className="px-3 py-1.5 text-right">${Number(item.price).toFixed(2)}</td>
+                                  <td className="px-3 py-1.5 text-right">${Number(item.cost).toFixed(2)}</td>
+                                  <td className="px-3 py-1.5 text-right">{item.quantity}</td>
+                                  <td className="px-3 py-1.5 text-right font-medium text-green-700">${Number(item.margin).toFixed(2)}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </details>
+                    )}
+                    {orderCommission.approved_at && (
+                      <div className="text-xs text-gray-500">
+                        Approved: {new Date(orderCommission.approved_at).toLocaleString()}
+                      </div>
+                    )}
+                    {orderCommission.paid_at && (
+                      <div className="text-xs text-gray-500">
+                        Paid: {new Date(orderCommission.paid_at).toLocaleString()}
+                        {orderCommission.payment_reference && ` (Ref: ${orderCommission.payment_reference})`}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm">
+                    {order.status === 'completed' ? (
+                      <div className="text-amber-700 bg-amber-50 border border-amber-200 rounded p-3">
+                        <p className="font-medium">No commission generated for this completed order.</p>
+                        <p className="text-xs mt-1">Possible reasons:</p>
+                        <ul className="text-xs list-disc list-inside mt-1 space-y-0.5">
+                          {!order.sales_rep_id && <li className="text-red-600 font-medium">No sales rep assigned to this order</li>}
+                          {order.sales_rep_id && <li>No active organization_sales_reps record for this sales rep + organization</li>}
+                          <li>Commission trigger may not have fired (check database triggers)</li>
+                          <li>Commission rate may be set to 0%</li>
+                        </ul>
+                      </div>
+                    ) : (
+                      <p className="text-gray-500 italic">
+                        Commission will be generated when the order is marked as completed
+                        {!order.sales_rep_id && <span className="text-amber-600 font-medium"> (Warning: No sales rep assigned)</span>}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 

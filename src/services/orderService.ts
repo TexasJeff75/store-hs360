@@ -653,10 +653,26 @@ class OrderService {
       }
 
       if (order.payment_status === 'captured') {
+        await this.logPaymentEvent(orderId, {
+          event: 'capture_skipped',
+          status: 'captured',
+          method: 'Already captured',
+          lastFour: order.payment_authorization_id?.slice(-4) || '----',
+          transactionId: order.payment_authorization_id || 'none',
+          amount: order.total,
+        });
         return { success: true };
       }
 
       if (order.payment_status !== 'authorized') {
+        await this.logPaymentEvent(orderId, {
+          event: 'capture_skipped',
+          status: order.payment_status || 'none',
+          method: 'No authorization found',
+          lastFour: '----',
+          transactionId: 'none',
+          amount: order.total,
+        });
         return { success: false, error: 'Payment must be authorized before capture' };
       }
 
@@ -665,6 +681,14 @@ class OrderService {
           await quickbooksPayments.captureCharge(order.payment_authorization_id, order.total);
         } catch (captureError: any) {
           console.error('QB Payments capture failed:', captureError);
+          await this.logPaymentEvent(orderId, {
+            event: 'capture_api_error',
+            status: 'failed',
+            method: 'QuickBooks Payments API',
+            lastFour: order.payment_authorization_id?.slice(-4) || '----',
+            transactionId: order.payment_authorization_id || 'unknown',
+            amount: order.total,
+          });
           return { success: false, error: `Payment capture failed: ${captureError.message}` };
         }
       }
@@ -672,8 +696,25 @@ class OrderService {
       const captureResult = await this.updatePaymentStatus(orderId, 'captured');
 
       if (!captureResult.success) {
+        await this.logPaymentEvent(orderId, {
+          event: 'capture_failed',
+          status: 'failed',
+          method: 'QuickBooks Payments',
+          lastFour: order.payment_authorization_id?.slice(-4) || '----',
+          transactionId: order.payment_authorization_id || 'unknown',
+          amount: order.total,
+        });
         return captureResult;
       }
+
+      await this.logPaymentEvent(orderId, {
+        event: 'payment_captured',
+        status: 'captured',
+        method: 'QuickBooks Payments',
+        lastFour: order.payment_authorization_id?.slice(-4) || '----',
+        transactionId: order.payment_authorization_id || 'unknown',
+        amount: order.total,
+      });
 
       return { success: true };
     } catch (error) {
