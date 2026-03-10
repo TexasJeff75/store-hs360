@@ -105,6 +105,17 @@ class OrderService {
             if (salesRepData) {
               salesRepId = salesRepData.sales_rep_id;
             }
+          } else {
+            // Ensure organization_sales_reps record exists for the default rep
+            // so the commission trigger can look up rate/structure
+            await supabase
+              .from('organization_sales_reps')
+              .upsert({
+                organization_id: data.organizationId,
+                sales_rep_id: salesRepId,
+                commission_rate: 5.00,
+                is_active: true,
+              }, { onConflict: 'organization_id,sales_rep_id' });
           }
         }
       }
