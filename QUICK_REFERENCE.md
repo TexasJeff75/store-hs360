@@ -54,6 +54,20 @@ BC_ACCESS_TOKEN=abcd1234...  # REST API token - KEEP SECRET!
 
 **Important:** Keep VITE_* and non-prefixed versions in sync!
 
+### QuickBooks (optional):
+```bash
+# Frontend
+VITE_QB_CLIENT_ID=your_client_id
+VITE_QB_ENVIRONMENT=sandbox        # sandbox or production
+VITE_QB_REDIRECT_URI=http://localhost:3000/admin/quickbooks/callback
+VITE_QB_REDIRECT_URI_PROD=https://yourdomain.com/admin/quickbooks/callback
+
+# Backend (Netlify Functions - never expose)
+QB_CLIENT_ID=your_client_id
+QB_CLIENT_SECRET=your_client_secret  # KEEP SECRET!
+QB_REDIRECT_URI=https://yourdomain.com/admin/quickbooks/callback
+```
+
 ---
 
 ## Common Issues
@@ -107,6 +121,9 @@ curl http://localhost:4000/api/gql -X POST \
 - **[REST_API_CHECKOUT.md](./REST_API_CHECKOUT.md)** - REST API checkout flow (no redirects)
 - **[ENV_SETUP.md](./ENV_SETUP.md)** - Complete environment variable setup
 - **[DEVELOPMENT.md](./DEVELOPMENT.md)** - Development workflow and architecture
+- **[QUICKBOOKS_FEATURES.md](./QUICKBOOKS_FEATURES.md)** - QuickBooks features overview
+- **[QUICKBOOKS_INTEGRATION.md](./QUICKBOOKS_INTEGRATION.md)** - QuickBooks technical integration
+- **[QUICKBOOKS_SETUP_GUIDE.md](./QUICKBOOKS_SETUP_GUIDE.md)** - QuickBooks setup & testing
 - **[README.md](./README.md)** - Project overview
 - **[.env.example](./.env.example)** - Template for environment variables
 
@@ -120,3 +137,5 @@ curl http://localhost:4000/api/gql -X POST \
 **Need to set up from scratch?** → [ENV_SETUP.md](./ENV_SETUP.md)
 **First time setup?** → [DEVELOPMENT.md](./DEVELOPMENT.md)
 **Want to understand checkout?** → [REST_API_CHECKOUT.md](./REST_API_CHECKOUT.md)
+**QuickBooks not connecting?** → [QUICKBOOKS_SETUP_GUIDE.md](./QUICKBOOKS_SETUP_GUIDE.md#troubleshooting)
+**QuickBooks sync failing?** → Check Admin Dashboard > QuickBooks > Sync Logs
