@@ -2,17 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
   Building2, Users, Plus, Trash2, X, UserPlus, UserCheck,
 } from 'lucide-react';
-import { supabase } from '@/services/supabase';
-import { createClient } from '@supabase/supabase-js';
+import { supabase, getSignUpClient } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { ENV } from '@/config/env';
-
-// Secondary client for signUp calls — avoids replacing the current user's session
-const signUpClient = createClient(
-  ENV.SUPABASE_URL.replace(/\/$/, ''),
-  ENV.SUPABASE_ANON_KEY,
-  { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } },
-);
 
 // ── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -302,7 +293,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       setError(null);
 
       // 1. Create auth user via signUp on a disposable client (won't affect current session)
-      const { data: signUpData, error: signUpError } = await signUpClient.auth.signUp({
+      const { data: signUpData, error: signUpError } = await getSignUpClient().auth.signUp({
         email: newRepEmail,
         password: newRepPassword,
       });
@@ -411,7 +402,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       setError(null);
 
       // 1. Create auth user via signUp on a disposable client
-      const { data: signUpData, error: signUpError } = await signUpClient.auth.signUp({
+      const { data: signUpData, error: signUpError } = await getSignUpClient().auth.signUp({
         email: newDelegateEmail,
         password: newDelegatePassword,
       });

@@ -19,6 +19,18 @@ const cleanSupabaseUrl = supabaseUrl.replace(/\/$/, '');
 
 export const supabase = createClient(cleanSupabaseUrl, supabaseAnonKey);
 
+// Lazy singleton for signup operations that shouldn't replace the current user's session
+let _signUpClient: ReturnType<typeof createClient> | null = null;
+
+export function getSignUpClient() {
+  if (!_signUpClient) {
+    _signUpClient = createClient(cleanSupabaseUrl, supabaseAnonKey, {
+      auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    });
+  }
+  return _signUpClient;
+}
+
 // Database types
 type ApprovalStatus = 'pending' | 'approved' | 'denied';
 
