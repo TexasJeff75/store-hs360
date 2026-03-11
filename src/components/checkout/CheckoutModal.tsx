@@ -12,6 +12,7 @@ import { supabase } from '@/services/supabase';
 import { quickbooksPayments } from '@/services/quickbooks';
 import OrderReceipt from './OrderReceipt';
 import { siteSettingsService, type ShippingMethod } from '@/services/siteSettings';
+import TurnstileWidget from '../TurnstileWidget';
 
 interface CartItem {
   id: number;
@@ -87,6 +88,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     transactionId: string;
   } | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   // Form data
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
@@ -496,6 +498,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 expiryMonth: parseInt(paymentData.expiryMonth),
                 expiryYear: parseInt('20' + paymentData.expiryYear),
                 accountHolderName: paymentData.cardholderName,
+                turnstileToken: turnstileToken || undefined,
               }),
             });
 
@@ -561,6 +564,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 lastFour: paymentData.lastFour,
                 accountHolderName: paymentData.accountHolderName,
                 accountType: acctTypeLower.includes('checking') ? 'checking' : 'savings',
+                turnstileToken: turnstileToken || undefined,
               }),
             });
 
@@ -617,6 +621,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             amount: total,
             currency: 'USD',
             description: `Order from checkout session ${sessionId}`,
+            turnstileToken: turnstileToken || undefined,
           }),
         });
 
@@ -1409,6 +1414,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           {/* Footer Navigation */}
           {!loading && !error && currentStep !== 'customer' && currentStep !== 'confirmation' && (
             <div className="border-t border-gray-200 p-6 bg-gray-50">
+              {currentStep === 'review' && (
+                <div className="mb-4 flex justify-center">
+                  <TurnstileWidget
+                    onVerify={(token) => setTurnstileToken(token)}
+                    onExpire={() => setTurnstileToken(null)}
+                    action="checkout"
+                  />
+                </div>
+              )}
               <div className="flex items-center justify-between">
                 <button
                   onClick={handleBack}
@@ -1421,7 +1435,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 {currentStep === 'review' ? (
                   <button
                     onClick={handlePlaceOrder}
-                    disabled={loading}
+                    disabled={loading || !turnstileToken}
                     className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? (
