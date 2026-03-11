@@ -248,7 +248,7 @@ const OrderReceipt: React.FC<OrderReceiptProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-[60] overflow-y-auto">
+    <div className="fixed inset-0 z-[60] overflow-y-auto" onClick={e => e.stopPropagation()}>
       <div className="flex items-center justify-center min-h-screen px-4 py-8">
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" />
 

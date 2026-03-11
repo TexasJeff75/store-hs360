@@ -121,7 +121,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden">
+    <div className="fixed inset-0 z-50 overflow-hidden" onClick={e => e.stopPropagation()}>
       <div className="absolute inset-0 bg-black bg-opacity-50"></div>
       
       <div className="absolute inset-0 flex items-center justify-center p-4">

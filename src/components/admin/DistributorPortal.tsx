@@ -1085,9 +1085,9 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
 const Modal: React.FC<{ title: string; onClose: () => void; children: React.ReactNode }> = ({
   title, onClose, children,
 }) => (
-  <div className="fixed inset-0 z-50 overflow-y-auto">
+  <div className="fixed inset-0 z-50 overflow-y-auto" onClick={e => e.stopPropagation()}>
     <div className="flex items-center justify-center min-h-screen px-4 py-8">
-      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+      <div className="fixed inset-0 bg-black/50" />
       <div className="relative bg-white rounded-lg shadow-lg w-full max-w-lg">
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
