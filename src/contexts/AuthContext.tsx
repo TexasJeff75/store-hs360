@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../services/supabase';
 import type { Profile } from '../services/supabase';
@@ -38,6 +38,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
   const [impersonation, setImpersonation] = useState<ImpersonationState | null>(null);
+
+  // Ref tracks whether we've loaded a profile at least once. This avoids a
+  // stale-closure bug: the onAuthStateChange callback (registered once on
+  // mount) captures the initial `profile` value (null). Without the ref,
+  // every SIGNED_IN event that fires on tab-refocus would call fetchProfile,
+  // which would see `profile === null` (stale), set loading=true, and
+  // unmount the entire app — closing any open modals.
+  const profileLoadedRef = useRef(false);
 
   useEffect(() => {
     sessionTrackingService.setupBeforeUnloadHandler();
@@ -118,10 +126,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // On token refresh (e.g. window regaining focus), skip re-fetching
-          // the profile if we already have it — avoids flashing a loading
-          // spinner and unmounting the dashboard.
-          if (event === 'TOKEN_REFRESHED') {
+          // On token refresh or background re-auth (e.g. window regaining
+          // focus), skip re-fetching the profile if we already have it —
+          // avoids flashing a loading spinner and unmounting the app shell
+          // (which closes open modals, loses form state, etc.).
+          if (event === 'TOKEN_REFRESHED' || (event === 'SIGNED_IN' && profileLoadedRef.current)) {
             return;
           }
           fetchProfile(session.user.id);
@@ -145,7 +154,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Only show the global loading spinner on initial load, not on
       // background re-fetches — setting loading=true unmounts the entire
       // app shell (including the admin dashboard) causing tab state loss.
-      if (!profile) {
+      // Use ref instead of `profile` state to avoid stale closure issues
+      // when called from the onAuthStateChange handler.
+      if (!profileLoadedRef.current) {
         setLoading(true);
       }
       
@@ -185,6 +196,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         setProfile(null);
       } else if (data) {
+        profileLoadedRef.current = true;
         setProfile(data);
       } else {
         console.warn('No profile data returned for user:', userId);
@@ -254,6 +266,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = async () => {
     await sessionTrackingService.recordLogout();
+    profileLoadedRef.current = false;
     const { error } = await supabase.auth.signOut();
     return { error };
   };
