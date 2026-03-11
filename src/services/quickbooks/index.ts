@@ -10,4 +10,6 @@ export type {
   QBECheckResponse,
   QBCardToken,
   QBBankAccountToken,
+  QBDeviceInfo,
+  QBPaymentContext,
 } from './payments';

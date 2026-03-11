@@ -31,15 +31,28 @@ export interface QBBankAccountTokenRequest {
   };
 }
 
+export interface QBDeviceInfo {
+  macAddress?: string;
+  ipAddress?: string;
+  longitude?: string;
+  latitude?: string;
+  phoneNumber?: string;
+  type?: string;
+  encrypted?: boolean;
+}
+
+export interface QBPaymentContext {
+  mobile: boolean;
+  isEcommerce: boolean;
+  deviceInfo?: QBDeviceInfo;
+}
+
 export interface QBChargeRequest {
   amount: string;
   currency: string;
   token?: string;
   bankAccountOnFile?: string;
-  context?: {
-    mobile: boolean;
-    isEcommerce: boolean;
-  };
+  context?: QBPaymentContext;
   description?: string;
   capture?: boolean;
 }
@@ -70,10 +83,7 @@ export interface QBChargeResponse {
 
 export interface QBCaptureRequest {
   amount: string;
-  context?: {
-    mobile: boolean;
-    isEcommerce: boolean;
-  };
+  context?: QBPaymentContext;
 }
 
 export interface QBECheckRequest {
@@ -87,10 +97,7 @@ export interface QBECheckRequest {
     phone: string;
   };
   description?: string;
-  context?: {
-    mobile: boolean;
-    isEcommerce: boolean;
-  };
+  context?: QBPaymentContext;
   checkNumber?: string;
   paymentMode?: 'WEB' | 'TEL' | 'PPD' | 'CCD';
 }
@@ -186,7 +193,7 @@ export const quickbooksPayments = {
       currency,
       token,
       capture: false,
-      context: { mobile: false, isEcommerce: true },
+      context: { mobile: false, isEcommerce: true, deviceInfo: { encrypted: true } },
       description,
     };
     const logId = `auth_${Date.now()}`;
@@ -212,7 +219,7 @@ export const quickbooksPayments = {
       currency,
       cardOnFile: cardOnFileId,
       capture: false,
-      context: { mobile: false, isEcommerce: true },
+      context: { mobile: false, isEcommerce: true, deviceInfo: { encrypted: true } },
       description,
     };
     const logId = `auth_cof_${Date.now()}`;
@@ -238,7 +245,7 @@ export const quickbooksPayments = {
       currency,
       token,
       capture: true,
-      context: { mobile: false, isEcommerce: true },
+      context: { mobile: false, isEcommerce: true, deviceInfo: { encrypted: true } },
       description,
     };
     const logId = `charge_${Date.now()}`;
@@ -259,7 +266,7 @@ export const quickbooksPayments = {
   ): Promise<QBChargeResponse> {
     const captureData: QBCaptureRequest = {
       amount: amount.toFixed(2),
-      context: { mobile: false, isEcommerce: true },
+      context: { mobile: false, isEcommerce: true, deviceInfo: { encrypted: true } },
     };
     try {
       await qbClient.logSync('payment_capture', chargeId, 'update', 'pending', chargeId, captureData);
@@ -284,7 +291,7 @@ export const quickbooksPayments = {
       bankAccount,
       description,
       paymentMode: 'WEB',
-      context: { mobile: false, isEcommerce: true },
+      context: { mobile: false, isEcommerce: true, deviceInfo: { encrypted: true } },
     };
     const logId = `ach_${Date.now()}`;
     try {
@@ -310,7 +317,7 @@ export const quickbooksPayments = {
       bankAccountOnFile: token,
       description,
       paymentMode: 'WEB' as const,
-      context: { mobile: false, isEcommerce: true },
+      context: { mobile: false, isEcommerce: true, deviceInfo: { encrypted: true } },
     };
     const logId = `ach_token_${Date.now()}`;
     try {

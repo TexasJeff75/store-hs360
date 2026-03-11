@@ -283,6 +283,18 @@ exports.handler = async (event) => {
     };
 
     if (data && ['POST', 'PUT'].includes(method.toUpperCase())) {
+      // Inject client IP into deviceInfo for payment API requests (fraud prevention)
+      if (usePaymentsAPI && data.context) {
+        const clientIp = event.headers['x-forwarded-for']?.split(',')[0]?.trim()
+          || event.headers['client-ip']
+          || event.headers['x-nf-client-connection-ip'];
+        if (clientIp) {
+          data.context.deviceInfo = {
+            ...data.context.deviceInfo,
+            ipAddress: clientIp,
+          };
+        }
+      }
       fetchOptions.body = JSON.stringify(data);
     }
 
