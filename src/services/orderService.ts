@@ -167,16 +167,20 @@ class OrderService {
     }
   }
 
-  async cancelOrder(orderId: string): Promise<{ success: boolean; error?: string }> {
+  async cancelOrder(orderId: string, isAdmin = false): Promise<{ success: boolean; error?: string }> {
     try {
-      // Only allow cancellation of pending orders
       const { order, error: fetchError } = await this.getOrderById(orderId);
       if (fetchError || !order) {
         return { success: false, error: fetchError || 'Order not found' };
       }
 
-      if (order.status !== 'pending') {
+      // Admins can cancel pending or processing orders; non-admins only pending
+      if (!isAdmin && order.status !== 'pending') {
         return { success: false, error: 'Only pending orders can be cancelled' };
+      }
+
+      if (isAdmin && !['pending', 'processing'].includes(order.status)) {
+        return { success: false, error: 'Only pending or processing orders can be cancelled' };
       }
 
       const { error } = await supabase
@@ -185,12 +189,19 @@ class OrderService {
           status: 'cancelled',
           updated_at: new Date().toISOString()
         })
-        .eq('id', orderId)
-        .eq('status', 'pending'); // Extra safety: only cancel if still pending
+        .eq('id', orderId);
 
       if (error) {
         console.error('Error cancelling order:', error);
         return { success: false, error: error.message };
+      }
+
+      // Auto-void authorized payment (best-effort, don't block cancellation)
+      if (order.payment_status === 'authorized') {
+        const voidResult = await this.voidPayment(orderId);
+        if (!voidResult.success) {
+          console.warn(`Auto-void failed for order ${orderId}: ${voidResult.error}`);
+        }
       }
 
       return { success: true };
@@ -714,6 +725,7 @@ class OrderService {
         return captureResult;
       }
 
+      await this.logTransaction(orderId, 'capture', order.total, 'success', order.payment_authorization_id || undefined, order.payment_authorization_id?.slice(-4));
       await this.logPaymentEvent(orderId, {
         event: 'payment_captured',
         status: 'captured',
@@ -762,6 +774,157 @@ class OrderService {
         .eq('id', orderId);
     } catch (error) {
       console.warn('Failed to log payment event:', error);
+    }
+  }
+
+  async logTransaction(
+    orderId: string,
+    transactionType: 'authorization' | 'capture' | 'void' | 'refund',
+    amount: number,
+    status: 'success' | 'failed' | 'pending' | 'declined',
+    gatewayTransactionId?: string,
+    lastFour?: string,
+    paymentMethod?: string,
+    errorMessage?: string,
+    metadata?: Record<string, any>
+  ): Promise<void> {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      await supabase.from('payment_transactions').insert({
+        order_id: orderId,
+        transaction_type: transactionType,
+        payment_method: paymentMethod,
+        gateway_transaction_id: gatewayTransactionId,
+        amount,
+        status,
+        last_four: lastFour,
+        error_message: errorMessage,
+        metadata: metadata || {},
+        created_by: user?.id,
+      });
+    } catch (error) {
+      console.warn('Failed to log payment transaction:', error);
+    }
+  }
+
+  async voidPayment(orderId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { order, error: fetchError } = await this.getOrderById(orderId);
+      if (fetchError || !order) {
+        return { success: false, error: fetchError || 'Order not found' };
+      }
+
+      if (order.payment_status !== 'authorized') {
+        return { success: false, error: 'Only authorized payments can be voided' };
+      }
+
+      const authId = order.payment_authorization_id;
+      if (authId && !authId.startsWith('auth_') && !authId.startsWith('saved_')) {
+        try {
+          // ACH echeck IDs typically start with 'E' or contain 'ech'
+          if (authId.toLowerCase().startsWith('e') || authId.toLowerCase().includes('ech')) {
+            await quickbooksPayments.voidECheck(authId);
+          } else {
+            await quickbooksPayments.voidCharge(authId);
+          }
+        } catch (voidError: any) {
+          console.error('QB Payments void failed:', voidError);
+          await this.logTransaction(orderId, 'void', order.total, 'failed', authId, authId?.slice(-4), undefined, voidError.message);
+          await this.logPaymentEvent(orderId, {
+            event: 'void_api_error',
+            status: 'failed',
+            method: 'QuickBooks Payments API',
+            lastFour: authId?.slice(-4) || '----',
+            transactionId: authId || 'unknown',
+            amount: order.total,
+          });
+          return { success: false, error: `Payment void failed: ${voidError.message}` };
+        }
+      }
+
+      const result = await this.updatePaymentStatus(orderId, 'cancelled');
+      if (!result.success) {
+        return result;
+      }
+
+      await this.logTransaction(orderId, 'void', order.total, 'success', authId || undefined, authId?.slice(-4));
+      await this.logPaymentEvent(orderId, {
+        event: 'payment_voided',
+        status: 'cancelled',
+        method: 'QuickBooks Payments',
+        lastFour: authId?.slice(-4) || '----',
+        transactionId: authId || 'none',
+        amount: order.total,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error voiding payment:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to void payment'
+      };
+    }
+  }
+
+  async refundPayment(orderId: string, amount?: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { order, error: fetchError } = await this.getOrderById(orderId);
+      if (fetchError || !order) {
+        return { success: false, error: fetchError || 'Order not found' };
+      }
+
+      if (order.payment_status !== 'captured') {
+        return { success: false, error: 'Only captured payments can be refunded' };
+      }
+
+      const refundAmount = amount || order.total;
+      const authId = order.payment_authorization_id;
+
+      if (authId && !authId.startsWith('auth_') && !authId.startsWith('saved_')) {
+        try {
+          if (authId.toLowerCase().startsWith('e') || authId.toLowerCase().includes('ech')) {
+            await quickbooksPayments.refundECheck(authId, refundAmount);
+          } else {
+            await quickbooksPayments.refundCharge(authId, refundAmount);
+          }
+        } catch (refundError: any) {
+          console.error('QB Payments refund failed:', refundError);
+          await this.logTransaction(orderId, 'refund', refundAmount, 'failed', authId, authId?.slice(-4), undefined, refundError.message);
+          await this.logPaymentEvent(orderId, {
+            event: 'refund_api_error',
+            status: 'failed',
+            method: 'QuickBooks Payments API',
+            lastFour: authId?.slice(-4) || '----',
+            transactionId: authId || 'unknown',
+            amount: refundAmount,
+          });
+          return { success: false, error: `Payment refund failed: ${refundError.message}` };
+        }
+      }
+
+      const result = await this.updatePaymentStatus(orderId, 'refunded');
+      if (!result.success) {
+        return result;
+      }
+
+      await this.logTransaction(orderId, 'refund', refundAmount, 'success', authId || undefined, authId?.slice(-4));
+      await this.logPaymentEvent(orderId, {
+        event: 'payment_refunded',
+        status: 'refunded',
+        method: 'QuickBooks Payments',
+        lastFour: authId?.slice(-4) || '----',
+        transactionId: authId || 'none',
+        amount: refundAmount,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error refunding payment:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to refund payment'
+      };
     }
   }
 
