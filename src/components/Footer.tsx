@@ -2,7 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Youtube } from 'lucide-react';
 import { siteSettingsService, type ContactInfo } from '@/services/siteSettings';
 
-const Footer: React.FC = () => {
+interface FooterProps {
+  onNavigateToLegal?: (page: 'eula' | 'privacy') => void;
+}
+
+const Footer: React.FC<FooterProps> = ({ onNavigateToLegal }) => {
   const [contact, setContact] = useState<ContactInfo>(siteSettingsService.getDefaults().contact);
 
   useEffect(() => {
@@ -85,9 +89,18 @@ const Footer: React.FC = () => {
               &copy; {new Date().getFullYear()} HealthSpan360. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
-              <a href="https://hs360.co/privacy" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">Privacy Policy</a>
-              <a href="https://hs360.co/terms" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">Terms of Service</a>
-              <a href="https://hs360.co/cookies" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white text-sm transition-colors">Cookie Policy</a>
+              <button
+                onClick={() => onNavigateToLegal?.('privacy')}
+                className="text-gray-400 hover:text-white text-sm transition-colors"
+              >
+                Privacy Policy
+              </button>
+              <button
+                onClick={() => onNavigateToLegal?.('eula')}
+                className="text-gray-400 hover:text-white text-sm transition-colors"
+              >
+                Terms of Service
+              </button>
             </div>
           </div>
         </div>

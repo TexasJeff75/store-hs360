@@ -18,6 +18,8 @@ import ErrorDebugPanel from '@/components/ErrorDebugPanel';
 import Toast from '@/components/Toast';
 import ImpersonationBanner from '@/components/ImpersonationBanner';
 import QuickBooksCallback from '@/components/QuickBooksCallback';
+import EULAPage from '@/components/legal/EULAPage';
+import PrivacyPolicyPage from '@/components/legal/PrivacyPolicyPage';
 import { productService, Product } from '@/services/productService';
 import { useErrorLogger } from '@/hooks/useErrorLogger';
 import { cacheService } from '@/services/cache';
@@ -59,6 +61,7 @@ function AppContent() {
   const { user, profile, loading: authLoading, isPasswordRecovery, isImpersonating, effectiveUserId, effectiveProfile, stopImpersonation } = useAuth();
   const { toastMessage, toastType, clearToast } = useFavorites();
 
+  const [activeLegalPage, setActiveLegalPage] = useState<'eula' | 'privacy' | null>(null);
   const [isOrgSelectorOpen, setIsOrgSelectorOpen] = useState(false);
   const [selectedOrganization, setSelectedOrganization] = useState<{id: string; name: string} | null>(null);
   const [userHasMultipleOrgs, setUserHasMultipleOrgs] = useState(false);
@@ -365,6 +368,14 @@ function AppContent() {
 
   if (isQuickBooksCallback) {
     return <QuickBooksCallback />;
+  }
+
+  if (activeLegalPage === 'eula') {
+    return <EULAPage onBack={() => setActiveLegalPage(null)} />;
+  }
+
+  if (activeLegalPage === 'privacy') {
+    return <PrivacyPolicyPage onBack={() => setActiveLegalPage(null)} />;
   }
 
   // Show loading or auth gate
@@ -799,7 +810,7 @@ function AppContent() {
           </div>
         </section>
 
-        <Footer />
+        <Footer onNavigateToLegal={setActiveLegalPage} />
 
         <Cart
           isOpen={isCartOpen}
