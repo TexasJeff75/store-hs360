@@ -224,6 +224,41 @@ async function handleRefresh() {
 
   if (!tokenResponse.ok) {
     const errorText = await tokenResponse.text();
+
+    // Parse error to detect invalid_grant (expired/revoked refresh token)
+    let isInvalidGrant = false;
+    try {
+      const errorJson = JSON.parse(errorText);
+      isInvalidGrant = errorJson.error === 'invalid_grant';
+    } catch {
+      isInvalidGrant = errorText.includes('invalid_grant');
+    }
+
+    // Log refresh failure to audit trail
+    await supabase.from('quickbooks_sync_log').insert({
+      entity_type: 'oauth',
+      entity_id: creds.realm_id,
+      sync_type: 'update',
+      status: 'failed',
+      error_message: isInvalidGrant
+        ? 'Refresh token expired or revoked - reconnection required'
+        : `Token refresh failed: ${errorText}`,
+      request_data: { action: 'refresh', grant_type: 'refresh_token' },
+      created_at: new Date().toISOString()
+    });
+
+    if (isInvalidGrant) {
+      // Deactivate stale credentials so subsequent calls don't keep failing
+      await supabase
+        .from('quickbooks_credentials')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', creds.id);
+
+      const err = new Error('QuickBooks connection expired. Please reconnect.');
+      err.code = 'INVALID_GRANT';
+      throw err;
+    }
+
     throw new Error(`Failed to refresh token: ${errorText}`);
   }
 
@@ -280,7 +315,7 @@ async function handleStatus() {
 
   const { data: creds } = await supabase
     .from('quickbooks_credentials')
-    .select('id, realm_id, is_active, expires_at, created_at, updated_at')
+    .select('id, realm_id, is_active, expires_at, refresh_token_expires_at, created_at, updated_at')
     .eq('is_active', true)
     .maybeSingle();
 
@@ -288,10 +323,18 @@ async function handleStatus() {
     return { connected: false };
   }
 
-  const expiresAt = new Date(creds.expires_at);
   const now = new Date();
+
+  const expiresAt = new Date(creds.expires_at);
   const isExpired = expiresAt <= now;
   const expiresInMinutes = Math.round((expiresAt.getTime() - now.getTime()) / 60000);
+
+  const refreshExpiresAt = creds.refresh_token_expires_at ? new Date(creds.refresh_token_expires_at) : null;
+  const refreshTokenIsExpired = refreshExpiresAt ? refreshExpiresAt <= now : false;
+  const refreshTokenExpiresInDays = refreshExpiresAt
+    ? Math.round((refreshExpiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  const refreshTokenExpiringSoon = refreshTokenExpiresInDays !== null && refreshTokenExpiresInDays <= 14 && !refreshTokenIsExpired;
 
   return {
     connected: true,
@@ -300,6 +343,10 @@ async function handleStatus() {
     expires_at: creds.expires_at,
     is_expired: isExpired,
     expires_in_minutes: expiresInMinutes,
+    refresh_token_expires_at: creds.refresh_token_expires_at,
+    refresh_token_is_expired: refreshTokenIsExpired,
+    refresh_token_expires_in_days: refreshTokenExpiresInDays,
+    refresh_token_expiring_soon: refreshTokenExpiringSoon,
     connected_at: creds.created_at,
     updated_at: creds.updated_at
   };

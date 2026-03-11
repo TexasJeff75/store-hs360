@@ -726,7 +726,12 @@ export function QuickBooksManagement() {
       const updated = await quickbooksOAuth.refreshTokens();
       setConnectionStatus({ connected: true, ...updated });
     } catch (error: any) {
-      alert(`Failed to refresh: ${error.message}`);
+      if (error.message?.startsWith('[RECONNECT_REQUIRED]')) {
+        alert('QuickBooks connection has expired and cannot be refreshed. Please disconnect and reconnect to QuickBooks.');
+        setConnectionStatus({ connected: false });
+      } else {
+        alert(`Failed to refresh: ${error.message}`);
+      }
     }
   };
 
@@ -737,7 +742,12 @@ export function QuickBooksManagement() {
       alert(`Sync complete!\nSuccess: ${result.success.length}\nFailed: ${result.failed.length}`);
       await loadSyncLogs();
     } catch (error: any) {
-      alert(`Sync failed: ${error.message}`);
+      if (error.message?.startsWith('[RECONNECT_REQUIRED]')) {
+        alert('QuickBooks connection has expired. Please disconnect and reconnect to QuickBooks.');
+        setConnectionStatus({ connected: false });
+      } else {
+        alert(`Sync failed: ${error.message}`);
+      }
     } finally {
       setSyncing(false);
     }
@@ -765,7 +775,12 @@ export function QuickBooksManagement() {
       alert(`Invoices created!\nSuccess: ${result.success.length}\nFailed: ${result.failed.length}`);
       await loadSyncLogs();
     } catch (error: any) {
-      alert(`Sync failed: ${error.message}`);
+      if (error.message?.startsWith('[RECONNECT_REQUIRED]')) {
+        alert('QuickBooks connection has expired. Please disconnect and reconnect to QuickBooks.');
+        setConnectionStatus({ connected: false });
+      } else {
+        alert(`Sync failed: ${error.message}`);
+      }
     } finally {
       setSyncing(false);
     }
@@ -845,6 +860,20 @@ export function QuickBooksManagement() {
             <div className="mt-4">
               {connectionStatus?.connected ? (
                 <div className="space-y-4">
+                  {(connectionStatus.refresh_token_expiring_soon || connectionStatus.refresh_token_is_expired) && (
+                    <div className={`rounded-md p-4 ${connectionStatus.refresh_token_is_expired ? 'bg-red-50' : 'bg-yellow-50'}`}>
+                      <div className="flex">
+                        <AlertCircle className={`h-5 w-5 ${connectionStatus.refresh_token_is_expired ? 'text-red-400' : 'text-yellow-400'}`} />
+                        <div className="ml-3">
+                          <p className={`text-sm font-medium ${connectionStatus.refresh_token_is_expired ? 'text-red-800' : 'text-yellow-800'}`}>
+                            {connectionStatus.refresh_token_is_expired
+                              ? 'QuickBooks refresh token has expired. Please disconnect and reconnect to restore the integration.'
+                              : `QuickBooks refresh token expires in ${connectionStatus.refresh_token_expires_in_days} days. Please disconnect and reconnect soon to avoid service interruption.`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <CheckCircle className="h-6 w-6 text-green-600" />
@@ -907,6 +936,29 @@ export function QuickBooksManagement() {
                           {connectionStatus.expires_in_minutes != null && !connectionStatus.is_expired && (
                             <span className="ml-2 text-xs text-gray-500">
                               ({connectionStatus.expires_in_minutes}m remaining)
+                            </span>
+                          )}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className="text-sm font-medium text-gray-500">Refresh Token Expires</dt>
+                        <dd className="mt-1 text-sm text-gray-900">
+                          {connectionStatus.refresh_token_expires_at
+                            ? new Date(connectionStatus.refresh_token_expires_at).toLocaleDateString()
+                            : 'Unknown'}
+                          {connectionStatus.refresh_token_is_expired && (
+                            <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                              Expired
+                            </span>
+                          )}
+                          {connectionStatus.refresh_token_expiring_soon && (
+                            <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                              {connectionStatus.refresh_token_expires_in_days}d remaining
+                            </span>
+                          )}
+                          {!connectionStatus.refresh_token_is_expired && !connectionStatus.refresh_token_expiring_soon && connectionStatus.refresh_token_expires_in_days != null && (
+                            <span className="ml-2 text-xs text-gray-500">
+                              ({connectionStatus.refresh_token_expires_in_days}d remaining)
                             </span>
                           )}
                         </dd>

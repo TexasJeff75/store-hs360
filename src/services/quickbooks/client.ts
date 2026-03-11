@@ -47,8 +47,12 @@ export class QuickBooksClient {
       let errorMessage = `QuickBooks API error: ${response.status}`;
       try {
         const errorData = await response.json();
+        if (errorData.error_code === 'INVALID_GRANT') {
+          throw new Error('[RECONNECT_REQUIRED] QuickBooks connection has expired. Please disconnect and reconnect.');
+        }
         errorMessage = errorData.error || errorMessage;
-      } catch {
+      } catch (e) {
+        if (e instanceof Error && e.message.startsWith('[RECONNECT_REQUIRED]')) throw e;
       }
       throw new Error(errorMessage);
     }

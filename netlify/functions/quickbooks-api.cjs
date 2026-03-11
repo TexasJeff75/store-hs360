@@ -125,6 +125,41 @@ async function refreshTokens(creds, supabase) {
 
   if (!tokenResponse.ok) {
     const errorText = await tokenResponse.text();
+
+    // Detect invalid_grant (expired/revoked refresh token)
+    let isInvalidGrant = false;
+    try {
+      const errorJson = JSON.parse(errorText);
+      isInvalidGrant = errorJson.error === 'invalid_grant';
+    } catch {
+      isInvalidGrant = errorText.includes('invalid_grant');
+    }
+
+    // Log refresh failure to audit trail
+    await supabase.from('quickbooks_sync_log').insert({
+      entity_type: 'oauth',
+      entity_id: creds.realm_id,
+      sync_type: 'update',
+      status: 'failed',
+      error_message: isInvalidGrant
+        ? 'Refresh token expired or revoked - reconnection required'
+        : `Token refresh failed: ${errorText}`,
+      request_data: { action: 'auto_refresh', grant_type: 'refresh_token' },
+      created_at: new Date().toISOString()
+    });
+
+    if (isInvalidGrant) {
+      // Deactivate stale credentials
+      await supabase
+        .from('quickbooks_credentials')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', creds.id);
+
+      const err = new Error('QuickBooks connection expired. Please reconnect.');
+      err.code = 'INVALID_GRANT';
+      throw err;
+    }
+
     throw new Error(`Token refresh failed: ${errorText}`);
   }
 
@@ -286,12 +321,18 @@ exports.handler = async (event) => {
     };
   } catch (error) {
     console.error('QuickBooks API proxy error:', error);
-    const statusCode = error.message === 'Unauthorized' || error.message?.includes('Auth error') ? 401 : 500;
+    let statusCode = 500;
+    if (error.message === 'Unauthorized' || error.message?.includes('Auth error')) {
+      statusCode = 401;
+    } else if (error.code === 'INVALID_GRANT') {
+      statusCode = 401;
+    }
     return {
       statusCode,
       headers: corsHeaders,
       body: JSON.stringify({
-        error: error.message
+        error: error.message,
+        error_code: error.code || undefined
       })
     };
   }
