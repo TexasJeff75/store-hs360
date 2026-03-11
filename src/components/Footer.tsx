@@ -79,18 +79,20 @@ const Footer: React.FC<FooterProps> = ({ onNavigateToLegal }) => {
               &copy; {new Date().getFullYear()} HealthSpan360. All rights reserved.
             </p>
             <div className="flex space-x-6 mt-4 md:mt-0">
-              <button
-                onClick={() => onNavigateToLegal?.('privacy')}
-                className="text-gray-400 hover:text-white text-sm transition-colors"
+              <a
+                href="#privacy-policy"
+                onClick={(e) => { e.preventDefault(); onNavigateToLegal?.('privacy'); }}
+                className="text-gray-400 hover:text-white text-sm transition-colors underline-offset-2 hover:underline"
               >
                 Privacy Policy
-              </button>
-              <button
-                onClick={() => onNavigateToLegal?.('eula')}
-                className="text-gray-400 hover:text-white text-sm transition-colors"
+              </a>
+              <a
+                href="#terms-of-service"
+                onClick={(e) => { e.preventDefault(); onNavigateToLegal?.('eula'); }}
+                className="text-gray-400 hover:text-white text-sm transition-colors underline-offset-2 hover:underline"
               >
                 Terms of Service
-              </button>
+              </a>
             </div>
           </div>
         </div>
