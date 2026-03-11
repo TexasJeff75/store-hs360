@@ -161,7 +161,7 @@ const EULAPage: React.FC<EULAPageProps> = ({ onBack }) => {
             </p>
             <div className="bg-gray-50 rounded-lg p-5 mt-3 border border-gray-200">
               <p className="text-gray-800 font-medium">HealthSpan360, LLC</p>
-              <p className="text-gray-600 mt-1">Email: legal@healthspan360.com</p>
+              <p className="text-gray-600 mt-1">Email: info@hs360.co</p>
               <p className="text-gray-600">Phone: 1-800-HEALTH-360</p>
             </div>
           </div>
