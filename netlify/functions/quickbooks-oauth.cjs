@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { encrypt, decrypt, isEncrypted } = require('./utils/qb-token-encryption.cjs');
 
 const ALLOWED_ORIGIN = process.env.CORS_ALLOWED_ORIGIN || '*';
 
@@ -165,8 +166,8 @@ async function handleExchange(body) {
     .from('quickbooks_credentials')
     .insert({
       realm_id: realmId,
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
+      access_token: encrypt(tokenData.access_token),
+      refresh_token: encrypt(tokenData.refresh_token),
       token_type: tokenData.token_type || 'bearer',
       expires_at: expiresAt.toISOString(),
       refresh_token_expires_at: refreshExpiresAt.toISOString(),
@@ -205,6 +206,7 @@ async function handleRefresh() {
     throw new Error('No active QuickBooks credentials found');
   }
 
+  const refreshToken = isEncrypted(creds.refresh_token) ? decrypt(creds.refresh_token) : creds.refresh_token;
   const basicAuth = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
 
   const tokenResponse = await fetch(QB_TOKEN_URL, {
@@ -216,7 +218,7 @@ async function handleRefresh() {
     },
     body: new URLSearchParams({
       grant_type: 'refresh_token',
-      refresh_token: creds.refresh_token
+      refresh_token: refreshToken
     })
   });
 
@@ -236,8 +238,8 @@ async function handleRefresh() {
   const { data: updated, error: updateError } = await supabase
     .from('quickbooks_credentials')
     .update({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
+      access_token: encrypt(tokenData.access_token),
+      refresh_token: encrypt(tokenData.refresh_token),
       expires_at: expiresAt.toISOString(),
       refresh_token_expires_at: refreshExpiresAt.toISOString(),
       updated_at: new Date().toISOString()
