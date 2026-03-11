@@ -1,17 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Mail, MapPin, Facebook, Twitter, Instagram, Youtube } from 'lucide-react';
-import { siteSettingsService, type ContactInfo } from '@/services/siteSettings';
 
 interface FooterProps {
   onNavigateToLegal?: (page: 'eula' | 'privacy') => void;
 }
 
 const Footer: React.FC<FooterProps> = ({ onNavigateToLegal }) => {
-  const [contact, setContact] = useState<ContactInfo>(siteSettingsService.getDefaults().contact);
-
-  useEffect(() => {
-    siteSettingsService.getSettings().then(s => setContact(s.contact));
-  }, []);
 
   return (
     <footer className="bg-gray-900 text-white">
@@ -66,13 +60,13 @@ const Footer: React.FC<FooterProps> = ({ onNavigateToLegal }) => {
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
                 <Mail className="h-5 w-5 text-pink-400" />
-                <span className="text-gray-300">{contact.email}</span>
+                <span className="text-gray-300">info@hs360.co</span>
               </div>
               <div className="flex items-start space-x-3">
                 <MapPin className="h-5 w-5 text-pink-400 mt-1" />
                 <span className="text-gray-300">
-                  {contact.addressLine1}<br />
-                  {contact.addressLine2}
+                  16922 Telge Rd., Suite 2<br />
+                  Cypress, TX 77429
                 </span>
               </div>
             </div>
