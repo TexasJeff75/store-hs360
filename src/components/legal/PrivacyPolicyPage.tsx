@@ -235,7 +235,8 @@ const PrivacyPolicyPage: React.FC<PrivacyPolicyPageProps> = ({ onBack }) => {
               <p className="text-gray-800 font-medium">HealthSpan360, LLC</p>
               <p className="text-gray-600 mt-1">Privacy Inquiries</p>
               <p className="text-gray-600 mt-1">Email: info@hs360.co</p>
-              <p className="text-gray-600">Phone: 1-800-HEALTH-360</p>
+              <p className="text-gray-600">16922 Telge Rd., Suite 2</p>
+              <p className="text-gray-600">Cypress, TX 77429</p>
             </div>
           </div>
         </div>

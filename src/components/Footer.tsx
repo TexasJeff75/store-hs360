@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Phone, MapPin, Facebook, Twitter, Instagram, Youtube } from 'lucide-react';
+import { Mail, MapPin, Facebook, Twitter, Instagram, Youtube } from 'lucide-react';
 import { siteSettingsService, type ContactInfo } from '@/services/siteSettings';
 
 interface FooterProps {
@@ -64,10 +64,6 @@ const Footer: React.FC<FooterProps> = ({ onNavigateToLegal }) => {
           <div>
             <h4 className="text-lg font-semibold mb-4">Contact Us</h4>
             <div className="space-y-3">
-              <div className="flex items-center space-x-3">
-                <Phone className="h-5 w-5 text-pink-400" />
-                <span className="text-gray-300">{contact.phone}</span>
-              </div>
               <div className="flex items-center space-x-3">
                 <Mail className="h-5 w-5 text-pink-400" />
                 <span className="text-gray-300">{contact.email}</span>

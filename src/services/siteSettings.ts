@@ -27,10 +27,10 @@ const DEFAULT_SETTINGS: SiteSettings = {
     { id: 'overnight', name: 'Overnight Shipping', price: 39.99, days: '1 business day' },
   ],
   contact: {
-    phone: '1-800-HEALTH-360',
-    email: 'support@healthspan360.com',
-    addressLine1: '123 Wellness Way',
-    addressLine2: 'Health City, HC 12345',
+    phone: '',
+    email: 'info@hs360.co',
+    addressLine1: '16922 Telge Rd., Suite 2',
+    addressLine2: 'Cypress, TX 77429',
   },
   sessionTimeoutMinutes: 120,
 };
