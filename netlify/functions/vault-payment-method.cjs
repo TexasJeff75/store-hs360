@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const { encrypt, decrypt, isEncrypted } = require('./utils/qb-token-encryption.cjs');
 
 const ALLOWED_ORIGIN = process.env.CORS_ALLOWED_ORIGIN || '*';
 
@@ -47,6 +48,24 @@ async function getQBCredentials(supabase) {
 
   if (!creds) throw new Error('No active QuickBooks connection');
 
+  // Decrypt tokens — they are only held in plain text in volatile function memory
+  const needsMigration = !isEncrypted(creds.access_token) || !isEncrypted(creds.refresh_token);
+  creds.access_token = isEncrypted(creds.access_token) ? decrypt(creds.access_token) : creds.access_token;
+  creds.refresh_token = isEncrypted(creds.refresh_token) ? decrypt(creds.refresh_token) : creds.refresh_token;
+
+  // Migrate legacy plain text tokens to encrypted format
+  if (needsMigration) {
+    console.log('Migrating plain text QB tokens to encrypted format');
+    await supabase
+      .from('quickbooks_credentials')
+      .update({
+        access_token: encrypt(creds.access_token),
+        refresh_token: encrypt(creds.refresh_token),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', creds.id);
+  }
+
   const expiresAt = new Date(creds.expires_at);
   const fiveMinutesFromNow = new Date(Date.now() + 5 * 60 * 1000);
 
@@ -86,8 +105,8 @@ async function refreshTokens(creds, supabase) {
   const { data: updated } = await supabase
     .from('quickbooks_credentials')
     .update({
-      access_token: tokenData.access_token,
-      refresh_token: tokenData.refresh_token,
+      access_token: encrypt(tokenData.access_token),
+      refresh_token: encrypt(tokenData.refresh_token),
       expires_at: expiresAt.toISOString(),
       refresh_token_expires_at: refreshExpiresAt.toISOString(),
       updated_at: new Date().toISOString()
@@ -95,6 +114,10 @@ async function refreshTokens(creds, supabase) {
     .eq('id', creds.id)
     .select('*')
     .single();
+
+  // Return plain text tokens in volatile memory for immediate use
+  updated.access_token = tokenData.access_token;
+  updated.refresh_token = tokenData.refresh_token;
 
   return updated;
 }
