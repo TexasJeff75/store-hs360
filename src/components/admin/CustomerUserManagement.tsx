@@ -398,7 +398,7 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
 
       {/* Create User Modal */}
       {isCreateUserModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="fixed inset-0 z-50 overflow-y-auto" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
             
@@ -512,7 +512,7 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
 
       {/* Assign/Edit User Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="fixed inset-0 z-50 overflow-y-auto" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
             

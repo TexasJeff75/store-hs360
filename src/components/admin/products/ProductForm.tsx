@@ -184,7 +184,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, isOpen, onClose, onS
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 overflow-y-auto" onClick={e => e.stopPropagation()}>
       <div className="flex items-start justify-center min-h-screen pt-4 px-4 pb-20">
         <div className="fixed inset-0 bg-black/50" />
 

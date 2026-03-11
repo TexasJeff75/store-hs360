@@ -826,9 +826,9 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
         const canSeeDistributor = canSeeAll || isDistributorUser;
 
         return (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
+        <div className="fixed inset-0 z-50 overflow-y-auto" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20">
-            <div className="fixed inset-0 bg-black bg-opacity-50 print:hidden" onClick={() => setSelectedCommission(null)}></div>
+            <div className="fixed inset-0 bg-black bg-opacity-50 print:hidden"></div>
 
             <div className="relative bg-white rounded-lg shadow-xl max-w-3xl w-full p-6 print:shadow-none print:max-w-none print:rounded-none">
               <div className="flex justify-between items-center mb-4">
