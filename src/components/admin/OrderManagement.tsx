@@ -36,6 +36,7 @@ const OrderManagement: React.FC = () => {
   const [selectedOrderOrgName, setSelectedOrderOrgName] = useState<string | null>(null);
   const [orderCommission, setOrderCommission] = useState<any>(null);
   const [paymentLogs, setPaymentLogs] = useState<any[]>([]);
+  const [paymentTransactions, setPaymentTransactions] = useState<any[]>([]);
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -56,12 +57,14 @@ const OrderManagement: React.FC = () => {
       resolveSelectedOrderNames(selectedOrder);
       fetchOrderCommission(selectedOrder.id);
       fetchPaymentLogs(selectedOrder.id);
+      fetchPaymentTransactions(selectedOrder.id);
     } else {
       setSubOrders([]);
       setShowSubOrders(false);
       setSelectedOrderOrgName(null);
       setOrderCommission(null);
       setPaymentLogs([]);
+      setPaymentTransactions([]);
     }
   }, [selectedOrder?.id]);
 
@@ -125,6 +128,26 @@ const OrderManagement: React.FC = () => {
     } catch (error) {
       console.error('Error fetching payment logs:', error);
       setPaymentLogs([]);
+    }
+  };
+
+  const fetchPaymentTransactions = async (orderId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('payment_transactions')
+        .select('*')
+        .eq('order_id', orderId)
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching payment transactions:', error);
+        setPaymentTransactions([]);
+      } else {
+        setPaymentTransactions(data || []);
+      }
+    } catch (error) {
+      console.error('Error fetching payment transactions:', error);
+      setPaymentTransactions([]);
     }
   };
 
@@ -230,17 +253,24 @@ const OrderManagement: React.FC = () => {
 
   const handleCancelOrder = async (orderId: string) => {
     const order = orders.find(o => o.id === orderId);
-    if (!order || order.status !== 'pending') {
+    if (!order) return;
+
+    if (!canManageOrders && order.status !== 'pending') {
       alert('Only pending orders can be cancelled.');
       return;
     }
 
-    if (!confirm('Are you sure you want to cancel this order? This action cannot be undone.')) {
+    const hasAuthorizedPayment = order.payment_status === 'authorized';
+    const confirmMsg = hasAuthorizedPayment
+      ? `This order has an authorized payment of $${order.total?.toFixed(2)}. The authorization will be voided. Cancel this order?`
+      : 'Are you sure you want to cancel this order? This action cannot be undone.';
+
+    if (!confirm(confirmMsg)) {
       return;
     }
 
     try {
-      const result = await orderService.cancelOrder(orderId);
+      const result = await orderService.cancelOrder(orderId, canManageOrders);
       if (!result.success) {
         alert(`Failed to cancel order: ${result.error}`);
         return;
@@ -257,6 +287,7 @@ const OrderManagement: React.FC = () => {
             new_status: 'cancelled',
             customer_email: order.customer_email,
             organization_id: order.organization_id,
+            payment_voided: hasAuthorizedPayment,
           },
         });
       }
@@ -264,6 +295,7 @@ const OrderManagement: React.FC = () => {
       await fetchOrders();
       if (selectedOrder?.id === orderId) {
         setSelectedOrder({ ...selectedOrder, status: 'cancelled' });
+        fetchPaymentLogs(orderId);
       }
     } catch (error) {
       console.error('Error cancelling order:', error);
@@ -303,6 +335,13 @@ const OrderManagement: React.FC = () => {
         const captureResult = await orderService.capturePaymentOnShipment(orderId);
         if (!captureResult.success) {
           alert(`Warning: Payment capture failed: ${captureResult.error}`);
+        }
+      }
+
+      if (newStatus === 'cancelled' && order?.payment_status === 'authorized') {
+        const voidResult = await orderService.voidPayment(orderId);
+        if (!voidResult.success) {
+          alert(`Warning: Auto-void failed: ${voidResult.error}. The authorization hold will expire on its own.`);
         }
       }
 
@@ -346,6 +385,7 @@ const OrderManagement: React.FC = () => {
         // Refresh commission and payment logs after status change
         fetchOrderCommission(orderId);
         fetchPaymentLogs(orderId);
+        fetchPaymentTransactions(orderId);
       }
     } catch (error) {
       console.error('Error updating order status:', error);
@@ -859,6 +899,58 @@ const OrderManagement: React.FC = () => {
                         Captured: {new Date(order.payment_captured_at).toLocaleString()}
                       </div>
                     )}
+                    {canManageOrders && order.payment_status === 'authorized' && (
+                      <div className="mt-3">
+                        <button
+                          onClick={async () => {
+                            if (!confirm(`Void the $${Number(order.total).toFixed(2)} authorization on this order? The hold will be released.`)) return;
+                            const result = await orderService.voidPayment(order.id);
+                            if (result.success) {
+                              alert('Authorization voided successfully.');
+                              await fetchOrders();
+                              const { order: refreshed } = await orderService.getOrderById(order.id);
+                              if (refreshed) setSelectedOrder(refreshed);
+                              fetchPaymentLogs(order.id);
+                              fetchPaymentTransactions(order.id);
+                            } else {
+                              alert(`Void failed: ${result.error}`);
+                            }
+                          }}
+                          className="w-full px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100"
+                        >
+                          Void Authorization
+                        </button>
+                      </div>
+                    )}
+                    {canManageOrders && order.payment_status === 'captured' && (
+                      <div className="mt-3">
+                        <button
+                          onClick={async () => {
+                            const input = prompt(`Refund this payment? Enter amount for partial refund, or leave blank for full refund of $${Number(order.total).toFixed(2)}:`);
+                            if (input === null) return;
+                            const amount = input.trim() === '' ? undefined : parseFloat(input);
+                            if (amount !== undefined && (isNaN(amount) || amount <= 0 || amount > Number(order.total))) {
+                              alert(`Invalid amount. Must be between $0.01 and $${Number(order.total).toFixed(2)}.`);
+                              return;
+                            }
+                            const result = await orderService.refundPayment(order.id, amount);
+                            if (result.success) {
+                              alert(`Refund of $${(amount || Number(order.total)).toFixed(2)} processed successfully.`);
+                              await fetchOrders();
+                              const { order: refreshed } = await orderService.getOrderById(order.id);
+                              if (refreshed) setSelectedOrder(refreshed);
+                              fetchPaymentLogs(order.id);
+                              fetchPaymentTransactions(order.id);
+                            } else {
+                              alert(`Refund failed: ${result.error}`);
+                            }
+                          }}
+                          className="w-full px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100"
+                        >
+                          Refund Payment
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -950,6 +1042,70 @@ const OrderManagement: React.FC = () => {
 
                 {paymentLogs.length === 0 && !order.notes && (
                   <p className="text-sm text-gray-500 italic mt-2">No QuickBooks API activity for this order</p>
+                )}
+              </div>
+            )}
+
+            {/* Payment Transaction History */}
+            {canManageOrders && paymentTransactions.length > 0 && (
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                  <DollarSign className="h-4 w-4 mr-2 text-green-600" />
+                  Payment Transaction History
+                </h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-gray-200">
+                        <th className="py-2 pr-3 text-left font-medium text-gray-500">Date</th>
+                        <th className="py-2 pr-3 text-left font-medium text-gray-500">Type</th>
+                        <th className="py-2 pr-3 text-left font-medium text-gray-500">Amount</th>
+                        <th className="py-2 pr-3 text-left font-medium text-gray-500">Status</th>
+                        <th className="py-2 pr-3 text-left font-medium text-gray-500">Last 4</th>
+                        <th className="py-2 text-left font-medium text-gray-500">Transaction ID</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {paymentTransactions.map((txn: any) => (
+                        <tr key={txn.id}>
+                          <td className="py-2 pr-3 text-gray-600">{new Date(txn.created_at).toLocaleString()}</td>
+                          <td className="py-2 pr-3">
+                            <span className={`px-2 py-0.5 rounded-full font-medium ${
+                              txn.transaction_type === 'authorization' ? 'bg-blue-100 text-blue-700' :
+                              txn.transaction_type === 'capture' ? 'bg-green-100 text-green-700' :
+                              txn.transaction_type === 'void' ? 'bg-orange-100 text-orange-700' :
+                              txn.transaction_type === 'refund' ? 'bg-red-100 text-red-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {txn.transaction_type}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-3 font-mono">${Number(txn.amount).toFixed(2)}</td>
+                          <td className="py-2 pr-3">
+                            <span className={`font-medium ${
+                              txn.status === 'success' ? 'text-green-600' :
+                              txn.status === 'failed' ? 'text-red-600' :
+                              txn.status === 'declined' ? 'text-red-600' :
+                              'text-yellow-600'
+                            }`}>
+                              {txn.status}
+                            </span>
+                          </td>
+                          <td className="py-2 pr-3 font-mono text-gray-500">{txn.last_four ? `****${txn.last_four}` : '—'}</td>
+                          <td className="py-2 font-mono text-gray-400 truncate max-w-[120px]">{txn.gateway_transaction_id || '—'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {paymentTransactions.some((txn: any) => txn.error_message) && (
+                  <div className="mt-2 space-y-1">
+                    {paymentTransactions.filter((txn: any) => txn.error_message).map((txn: any) => (
+                      <div key={`txn-err-${txn.id}`} className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                        <span className="font-medium">{txn.transaction_type} error:</span> {txn.error_message}
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
             )}
