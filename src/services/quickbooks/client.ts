@@ -101,17 +101,21 @@ export class QuickBooksClient {
     responseData?: any,
     errorMessage?: string
   ): Promise<void> {
-    await supabase.from('quickbooks_sync_log').insert({
-      entity_type: entityType,
-      entity_id: entityId,
-      quickbooks_id: quickbooksId,
-      sync_type: syncType,
-      status,
-      request_data: requestData,
-      response_data: responseData,
-      error_message: errorMessage,
-      synced_at: status === 'success' ? new Date().toISOString() : null
-    });
+    try {
+      await supabase.from('quickbooks_sync_log').insert({
+        entity_type: entityType,
+        entity_id: entityId,
+        quickbooks_id: quickbooksId,
+        sync_type: syncType,
+        status,
+        request_data: requestData,
+        response_data: responseData,
+        error_message: errorMessage,
+        synced_at: status === 'success' ? new Date().toISOString() : null
+      });
+    } catch {
+      // Sync logging is best-effort — don't let failures propagate
+    }
   }
 
   getRealmId(): string | null {
