@@ -117,7 +117,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        // Reset password recovery flag on signed in after recovery
+        // Once a profile is loaded, lock down state updates. Only an
+        // explicit SIGNED_OUT (user clicked "Sign Out") can tear down
+        // the session. All other background events (TOKEN_REFRESHED,
+        // SIGNED_IN re-auth on tab focus, transient null-session events
+        // during refresh races) are handled silently to avoid unmounting
+        // the app shell — which would close open modals and lose form state.
+        if (profileLoadedRef.current) {
+          if (event === 'SIGNED_OUT') {
+            profileLoadedRef.current = false;
+            setSession(null);
+            setUser(null);
+            setProfile(null);
+            setLoading(false);
+            return;
+          }
+          // Silently update session/user if valid, ignore null sessions
+          if (session?.user) {
+            setSession(session);
+            setUser(session.user);
+          }
+          return;
+        }
+
+        // First-time auth flow (profile not yet loaded)
         if (event === 'SIGNED_IN') {
           setIsPasswordRecovery(false);
         }
@@ -126,13 +149,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session?.user ?? null);
 
         if (session?.user) {
-          // On token refresh or background re-auth (e.g. window regaining
-          // focus), skip re-fetching the profile if we already have it —
-          // avoids flashing a loading spinner and unmounting the app shell
-          // (which closes open modals, loses form state, etc.).
-          if (event === 'TOKEN_REFRESHED' || (event === 'SIGNED_IN' && profileLoadedRef.current)) {
-            return;
-          }
           fetchProfile(session.user.id);
         } else {
           setProfile(null);
