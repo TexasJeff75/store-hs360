@@ -1,5 +1,6 @@
 const { createClient } = require('@supabase/supabase-js');
 const { encrypt, decrypt, isEncrypted } = require('./utils/qb-token-encryption.cjs');
+const { verifyTurnstileToken } = require('./utils/turnstile-verify.cjs');
 
 const ALLOWED_ORIGIN = process.env.CORS_ALLOWED_ORIGIN || '*';
 
@@ -228,6 +229,21 @@ exports.handler = async (event) => {
         headers: corsHeaders,
         body: JSON.stringify({ error: 'Invalid request body' })
       };
+    }
+
+    // Verify Turnstile CAPTCHA token
+    if (body.turnstileToken) {
+      const captchaResult = await verifyTurnstileToken(
+        body.turnstileToken,
+        event.headers['x-forwarded-for'] || event.headers['client-ip']
+      );
+      if (!captchaResult.success) {
+        return {
+          statusCode: 403,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: 'CAPTCHA verification failed. Please try again.' })
+        };
+      }
     }
 
     const {

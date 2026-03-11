@@ -22,8 +22,8 @@ interface AuthContextType {
   effectiveProfile: Profile | null;
   startImpersonation: (userId: string) => Promise<void>;
   stopImpersonation: () => void;
-  signUp: (email: string, password: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string, ageVerified: boolean) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, captchaToken?: string) => Promise<{ error: any }>;
+  signIn: (email: string, password: string, ageVerified: boolean, captchaToken?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: any }>;
   resetPassword: (newPassword: string) => Promise<{ error: any }>;
@@ -204,10 +204,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string) => {
+  const signUp = async (email: string, password: string, captchaToken?: string) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
+      options: captchaToken ? { captchaToken } : undefined,
     });
 
 
@@ -233,10 +234,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error };
   };
 
-  const signIn = async (email: string, password: string, ageVerified: boolean) => {
+  const signIn = async (email: string, password: string, ageVerified: boolean, captchaToken?: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
+      options: captchaToken ? { captchaToken } : undefined,
     });
 
     if (!error && data.user) {

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { X, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import TurnstileWidget from './TurnstileWidget';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -17,8 +18,17 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
 
   const { signIn, signUp } = useAuth();
+
+  const handleTurnstileVerify = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
+
+  const handleTurnstileExpire = useCallback(() => {
+    setTurnstileToken(null);
+  }, []);
 
   const resetForm = () => {
     setEmail('');
@@ -27,6 +37,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
     setAgeVerified(false);
     setError(null);
     setSuccess(null);
+    setTurnstileToken(null);
   };
 
   const handleClose = () => {
@@ -60,7 +71,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
 
     try {
       if (mode === 'signin') {
-        const { error } = await signIn(email, password, ageVerified);
+        const { error } = await signIn(email, password, ageVerified, turnstileToken || undefined);
         if (error) {
           console.error('Sign in error:', error);
           if (error.message.includes('Invalid login credentials')) {
@@ -77,7 +88,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
           }, 1000);
         }
       } else {
-        const { error } = await signUp(email, password);
+        const { error } = await signUp(email, password, turnstileToken || undefined);
         if (error) {
           console.error('Sign up error:', error);
           if (error.message.includes('User already registered')) {
@@ -229,10 +240,16 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                 </label>
               </div>
 
+              <TurnstileWidget
+                onVerify={handleTurnstileVerify}
+                onExpire={handleTurnstileExpire}
+                action={mode}
+              />
+
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !turnstileToken}
                 className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-2 px-4 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
                 {loading ? (
