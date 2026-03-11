@@ -9,6 +9,10 @@ export interface QBConnectionStatus {
   expires_at?: string;
   is_expired?: boolean;
   expires_in_minutes?: number;
+  refresh_token_expires_at?: string;
+  refresh_token_is_expired?: boolean;
+  refresh_token_expires_in_days?: number;
+  refresh_token_expiring_soon?: boolean;
   connected_at?: string;
   updated_at?: string;
 }
@@ -74,8 +78,11 @@ export const quickbooksOAuth = {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to refresh token');
+      const errorData = await response.json();
+      if (errorData.code === 'INVALID_GRANT' || errorData.error?.includes('invalid_grant')) {
+        throw new Error('[RECONNECT_REQUIRED] QuickBooks connection has expired. Please disconnect and reconnect.');
+      }
+      throw new Error(errorData.error || 'Failed to refresh token');
     }
 
     const { credentials } = await response.json();
