@@ -280,6 +280,19 @@ exports.handler = async (event) => {
 
     const isACH = paymentMethod.payment_type === 'ach' || paymentMethod.payment_type === 'bank_account';
 
+    // Extract client IP for fraud prevention (QuickBooks deviceInfo)
+    const clientIp = event.headers['x-forwarded-for']?.split(',')[0]?.trim()
+      || event.headers['client-ip']
+      || event.headers['x-nf-client-connection-ip'];
+    const paymentContext = {
+      mobile: false,
+      isEcommerce: true,
+      deviceInfo: {
+        encrypted: true,
+        ...(clientIp ? { ipAddress: clientIp } : {}),
+      },
+    };
+
     let qbUrl, requestBody;
 
     if (isACH) {
@@ -290,7 +303,7 @@ exports.handler = async (event) => {
         bankAccountOnFile: token,
         description: description || 'Saved payment method charge',
         paymentMode: 'WEB',
-        context: { mobile: false, isEcommerce: true },
+        context: paymentContext,
       };
     } else {
       qbUrl = `${QB_PAYMENTS_BASE_URL}/payments/charges`;
@@ -300,7 +313,7 @@ exports.handler = async (event) => {
         cardOnFile: token,
         capture: false,
         description: description || 'Saved payment method authorization',
-        context: { mobile: false, isEcommerce: true },
+        context: paymentContext,
       };
     }
 
