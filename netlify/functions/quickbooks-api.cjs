@@ -32,7 +32,7 @@ function getSupabaseAdmin() {
   return createClient(url, key);
 }
 
-async function authenticateUser(authHeader) {
+async function authenticateUser(authHeader, { requireAdmin = true } = {}) {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     throw new Error('Missing or invalid authorization header');
   }
@@ -45,14 +45,16 @@ async function authenticateUser(authHeader) {
     throw new Error(error ? `Auth error: ${error.message}` : 'Unauthorized');
   }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle();
+  if (requireAdmin) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
 
-  if (!profile || profile.role !== 'admin') {
-    throw new Error('Only admins can access QuickBooks API');
+    if (!profile || profile.role !== 'admin') {
+      throw new Error('Only admins can access QuickBooks API');
+    }
   }
 
   return user;
@@ -220,8 +222,8 @@ exports.handler = async (event) => {
 
   try {
     const authHeader = event.headers.authorization || event.headers.Authorization;
-    const user = await authenticateUser(authHeader);
 
+    // Parse body first to determine if this is a payment API call
     let body = {};
     if (event.body) {
       try {
@@ -236,6 +238,11 @@ exports.handler = async (event) => {
     }
 
     const { endpoint, method = 'GET', data, usePaymentsAPI = false, isQuery = false } = body;
+
+    // Payment API endpoints (tokenize, charge, authorize) are called during
+    // customer checkout — any authenticated user can access them.
+    // Accounting API endpoints (invoices, customers, etc.) remain admin-only.
+    const user = await authenticateUser(authHeader, { requireAdmin: !usePaymentsAPI });
 
     if (usePaymentsAPI && method.toUpperCase() === 'POST') {
       if (!checkPaymentRateLimit(user.id)) {
