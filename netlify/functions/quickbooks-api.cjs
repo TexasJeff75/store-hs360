@@ -288,6 +288,10 @@ exports.handler = async (event) => {
       url = `${QB_API_BASE_URL}/v3/company/${creds.realm_id}/${endpoint}`;
     }
 
+    const crypto = require('crypto');
+    const requestId = crypto.randomUUID();
+    const supabase = getSupabaseAdmin();
+
     const headers = {
       'Authorization': `Bearer ${creds.access_token}`,
       'Accept': 'application/json',
@@ -295,8 +299,7 @@ exports.handler = async (event) => {
     };
 
     if (usePaymentsAPI) {
-      const crypto = require('crypto');
-      headers['Request-Id'] = crypto.randomUUID();
+      headers['Request-Id'] = requestId;
     }
 
     const fetchOptions = {
@@ -338,6 +341,25 @@ exports.handler = async (event) => {
 
       // Only include structured error details, never raw HTML
       const safeDetails = responseData?.Fault || responseData?.errors || undefined;
+
+      // Log failed API call for troubleshooting
+      supabase.from('quickbooks_sync_log').insert({
+        entity_type: usePaymentsAPI ? 'payment_api' : 'accounting_api',
+        entity_id: `api_${Date.now()}`,
+        sync_type: method.toLowerCase(),
+        status: 'failed',
+        error_message: errorMessage,
+        request_data: {
+          endpoint,
+          method: method.toUpperCase(),
+          requestId,
+          httpStatus: qbResponse.status,
+          usePaymentsAPI,
+          isQuery,
+        },
+        response_data: safeDetails ? { fault: safeDetails } : undefined,
+        created_at: new Date().toISOString(),
+      }).then(() => {}).catch(() => {});
 
       return {
         statusCode: qbResponse.status,
