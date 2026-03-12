@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Building2, Users, Plus, Trash2, X, UserPlus, UserCheck,
 } from 'lucide-react';
-import { supabase, getSignUpClient } from '@/services/supabase';
+import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 
 // ── Interfaces ───────────────────────────────────────────────────────────────
@@ -100,7 +100,6 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
   const [showAddSalesRep, setShowAddSalesRep] = useState(false);
   const [showCreateRepUser, setShowCreateRepUser] = useState(false);
   const [newRepEmail, setNewRepEmail] = useState('');
-  const [newRepPassword, setNewRepPassword] = useState('');
   const [newRepFullName, setNewRepFullName] = useState('');
   const [newRepPhone, setNewRepPhone] = useState('');
   const [isCreatingRepUser, setIsCreatingRepUser] = useState(false);
@@ -116,7 +115,6 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
   const [showAddDelegate, setShowAddDelegate] = useState(false);
   const [showCreateDelegateUser, setShowCreateDelegateUser] = useState(false);
   const [newDelegateEmail, setNewDelegateEmail] = useState('');
-  const [newDelegatePassword, setNewDelegatePassword] = useState('');
   const [newDelegateFullName, setNewDelegateFullName] = useState('');
   const [isCreatingDelegateUser, setIsCreatingDelegateUser] = useState(false);
   const [selectedDelegateUserId, setSelectedDelegateUserId] = useState('');
@@ -196,6 +194,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
           state: newCustomer.state || null,
           zip: newCustomer.zip || null,
           description: newCustomer.description || null,
+          org_type: 'customer',
           is_active: true,
         }])
         .select('id')
@@ -279,12 +278,12 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
   };
 
   const handleCreateSalesRepUser = async () => {
-    if (!newRepEmail.trim() || !newRepPassword.trim()) {
-      setError('Email and password are required');
+    if (!newRepEmail.trim()) {
+      setError('Email is required');
       return;
     }
-    if (newRepPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (!newRepFullName.trim()) {
+      setError('Full name is required');
       return;
     }
     if (!distributor) return;
@@ -292,46 +291,36 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       setIsCreatingRepUser(true);
       setError(null);
 
-      // 1. Create auth user via signUp on a disposable client (won't affect current session)
-      const { data: signUpData, error: signUpError } = await getSignUpClient().auth.signUp({
-        email: newRepEmail,
-        password: newRepPassword,
-      });
-      if (signUpError) throw new Error(signUpError.message);
-      const newUserId = signUpData.user?.id;
-      if (!newUserId) throw new Error('User creation failed — no user ID returned');
-      // Supabase returns identities:[] when the email already exists (no error thrown)
-      if (!signUpData.user?.identities?.length) {
-        throw new Error('A user with this email already exists');
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-      // 2. Brief wait to ensure the handle_new_user trigger has committed the profile
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: newRepEmail,
+            role: 'sales_rep',
+            fullName: newRepFullName,
+            phone: newRepPhone || null,
+            isIndependent: false,
+            distributorId: distributor.id,
+            commissionSplitType: newSalesRep.commission_split_type,
+            salesRepRate: newSalesRep.sales_rep_rate,
+            distributorOverrideRate: newSalesRep.commission_split_type === 'fixed_with_override'
+              ? newSalesRep.distributor_override_rate : undefined,
+          }),
+        }
+      );
 
-      // 3. Call DB function to set role, name, phone (SECURITY DEFINER, bypasses RLS)
-      const { data: setupResult, error: setupError } = await supabase.rpc('distributor_setup_user', {
-        p_user_id: newUserId,
-        p_role: 'sales_rep',
-        p_full_name: newRepFullName || null,
-        p_phone: newRepPhone || null,
-      });
-      if (setupError) throw new Error(setupError.message);
-      if (setupResult && !setupResult.success) throw new Error(setupResult.error || 'Failed to set up user profile');
-
-      // 3. Auto-assign this new rep to the distributorship
-      await supabase.from('distributor_sales_reps').insert([{
-        distributor_id: distributor.id,
-        sales_rep_id: newUserId,
-        commission_split_type: newSalesRep.commission_split_type,
-        sales_rep_rate: newSalesRep.sales_rep_rate,
-        distributor_override_rate: newSalesRep.commission_split_type === 'fixed_with_override'
-          ? newSalesRep.distributor_override_rate : null,
-        is_active: true,
-        notes: newSalesRep.notes || null,
-      }]);
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || 'Failed to create sales rep');
 
       setNewRepEmail('');
-      setNewRepPassword('');
       setNewRepFullName('');
       setNewRepPhone('');
       setShowCreateRepUser(false);
@@ -340,7 +329,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
         sales_rep_id: '', commission_split_type: 'percentage_of_distributor',
         sales_rep_rate: 50, distributor_override_rate: 0, notes: '',
       });
-      setSuccess('Sales rep created and added');
+      setSuccess('Sales rep created — invite email sent');
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create user');
@@ -388,12 +377,12 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
   };
 
   const handleCreateDelegateUser = async () => {
-    if (!newDelegateEmail.trim() || !newDelegatePassword.trim()) {
-      setError('Email and password are required');
+    if (!newDelegateEmail.trim()) {
+      setError('Email is required');
       return;
     }
-    if (newDelegatePassword.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (!newDelegateFullName.trim()) {
+      setError('Full name is required');
       return;
     }
     if (!distributor) return;
@@ -401,47 +390,37 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       setIsCreatingDelegateUser(true);
       setError(null);
 
-      // 1. Create auth user via signUp on a disposable client
-      const { data: signUpData, error: signUpError } = await getSignUpClient().auth.signUp({
-        email: newDelegateEmail,
-        password: newDelegatePassword,
-      });
-      if (signUpError) throw new Error(signUpError.message);
-      const newUserId = signUpData.user?.id;
-      if (!newUserId) throw new Error('User creation failed — no user ID returned');
-      if (!signUpData.user?.identities?.length) {
-        throw new Error('A user with this email already exists');
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
 
-      // 2. Brief wait to ensure the handle_new_user trigger has committed the profile
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: newDelegateEmail,
+            role: 'distributor',
+            fullName: newDelegateFullName,
+            delegateForDistributorId: distributor.id,
+            delegateNotes: delegateNotes || null,
+          }),
+        }
+      );
 
-      // 3. Set role to distributor via DB function
-      const { data: setupResult, error: setupError } = await supabase.rpc('distributor_setup_user', {
-        p_user_id: newUserId,
-        p_role: 'distributor',
-        p_full_name: newDelegateFullName || null,
-        p_phone: null,
-      });
-      if (setupError) throw new Error(setupError.message);
-      if (setupResult && !setupResult.success) throw new Error(setupResult.error || 'Failed to set up user profile');
-
-      // 3. Auto-assign as delegate
-      await supabase.from('distributor_delegates').insert([{
-        distributor_id: distributor.id,
-        user_id: newUserId,
-        is_active: true,
-        notes: delegateNotes || null,
-      }]);
+      const result = await response.json();
+      if (!result.success) throw new Error(result.error || 'Failed to create delegate');
 
       setNewDelegateEmail('');
-      setNewDelegatePassword('');
       setNewDelegateFullName('');
       setShowCreateDelegateUser(false);
       setShowAddDelegate(false);
       setDelegateNotes('');
       setSelectedDelegateUserId('');
-      setSuccess('Delegate user created and added');
+      setSuccess('Delegate created — invite email sent');
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create delegate user');
@@ -841,17 +820,11 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                         placeholder="(555) 555-1234"
                       />
                     </Field>
-                    <Field label="Password *">
-                      <input
-                        type="password"
-                        required
-                        value={newRepPassword}
-                        onChange={(e) => setNewRepPassword(e.target.value)}
-                        className={inputCls}
-                        placeholder="Min 6 characters"
-                      />
-                    </Field>
                   </div>
+
+                  <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">
+                    An invite email will be sent. The user sets their own password.
+                  </p>
 
                   <Field label="Commission Split Type">
                     <select
@@ -916,10 +889,10 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                     <button
                       type="button"
                       onClick={handleCreateSalesRepUser}
-                      disabled={isCreatingRepUser || !newRepEmail || !newRepPassword || !newRepFullName}
+                      disabled={isCreatingRepUser || !newRepEmail || !newRepFullName}
                       className={`${primaryBtnCls} disabled:opacity-50`}
                     >
-                      {isCreatingRepUser ? 'Creating...' : 'Create & Add Sales Rep'}
+                      {isCreatingRepUser ? 'Creating...' : 'Create & Send Invite'}
                     </button>
                   </div>
                 </div>
@@ -1030,17 +1003,11 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                           placeholder="jane@example.com"
                         />
                       </Field>
-                      <Field label="Password *">
-                        <input
-                          type="password"
-                          required
-                          value={newDelegatePassword}
-                          onChange={(e) => setNewDelegatePassword(e.target.value)}
-                          className={inputCls}
-                          placeholder="Min 6 characters"
-                        />
-                      </Field>
                     </div>
+
+                    <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">
+                      An invite email will be sent. The user sets their own password.
+                    </p>
 
                     <Field label="Notes">
                       <textarea
@@ -1056,7 +1023,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                       type="button"
                       onClick={() => {
                         setShowCreateDelegateUser(false);
-                        setNewDelegateEmail(''); setNewDelegatePassword(''); setNewDelegateFullName('');
+                        setNewDelegateEmail(''); setNewDelegateFullName('');
                       }}
                       className={cancelBtnCls}
                     >
@@ -1064,10 +1031,10 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                     </button>
                     <button
                       type="submit"
-                      disabled={isCreatingDelegateUser || !newDelegateEmail || !newDelegatePassword || !newDelegateFullName}
+                      disabled={isCreatingDelegateUser || !newDelegateEmail || !newDelegateFullName}
                       className={`${primaryBtnCls} disabled:opacity-50`}
                     >
-                      {isCreatingDelegateUser ? 'Creating...' : 'Create & Add Delegate'}
+                      {isCreatingDelegateUser ? 'Creating...' : 'Create & Send Invite'}
                     </button>
                   </div>
                 </form>

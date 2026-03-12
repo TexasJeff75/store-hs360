@@ -59,6 +59,9 @@ export interface Organization {
   state?: string;
   zip?: string;
   is_active: boolean;
+  org_type?: 'customer' | 'distributor';
+  is_house_account?: boolean;
+  created_by?: string;
   created_at: string;
   updated_at: string;
 }

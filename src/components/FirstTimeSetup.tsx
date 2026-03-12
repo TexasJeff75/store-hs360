@@ -39,7 +39,9 @@ const FirstTimeSetup: React.FC<FirstTimeSetupProps> = ({ onComplete }) => {
   const loadOrganizations = async () => {
     try {
       setLoading(true);
-      const data = await multiTenantService.getOrganizations();
+      const allOrgs = await multiTenantService.getOrganizations();
+      // Only show customer organizations (not distributor orgs)
+      const data = allOrgs.filter((org: any) => !org.org_type || org.org_type === 'customer');
       setOrganizations(data);
     } catch (err) {
       console.error('Error loading organizations:', err);
