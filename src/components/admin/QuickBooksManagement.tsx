@@ -12,6 +12,8 @@ interface SyncLog {
   sync_type: string;
   status: string;
   error_message: string | null;
+  request_data: Record<string, any> | null;
+  response_data: Record<string, any> | null;
   created_at: string;
 }
 
@@ -665,11 +667,17 @@ export function QuickBooksManagement() {
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [syncing, setSyncing] = useState(false);
   const [activeTab, setActiveTab] = useState<'connection' | 'diagnostics' | 'import' | 'sync' | 'logs'>('connection');
+  const [logStatusFilter, setLogStatusFilter] = useState<string>('all');
+  const [logLimit, setLogLimit] = useState(50);
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
 
   useEffect(() => {
     loadConnectionStatus();
     loadSyncLogs();
   }, []);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { loadSyncLogs(); }, [logStatusFilter, logLimit]);
 
   const loadConnectionStatus = async () => {
     try {
@@ -684,16 +692,72 @@ export function QuickBooksManagement() {
 
   const loadSyncLogs = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('quickbooks_sync_log')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(50);
+        .limit(logLimit);
+
+      if (logStatusFilter !== 'all') {
+        query = query.eq('status', logStatusFilter);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setSyncLogs(data || []);
     } catch (error) {
       console.error('Failed to load sync logs:', error);
+    }
+  };
+
+  const exportSyncLogs = async () => {
+    try {
+      let query = supabase
+        .from('quickbooks_sync_log')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1000);
+
+      if (logStatusFilter !== 'all') {
+        query = query.eq('status', logStatusFilter);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      if (!data || data.length === 0) {
+        alert('No logs to export.');
+        return;
+      }
+
+      const exportData = data.map(log => ({
+        timestamp: log.created_at,
+        status: log.status,
+        entity_type: log.entity_type,
+        entity_id: log.entity_id,
+        quickbooks_id: log.quickbooks_id || '',
+        sync_type: log.sync_type,
+        error_message: log.error_message || '',
+        request_data: log.request_data ? JSON.stringify(log.request_data) : '',
+        response_data: log.response_data ? JSON.stringify(log.response_data) : '',
+      }));
+
+      const csvHeaders = Object.keys(exportData[0]).join(',');
+      const csvRows = exportData.map(row =>
+        Object.values(row).map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+      );
+      const csv = [csvHeaders, ...csvRows].join('\n');
+
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `quickbooks-sync-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Failed to export logs:', error);
+      alert('Failed to export logs.');
     }
   };
 
@@ -1065,15 +1129,45 @@ export function QuickBooksManagement() {
           <div className="px-4 py-5 sm:px-6 flex items-center justify-between">
             <div>
               <h3 className="text-lg font-medium text-gray-900">Sync Logs</h3>
-              <p className="mt-1 text-sm text-gray-500">Recent synchronization activity</p>
+              <p className="mt-1 text-sm text-gray-500">Recent synchronization activity — click a row for details</p>
             </div>
-            <button
-              onClick={loadSyncLogs}
-              className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-            >
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Refresh
-            </button>
+            <div className="flex items-center gap-2">
+              <select
+                value={logStatusFilter}
+                onChange={(e) => { setLogStatusFilter(e.target.value); }}
+                className="text-sm border-gray-300 rounded-md shadow-sm"
+              >
+                <option value="all">All statuses</option>
+                <option value="failed">Failed</option>
+                <option value="success">Success</option>
+                <option value="pending">Pending</option>
+              </select>
+              <select
+                value={logLimit}
+                onChange={(e) => { setLogLimit(Number(e.target.value)); }}
+                className="text-sm border-gray-300 rounded-md shadow-sm"
+              >
+                <option value={50}>Last 50</option>
+                <option value={100}>Last 100</option>
+                <option value={200}>Last 200</option>
+                <option value={500}>Last 500</option>
+              </select>
+              <button
+                onClick={loadSyncLogs}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Refresh
+              </button>
+              <button
+                onClick={exportSyncLogs}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                title="Export logs as CSV for QuickBooks support"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Export CSV
+              </button>
+            </div>
           </div>
           <div className="border-t border-gray-200">
             <div className="overflow-x-auto">
@@ -1109,31 +1203,68 @@ export function QuickBooksManagement() {
                     </tr>
                   ) : (
                     syncLogs.map((log) => (
-                      <tr key={log.id}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            {getStatusIcon(log.status)}
-                            <span className={`ml-2 text-sm font-medium ${getStatusColor(log.status)}`}>
-                              {log.status}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {log.entity_type}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {log.sync_type}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                          {log.quickbooks_id || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(log.created_at).toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-red-600 max-w-xs truncate">
-                          {log.error_message || '-'}
-                        </td>
-                      </tr>
+                      <>
+                        <tr
+                          key={log.id}
+                          onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
+                          className="cursor-pointer hover:bg-gray-50"
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              {getStatusIcon(log.status)}
+                              <span className={`ml-2 text-sm font-medium ${getStatusColor(log.status)}`}>
+                                {log.status}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {log.entity_type}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {log.sync_type}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                            {log.quickbooks_id || '-'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(log.created_at).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-red-600 max-w-xs truncate">
+                            {log.error_message || '-'}
+                          </td>
+                        </tr>
+                        {expandedLogId === log.id && (
+                          <tr key={`${log.id}-detail`}>
+                            <td colSpan={6} className="px-6 py-4 bg-gray-50">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                                <div>
+                                  <h4 className="font-medium text-gray-700 mb-1">Request Data</h4>
+                                  <pre className="bg-white p-3 rounded border text-xs overflow-auto max-h-48 whitespace-pre-wrap">
+                                    {log.request_data ? JSON.stringify(log.request_data, null, 2) : 'No request data'}
+                                  </pre>
+                                </div>
+                                <div>
+                                  <h4 className="font-medium text-gray-700 mb-1">Response Data</h4>
+                                  <pre className="bg-white p-3 rounded border text-xs overflow-auto max-h-48 whitespace-pre-wrap">
+                                    {log.response_data ? JSON.stringify(log.response_data, null, 2) : 'No response data'}
+                                  </pre>
+                                </div>
+                                {log.error_message && (
+                                  <div className="md:col-span-2">
+                                    <h4 className="font-medium text-gray-700 mb-1">Full Error Message</h4>
+                                    <pre className="bg-white p-3 rounded border text-xs overflow-auto max-h-32 whitespace-pre-wrap text-red-600">
+                                      {log.error_message}
+                                    </pre>
+                                  </div>
+                                )}
+                                <div className="md:col-span-2 text-xs text-gray-400">
+                                  Log ID: {log.id} | Entity ID: {log.entity_id}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
                     ))
                   )}
                 </tbody>
