@@ -144,6 +144,8 @@ async function handleExchange(body) {
     })
   });
 
+  const exchangeIntuitTid = tokenResponse.headers.get('intuit_tid') || undefined;
+
   if (!tokenResponse.ok) {
     const errorText = await tokenResponse.text();
     let safeMessage = `Failed to exchange authorization code (HTTP ${tokenResponse.status})`;
@@ -157,7 +159,23 @@ async function handleExchange(body) {
     } catch {
       // Non-JSON response — don't include raw text which may contain tokens
     }
-    console.error('OAuth code exchange failed:', errorText.substring(0, 500));
+    console.error('OAuth code exchange failed:', errorText.substring(0, 500), 'intuit_tid:', exchangeIntuitTid);
+
+    // Log exchange failure to audit trail (best-effort)
+    try {
+      await supabase.from('quickbooks_sync_log').insert({
+        entity_type: 'oauth',
+        entity_id: realmId || 'unknown',
+        sync_type: 'create',
+        status: 'failed',
+        error_message: safeMessage,
+        request_data: { action: 'exchange', grant_type: 'authorization_code', intuit_tid: exchangeIntuitTid },
+        created_at: new Date().toISOString()
+      });
+    } catch (logError) {
+      console.error('Failed to log exchange failure:', logError.message);
+    }
+
     throw new Error(safeMessage);
   }
 
@@ -192,6 +210,21 @@ async function handleExchange(body) {
     throw new Error(`Failed to store credentials: ${insertError.message}`);
   }
 
+  // Log successful exchange (best-effort)
+  try {
+    await supabase.from('quickbooks_sync_log').insert({
+      entity_type: 'oauth',
+      entity_id: realmId,
+      sync_type: 'create',
+      status: 'success',
+      request_data: { action: 'exchange', grant_type: 'authorization_code', intuit_tid: exchangeIntuitTid },
+      synced_at: new Date().toISOString(),
+      created_at: new Date().toISOString()
+    });
+  } catch (logError) {
+    console.error('Failed to log exchange success:', logError.message);
+  }
+
   return {
     success: true,
     credentials: {
@@ -200,7 +233,8 @@ async function handleExchange(body) {
       expires_at: credentials.expires_at,
       connected_at: credentials.created_at,
       updated_at: credentials.updated_at
-    }
+    },
+    intuit_tid: exchangeIntuitTid
   };
 }
 
@@ -234,6 +268,8 @@ async function handleRefresh() {
     })
   });
 
+  const refreshIntuitTid = tokenResponse.headers.get('intuit_tid') || undefined;
+
   if (!tokenResponse.ok) {
     const errorText = await tokenResponse.text();
 
@@ -256,7 +292,7 @@ async function handleRefresh() {
     } catch {
       // Non-JSON — already have safe default
     }
-    console.error('Token refresh failed:', errorText.substring(0, 500));
+    console.error('Token refresh failed:', errorText.substring(0, 500), 'intuit_tid:', refreshIntuitTid);
 
     // Log refresh failure to audit trail (best-effort)
     try {
@@ -268,7 +304,7 @@ async function handleRefresh() {
         error_message: isInvalidGrant
           ? 'Refresh token expired or revoked - reconnection required'
           : safeErrorMessage,
-        request_data: { action: 'refresh', grant_type: 'refresh_token' },
+        request_data: { action: 'refresh', grant_type: 'refresh_token', intuit_tid: refreshIntuitTid },
         created_at: new Date().toISOString()
       });
     } catch (logError) {
@@ -323,7 +359,8 @@ async function handleRefresh() {
       expires_at: updated.expires_at,
       connected_at: updated.created_at,
       updated_at: updated.updated_at
-    }
+    },
+    intuit_tid: refreshIntuitTid
   };
 }
 
@@ -409,10 +446,13 @@ async function handleDiagnostics() {
     dbStatus = `connection failed: ${e.message}`;
   }
 
+  const serverQBEnvironment = process.env.QB_ENVIRONMENT || process.env.VITE_QB_ENVIRONMENT || 'sandbox';
+
   return {
     status: 'ok',
     timestamp: new Date().toISOString(),
     storage: 'supabase-server-side',
+    environment: serverQBEnvironment,
     supabase: {
       url: url ? url.substring(0, 30) + '...' : 'MISSING',
       hasServiceRoleKey: hasServiceKey,

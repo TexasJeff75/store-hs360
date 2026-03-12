@@ -12,7 +12,7 @@ const corsHeaders = {
 };
 
 const QB_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
-const QB_ENVIRONMENT = process.env.VITE_QB_ENVIRONMENT || process.env.QB_ENVIRONMENT || 'sandbox';
+const QB_ENVIRONMENT = process.env.QB_ENVIRONMENT || process.env.VITE_QB_ENVIRONMENT || 'sandbox';
 
 const QB_API_BASE_URL = QB_ENVIRONMENT === 'production'
   ? 'https://quickbooks.api.intuit.com'
@@ -107,8 +107,11 @@ async function refreshTokens(creds, supabase) {
     })
   });
 
+  const refreshIntuitTid = tokenResponse.headers.get('intuit_tid') || undefined;
+
   if (!tokenResponse.ok) {
     const errorText = await tokenResponse.text();
+    console.error('Token refresh failed:', errorText.substring(0, 500), 'intuit_tid:', refreshIntuitTid);
 
     let isInvalidGrant = false;
     try {
@@ -173,7 +176,7 @@ async function findOrCreateQBCustomer(supabase, creds, organizationId) {
   if (!org) throw new Error('Organization not found');
 
   if (org.qb_customer_id) {
-    return org.qb_customer_id;
+    return { customerId: org.qb_customer_id, intuit_tid: undefined };
   }
 
   // Search QB for existing customer by org name
@@ -187,6 +190,8 @@ async function findOrCreateQBCustomer(supabase, creds, organizationId) {
     }
   });
 
+  const searchIntuitTid = searchResponse.headers.get('intuit_tid') || undefined;
+
   if (searchResponse.ok) {
     const searchData = await searchResponse.json();
     const existingCustomer = searchData?.QueryResponse?.Customer?.[0];
@@ -196,7 +201,7 @@ async function findOrCreateQBCustomer(supabase, creds, organizationId) {
         .from('organizations')
         .update({ qb_customer_id: existingCustomer.Id })
         .eq('id', organizationId);
-      return existingCustomer.Id;
+      return { customerId: existingCustomer.Id, intuit_tid: searchIntuitTid };
     }
   }
 
@@ -214,6 +219,8 @@ async function findOrCreateQBCustomer(supabase, creds, organizationId) {
       CompanyName: org.name,
     })
   });
+
+  const createIntuitTid = createResponse.headers.get('intuit_tid') || undefined;
 
   if (!createResponse.ok) {
     const errorData = await createResponse.text();
@@ -238,7 +245,7 @@ async function findOrCreateQBCustomer(supabase, creds, organizationId) {
     .update({ qb_customer_id: qbCustomerId })
     .eq('id', organizationId);
 
-  return qbCustomerId;
+  return { customerId: qbCustomerId, intuit_tid: createIntuitTid };
 }
 
 /**
@@ -344,7 +351,9 @@ exports.handler = async (event) => {
     const crypto = require('crypto');
 
     // Find or create a QB customer for this organization
-    const qbCustomerId = await findOrCreateQBCustomer(supabase, creds, organizationId);
+    const qbCustomerResult = await findOrCreateQBCustomer(supabase, creds, organizationId);
+    const qbCustomerId = qbCustomerResult.customerId;
+    const customerIntuitTid = qbCustomerResult.intuit_tid;
 
     const isACH = paymentType === 'ach' || paymentType === 'bank_account';
 
@@ -369,6 +378,7 @@ exports.handler = async (event) => {
     });
 
     const vaultText = await vaultResponse.text();
+    const vaultIntuitTid = vaultResponse.headers.get('intuit_tid') || undefined;
     let vaultData;
     try {
       vaultData = JSON.parse(vaultText);
@@ -387,14 +397,14 @@ exports.handler = async (event) => {
         entity_id: `vault_${Date.now()}`,
         sync_type: 'create',
         status: 'failed',
-        request_data: { organizationId, paymentType, qbCustomerId },
+        request_data: { organizationId, paymentType, qbCustomerId, intuit_tid: vaultIntuitTid },
         error_message: errorMsg,
       }).then(() => {}).catch(() => {});
 
       return {
         statusCode: vaultResponse.status >= 400 && vaultResponse.status < 500 ? vaultResponse.status : 502,
         headers: corsHeaders,
-        body: JSON.stringify({ error: errorMsg })
+        body: JSON.stringify({ error: errorMsg, intuit_tid: vaultIntuitTid })
       };
     }
 
@@ -437,7 +447,7 @@ exports.handler = async (event) => {
       quickbooks_id: reusableId,
       sync_type: 'create',
       status: 'success',
-      request_data: { organizationId, paymentType, qbCustomerId },
+      request_data: { organizationId, paymentType, qbCustomerId, intuit_tid: vaultIntuitTid },
       response_data: { reusableId, last4: lastFour },
       synced_at: new Date().toISOString(),
     }).then(() => {}).catch(() => {});
@@ -449,6 +459,7 @@ exports.handler = async (event) => {
         paymentMethodId: savedMethod.id,
         reusableToken: reusableId,
         qbCustomerId,
+        intuit_tid: vaultIntuitTid,
       })
     };
   } catch (error) {

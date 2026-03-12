@@ -11,7 +11,7 @@ const corsHeaders = {
 };
 
 const QB_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
-const QB_ENVIRONMENT = process.env.VITE_QB_ENVIRONMENT || process.env.QB_ENVIRONMENT || 'sandbox';
+const QB_ENVIRONMENT = process.env.QB_ENVIRONMENT || process.env.VITE_QB_ENVIRONMENT || 'sandbox';
 
 const QB_API_BASE_URL = QB_ENVIRONMENT === 'production'
   ? 'https://quickbooks.api.intuit.com'
@@ -325,6 +325,9 @@ exports.handler = async (event) => {
 
     const qbResponse = await fetch(url, fetchOptions);
 
+    // Capture intuit_tid from response headers for QB support troubleshooting
+    const intuitTid = qbResponse.headers.get('intuit_tid') || undefined;
+
     const responseText = await qbResponse.text();
     let responseData;
     try {
@@ -353,6 +356,7 @@ exports.handler = async (event) => {
           endpoint,
           method: method.toUpperCase(),
           requestId,
+          intuit_tid: intuitTid,
           httpStatus: qbResponse.status,
           usePaymentsAPI,
           isQuery,
@@ -366,7 +370,8 @@ exports.handler = async (event) => {
         headers: corsHeaders,
         body: JSON.stringify({
           error: errorMessage,
-          details: safeDetails
+          details: safeDetails,
+          intuit_tid: intuitTid,
         })
       };
     }
@@ -376,7 +381,8 @@ exports.handler = async (event) => {
       headers: corsHeaders,
       body: JSON.stringify({
         data: responseData,
-        realm_id: creds.realm_id
+        realm_id: creds.realm_id,
+        intuit_tid: intuitTid,
       })
     };
   } catch (error) {
