@@ -110,11 +110,26 @@ WHERE distributor_class IS NULL OR distributor_class = 'company';
 -- ═══════════════════════════════════════
 -- 7. Backfill org_type for distributor orgs
 -- ═══════════════════════════════════════
+-- An org is a "distributor org" if a user with role='distributor' belongs to it
 UPDATE organizations SET org_type = 'distributor'
 WHERE id IN (
-  SELECT DISTINCT organization_id FROM distributor_customers
-  WHERE organization_id IS NOT NULL
+  SELECT DISTINCT uor.organization_id
+  FROM user_organization_roles uor
+  JOIN profiles p ON p.id = uor.user_id
+  WHERE p.role = 'distributor'
+    AND uor.organization_id IS NOT NULL
 );
+-- Ensure any orgs wrongly marked as 'distributor' from customer links are reset
+-- (distributor_customers.organization_id is the CUSTOMER org, not the distributor org)
+UPDATE organizations SET org_type = 'customer'
+WHERE org_type = 'distributor'
+  AND id NOT IN (
+    SELECT DISTINCT uor.organization_id
+    FROM user_organization_roles uor
+    JOIN profiles p ON p.id = uor.user_id
+    WHERE p.role = 'distributor'
+      AND uor.organization_id IS NOT NULL
+  );
 
 -- ═══════════════════════════════════════
 -- 8. Index on org_type for filtering
