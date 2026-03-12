@@ -12,7 +12,7 @@ const corsHeaders = {
 };
 
 const QB_TOKEN_URL = 'https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer';
-const QB_ENVIRONMENT = process.env.VITE_QB_ENVIRONMENT || process.env.QB_ENVIRONMENT || 'sandbox';
+const QB_ENVIRONMENT = process.env.QB_ENVIRONMENT || process.env.VITE_QB_ENVIRONMENT || 'sandbox';
 
 const QB_API_BASE_URL = QB_ENVIRONMENT === 'production'
   ? 'https://quickbooks.api.intuit.com'
