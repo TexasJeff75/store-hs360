@@ -374,6 +374,9 @@ exports.handler = async (event) => {
       body: JSON.stringify(requestBody),
     });
 
+    // Capture intuit_tid from response headers for QB support troubleshooting
+    const intuitTid = qbResponse.headers.get('intuit_tid') || undefined;
+
     const responseText = await qbResponse.text();
     let responseData;
     try {
@@ -406,7 +409,7 @@ exports.handler = async (event) => {
         entity_id: logId,
         sync_type: 'create',
         status: 'failed',
-        request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId },
+        request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId, intuit_tid: intuitTid },
         error_message: errorMsg,
         response_data: { status: responseData?.status, httpStatus: qbResponse.status },
       }).then(() => {}).catch(() => {});
@@ -418,6 +421,7 @@ exports.handler = async (event) => {
           error: userMessage,
           status: isInvalidToken ? 'INVALID_TOKEN' : (responseData?.status || 'FAILED'),
           invalidPaymentMethod: isInvalidToken,
+          intuit_tid: intuitTid,
         })
       };
     }
@@ -430,7 +434,7 @@ exports.handler = async (event) => {
         quickbooks_id: responseData.id,
         sync_type: 'create',
         status: 'failed',
-        request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId },
+        request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId, intuit_tid: intuitTid },
         error_message: 'Payment declined',
         response_data: { id: responseData.id, status: 'DECLINED', amount: responseData.amount },
       }).then(() => {}).catch(() => {});
@@ -441,6 +445,7 @@ exports.handler = async (event) => {
         body: JSON.stringify({
           error: 'Payment was declined',
           status: 'DECLINED',
+          intuit_tid: intuitTid,
         })
       };
     }
@@ -452,7 +457,7 @@ exports.handler = async (event) => {
       quickbooks_id: responseData.id,
       sync_type: 'create',
       status: 'success',
-      request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId },
+      request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId, intuit_tid: intuitTid },
       response_data: { id: responseData.id, status: responseData.status, amount: responseData.amount, authCode: responseData.authCode },
       synced_at: new Date().toISOString(),
     }).then(() => {}).catch(() => {});
