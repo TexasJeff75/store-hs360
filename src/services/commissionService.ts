@@ -668,6 +668,87 @@ class CommissionService {
       };
     }
   }
+
+  async createIndependentDistributor(
+    profileId: string,
+    name: string,
+    options?: {
+      phone?: string;
+      taxId?: string;
+      taxIdType?: 'ein' | 'ssn';
+      legalName?: string;
+      businessName?: string;
+      taxClassification?: string;
+      w9Consent?: boolean;
+    }
+  ): Promise<{ data?: any; error?: string }> {
+    try {
+      const code = `IND-${name.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8)}`;
+
+      const { data: distributor, error: distError } = await supabase
+        .from('distributors')
+        .insert({
+          profile_id: profileId,
+          name,
+          code,
+          distributor_class: 'independent',
+          contact_name: name,
+          phone: options?.phone || null,
+          is_active: true,
+          tax_id: options?.taxId || null,
+          tax_id_type: options?.taxIdType || null,
+          legal_name: options?.legalName || null,
+          business_name: options?.businessName || null,
+          tax_classification: options?.taxClassification || null,
+          w9_consent: options?.w9Consent === true,
+          w9_consent_date: options?.w9Consent ? new Date().toISOString() : null,
+          w9_status: options?.w9Consent ? 'received' : 'pending',
+        })
+        .select('id')
+        .single();
+
+      if (distError) throw distError;
+
+      // Self-link: sales rep belongs to their own distributor entity
+      const { error: dsrError } = await supabase
+        .from('distributor_sales_reps')
+        .upsert({
+          distributor_id: distributor.id,
+          sales_rep_id: profileId,
+          commission_split_type: 'percentage_of_distributor',
+          sales_rep_rate: 100,
+          distributor_override_rate: 0,
+          is_active: true,
+        }, { onConflict: 'distributor_id,sales_rep_id' });
+
+      if (dsrError) throw dsrError;
+
+      return { data: distributor };
+    } catch (error) {
+      console.error('Error creating independent distributor:', error);
+      return {
+        error: error instanceof Error ? error.message : 'Failed to create independent distributor'
+      };
+    }
+  }
+
+  async promoteToCompany(distributorId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('distributors')
+        .update({ distributor_class: 'company' })
+        .eq('id', distributorId);
+
+      if (error) throw error;
+      return { success: true };
+    } catch (error) {
+      console.error('Error promoting distributor:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to promote distributor'
+      };
+    }
+  }
 }
 
 export const commissionService = new CommissionService();

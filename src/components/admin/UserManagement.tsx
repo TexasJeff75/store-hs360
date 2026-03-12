@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Shield, Clock, CheckCircle, Pencil, Trash2, Search, Filter, Key, AlertCircle, Save, RotateCcw, Plus, XCircle, Eye } from 'lucide-react';
+import { User, Mail, Shield, Clock, CheckCircle, Pencil, Trash2, Search, Filter, Key, AlertCircle, Save, RotateCcw, Plus, XCircle, Eye, Building2, FileText, Info } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import type { Profile } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -21,9 +21,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('');
-  const [newUserRole, setNewUserRole] = useState<'admin' | 'sales_rep' | 'customer'>('customer');
-  const [newUserApproved, setNewUserApproved] = useState(true);
+  const [newUserRole, setNewUserRole] = useState<'admin' | 'sales_rep' | 'customer' | 'distributor'>('customer');
   const [newUserOrganizationId, setNewUserOrganizationId] = useState<string>('');
   const [newUserOrganizationRole, setNewUserOrganizationRole] = useState<string>('member');
   const [createNewOrganization, setCreateNewOrganization] = useState(false);
@@ -31,6 +29,22 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
   const [newOrgCode, setNewOrgCode] = useState('');
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [loadingOrgs, setLoadingOrgs] = useState(false);
+  // Role-specific state
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [isHouseAccount, setIsHouseAccount] = useState(false);
+  const [selectedSalesRepId, setSelectedSalesRepId] = useState('');
+  const [isIndependent, setIsIndependent] = useState(true);
+  const [selectedDistributorId, setSelectedDistributorId] = useState('');
+  const [salesReps, setSalesReps] = useState<any[]>([]);
+  const [distributorsList, setDistributorsList] = useState<any[]>([]);
+  // W-9 fields
+  const [taxId, setTaxId] = useState('');
+  const [taxIdType, setTaxIdType] = useState<'ein' | 'ssn'>('ssn');
+  const [legalName, setLegalName] = useState('');
+  const [businessName, setBusinessName] = useState('');
+  const [taxClassification, setTaxClassification] = useState('individual');
+  const [w9Consent, setW9Consent] = useState(false);
   const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [sendingPasswordReset, setSendingPasswordReset] = useState(false);
   const [pendingChanges, setPendingChanges] = useState<{ [key: string]: Partial<Profile> }>({});
@@ -41,6 +55,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
   useEffect(() => {
     fetchUsers();
     fetchOrganizations();
+    fetchSalesReps();
+    fetchDistributors();
   }, []);
 
   // Auto-dismiss success messages after 3 seconds
@@ -63,7 +79,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
       setLoadingOrgs(true);
       const { data, error } = await supabase
         .from('organizations')
-        .select('id, name, code')
+        .select('id, name, code, org_type, is_house_account')
         .eq('is_active', true)
         .order('name');
 
@@ -73,6 +89,59 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
       console.error('Failed to fetch organizations:', err);
     } finally {
       setLoadingOrgs(false);
+    }
+  };
+
+  const fetchSalesReps = async () => {
+    try {
+      const { data: reps } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .eq('role', 'sales_rep')
+        .eq('approval_status', 'approved');
+
+      if (!reps) { setSalesReps([]); return; }
+
+      // Fetch distributor info for each rep
+      const repIds = reps.map(r => r.id);
+      const { data: dsr } = await supabase
+        .from('distributor_sales_reps')
+        .select('sales_rep_id, distributor_id, distributors(name, distributor_class)')
+        .in('sales_rep_id', repIds)
+        .eq('is_active', true);
+
+      const distMap = new Map<string, { name: string; class: string }>();
+      if (dsr) {
+        for (const row of dsr) {
+          const dist = (row as any).distributors;
+          if (dist) {
+            distMap.set(row.sales_rep_id, { name: dist.name, class: dist.distributor_class });
+          }
+        }
+      }
+
+      setSalesReps(reps.map(r => ({
+        ...r,
+        distributorName: distMap.get(r.id)?.name || null,
+        distributorClass: distMap.get(r.id)?.class || null,
+      })));
+    } catch (err) {
+      console.error('Failed to fetch sales reps:', err);
+    }
+  };
+
+  const fetchDistributors = async () => {
+    try {
+      const { data } = await supabase
+        .from('distributors')
+        .select('id, name, code, distributor_class')
+        .eq('is_active', true)
+        .eq('distributor_class', 'company')
+        .order('name');
+
+      setDistributorsList(data || []);
+    } catch (err) {
+      console.error('Failed to fetch distributors:', err);
     }
   };
 
@@ -278,14 +347,53 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
     }, 2000);
   };
 
+  const resetCreateForm = () => {
+    setNewUserEmail('');
+    setNewUserRole('customer');
+    setNewUserOrganizationId('');
+    setNewUserOrganizationRole('member');
+    setCreateNewOrganization(false);
+    setNewOrgName('');
+    setNewOrgCode('');
+    setFullName('');
+    setPhone('');
+    setIsHouseAccount(false);
+    setSelectedSalesRepId('');
+    setIsIndependent(true);
+    setSelectedDistributorId('');
+    setTaxId('');
+    setTaxIdType('ssn');
+    setLegalName('');
+    setBusinessName('');
+    setTaxClassification('individual');
+    setW9Consent(false);
+    setModalMessage(null);
+  };
+
   const handleCreateUser = async () => {
-    if (!newUserEmail.trim() || !newUserPassword.trim()) {
-      setModalMessage({ type: 'error', text: 'Email and password are required' });
+    if (!newUserEmail.trim()) {
+      setModalMessage({ type: 'error', text: 'Email is required' });
       return;
     }
 
-    if (newUserPassword.length < 6) {
-      setModalMessage({ type: 'error', text: 'Password must be at least 6 characters' });
+    // Role-specific validation
+    if (newUserRole === 'customer' && !isHouseAccount && !selectedSalesRepId) {
+      setModalMessage({ type: 'error', text: 'Sales rep is required unless this is a house account' });
+      return;
+    }
+
+    if (newUserRole === 'sales_rep' && isIndependent && !w9Consent) {
+      setModalMessage({ type: 'error', text: 'W-9 consent is required for independent sales reps' });
+      return;
+    }
+
+    if (newUserRole === 'sales_rep' && !isIndependent && !selectedDistributorId) {
+      setModalMessage({ type: 'error', text: 'Please select a distributor' });
+      return;
+    }
+
+    if (newUserRole === 'distributor' && !w9Consent) {
+      setModalMessage({ type: 'error', text: 'W-9 consent is required for distributors' });
       return;
     }
 
@@ -309,14 +417,29 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
           },
           body: JSON.stringify({
             email: newUserEmail,
-            password: newUserPassword,
             role: newUserRole,
-            is_approved: newUserApproved,
+            fullName: fullName || undefined,
+            phone: phone || undefined,
+            // Customer-specific
             organizationId: newUserOrganizationId || undefined,
-            organizationRole: newUserOrganizationRole,
+            orgRole: newUserOrganizationRole,
+            isHouseAccount: newUserRole === 'customer' ? isHouseAccount : undefined,
+            salesRepId: newUserRole === 'customer' && !isHouseAccount ? selectedSalesRepId : undefined,
+            // Sales rep-specific
+            isIndependent: newUserRole === 'sales_rep' ? isIndependent : undefined,
+            distributorId: newUserRole === 'sales_rep' && !isIndependent ? selectedDistributorId : undefined,
+            // W-9 fields
+            taxId: taxId || undefined,
+            taxIdType: taxId ? taxIdType : undefined,
+            legalName: legalName || undefined,
+            businessName: businessName || undefined,
+            taxClassification: taxClassification || undefined,
+            w9Consent,
+            // Org creation
             createOrganization: createNewOrganization,
             newOrgName: createNewOrganization ? newOrgName : undefined,
             newOrgCode: createNewOrganization ? newOrgCode : undefined,
+            orgType: newUserRole === 'distributor' ? 'distributor' : 'customer',
           }),
         }
       );
@@ -332,27 +455,23 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
         throw new Error(result.error || 'User creation failed');
       }
 
+      const inviteNote = result.inviteEmailSent
+        ? ' An invite email has been sent.'
+        : ' Note: invite email could not be sent. Use "Send Password Reset" to send manually.';
+
       setModalMessage({
         type: 'success',
-        text: 'User created successfully!'
+        text: `User created successfully!${inviteNote}`
       });
 
       await fetchUsers();
 
       setTimeout(() => {
         setIsCreateModalOpen(false);
-        setNewUserEmail('');
-        setNewUserPassword('');
-        setNewUserRole('customer');
-        setNewUserApproved(true);
-        setNewUserOrganizationId('');
-        setNewUserOrganizationRole('member');
-        setCreateNewOrganization(false);
-        setNewOrgName('');
-        setNewOrgCode('');
-        setModalMessage(null);
+        resetCreateForm();
         fetchOrganizations();
-      }, 2000);
+        fetchSalesReps();
+      }, 3000);
 
     } catch (err) {
       console.error('Error creating user:', err);
@@ -992,7 +1111,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
 
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full max-h-[90vh] overflow-y-auto">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
                   <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
@@ -1007,9 +1126,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                           : 'bg-red-50 border border-red-200'
                       }`}>
                         {modalMessage.type === 'success' ? (
-                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0" />
                         ) : (
-                          <AlertCircle className="h-5 w-5 text-red-600" />
+                          <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
                         )}
                         <span className={`text-sm ${
                           modalMessage.type === 'success' ? 'text-green-700' : 'text-red-700'
@@ -1020,6 +1139,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                     )}
 
                     <div className="space-y-4">
+                      {/* Email */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Email Address *
@@ -1033,140 +1153,532 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                         />
                       </div>
 
+                      {/* Full Name */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Password *
+                          Full Name
                         </label>
                         <input
-                          type="password"
-                          value={newUserPassword}
-                          onChange={(e) => setNewUserPassword(e.target.value)}
+                          type="text"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="Minimum 6 characters"
+                          placeholder="John Doe"
                         />
-                        <p className="text-xs text-gray-500 mt-1">
-                          Password must be at least 6 characters long
-                        </p>
                       </div>
 
+                      {/* Role */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Role
+                          Role *
                         </label>
                         <select
                           value={newUserRole}
-                          onChange={(e) => setNewUserRole(e.target.value as any)}
+                          onChange={(e) => {
+                            setNewUserRole(e.target.value as any);
+                            setCreateNewOrganization(false);
+                            setNewUserOrganizationId('');
+                          }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
                           <option value="customer">Customer</option>
                           <option value="sales_rep">Sales Rep</option>
+                          <option value="distributor">Distributor</option>
                           <option value="admin">Admin</option>
                         </select>
                       </div>
 
-                      <div>
-                        <label className="flex items-center">
-                          <input
-                            type="checkbox"
-                            checked={newUserApproved}
-                            onChange={(e) => setNewUserApproved(e.target.checked)}
-                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                          />
-                          <span className="ml-2 text-sm text-gray-700">Account Approved</span>
-                        </label>
+                      {/* Invite notice */}
+                      <div className="flex items-start space-x-2 bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <Info className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <p className="text-xs text-blue-700">
+                          An invite email will be sent. The user sets their own password on first login.
+                        </p>
                       </div>
 
-                      {(newUserRole === 'customer' || newUserRole === 'sales_rep') && (
-                        <>
-                          <div className="pt-4 border-t border-gray-200">
-                            <h4 className="text-sm font-medium text-gray-900 mb-3">Organization Assignment</h4>
+                      {/* ═══ CUSTOMER FIELDS ═══ */}
+                      {newUserRole === 'customer' && (
+                        <div className="pt-4 border-t border-gray-200 space-y-4">
+                          <h4 className="text-sm font-medium text-gray-900 flex items-center space-x-2">
+                            <Building2 className="h-4 w-4" />
+                            <span>Customer Setup</span>
+                          </h4>
 
-                            <div className="mb-4">
-                              <label className="flex items-center mb-2">
-                                <input
-                                  type="checkbox"
-                                  checked={createNewOrganization}
-                                  onChange={(e) => {
-                                    setCreateNewOrganization(e.target.checked);
-                                    if (e.target.checked) {
-                                      setNewUserOrganizationId('');
-                                    }
-                                  }}
-                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                                />
-                                <span className="ml-2 text-sm text-gray-700">Create New Organization</span>
-                              </label>
-                            </div>
+                          {/* House Account */}
+                          <div>
+                            <label className="flex items-center">
+                              <input
+                                type="checkbox"
+                                checked={isHouseAccount}
+                                onChange={(e) => setIsHouseAccount(e.target.checked)}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">House Account</span>
+                            </label>
+                            <p className="text-xs text-gray-500 ml-6">Admin-managed account with no sales rep assignment</p>
+                          </div>
 
-                            {createNewOrganization ? (
-                              <>
-                                <div className="mb-3">
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Organization Name *
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={newOrgName}
-                                    onChange={(e) => setNewOrgName(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder="e.g., Acme Corporation"
-                                  />
-                                </div>
-                                <div className="mb-3">
-                                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Organization Code *
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={newOrgCode}
-                                    onChange={(e) => setNewOrgCode(e.target.value.toUpperCase())}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                    placeholder="e.g., ACME"
-                                    maxLength={10}
-                                  />
-                                  <p className="text-xs text-gray-500 mt-1">
-                                    Short unique identifier for the organization
-                                  </p>
-                                </div>
-                              </>
-                            ) : (
-                              <div className="mb-3">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Select Organization
-                                </label>
-                                <select
-                                  value={newUserOrganizationId}
-                                  onChange={(e) => setNewUserOrganizationId(e.target.value)}
-                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                  disabled={loadingOrgs}
-                                >
-                                  <option value="">-- Optional --</option>
-                                  {organizations.map(org => (
-                                    <option key={org.id} value={org.id}>
-                                      {org.name} ({org.code})
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-                            )}
-
+                          {/* Sales Rep (required unless house account) */}
+                          {!isHouseAccount && (
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Organization Role
+                                Sales Rep *
                               </label>
                               <select
-                                value={newUserOrganizationRole}
-                                onChange={(e) => setNewUserOrganizationRole(e.target.value)}
+                                value={selectedSalesRepId}
+                                onChange={(e) => setSelectedSalesRepId(e.target.value)}
                                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                               >
-                                <option value="viewer">Viewer</option>
-                                <option value="member">Member</option>
-                                <option value="manager">Manager</option>
-                                <option value="admin">Admin</option>
+                                <option value="">-- Select Sales Rep --</option>
+                                {salesReps.map(rep => (
+                                  <option key={rep.id} value={rep.id}>
+                                    {rep.full_name || rep.email}
+                                    {rep.distributorName
+                                      ? ` — ${rep.distributorName}`
+                                      : rep.distributorClass === 'independent'
+                                        ? ' — Independent'
+                                        : ''}
+                                  </option>
+                                ))}
+                              </select>
+                              {selectedSalesRepId && salesReps.find(r => r.id === selectedSalesRepId)?.distributorName && (
+                                <p className="text-xs text-blue-600 mt-1 flex items-center space-x-1">
+                                  <Info className="h-3 w-3" />
+                                  <span>Customer will be auto-linked to distributor: {salesReps.find(r => r.id === selectedSalesRepId)?.distributorName}</span>
+                                </p>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Organization */}
+                          <div>
+                            <label className="flex items-center mb-2">
+                              <input
+                                type="checkbox"
+                                checked={createNewOrganization}
+                                onChange={(e) => {
+                                  setCreateNewOrganization(e.target.checked);
+                                  if (e.target.checked) setNewUserOrganizationId('');
+                                }}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">Create New Organization</span>
+                            </label>
+                          </div>
+
+                          {createNewOrganization ? (
+                            <>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Organization Name *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={newOrgName}
+                                  onChange={(e) => setNewOrgName(e.target.value)}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="e.g., Acme Corporation"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Organization Code *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={newOrgCode}
+                                  onChange={(e) => setNewOrgCode(e.target.value.toUpperCase())}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="e.g., ACME"
+                                  maxLength={10}
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Select Organization
+                              </label>
+                              <select
+                                value={newUserOrganizationId}
+                                onChange={(e) => setNewUserOrganizationId(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                disabled={loadingOrgs}
+                              >
+                                <option value="">-- Optional --</option>
+                                {organizations.filter(o => o.org_type === 'customer').map(org => (
+                                  <option key={org.id} value={org.id}>
+                                    {org.name} ({org.code})
+                                  </option>
+                                ))}
                               </select>
                             </div>
+                          )}
+
+                          {/* Org Role */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Organization Role
+                            </label>
+                            <select
+                              value={newUserOrganizationRole}
+                              onChange={(e) => setNewUserOrganizationRole(e.target.value)}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            >
+                              <option value="member">Member (place orders)</option>
+                              <option value="admin">Admin (manage org)</option>
+                            </select>
                           </div>
-                        </>
+                        </div>
+                      )}
+
+                      {/* ═══ SALES REP FIELDS ═══ */}
+                      {newUserRole === 'sales_rep' && (
+                        <div className="pt-4 border-t border-gray-200 space-y-4">
+                          <h4 className="text-sm font-medium text-gray-900 flex items-center space-x-2">
+                            <User className="h-4 w-4" />
+                            <span>Sales Rep Setup</span>
+                          </h4>
+
+                          {/* Phone */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                            <input
+                              type="tel"
+                              value={phone}
+                              onChange={(e) => setPhone(e.target.value)}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="(555) 123-4567"
+                            />
+                          </div>
+
+                          {/* Distributor Assignment */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                              Distributor Assignment *
+                            </label>
+                            <div className="space-y-2">
+                              <label className="flex items-center">
+                                <input
+                                  type="radio"
+                                  checked={isIndependent}
+                                  onChange={() => setIsIndependent(true)}
+                                  className="border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="ml-2 text-sm text-gray-700">Independent</span>
+                                <span className="ml-1 text-xs text-gray-500">(solo rep, acts as own distributor)</span>
+                              </label>
+                              <label className="flex items-center">
+                                <input
+                                  type="radio"
+                                  checked={!isIndependent}
+                                  onChange={() => setIsIndependent(false)}
+                                  className="border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="ml-2 text-sm text-gray-700">Assign to Company</span>
+                              </label>
+                            </div>
+                          </div>
+
+                          {!isIndependent && (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Select Distributor *
+                              </label>
+                              <select
+                                value={selectedDistributorId}
+                                onChange={(e) => setSelectedDistributorId(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              >
+                                <option value="">-- Select Distributor --</option>
+                                {distributorsList.map(d => (
+                                  <option key={d.id} value={d.id}>
+                                    {d.name} ({d.code})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          {/* W-9 fields for independent reps */}
+                          {isIndependent && (
+                            <div className="pt-3 border-t border-gray-100 space-y-3">
+                              <h5 className="text-sm font-medium text-gray-900 flex items-center space-x-2">
+                                <FileText className="h-4 w-4" />
+                                <span>W-9 / 1099 Information</span>
+                              </h5>
+
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">Tax ID Type</label>
+                                  <select
+                                    value={taxIdType}
+                                    onChange={(e) => setTaxIdType(e.target.value as 'ein' | 'ssn')}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  >
+                                    <option value="ssn">SSN</option>
+                                    <option value="ein">EIN</option>
+                                  </select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                                    {taxIdType === 'ssn' ? 'SSN' : 'EIN'} *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={taxId}
+                                    onChange={(e) => setTaxId(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder={taxIdType === 'ssn' ? 'XXX-XX-XXXX' : 'XX-XXXXXXX'}
+                                  />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Legal Name *</label>
+                                <input
+                                  type="text"
+                                  value={legalName}
+                                  onChange={(e) => setLegalName(e.target.value)}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="Legal name as it appears on W-9"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Business Name (DBA)</label>
+                                <input
+                                  type="text"
+                                  value={businessName}
+                                  onChange={(e) => setBusinessName(e.target.value)}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="Optional DBA name"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Tax Classification *</label>
+                                <select
+                                  value={taxClassification}
+                                  onChange={(e) => setTaxClassification(e.target.value)}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                  <option value="individual">Individual / Sole Proprietor</option>
+                                  <option value="sole_proprietor">Sole Proprietor</option>
+                                  <option value="llc_single">LLC (Single Member)</option>
+                                  <option value="llc_partnership">LLC (Partnership)</option>
+                                  <option value="llc_corp">LLC (Corp)</option>
+                                  <option value="c_corp">C Corporation</option>
+                                  <option value="s_corp">S Corporation</option>
+                                  <option value="partnership">Partnership</option>
+                                  <option value="trust">Trust / Estate</option>
+                                  <option value="other">Other</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="flex items-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={w9Consent}
+                                    onChange={(e) => setW9Consent(e.target.checked)}
+                                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                  />
+                                  <span className="ml-2 text-xs text-gray-700">
+                                    I certify that the information provided is correct (W-9 consent) *
+                                  </span>
+                                </label>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* ═══ DISTRIBUTOR FIELDS ═══ */}
+                      {newUserRole === 'distributor' && (
+                        <div className="pt-4 border-t border-gray-200 space-y-4">
+                          <h4 className="text-sm font-medium text-gray-900 flex items-center space-x-2">
+                            <Building2 className="h-4 w-4" />
+                            <span>Distributor Setup</span>
+                          </h4>
+
+                          {/* Phone */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
+                            <input
+                              type="tel"
+                              value={phone}
+                              onChange={(e) => setPhone(e.target.value)}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              placeholder="(555) 123-4567"
+                            />
+                          </div>
+
+                          {/* Organization */}
+                          <div>
+                            <label className="flex items-center mb-2">
+                              <input
+                                type="checkbox"
+                                checked={createNewOrganization}
+                                onChange={(e) => {
+                                  setCreateNewOrganization(e.target.checked);
+                                  if (e.target.checked) setNewUserOrganizationId('');
+                                }}
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">Create New Organization</span>
+                            </label>
+                          </div>
+
+                          {createNewOrganization ? (
+                            <>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Organization Name *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={newOrgName}
+                                  onChange={(e) => setNewOrgName(e.target.value)}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="e.g., ABC Distribution"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Organization Code *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={newOrgCode}
+                                  onChange={(e) => setNewOrgCode(e.target.value.toUpperCase())}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="e.g., ABCD"
+                                  maxLength={10}
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Select Distributor Organization
+                              </label>
+                              <select
+                                value={newUserOrganizationId}
+                                onChange={(e) => setNewUserOrganizationId(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                disabled={loadingOrgs}
+                              >
+                                <option value="">-- Optional --</option>
+                                {organizations.filter(o => o.org_type === 'distributor').map(org => (
+                                  <option key={org.id} value={org.id}>
+                                    {org.name} ({org.code})
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          {/* W-9 fields */}
+                          <div className="pt-3 border-t border-gray-100 space-y-3">
+                            <h5 className="text-sm font-medium text-gray-900 flex items-center space-x-2">
+                              <FileText className="h-4 w-4" />
+                              <span>W-9 / 1099 Information</span>
+                            </h5>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">Tax ID Type</label>
+                                <select
+                                  value={taxIdType}
+                                  onChange={(e) => setTaxIdType(e.target.value as 'ein' | 'ssn')}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                >
+                                  <option value="ssn">SSN</option>
+                                  <option value="ein">EIN</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="block text-xs font-medium text-gray-700 mb-1">
+                                  {taxIdType === 'ssn' ? 'SSN' : 'EIN'} *
+                                </label>
+                                <input
+                                  type="text"
+                                  value={taxId}
+                                  onChange={(e) => setTaxId(e.target.value)}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder={taxIdType === 'ssn' ? 'XXX-XX-XXXX' : 'XX-XXXXXXX'}
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Legal Name *</label>
+                              <input
+                                type="text"
+                                value={legalName}
+                                onChange={(e) => setLegalName(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Legal name as it appears on W-9"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Business Name (DBA)</label>
+                              <input
+                                type="text"
+                                value={businessName}
+                                onChange={(e) => setBusinessName(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                placeholder="Optional DBA name"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">Tax Classification *</label>
+                              <select
+                                value={taxClassification}
+                                onChange={(e) => setTaxClassification(e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              >
+                                <option value="individual">Individual / Sole Proprietor</option>
+                                <option value="sole_proprietor">Sole Proprietor</option>
+                                <option value="llc_single">LLC (Single Member)</option>
+                                <option value="llc_partnership">LLC (Partnership)</option>
+                                <option value="llc_corp">LLC (Corp)</option>
+                                <option value="c_corp">C Corporation</option>
+                                <option value="s_corp">S Corporation</option>
+                                <option value="partnership">Partnership</option>
+                                <option value="trust">Trust / Estate</option>
+                                <option value="other">Other</option>
+                              </select>
+                            </div>
+
+                            <div>
+                              <label className="flex items-center">
+                                <input
+                                  type="checkbox"
+                                  checked={w9Consent}
+                                  onChange={(e) => setW9Consent(e.target.checked)}
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                />
+                                <span className="ml-2 text-xs text-gray-700">
+                                  I certify that the information provided is correct (W-9 consent) *
+                                </span>
+                              </label>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* ═══ ADMIN FIELDS ═══ */}
+                      {newUserRole === 'admin' && (
+                        <div className="flex items-start space-x-2 bg-purple-50 border border-purple-200 rounded-lg p-3">
+                          <Shield className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                          <p className="text-xs text-purple-700">
+                            Admin users have full access to all system features. Only email is required.
+                          </p>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1176,7 +1688,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                 <button
                   type="button"
                   onClick={handleCreateUser}
-                  disabled={isCreatingUser || !newUserEmail.trim() || !newUserPassword.trim()}
+                  disabled={isCreatingUser || !newUserEmail.trim()}
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isCreatingUser ? (
@@ -1185,23 +1697,17 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                       <span>Creating...</span>
                     </div>
                   ) : (
-                    'Create User'
+                    <div className="flex items-center space-x-2">
+                      <Mail className="h-4 w-4" />
+                      <span>Create & Send Invite</span>
+                    </div>
                   )}
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     setIsCreateModalOpen(false);
-                    setNewUserEmail('');
-                    setNewUserPassword('');
-                    setNewUserRole('customer');
-                    setNewUserApproved(true);
-                    setNewUserOrganizationId('');
-                    setNewUserOrganizationRole('member');
-                    setCreateNewOrganization(false);
-                    setNewOrgName('');
-                    setNewOrgCode('');
-                    setModalMessage(null);
+                    resetCreateForm();
                   }}
                   disabled={isCreatingUser}
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"

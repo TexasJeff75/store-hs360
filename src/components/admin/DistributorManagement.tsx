@@ -149,6 +149,15 @@ interface Distributor {
   phone?: string;
   created_at: string;
   profiles?: { email: string };
+  distributor_class: 'independent' | 'company';
+  tax_id?: string;
+  tax_id_type?: 'ein' | 'ssn';
+  legal_name?: string;
+  business_name?: string;
+  tax_classification?: string;
+  w9_consent?: boolean;
+  w9_consent_date?: string;
+  w9_status: 'pending' | 'received' | 'verified';
 }
 
 interface DistributorProductPrice {
@@ -1095,6 +1104,26 @@ const DistributorManagement: React.FC = () => {
 
                     {/* Right-side badges + actions */}
                     <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+                      {/* Distributor class badge */}
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                        distributor.distributor_class === 'independent'
+                          ? 'bg-sky-100 text-sky-700'
+                          : 'bg-indigo-100 text-indigo-700'
+                      }`}>
+                        {distributor.distributor_class === 'independent' ? 'Independent' : 'Company'}
+                      </span>
+
+                      {/* W-9 status badge */}
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                        distributor.w9_status === 'verified'
+                          ? 'bg-green-100 text-green-700'
+                          : distributor.w9_status === 'received'
+                            ? 'bg-yellow-100 text-yellow-700'
+                            : 'bg-red-100 text-red-700'
+                      }`}>
+                        W-9: {distributor.w9_status === 'verified' ? 'Verified' : distributor.w9_status === 'received' ? 'Received' : 'Pending'}
+                      </span>
+
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                         distributor.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                       }`}>
@@ -1126,6 +1155,28 @@ const DistributorManagement: React.FC = () => {
                         <TrendingUp className="h-3.5 w-3.5" />
                         {rateDisplay}
                       </span>
+                      )}
+
+                      {distributor.distributor_class === 'independent' && (
+                        <button
+                          onClick={async () => {
+                            if (confirm(`Promote "${distributor.name}" from Independent to Company? This will allow them to manage sub-reps.`)) {
+                              const { error } = await supabase
+                                .from('distributors')
+                                .update({ distributor_class: 'company' })
+                                .eq('id', distributor.id);
+                              if (error) {
+                                alert('Failed to promote: ' + error.message);
+                              } else {
+                                fetchData();
+                              }
+                            }
+                          }}
+                          className="px-2.5 py-1 text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg transition-colors"
+                          title="Promote to Company"
+                        >
+                          Promote to Company
+                        </button>
                       )}
 
                       <button
