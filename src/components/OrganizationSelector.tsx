@@ -18,7 +18,7 @@ const OrganizationSelector: React.FC<OrganizationSelectorProps> = ({
   onSelectOrganization,
   selectedOrganization
 }) => {
-  const { isImpersonating, effectiveUserId } = useAuth();
+  const { isImpersonating, effectiveUserId, effectiveProfile } = useAuth();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,8 +33,46 @@ const OrganizationSelector: React.FC<OrganizationSelectorProps> = ({
   const fetchOrganizations = async () => {
     try {
       setLoading(true);
+      setError(null);
 
-      if (isImpersonating && effectiveUserId) {
+      const role = effectiveProfile?.role;
+
+      if (role === 'distributor' && effectiveUserId) {
+        // Distributors see their assigned customers via distributor_customers
+        const { data: distData } = await supabase
+          .from('distributors')
+          .select('id')
+          .eq('profile_id', effectiveUserId)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (distData) {
+          const { data, error: fetchError } = await supabase
+            .from('distributor_customers')
+            .select('organizations!inner(id, name, code, description, billing_address, contact_email, contact_phone, is_active, created_at, updated_at)')
+            .eq('distributor_id', distData.id)
+            .eq('is_active', true)
+            .eq('organizations.is_active', true);
+
+          if (fetchError) throw fetchError;
+          const orgs = (data || []).map((row: any) => row.organizations);
+          setOrganizations(orgs);
+        } else {
+          setOrganizations([]);
+        }
+      } else if (role === 'sales_rep' && effectiveUserId) {
+        // Sales reps see their assigned organizations via organization_sales_reps
+        const { data, error: fetchError } = await supabase
+          .from('organization_sales_reps')
+          .select('organizations:organization_id(id, name, code, description, billing_address, contact_email, contact_phone, is_active, created_at, updated_at)')
+          .eq('sales_rep_id', effectiveUserId)
+          .eq('is_active', true);
+
+        if (fetchError) throw fetchError;
+        const orgs = (data || []).map((row: any) => row.organizations).filter(Boolean).filter((org: any) => org.is_active);
+        setOrganizations(orgs);
+      } else if (isImpersonating && effectiveUserId) {
+        // Impersonating a customer — use their org memberships
         const { data, error: fetchError } = await supabase
           .from('user_organization_roles')
           .select('organizations!inner(id, name, code, description, billing_address, contact_email, contact_phone, is_active, created_at, updated_at)')
