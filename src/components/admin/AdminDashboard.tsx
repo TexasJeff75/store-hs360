@@ -373,11 +373,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
         )}
 
         {/* Desktop Sidebar */}
-        <div className={`hidden sm:flex ${isSidebarCollapsed ? 'w-16' : 'w-56'} bg-white border-r border-gray-200 transition-all duration-200 relative flex-col overflow-y-auto flex-shrink-0`}>
+        <div className={`hidden sm:flex ${isSidebarCollapsed ? 'w-16' : 'w-56'} bg-white border-r border-gray-200 transition-all duration-200 relative flex-col flex-shrink-0`}>
           {/* Collapse toggle */}
           <button
             onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-            className="absolute -right-3 top-4 bg-white border border-gray-300 rounded-full p-1 shadow-sm hover:bg-gray-100 z-10 flex-shrink-0"
+            className="absolute -right-3 top-4 bg-white border border-gray-300 rounded-full p-1.5 shadow-md hover:bg-gray-100 hover:shadow-lg z-30 flex-shrink-0 transition-all"
             title={isSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
             {isSidebarCollapsed
@@ -385,12 +385,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
               : <ChevronLeft className="h-3.5 w-3.5 text-gray-500" />
             }
           </button>
-          <SidebarNav
-            visibleGroups={visibleGroups}
-            activeTab={activeTab}
-            collapsed={isSidebarCollapsed}
-            onSelect={setActiveTab}
-          />
+          <div className="flex-1 overflow-y-auto">
+            <SidebarNav
+              visibleGroups={visibleGroups}
+              activeTab={activeTab}
+              collapsed={isSidebarCollapsed}
+              onSelect={setActiveTab}
+            />
+          </div>
         </div>
 
         {/* Main Content */}
