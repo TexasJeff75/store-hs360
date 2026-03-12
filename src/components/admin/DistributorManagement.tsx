@@ -958,12 +958,12 @@ const DistributorManagement: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Distributor Management</h2>
-          <p className="text-sm text-gray-600 mt-1">
+          <p className="text-gray-600 mt-1">
             Manage distributors, their customer accounts, commission structures, and sales rep hierarchies
           </p>
         </div>
