@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   Building2, Users, Plus, Trash2, X, UserPlus, UserCheck,
+  Search, MapPin, Mail, Phone, Eye, ArrowLeft, Settings, DollarSign, Pencil, CheckCircle, Archive,
 } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
+import AddressManagement from './AddressManagement';
+import PricingManagement from './PricingManagement';
+import CustomerUserManagement from './CustomerUserManagement';
 
 // ── Interfaces ───────────────────────────────────────────────────────────────
 
@@ -14,13 +18,15 @@ interface Distributor {
   code: string;
 }
 
+type CustomerSubTab = 'addresses' | 'pricing' | 'users';
+
 interface DistributorCustomer {
   id: string;
   distributor_id: string;
   organization_id: string;
   is_active: boolean;
   notes?: string;
-  organizations: { name: string; code: string; contact_name?: string; contact_email?: string; contact_phone?: string; city?: string; state?: string };
+  organizations: { id: string; name: string; code: string; description?: string; contact_name?: string; contact_email?: string; contact_phone?: string; city?: string; state?: string; is_active: boolean };
 }
 
 interface DistributorSalesRep {
@@ -88,6 +94,12 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // ── Customer search & sub-management ──────────────────────────────────────
+  const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+  const [selectedCustomerOrg, setSelectedCustomerOrg] = useState<DistributorCustomer | null>(null);
+  const [activeCustomerSubTab, setActiveCustomerSubTab] = useState<CustomerSubTab>('users');
+  const [customerOrgStats, setCustomerOrgStats] = useState<{ [key: string]: { addresses: number; users: number } }>({});
+
   // ── Add Customer (create new org) ──────────────────────────────────────────
   const [showAddCustomer, setShowAddCustomer] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
@@ -146,7 +158,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       const [custRes, repsRes, delegatesRes] = await Promise.all([
         supabase
           .from('distributor_customers')
-          .select('*, organizations(name, code, contact_name, contact_email, contact_phone, city, state)')
+          .select('*, organizations(id, name, code, description, contact_name, contact_email, contact_phone, city, state, is_active)')
           .eq('distributor_id', distData.id)
           .eq('is_active', true),
         supabase
@@ -163,9 +175,34 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
           .order('created_at', { ascending: false }),
       ]);
 
-      if (!custRes.error) setCustomers((custRes.data as DistributorCustomer[]) || []);
+      const custData = (custRes.data as DistributorCustomer[]) || [];
+      if (!custRes.error) setCustomers(custData);
       if (!repsRes.error) setSalesReps((repsRes.data as DistributorSalesRep[]) || []);
       if (!delegatesRes.error) setDelegates((delegatesRes.data as DistributorDelegate[]) || []);
+
+      // Fetch org stats for customer orgs
+      if (custData.length > 0) {
+        const orgIds = custData.map(c => c.organization_id);
+        const [userRolesRes, addressesRes] = await Promise.all([
+          supabase
+            .from('user_organization_roles')
+            .select('organization_id')
+            .in('organization_id', orgIds),
+          supabase
+            .from('organization_addresses')
+            .select('organization_id')
+            .in('organization_id', orgIds),
+        ]);
+        const stats: { [key: string]: { addresses: number; users: number } } = {};
+        orgIds.forEach(id => { stats[id] = { addresses: 0, users: 0 }; });
+        userRolesRes.data?.forEach((r: any) => {
+          if (stats[r.organization_id]) stats[r.organization_id].users++;
+        });
+        addressesRes.data?.forEach((a: any) => {
+          if (stats[a.organization_id]) stats[a.organization_id].addresses++;
+        });
+        setCustomerOrgStats(stats);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load data');
     } finally {
@@ -482,74 +519,290 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* CUSTOMERS VIEW                                                        */}
       {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {view === 'customers' && (
+      {view === 'customers' && selectedCustomerOrg && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">My Customers</h2>
+          {/* Sub-management header */}
+          <div className="mb-6">
+            <button
+              onClick={() => setSelectedCustomerOrg(null)}
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors mb-4"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              <span className="text-sm font-medium">Back to Customers</span>
+            </button>
+
+            <div className="flex items-center space-x-4">
+              <div className="p-3 bg-orange-100 rounded-lg">
+                <Building2 className="h-8 w-8 text-orange-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">{selectedCustomerOrg.organizations?.name}</h2>
+                <p className="text-gray-600">Code: {selectedCustomerOrg.organizations?.code}</p>
+                <p className="text-gray-600">Manage addresses, pricing, and users for this organization</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Sub-tabs */}
+          <div className="border-b border-gray-200 mb-6">
+            <nav className="-mb-px flex space-x-8">
+              {([
+                { id: 'users' as CustomerSubTab, label: 'Customer Users', icon: Users },
+                { id: 'addresses' as CustomerSubTab, label: 'Addresses', icon: MapPin },
+                { id: 'pricing' as CustomerSubTab, label: 'Contract Pricing', icon: DollarSign },
+              ]).map((tab) => {
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveCustomerSubTab(tab.id)}
+                    className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                      activeCustomerSubTab === tab.id
+                        ? 'border-orange-500 text-orange-600'
+                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Sub-tab content */}
+          <div>
+            {activeCustomerSubTab === 'users' && (
+              <CustomerUserManagement organizationId={selectedCustomerOrg.organization_id} />
+            )}
+            {activeCustomerSubTab === 'addresses' && (
+              <AddressManagement organizationId={selectedCustomerOrg.organization_id} />
+            )}
+            {activeCustomerSubTab === 'pricing' && (
+              <PricingManagement organizationId={selectedCustomerOrg.organization_id} />
+            )}
+          </div>
+        </div>
+      )}
+
+      {view === 'customers' && !selectedCustomerOrg && (() => {
+        const filteredCustomers = customers.filter((cust) => {
+          if (!customerSearchTerm) return true;
+          const term = customerSearchTerm.toLowerCase();
+          const org = cust.organizations;
+          return (
+            org?.name?.toLowerCase().includes(term) ||
+            org?.code?.toLowerCase().includes(term) ||
+            org?.description?.toLowerCase().includes(term) ||
+            org?.contact_name?.toLowerCase().includes(term) ||
+            org?.contact_email?.toLowerCase().includes(term)
+          );
+        });
+
+        const activeCount = customers.filter(c => c.organizations?.is_active).length;
+        const inactiveCount = customers.length - activeCount;
+        const totalAddresses = Object.values(customerOrgStats).reduce((sum, s) => sum + s.addresses, 0);
+
+        return (
+        <div>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">My Customers</h2>
+              <p className="text-gray-600 mt-1">Manage your customer organizations</p>
+            </div>
             <button
               onClick={() => setShowAddCustomer(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-colors text-sm font-medium"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors text-sm font-medium"
             >
               <Plus className="h-4 w-4" />
               New Customer
             </button>
           </div>
 
-          {customers.length === 0 ? (
+          {/* Search */}
+          <div className="mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search customers by name, code, or contact..."
+                value={customerSearchTerm}
+                onChange={(e) => setCustomerSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center">
+                <Building2 className="h-8 w-8 text-orange-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Total Customers</p>
+                  <p className="text-2xl font-semibold text-gray-900">{customers.length}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center">
+                <CheckCircle className="h-8 w-8 text-green-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Active</p>
+                  <p className="text-2xl font-semibold text-gray-900">{activeCount}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center">
+                <Archive className="h-8 w-8 text-gray-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Inactive</p>
+                  <p className="text-2xl font-semibold text-gray-900">{inactiveCount}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center">
+                <MapPin className="h-8 w-8 text-blue-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Total Addresses</p>
+                  <p className="text-2xl font-semibold text-gray-900">{totalAddresses}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Customers Table */}
+          {filteredCustomers.length === 0 && customers.length === 0 ? (
             <div className="text-center py-12 text-gray-400 bg-white rounded-lg border border-gray-200">
               <Building2 className="mx-auto h-10 w-10 text-gray-300 mb-2" />
               <p className="text-sm">No customers yet.</p>
               <p className="text-xs text-gray-400 mt-1">Create new customer organizations to start tracking orders and commissions.</p>
             </div>
           ) : (
-            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr className="bg-gray-50">
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-32">Code</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
-                    <th className="px-4 py-3 w-20" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {customers.map((cust) => (
-                    <tr key={cust.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <span className="text-sm font-medium text-gray-900">{cust.organizations?.name}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs font-mono text-gray-500">{cust.organizations?.code}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="space-y-0.5">
-                          {cust.organizations?.contact_name && (
-                            <div className="text-xs font-medium text-gray-900">{cust.organizations.contact_name}</div>
-                          )}
-                          <span className="text-xs text-gray-500">
-                            {cust.organizations?.contact_email || cust.organizations?.contact_phone || '—'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-gray-500">
-                          {[cust.organizations?.city, cust.organizations?.state].filter(Boolean).join(', ') || '—'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <button
-                          onClick={() => handleRemoveCustomer(cust.id)}
-                          className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                          title="Remove customer"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stats</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {filteredCustomers.map((cust) => (
+                      <tr key={cust.id} className={cust.organizations?.is_active ? 'hover:bg-gray-50' : 'bg-gray-50'}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-2">
+                            <button
+                              onClick={() => { setSelectedCustomerOrg(cust); setActiveCustomerSubTab('users'); }}
+                              className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                              title="View Details"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => { setSelectedCustomerOrg(cust); setActiveCustomerSubTab('addresses'); }}
+                              className="p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+                              title="Manage Addresses & Pricing"
+                            >
+                              <Settings className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleRemoveCustomer(cust.id)}
+                              className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                              title="Remove Customer"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            <div className={`p-2 rounded-lg ${cust.organizations?.is_active ? 'bg-orange-100' : 'bg-gray-200'}`}>
+                              <Building2 className={`h-5 w-5 ${cust.organizations?.is_active ? 'text-orange-600' : 'text-gray-500'}`} />
+                            </div>
+                            <div className="ml-3">
+                              <div className={`text-sm font-semibold ${cust.organizations?.is_active ? 'text-gray-900' : 'text-gray-600'}`}>
+                                {cust.organizations?.name}
+                              </div>
+                              <div className="text-sm text-gray-500">Code: {cust.organizations?.code}</div>
+                              {cust.organizations?.description && (
+                                <div className="text-xs text-gray-500 mt-1 max-w-xs truncate">{cust.organizations.description}</div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="space-y-1">
+                            {cust.organizations?.contact_name && (
+                              <div className="text-sm font-medium text-gray-900">{cust.organizations.contact_name}</div>
+                            )}
+                            {cust.organizations?.contact_email && (
+                              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                                <Mail className="h-3 w-3 text-gray-400" />
+                                <span className="truncate max-w-xs">{cust.organizations.contact_email}</span>
+                              </div>
+                            )}
+                            {cust.organizations?.contact_phone && (
+                              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                                <Phone className="h-3 w-3 text-gray-400" />
+                                <span>{cust.organizations.contact_phone}</span>
+                              </div>
+                            )}
+                            {(cust.organizations?.city || cust.organizations?.state) && (
+                              <div className="flex items-center space-x-2 text-sm text-gray-500">
+                                <MapPin className="h-3 w-3 text-gray-400" />
+                                <span>{[cust.organizations?.city, cust.organizations?.state].filter(Boolean).join(', ')}</span>
+                              </div>
+                            )}
+                            {!cust.organizations?.contact_name && !cust.organizations?.contact_email && !cust.organizations?.contact_phone && (
+                              <span className="text-sm text-gray-400">No contact info</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center space-x-4">
+                            <div className="flex items-center space-x-1">
+                              <MapPin className="h-4 w-4 text-blue-600" />
+                              <span className="text-sm font-medium text-gray-900">
+                                {customerOrgStats[cust.organization_id]?.addresses || 0}
+                              </span>
+                            </div>
+                            <div className="flex items-center space-x-1">
+                              <Users className="h-4 w-4 text-green-600" />
+                              <span className="text-sm font-medium text-gray-900">
+                                {customerOrgStats[cust.organization_id]?.users || 0}
+                              </span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                            cust.organizations?.is_active
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {cust.organizations?.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {filteredCustomers.length === 0 && customers.length > 0 && (
+            <div className="text-center py-12">
+              <Building2 className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No customers found</h3>
+              <p className="mt-1 text-sm text-gray-500">Try adjusting your search criteria.</p>
             </div>
           )}
 
@@ -704,7 +957,8 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
             </Modal>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {/* SALES REPS VIEW                                                       */}
