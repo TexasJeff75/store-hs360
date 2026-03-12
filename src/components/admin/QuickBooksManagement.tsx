@@ -95,7 +95,7 @@ function ConnectionDiagnostics() {
           status: hasQBError ? 'fail' : 'pass',
           message: hasQBError
             ? `Server QB config error: ${diagData.quickbooks.error}`
-            : `Server config OK (storage: ${diagData.storage})`,
+            : `Server config OK (storage: ${diagData.storage}, environment: ${diagData.environment || 'unknown'})`,
           details: JSON.stringify(diagData, null, 2)
         });
       } else {

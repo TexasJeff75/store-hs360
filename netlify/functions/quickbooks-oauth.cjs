@@ -446,10 +446,13 @@ async function handleDiagnostics() {
     dbStatus = `connection failed: ${e.message}`;
   }
 
+  const serverQBEnvironment = process.env.QB_ENVIRONMENT || process.env.VITE_QB_ENVIRONMENT || 'sandbox';
+
   return {
     status: 'ok',
     timestamp: new Date().toISOString(),
     storage: 'supabase-server-side',
+    environment: serverQBEnvironment,
     supabase: {
       url: url ? url.substring(0, 30) + '...' : 'MISSING',
       hasServiceRoleKey: hasServiceKey,
