@@ -8,7 +8,7 @@ import { normalizeAddress } from './orders/types';
 import { activityLogService } from '../../services/activityLog';
 
 const OrderManagement: React.FC = () => {
-  const { user, profile, effectiveProfile } = useAuth();
+  const { user, profile, effectiveProfile, effectiveUserId } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -49,7 +49,7 @@ const OrderManagement: React.FC = () => {
   useEffect(() => {
     fetchOrders();
     checkManagementPermissions();
-  }, [user, profile]);
+  }, [user, profile, effectiveProfile, effectiveUserId]);
 
   useEffect(() => {
     if (selectedOrder) {
@@ -186,14 +186,18 @@ const OrderManagement: React.FC = () => {
         .from('orders')
         .select('*');
 
-      if (profile?.role === 'sales_rep' && user) {
-        query = query.eq('sales_rep_id', user.id);
-      } else if (profile?.role === 'distributor' && user) {
-        // Get the distributor record for this user
+      // Use effective profile/user for data display (supports impersonation)
+      const viewRole = effectiveProfile?.role ?? profile?.role;
+      const viewUserId = effectiveUserId ?? user?.id;
+
+      if (viewRole === 'sales_rep' && viewUserId) {
+        query = query.eq('sales_rep_id', viewUserId);
+      } else if (viewRole === 'distributor' && viewUserId) {
+        // Get the distributor record for the effective user
         const { data: distributorData } = await supabase
           .from('distributors')
           .select('id')
-          .eq('profile_id', user.id)
+          .eq('profile_id', viewUserId)
           .maybeSingle();
 
         if (distributorData) {
