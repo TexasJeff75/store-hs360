@@ -31,7 +31,6 @@ export interface Address {
 
 export interface CreateOrderData {
   userId: string;
-  bigcommerceCartId: string;
   items: OrderItem[];
   subtotal: number;
   tax: number;
@@ -48,8 +47,6 @@ export interface CreateOrderData {
 interface Order {
   id: string;
   user_id: string;
-  bigcommerce_order_id?: string;
-  bigcommerce_cart_id: string;
   order_number?: string;
   status: string;
   subtotal: number;
@@ -120,7 +117,6 @@ class OrderService {
         .from('orders')
         .insert({
           user_id: data.userId,
-          bigcommerce_cart_id: data.bigcommerceCartId,
           status: 'pending',
           subtotal: data.subtotal,
           tax: data.tax,
@@ -216,18 +212,13 @@ class OrderService {
 
   async updateOrderStatus(
     orderId: string,
-    status: string,
-    bigcommerceOrderId?: string
+    status: string
   ): Promise<{ success: boolean; error?: string }> {
     try {
       const updateData: any = {
         status,
         updated_at: new Date().toISOString()
       };
-
-      if (bigcommerceOrderId) {
-        updateData.bigcommerce_order_id = bigcommerceOrderId;
-      }
 
       if (status === 'completed') {
         updateData.completed_at = new Date().toISOString();
@@ -447,7 +438,7 @@ class OrderService {
         .from('orders')
         .insert({
           user_id: originalOrder.user_id,
-          bigcommerce_cart_id: originalOrder.bigcommerce_cart_id,
+
           status: 'backorder',
           order_type: 'backorder',
           subtotal: backorderSubtotal,
@@ -583,7 +574,7 @@ class OrderService {
         .from('orders')
         .insert({
           user_id: originalOrder.user_id,
-          bigcommerce_cart_id: originalOrder.bigcommerce_cart_id,
+
           status: 'backorder',
           order_type: 'backorder',
           subtotal: backorderSubtotal,
@@ -1038,7 +1029,7 @@ class OrderService {
           .from('orders')
           .insert({
             user_id: originalOrder.user_id,
-            bigcommerce_cart_id: originalOrder.bigcommerce_cart_id,
+  
             status: originalOrder.status,
             order_type: 'vendor_sub_order',
             is_sub_order: true,

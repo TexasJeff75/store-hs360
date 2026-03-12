@@ -146,7 +146,19 @@ async function handleExchange(body) {
 
   if (!tokenResponse.ok) {
     const errorText = await tokenResponse.text();
-    throw new Error(`Failed to exchange code: ${errorText}`);
+    let safeMessage = `Failed to exchange authorization code (HTTP ${tokenResponse.status})`;
+    try {
+      const errorJson = JSON.parse(errorText);
+      if (errorJson.error_description) {
+        safeMessage = `Failed to exchange code: ${errorJson.error_description}`;
+      } else if (errorJson.error) {
+        safeMessage = `Failed to exchange code: ${errorJson.error}`;
+      }
+    } catch {
+      // Non-JSON response — don't include raw text which may contain tokens
+    }
+    console.error('OAuth code exchange failed:', errorText.substring(0, 500));
+    throw new Error(safeMessage);
   }
 
   const tokenData = await tokenResponse.json();
@@ -234,18 +246,34 @@ async function handleRefresh() {
       isInvalidGrant = errorText.includes('invalid_grant');
     }
 
-    // Log refresh failure to audit trail
-    await supabase.from('quickbooks_sync_log').insert({
-      entity_type: 'oauth',
-      entity_id: creds.realm_id,
-      sync_type: 'update',
-      status: 'failed',
-      error_message: isInvalidGrant
-        ? 'Refresh token expired or revoked - reconnection required'
-        : `Token refresh failed: ${errorText}`,
-      request_data: { action: 'refresh', grant_type: 'refresh_token' },
-      created_at: new Date().toISOString()
-    });
+    // Build a safe error message without raw response text
+    let safeErrorMessage = `Token refresh failed (HTTP ${tokenResponse.status})`;
+    try {
+      const errorJson = JSON.parse(errorText);
+      if (errorJson.error_description) {
+        safeErrorMessage = `Token refresh failed: ${errorJson.error_description}`;
+      }
+    } catch {
+      // Non-JSON — already have safe default
+    }
+    console.error('Token refresh failed:', errorText.substring(0, 500));
+
+    // Log refresh failure to audit trail (best-effort)
+    try {
+      await supabase.from('quickbooks_sync_log').insert({
+        entity_type: 'oauth',
+        entity_id: creds.realm_id,
+        sync_type: 'update',
+        status: 'failed',
+        error_message: isInvalidGrant
+          ? 'Refresh token expired or revoked - reconnection required'
+          : safeErrorMessage,
+        request_data: { action: 'refresh', grant_type: 'refresh_token' },
+        created_at: new Date().toISOString()
+      });
+    } catch (logError) {
+      console.error('Failed to log refresh failure:', logError.message);
+    }
 
     if (isInvalidGrant) {
       // Deactivate stale credentials so subsequent calls don't keep failing
@@ -259,7 +287,7 @@ async function handleRefresh() {
       throw err;
     }
 
-    throw new Error(`Failed to refresh token: ${errorText}`);
+    throw new Error(safeErrorMessage);
   }
 
   const tokenData = await tokenResponse.json();

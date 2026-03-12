@@ -72,21 +72,34 @@ async function getCredentials() {
   }
 
   // Decrypt tokens — they are only held in plain text in volatile function memory
-  const needsMigration = !isEncrypted(creds.access_token) || !isEncrypted(creds.refresh_token);
-  creds.access_token = isEncrypted(creds.access_token) ? decrypt(creds.access_token) : creds.access_token;
-  creds.refresh_token = isEncrypted(creds.refresh_token) ? decrypt(creds.refresh_token) : creds.refresh_token;
+  let needsMigration = false;
+  try {
+    needsMigration = !isEncrypted(creds.access_token) || !isEncrypted(creds.refresh_token);
+    creds.access_token = isEncrypted(creds.access_token) ? decrypt(creds.access_token) : creds.access_token;
+    creds.refresh_token = isEncrypted(creds.refresh_token) ? decrypt(creds.refresh_token) : creds.refresh_token;
+  } catch (decryptError) {
+    console.error('Failed to decrypt QB tokens:', decryptError.message);
+    throw new Error('QuickBooks credentials are corrupted. Please reconnect.');
+  }
 
   // Migrate legacy plain text tokens to encrypted format
   if (needsMigration) {
-    console.log('Migrating plain text QB tokens to encrypted format');
-    await supabase
-      .from('quickbooks_credentials')
-      .update({
-        access_token: encrypt(creds.access_token),
-        refresh_token: encrypt(creds.refresh_token),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', creds.id);
+    try {
+      console.log('Migrating plain text QB tokens to encrypted format');
+      const encAccessToken = encrypt(creds.access_token);
+      const encRefreshToken = encrypt(creds.refresh_token);
+      await supabase
+        .from('quickbooks_credentials')
+        .update({
+          access_token: encAccessToken,
+          refresh_token: encRefreshToken,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', creds.id);
+    } catch (migrationError) {
+      // Log but don't fail — tokens are already decrypted in memory for this request
+      console.error('Token migration failed (will retry next request):', migrationError.message);
+    }
   }
 
   const expiresAt = new Date(creds.expires_at);
@@ -128,25 +141,34 @@ async function refreshTokens(creds, supabase) {
 
     // Detect invalid_grant (expired/revoked refresh token)
     let isInvalidGrant = false;
+    let safeErrorMessage = `Token refresh failed (HTTP ${tokenResponse.status})`;
     try {
       const errorJson = JSON.parse(errorText);
       isInvalidGrant = errorJson.error === 'invalid_grant';
+      // Use QB's error description if available, but never include raw token data
+      if (errorJson.error_description) {
+        safeErrorMessage = `Token refresh failed: ${errorJson.error_description}`;
+      }
     } catch {
       isInvalidGrant = errorText.includes('invalid_grant');
     }
 
-    // Log refresh failure to audit trail
-    await supabase.from('quickbooks_sync_log').insert({
-      entity_type: 'oauth',
-      entity_id: creds.realm_id,
-      sync_type: 'update',
-      status: 'failed',
-      error_message: isInvalidGrant
-        ? 'Refresh token expired or revoked - reconnection required'
-        : `Token refresh failed: ${errorText}`,
-      request_data: { action: 'auto_refresh', grant_type: 'refresh_token' },
-      created_at: new Date().toISOString()
-    });
+    // Log refresh failure to audit trail (best-effort)
+    try {
+      await supabase.from('quickbooks_sync_log').insert({
+        entity_type: 'oauth',
+        entity_id: creds.realm_id,
+        sync_type: 'update',
+        status: 'failed',
+        error_message: isInvalidGrant
+          ? 'Refresh token expired or revoked - reconnection required'
+          : safeErrorMessage,
+        request_data: { action: 'auto_refresh', grant_type: 'refresh_token' },
+        created_at: new Date().toISOString()
+      });
+    } catch (logError) {
+      console.error('Failed to log token refresh failure:', logError.message);
+    }
 
     if (isInvalidGrant) {
       // Deactivate stale credentials
@@ -160,7 +182,7 @@ async function refreshTokens(creds, supabase) {
       throw err;
     }
 
-    throw new Error(`Token refresh failed: ${errorText}`);
+    throw new Error(safeErrorMessage);
   }
 
   const tokenData = await tokenResponse.json();
@@ -305,7 +327,8 @@ exports.handler = async (event) => {
     try {
       responseData = JSON.parse(responseText);
     } catch {
-      responseData = { raw: responseText };
+      // Non-JSON response (e.g. HTML error page) — truncate to prevent leaking server internals
+      responseData = { raw: responseText.substring(0, 500) };
     }
 
     if (!qbResponse.ok) {
@@ -313,12 +336,15 @@ exports.handler = async (event) => {
         || responseData?.message
         || `QuickBooks API error: ${qbResponse.status}`;
 
+      // Only include structured error details, never raw HTML
+      const safeDetails = responseData?.Fault || responseData?.errors || undefined;
+
       return {
         statusCode: qbResponse.status,
         headers: corsHeaders,
         body: JSON.stringify({
           error: errorMessage,
-          details: responseData
+          details: safeDetails
         })
       };
     }

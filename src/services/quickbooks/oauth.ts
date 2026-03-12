@@ -25,6 +25,15 @@ export interface TokenResponse {
   token_type: string;
 }
 
+async function parseErrorResponse(response: Response, fallback: string): Promise<string> {
+  try {
+    const errorData = await response.json();
+    return errorData.error || fallback;
+  } catch {
+    return `${fallback} (HTTP ${response.status})`;
+  }
+}
+
 async function getAuthHeaders(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
@@ -43,8 +52,8 @@ export const quickbooksOAuth = {
     const response = await fetch(`${FUNCTION_URL}?action=authorize`, { headers });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to get authorization URL');
+      const errorMessage = await parseErrorResponse(response, 'Failed to get authorization URL');
+      throw new Error(errorMessage);
     }
 
     const { url } = await response.json();
@@ -61,8 +70,8 @@ export const quickbooksOAuth = {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to exchange code for tokens');
+      const errorMessage = await parseErrorResponse(response, 'Failed to exchange code for tokens');
+      throw new Error(errorMessage);
     }
 
     const { credentials } = await response.json();
@@ -78,11 +87,16 @@ export const quickbooksOAuth = {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      if (errorData.code === 'INVALID_GRANT' || errorData.error?.includes('invalid_grant')) {
-        throw new Error('[RECONNECT_REQUIRED] QuickBooks connection has expired. Please disconnect and reconnect.');
+      try {
+        const errorData = await response.json();
+        if (errorData.code === 'INVALID_GRANT' || errorData.error_code === 'INVALID_GRANT' || errorData.error?.includes('expired')) {
+          throw new Error('[RECONNECT_REQUIRED] QuickBooks connection has expired. Please disconnect and reconnect.');
+        }
+        throw new Error(errorData.error || 'Failed to refresh token');
+      } catch (e) {
+        if (e instanceof Error && e.message.startsWith('[RECONNECT_REQUIRED]')) throw e;
+        throw new Error(`Failed to refresh token (HTTP ${response.status})`);
       }
-      throw new Error(errorData.error || 'Failed to refresh token');
     }
 
     const { credentials } = await response.json();
@@ -95,8 +109,8 @@ export const quickbooksOAuth = {
     const response = await fetch(`${FUNCTION_URL}?action=status`, { headers });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to get connection status');
+      const errorMessage = await parseErrorResponse(response, 'Failed to get connection status');
+      throw new Error(errorMessage);
     }
 
     return await response.json();
@@ -111,8 +125,8 @@ export const quickbooksOAuth = {
     });
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to disconnect');
+      const errorMessage = await parseErrorResponse(response, 'Failed to disconnect');
+      throw new Error(errorMessage);
     }
   }
 };
