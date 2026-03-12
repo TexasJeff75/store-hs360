@@ -965,17 +965,56 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       {/* ═══════════════════════════════════════════════════════════════════════ */}
       {view === 'sales-reps' && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">My Sales Representatives</h2>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">My Sales Representatives</h2>
+              <p className="text-gray-600 mt-1">Manage sales reps who sell on behalf of your distributorship</p>
+            </div>
             <button
               onClick={() => setShowAddSalesRep(true)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition-colors text-sm font-medium"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium"
             >
               <Plus className="h-4 w-4" />
               Add Sales Rep
             </button>
           </div>
 
+          {/* Stats */}
+          <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center">
+                <Users className="h-8 w-8 text-pink-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Total Reps</p>
+                  <p className="text-2xl font-semibold text-gray-900">{salesReps.length}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center">
+                <CheckCircle className="h-8 w-8 text-green-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Active</p>
+                  <p className="text-2xl font-semibold text-gray-900">{salesReps.filter(r => r.is_active).length}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+              <div className="flex items-center">
+                <DollarSign className="h-8 w-8 text-yellow-600" />
+                <div className="ml-3">
+                  <p className="text-sm font-medium text-gray-500">Avg Rep Rate</p>
+                  <p className="text-2xl font-semibold text-gray-900">
+                    {salesReps.length > 0
+                      ? `${(salesReps.reduce((sum, r) => sum + r.sales_rep_rate, 0) / salesReps.length).toFixed(1)}%`
+                      : '—'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Table */}
           {salesReps.length === 0 ? (
             <div className="text-center py-12 text-gray-400 bg-white rounded-lg border border-gray-200">
               <Users className="mx-auto h-10 w-10 text-gray-300 mb-2" />
@@ -983,39 +1022,101 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
               <p className="text-xs text-gray-400 mt-1">Create sales reps who sell on behalf of your distributorship.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {salesReps.map((dsr) => {
-                const splitLabel =
-                  dsr.commission_split_type === 'percentage_of_distributor'
-                    ? `${dsr.sales_rep_rate}% of distributor commission`
-                    : `Fixed ${dsr.sales_rep_rate}% + ${dsr.distributor_override_rate ?? 0}% override`;
-                return (
-                  <div key={dsr.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">
-                        {dsr.profiles?.full_name || dsr.profiles?.email}
-                      </p>
-                      {dsr.profiles?.full_name && (
-                        <p className="text-xs text-gray-500">{dsr.profiles.email}</p>
-                      )}
-                      <p className="text-xs text-gray-500 mt-1">
-                        Split: <span className="font-medium text-gray-700">{splitLabel}</span>
-                        {dsr.notes && <span className="ml-2 text-gray-400">{dsr.notes}</span>}
-                      </p>
-                      {dsr.profiles?.phone && (
-                        <p className="text-xs text-gray-400 mt-0.5">Phone: {dsr.profiles.phone}</p>
-                      )}
-                    </div>
-                    <button
-                      onClick={() => handleRemoveSalesRep(dsr.id)}
-                      className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Remove"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                );
-              })}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sales Rep</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {salesReps.map((dsr) => {
+                      const splitLabel =
+                        dsr.commission_split_type === 'percentage_of_distributor'
+                          ? `${dsr.sales_rep_rate}% of distributor commission`
+                          : `Fixed ${dsr.sales_rep_rate}% + ${dsr.distributor_override_rate ?? 0}% override`;
+                      const splitType =
+                        dsr.commission_split_type === 'percentage_of_distributor'
+                          ? '% of Distributor'
+                          : 'Fixed + Override';
+                      return (
+                        <tr key={dsr.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => handleRemoveSalesRep(dsr.id)}
+                                className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                                title="Remove Sales Rep"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex items-center">
+                              <div className="p-2 bg-pink-100 rounded-lg">
+                                <Users className="h-5 w-5 text-pink-600" />
+                              </div>
+                              <div className="ml-3">
+                                <div className="text-sm font-semibold text-gray-900">
+                                  {dsr.profiles?.full_name || dsr.profiles?.email}
+                                </div>
+                                {dsr.profiles?.full_name && (
+                                  <div className="text-sm text-gray-500">{dsr.profiles.email}</div>
+                                )}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="space-y-1">
+                              {dsr.profiles?.email && (
+                                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                                  <Mail className="h-3 w-3 text-gray-400" />
+                                  <span className="truncate max-w-xs">{dsr.profiles.email}</span>
+                                </div>
+                              )}
+                              {dsr.profiles?.phone && (
+                                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                                  <Phone className="h-3 w-3 text-gray-400" />
+                                  <span>{dsr.profiles.phone}</span>
+                                </div>
+                              )}
+                              {!dsr.profiles?.email && !dsr.profiles?.phone && (
+                                <span className="text-sm text-gray-400">No contact info</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="space-y-1">
+                              <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                {splitType}
+                              </span>
+                              <div className="text-sm text-gray-700 font-medium">{splitLabel}</div>
+                              {dsr.notes && (
+                                <div className="text-xs text-gray-400 max-w-xs truncate">{dsr.notes}</div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
+                              dsr.is_active
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}>
+                              {dsr.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
