@@ -110,6 +110,7 @@ const OrganizationManagement: React.FC = () => {
       city: '',
       state: '',
       zip: '',
+      org_type: 'customer',
       is_active: true,
       created_at: '',
       updated_at: ''
@@ -651,6 +652,11 @@ const OrganizationManagement: React.FC = () => {
                       }`}>
                         {org.is_active ? 'Active' : 'Inactive'}
                       </span>
+                      {(org as any).org_type === 'distributor' && (
+                        <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                          Distributor
+                        </span>
+                      )}
                       {(org as any).is_house_account && (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                           <Home className="h-3 w-3 mr-1" />
@@ -753,7 +759,21 @@ const OrganizationManagement: React.FC = () => {
                           }
                         </p>
                       </div>
-                      
+
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Organization Type *
+                        </label>
+                        <select
+                          value={selectedOrg.org_type || 'customer'}
+                          onChange={(e) => setSelectedOrg({...selectedOrg, org_type: e.target.value as 'customer' | 'distributor'})}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        >
+                          <option value="customer">Customer</option>
+                          <option value="distributor">Distributor</option>
+                        </select>
+                      </div>
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Contact Name

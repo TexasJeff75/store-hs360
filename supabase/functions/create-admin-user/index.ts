@@ -20,6 +20,10 @@ interface CreateUserRequest {
   // Sales rep-specific
   isIndependent?: boolean;
   distributorId?: string;
+  // Commission split fields (for company-affiliated sales reps)
+  commissionSplitType?: "percentage_of_distributor" | "fixed_with_override";
+  salesRepRate?: number;
+  distributorOverrideRate?: number;
   // W-9 fields (for independent sales rep or distributor)
   taxId?: string;
   taxIdType?: "ein" | "ssn";
@@ -32,6 +36,9 @@ interface CreateUserRequest {
   newOrgName?: string;
   newOrgCode?: string;
   orgType?: "customer" | "distributor";
+  // Delegate creation (distributor adding a delegate user)
+  delegateForDistributorId?: string;
+  delegateNotes?: string;
 }
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
@@ -73,9 +80,12 @@ Deno.serve(async (req: Request) => {
       .eq("id", caller.id)
       .single();
 
-    if (!callerProfile || callerProfile.role !== "admin") {
-      return jsonResponse({ success: false, error: "Only admins can create users" }, 403);
+    if (!callerProfile || !["admin", "distributor"].includes(callerProfile.role)) {
+      return jsonResponse({ success: false, error: "Only admins and distributors can create users" }, 403);
     }
+
+    const callerIsAdmin = callerProfile.role === "admin";
+    const callerIsDistributor = callerProfile.role === "distributor";
 
     const body: CreateUserRequest = await req.json();
 
@@ -86,6 +96,36 @@ Deno.serve(async (req: Request) => {
     // Validate role
     if (!["customer", "sales_rep", "distributor", "admin"].includes(body.role)) {
       return jsonResponse({ success: false, error: "Invalid role" }, 400);
+    }
+
+    // Distributors can only create sales_rep or distributor (delegate) users
+    if (callerIsDistributor) {
+      if (!["sales_rep", "distributor"].includes(body.role)) {
+        return jsonResponse({ success: false, error: "Distributors can only create sales reps and delegates" }, 403);
+      }
+      // Verify the distributor owns the distributorId or delegateForDistributorId they're targeting
+      const targetDistId = body.distributorId || body.delegateForDistributorId;
+      if (targetDistId) {
+        const { data: ownedDist } = await adminClient
+          .from("distributors")
+          .select("id")
+          .eq("id", targetDistId)
+          .eq("profile_id", caller.id)
+          .single();
+        if (!ownedDist) {
+          // Check if they're a delegate for this distributor
+          const { data: delegateAccess } = await adminClient
+            .from("distributor_delegates")
+            .select("id")
+            .eq("distributor_id", targetDistId)
+            .eq("user_id", caller.id)
+            .eq("is_active", true)
+            .single();
+          if (!delegateAccess) {
+            return jsonResponse({ success: false, error: "You don't have access to this distributor" }, 403);
+          }
+        }
+      }
     }
 
     // ═══════════════════════════════════════
@@ -282,61 +322,84 @@ Deno.serve(async (req: Request) => {
           }, { onConflict: "distributor_id,sales_rep_id" });
 
       } else if (body.distributorId) {
-        // Company-affiliated: link to existing distributor
+        // Company-affiliated: link to existing distributor with commission split
+        const repLink: Record<string, unknown> = {
+          distributor_id: body.distributorId,
+          sales_rep_id: userId,
+          is_active: true,
+        };
+        if (body.commissionSplitType) {
+          repLink.commission_split_type = body.commissionSplitType;
+        }
+        if (body.salesRepRate !== undefined) {
+          repLink.sales_rep_rate = body.salesRepRate;
+        }
+        if (body.commissionSplitType === "fixed_with_override" && body.distributorOverrideRate !== undefined) {
+          repLink.distributor_override_rate = body.distributorOverrideRate;
+        }
         await adminClient
           .from("distributor_sales_reps")
-          .upsert({
-            distributor_id: body.distributorId,
-            sales_rep_id: userId,
-            is_active: true,
-          }, { onConflict: "distributor_id,sales_rep_id" });
+          .upsert(repLink, { onConflict: "distributor_id,sales_rep_id" });
       }
     }
 
     // --- DISTRIBUTOR setup ---
     if (body.role === "distributor") {
-      const distName = body.fullName || body.newOrgName || body.email.split("@")[0];
-      const code = `DIST-${(body.newOrgCode || body.email.split("@")[0]).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8)}`;
-
-      const { error: distError } = await adminClient
-        .from("distributors")
-        .insert({
-          profile_id: userId,
-          name: distName,
-          code,
-          distributor_class: "company",
-          contact_name: body.fullName || null,
-          phone: body.phone || null,
-          is_active: true,
-          // W-9 fields
-          tax_id: body.taxId || null,
-          tax_id_type: body.taxIdType || null,
-          legal_name: body.legalName || null,
-          business_name: body.businessName || null,
-          tax_classification: body.taxClassification || null,
-          w9_consent: body.w9Consent === true,
-          w9_consent_date: body.w9Consent ? new Date().toISOString() : null,
-          w9_status: body.w9Consent ? "received" : "pending",
-        });
-
-      if (distError) {
-        return jsonResponse({
-          success: false,
-          error: `Distributor creation failed: ${distError.message}`,
-          userId,
-        }, 500);
-      }
-
-      // Assign to distributor org if provided
-      if (organizationId) {
+      if (body.delegateForDistributorId) {
+        // Delegate: add user as delegate for an existing distributor (no new distributor entity)
         await adminClient
-          .from("user_organization_roles")
+          .from("distributor_delegates")
           .upsert({
+            distributor_id: body.delegateForDistributorId,
             user_id: userId,
-            organization_id: organizationId,
-            role: "admin",
-            is_primary: true,
-          }, { onConflict: "user_id,organization_id,location_id" });
+            is_active: true,
+            notes: body.delegateNotes || null,
+          }, { onConflict: "distributor_id,user_id" });
+      } else {
+        // New distributor entity
+        const distName = body.fullName || body.newOrgName || body.email.split("@")[0];
+        const code = `DIST-${(body.newOrgCode || body.email.split("@")[0]).toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 8)}`;
+
+        const { error: distError } = await adminClient
+          .from("distributors")
+          .insert({
+            profile_id: userId,
+            name: distName,
+            code,
+            distributor_class: "company",
+            contact_name: body.fullName || null,
+            phone: body.phone || null,
+            is_active: true,
+            // W-9 fields
+            tax_id: body.taxId || null,
+            tax_id_type: body.taxIdType || null,
+            legal_name: body.legalName || null,
+            business_name: body.businessName || null,
+            tax_classification: body.taxClassification || null,
+            w9_consent: body.w9Consent === true,
+            w9_consent_date: body.w9Consent ? new Date().toISOString() : null,
+            w9_status: body.w9Consent ? "received" : "pending",
+          });
+
+        if (distError) {
+          return jsonResponse({
+            success: false,
+            error: `Distributor creation failed: ${distError.message}`,
+            userId,
+          }, 500);
+        }
+
+        // Assign to distributor org if provided
+        if (organizationId) {
+          await adminClient
+            .from("user_organization_roles")
+            .upsert({
+              user_id: userId,
+              organization_id: organizationId,
+              role: "admin",
+              is_primary: true,
+            }, { onConflict: "user_id,organization_id,location_id" });
+        }
       }
     }
 

@@ -24,7 +24,7 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
   const [isEditing, setIsEditing] = useState(false);
   const [isCreateUserModalOpen, setIsCreateUserModalOpen] = useState(false);
   const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [newUserData, setNewUserData] = useState({ email: '', password: '', role: 'viewer' as string });
+  const [newUserData, setNewUserData] = useState({ email: '', role: 'viewer' as string });
   const [sendingPasswordReset, setSendingPasswordReset] = useState(false);
 
   useEffect(() => {
@@ -98,11 +98,9 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
           },
           body: JSON.stringify({
             email: newUserData.email,
-            password: newUserData.password,
             role: 'customer',
-            is_approved: true,
             organizationId: organizationId,
-            organizationRole: newUserData.role,
+            orgRole: newUserData.role,
           }),
         }
       );
@@ -118,10 +116,10 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
         throw new Error(result.error || 'User creation failed');
       }
 
-      setModalMessage({ type: 'success', text: 'User created and assigned to organization successfully!' });
+      setModalMessage({ type: 'success', text: 'User created — invite email sent!' });
 
       // Reset form
-      setNewUserData({ email: '', password: '', role: 'viewer' });
+      setNewUserData({ email: '', role: 'viewer' });
 
       // Refresh data
       fetchData();
@@ -444,22 +442,10 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
                         />
                       </div>
                       
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Temporary Password *
-                        </label>
-                        <input
-                          type="password"
-                          value={newUserData.password}
-                          onChange={(e) => setNewUserData({...newUserData, password: e.target.value})}
-                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          placeholder="Temporary password"
-                        />
-                        <p className="text-xs text-gray-500 mt-1">
-                          User will be able to change this password after first login
-                        </p>
-                      </div>
-                      
+                      <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">
+                        An invite email will be sent. The user sets their own password.
+                      </p>
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Organization Role *
@@ -488,16 +474,16 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
                 <button
                   type="button"
                   onClick={handleCreateUser}
-                  disabled={!newUserData.email || !newUserData.password}
+                  disabled={!newUserData.email}
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Create User
+                  Create & Send Invite
                 </button>
                 <button
                   type="button"
                   onClick={() => {
                     setIsCreateUserModalOpen(false);
-                    setNewUserData({ email: '', password: '', role: 'viewer' });
+                    setNewUserData({ email: '', role: 'viewer' });
                     setModalMessage(null);
                   }}
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"

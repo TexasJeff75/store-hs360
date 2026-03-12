@@ -181,11 +181,23 @@ const SalesRepDashboard: React.FC = () => {
           state: newOrg.state || null,
           zip: newOrg.zip || null,
           description: newOrg.description || null,
+          org_type: 'customer',
           is_active: true,
         }])
         .select('id')
         .single();
       if (orgError) throw orgError;
+
+      // Look up this sales rep's distributor
+      const { data: repDist } = await supabase
+        .from('distributor_sales_reps')
+        .select('distributor_id')
+        .eq('sales_rep_id', effectiveUserId)
+        .eq('is_active', true)
+        .limit(1)
+        .single();
+
+      const distributorId = repDist?.distributor_id || null;
 
       // Link to this sales rep
       const { error: linkError } = await supabase
@@ -193,10 +205,21 @@ const SalesRepDashboard: React.FC = () => {
         .insert([{
           organization_id: orgData.id,
           sales_rep_id: effectiveUserId,
-          commission_rate: 10,
+          distributor_id: distributorId,
           is_active: true,
         }]);
       if (linkError) throw linkError;
+
+      // Auto-link customer org to distributor
+      if (distributorId) {
+        await supabase
+          .from('distributor_customers')
+          .upsert({
+            distributor_id: distributorId,
+            organization_id: orgData.id,
+            is_active: true,
+          }, { onConflict: 'distributor_id,organization_id' });
+      }
 
       setSuccess('Customer organization created');
       setShowCreateOrg(false);
