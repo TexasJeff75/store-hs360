@@ -52,12 +52,25 @@ export class QuickBooksClient {
         }
         errorMessage = errorData.error || errorMessage;
       } catch (e) {
+        // Re-throw RECONNECT_REQUIRED errors; swallow JSON parse failures
         if (e instanceof Error && e.message.startsWith('[RECONNECT_REQUIRED]')) throw e;
+        // If .json() failed, the response was not JSON (e.g. HTML error page) — use default message
       }
       throw new Error(errorMessage);
     }
 
-    const result = await response.json();
+    const responseText = await response.text();
+    if (!responseText) {
+      return { data: null as unknown as T, realm_id: this.realmId };
+    }
+
+    let result;
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      throw new Error(`QuickBooks returned invalid JSON response`);
+    }
+
     this.realmId = result.realm_id || this.realmId;
     return result.data;
   }

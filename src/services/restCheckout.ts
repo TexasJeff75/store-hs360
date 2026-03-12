@@ -239,7 +239,6 @@ class RestCheckoutService {
 
       const orderData: CreateOrderData = {
         userId: session.user_id,
-        bigcommerceCartId: session.cart_id || '',
         items: session.cart_items.map((item: any) => ({
           productId: item.productId,
           name: item.name,

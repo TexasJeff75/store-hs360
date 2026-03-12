@@ -77,21 +77,33 @@ async function getQBCredentials(supabase) {
   }
 
   // Decrypt tokens — they are only held in plain text in volatile function memory
-  const needsMigration = !isEncrypted(creds.access_token) || !isEncrypted(creds.refresh_token);
-  creds.access_token = isEncrypted(creds.access_token) ? decrypt(creds.access_token) : creds.access_token;
-  creds.refresh_token = isEncrypted(creds.refresh_token) ? decrypt(creds.refresh_token) : creds.refresh_token;
+  let needsMigration = false;
+  try {
+    needsMigration = !isEncrypted(creds.access_token) || !isEncrypted(creds.refresh_token);
+    creds.access_token = isEncrypted(creds.access_token) ? decrypt(creds.access_token) : creds.access_token;
+    creds.refresh_token = isEncrypted(creds.refresh_token) ? decrypt(creds.refresh_token) : creds.refresh_token;
+  } catch (decryptError) {
+    console.error('Failed to decrypt QB tokens:', decryptError.message);
+    throw new Error('QuickBooks credentials are corrupted. Please reconnect.');
+  }
 
   // Migrate legacy plain text tokens to encrypted format
   if (needsMigration) {
-    console.log('Migrating plain text QB tokens to encrypted format');
-    await supabase
-      .from('quickbooks_credentials')
-      .update({
-        access_token: encrypt(creds.access_token),
-        refresh_token: encrypt(creds.refresh_token),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', creds.id);
+    try {
+      console.log('Migrating plain text QB tokens to encrypted format');
+      const encAccessToken = encrypt(creds.access_token);
+      const encRefreshToken = encrypt(creds.refresh_token);
+      await supabase
+        .from('quickbooks_credentials')
+        .update({
+          access_token: encAccessToken,
+          refresh_token: encRefreshToken,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', creds.id);
+    } catch (migrationError) {
+      console.error('Token migration failed (will retry next request):', migrationError.message);
+    }
   }
 
   const expiresAt = new Date(creds.expires_at);
@@ -126,7 +138,29 @@ async function refreshTokens(creds, supabase) {
   });
 
   if (!tokenResponse.ok) {
-    throw new Error('Token refresh failed');
+    const errorText = await tokenResponse.text();
+
+    // Detect invalid_grant (expired/revoked refresh token)
+    let isInvalidGrant = false;
+    try {
+      const errorJson = JSON.parse(errorText);
+      isInvalidGrant = errorJson.error === 'invalid_grant';
+    } catch {
+      isInvalidGrant = errorText.includes('invalid_grant');
+    }
+
+    if (isInvalidGrant) {
+      await supabase
+        .from('quickbooks_credentials')
+        .update({ is_active: false, updated_at: new Date().toISOString() })
+        .eq('id', creds.id);
+
+      const err = new Error('QuickBooks connection expired. Please reconnect.');
+      err.code = 'INVALID_GRANT';
+      throw err;
+    }
+
+    throw new Error(`Token refresh failed (HTTP ${tokenResponse.status})`);
   }
 
   const tokenData = await tokenResponse.json();
@@ -345,7 +379,7 @@ exports.handler = async (event) => {
     try {
       responseData = JSON.parse(responseText);
     } catch {
-      responseData = { raw: responseText };
+      responseData = { raw: responseText.substring(0, 500) };
     }
 
     if (!qbResponse.ok) {
@@ -434,20 +468,30 @@ exports.handler = async (event) => {
       })
     };
   } catch (error) {
+    console.error('Payment processing error:', error.message, error.stack);
     const knownErrors = [
       'Unauthorized',
       'Missing or invalid authorization header',
       'No active QuickBooks connection',
       'QuickBooks client credentials not configured',
-      'Token refresh failed',
       'Supabase config missing',
+      'QuickBooks credentials are corrupted. Please reconnect.',
+      'QuickBooks connection expired. Please reconnect.',
     ];
-    const isKnown = knownErrors.includes(error.message);
-    const statusCode = error.message === 'Unauthorized' || error.message === 'Missing or invalid authorization header' ? 401 : 500;
+    const isKnown = knownErrors.includes(error.message) || error.message?.startsWith('Token refresh failed');
+    let statusCode = 500;
+    if (error.message === 'Unauthorized' || error.message === 'Missing or invalid authorization header') {
+      statusCode = 401;
+    } else if (error.code === 'INVALID_GRANT') {
+      statusCode = 401;
+    }
     return {
       statusCode,
       headers: corsHeaders,
-      body: JSON.stringify({ error: isKnown ? error.message : 'An internal error occurred' })
+      body: JSON.stringify({
+        error: isKnown ? error.message : 'An internal error occurred',
+        error_code: error.code || undefined
+      })
     };
   }
 };

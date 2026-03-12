@@ -70,8 +70,6 @@ export interface Order {
   user_id: string;
   organization_id?: string;
   location_id?: string;
-  bigcommerce_order_id?: string;
-  bigcommerce_cart_id?: string;
   order_number?: string;
   status: string;
   subtotal: number;
