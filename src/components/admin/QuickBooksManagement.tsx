@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { RefreshCw, CheckCircle, XCircle, AlertCircle, ExternalLink, Download, Activity, Upload, Search, Building2 } from 'lucide-react';
+import { RefreshCw, CheckCircle, XCircle, AlertCircle, ExternalLink, Download, Activity, Upload, Search, Building2, BookOpen } from 'lucide-react';
 import { quickbooksOAuth, quickbooksCustomers, quickbooksInvoices } from '../../services/quickbooks';
 import type { QBConnectionStatus } from '../../services/quickbooks/oauth';
 import { supabase } from '../../services/supabase';
@@ -815,12 +815,15 @@ export function QuickBooksManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold text-gray-900">QuickBooks Online Integration</h2>
-        <p className="mt-1 text-sm text-gray-600">
-          Manage QuickBooks connection, sync customers and invoices
-        </p>
+    <div className="p-6 space-y-6">
+      <div className="flex items-center space-x-3">
+        <BookOpen className="h-8 w-8 text-gray-700" />
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">QuickBooks Online Integration</h2>
+          <p className="text-sm text-gray-500">
+            Manage QuickBooks connection, sync customers and invoices
+          </p>
+        </div>
       </div>
 
       <div className="border-b border-gray-200">
