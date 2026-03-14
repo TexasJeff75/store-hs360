@@ -345,7 +345,7 @@ exports.handler = async (event) => {
       // Only include structured error details, never raw HTML
       const safeDetails = responseData?.Fault || responseData?.errors || undefined;
 
-      // Log failed API call for troubleshooting
+      // Log failed API call for troubleshooting (best-effort, don't block response)
       supabase.from('quickbooks_sync_log').insert({
         entity_type: usePaymentsAPI ? 'payment_api' : 'accounting_api',
         entity_id: `api_${Date.now()}`,
@@ -363,7 +363,11 @@ exports.handler = async (event) => {
         },
         response_data: safeDetails ? { fault: safeDetails } : undefined,
         created_at: new Date().toISOString(),
-      }).then(() => {}).catch(() => {});
+      }).then(({ error: logErr }) => {
+        if (logErr) console.error('Failed to log QB API error to sync_log:', logErr.message);
+      }).catch((e) => {
+        console.error('Failed to log QB API error to sync_log:', e.message);
+      });
 
       return {
         statusCode: qbResponse.status,

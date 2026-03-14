@@ -21,6 +21,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 export class QuickBooksClient {
   private realmId: string | null = null;
+  private syncLogEnabled: boolean | null = null;
 
   private async proxyRequest<T>(
     endpoint: string,
@@ -115,7 +116,11 @@ export class QuickBooksClient {
     errorMessage?: string
   ): Promise<void> {
     try {
-      await supabase.from('quickbooks_sync_log').insert({
+      // After a failed insert (RLS denial), skip further attempts this session
+      // to avoid flooding the console with 400 errors
+      if (this.syncLogEnabled === false) return;
+
+      const { error } = await supabase.from('quickbooks_sync_log').insert({
         entity_type: entityType,
         entity_id: entityId,
         quickbooks_id: quickbooksId,
@@ -126,8 +131,17 @@ export class QuickBooksClient {
         error_message: errorMessage,
         synced_at: status === 'success' ? new Date().toISOString() : null
       });
+
+      if (error) {
+        // RLS denial or schema error — disable sync logging for this session
+        console.warn('Sync logging disabled for this session:', error.message);
+        this.syncLogEnabled = false;
+      } else {
+        this.syncLogEnabled = true;
+      }
     } catch {
       // Sync logging is best-effort — don't let failures propagate
+      this.syncLogEnabled = false;
     }
   }
 

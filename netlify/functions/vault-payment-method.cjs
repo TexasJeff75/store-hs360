@@ -399,7 +399,9 @@ exports.handler = async (event) => {
         status: 'failed',
         request_data: { organizationId, paymentType, qbCustomerId, intuit_tid: vaultIntuitTid },
         error_message: errorMsg,
-      }).then(() => {}).catch(() => {});
+      }).then(({ error: logErr }) => {
+        if (logErr) console.error('sync_log insert failed:', logErr.message);
+      }).catch((e) => console.error('sync_log insert failed:', e.message));
 
       return {
         statusCode: vaultResponse.status >= 400 && vaultResponse.status < 500 ? vaultResponse.status : 502,
@@ -450,7 +452,9 @@ exports.handler = async (event) => {
       request_data: { organizationId, paymentType, qbCustomerId, intuit_tid: vaultIntuitTid },
       response_data: { reusableId, last4: lastFour },
       synced_at: new Date().toISOString(),
-    }).then(() => {}).catch(() => {});
+    }).then(({ error: logErr }) => {
+        if (logErr) console.error('sync_log insert failed:', logErr.message);
+      }).catch((e) => console.error('sync_log insert failed:', e.message));
 
     return {
       statusCode: 200,
