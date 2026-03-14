@@ -445,6 +445,56 @@ class CommissionService {
     }
   }
 
+  async cancelCommission(
+    commissionId: string,
+    reason: string,
+    cancelledBy: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { data: commission, error: fetchError } = await supabase
+        .from('commissions')
+        .select('*')
+        .eq('id', commissionId)
+        .single();
+
+      if (fetchError || !commission) {
+        return { success: false, error: fetchError?.message || 'Commission not found' };
+      }
+
+      if (commission.status === 'paid') {
+        return { success: false, error: 'Cannot cancel a commission that has already been paid' };
+      }
+
+      const { error } = await supabase
+        .from('commissions')
+        .update({
+          status: 'cancelled',
+          notes: `${commission.notes ? commission.notes + '\n' : ''}[Cancelled] ${reason} (by ${cancelledBy} on ${new Date().toISOString()})`
+        })
+        .eq('id', commissionId);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      // Log to audit trail
+      await supabase.from('commission_audit_log').insert({
+        order_id: commission.order_id,
+        commission_id: commissionId,
+        event_type: 'cancelled',
+        details: { reason, cancelled_by: cancelledBy, previous_status: commission.status }
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error cancelling commission:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to cancel commission'
+      };
+    }
+  }
+
   async getAllCommissions(
     filters?: {
       status?: string;

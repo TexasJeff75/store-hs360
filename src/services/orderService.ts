@@ -1,6 +1,15 @@
 import { supabase } from './supabase';
 import { quickbooksPayments } from './quickbooks';
 import { activityLogService } from './activityLog';
+import { commissionService } from './commissionService';
+
+export interface RefundOptions {
+  amount?: number;
+  includeShipping?: boolean;
+  cancelCommission?: boolean;
+  reason?: string;
+  refundedBy?: string;
+}
 
 export interface OrderItem {
   productId: number;
@@ -858,8 +867,13 @@ class OrderService {
     }
   }
 
-  async refundPayment(orderId: string, amount?: number): Promise<{ success: boolean; error?: string }> {
+  async refundPayment(orderId: string, amountOrOptions?: number | RefundOptions): Promise<{ success: boolean; error?: string }> {
     try {
+      // Support both legacy (amount) and new (options) signatures
+      const options: RefundOptions = typeof amountOrOptions === 'number'
+        ? { amount: amountOrOptions }
+        : amountOrOptions || {};
+
       const { order, error: fetchError } = await this.getOrderById(orderId);
       if (fetchError || !order) {
         return { success: false, error: fetchError || 'Order not found' };
@@ -869,7 +883,18 @@ class OrderService {
         return { success: false, error: 'Only captured payments can be refunded' };
       }
 
-      const refundAmount = amount || order.total;
+      // Calculate refund amount
+      let refundAmount: number;
+      if (options.amount !== undefined) {
+        refundAmount = options.amount;
+      } else if (options.includeShipping) {
+        refundAmount = Number(order.total);
+      } else {
+        // Default full refund includes shipping
+        refundAmount = Number(order.total);
+      }
+
+      const isPartial = refundAmount < Number(order.total);
       const authId = order.payment_authorization_id;
 
       if (authId && !authId.startsWith('auth_') && !authId.startsWith('saved_')) {
@@ -894,20 +919,64 @@ class OrderService {
         }
       }
 
-      const result = await this.updatePaymentStatus(orderId, 'refunded');
+      const newStatus = isPartial ? 'partially_refunded' : 'refunded';
+      const result = await this.updatePaymentStatus(orderId, newStatus);
       if (!result.success) {
         return result;
       }
 
+      const reasonNote = options.reason ? ` | Reason: ${options.reason}` : '';
+      const shippingNote = options.includeShipping ? ' (includes shipping)' : '';
       await this.logTransaction(orderId, 'refund', refundAmount, 'success', authId || undefined, authId?.slice(-4));
       await this.logPaymentEvent(orderId, {
-        event: 'payment_refunded',
-        status: 'refunded',
+        event: isPartial ? 'payment_partially_refunded' : 'payment_refunded',
+        status: newStatus,
         method: 'QuickBooks Payments',
         lastFour: authId?.slice(-4) || '----',
         transactionId: authId || 'none',
         amount: refundAmount,
       });
+
+      // Append reason to order notes
+      if (options.reason || shippingNote) {
+        const { data: currentOrder } = await supabase
+          .from('orders')
+          .select('notes')
+          .eq('id', orderId)
+          .single();
+
+        const timestamp = new Date().toISOString();
+        const refundNote = `[${timestamp}] Refund $${refundAmount.toFixed(2)}${shippingNote}${reasonNote}`;
+        await supabase
+          .from('orders')
+          .update({ notes: (currentOrder?.notes ? currentOrder.notes + '\n' : '') + refundNote })
+          .eq('id', orderId);
+      }
+
+      // Handle commission cancellation
+      if (options.cancelCommission) {
+        try {
+          const { data: commission } = await supabase
+            .from('commissions')
+            .select('id, status')
+            .eq('order_id', orderId)
+            .maybeSingle();
+
+          if (commission && commission.status !== 'paid' && commission.status !== 'cancelled') {
+            const cancelReason = isPartial
+              ? `Partial refund of $${refundAmount.toFixed(2)} on order`
+              : `Full refund of $${refundAmount.toFixed(2)} on order`;
+            await commissionService.cancelCommission(
+              commission.id,
+              cancelReason,
+              options.refundedBy || 'system'
+            );
+          }
+        } catch (commError) {
+          console.warn('Failed to cancel commission during refund:', commError);
+          // Don't fail the refund if commission cancel fails
+        }
+      }
 
       return { success: true };
     } catch (error) {
