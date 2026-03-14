@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter, AlertTriangle, ChevronDown, ChevronRight, Printer, ExternalLink, FileText } from 'lucide-react';
+import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter, AlertTriangle, ChevronDown, ChevronRight, Printer, ExternalLink, FileText, Loader, Ban, RotateCcw } from 'lucide-react';
 import { commissionService, Commission, CommissionLineItem } from '../../services/commissionService';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
@@ -33,9 +33,12 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
     total: 0,
     pending: 0,
     approved: 0,
-    paid: 0
+    paid: 0,
+    cancelled: 0
   });
   const [error, setError] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [batchProcessing, setBatchProcessing] = useState(false);
   const [diagnostics, setDiagnostics] = useState<DiagnosticData | null>(null);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   const [lineItems, setLineItems] = useState<CommissionLineItem[]>([]);
@@ -117,16 +120,19 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
 
         setCommissions(data);
 
-        const totalSum = data.reduce((acc, c) => acc + Number(c.commission_amount), 0);
+        const activeCommissions = data.filter(c => c.status !== 'cancelled');
+        const totalSum = activeCommissions.reduce((acc, c) => acc + Number(c.commission_amount), 0);
         const pendingSum = data.filter(c => c.status === 'pending').reduce((acc, c) => acc + Number(c.commission_amount), 0);
         const approvedSum = data.filter(c => c.status === 'approved').reduce((acc, c) => acc + Number(c.commission_amount), 0);
         const paidSum = data.filter(c => c.status === 'paid').reduce((acc, c) => acc + Number(c.commission_amount), 0);
+        const cancelledSum = data.filter(c => c.status === 'cancelled').reduce((acc, c) => acc + Number(c.commission_amount), 0);
 
         setSummary({
           total: totalSum,
           pending: pendingSum,
           approved: approvedSum,
-          paid: paidSum
+          paid: paidSum,
+          cancelled: cancelledSum
         });
       } else {
         setError('You do not have permission to view commissions');
@@ -237,8 +243,12 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
     }
   }, [selectedCommission?.order_id]);
 
+  // Admins and distributors can approve; only admins can mark paid
+  const canApprove = profile?.role === 'admin' || profile?.role === 'distributor';
+  const canMarkPaid = profile?.role === 'admin';
+
   const handleApproveCommission = async (commissionId: string) => {
-    if (!user) return;
+    if (!user || !canApprove) return;
 
     const notes = prompt('Add approval notes (optional):');
     const result = await commissionService.approveCommission(commissionId, user.id, notes || undefined);
@@ -253,6 +263,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
   };
 
   const handleMarkPaid = async (commissionId: string) => {
+    if (!canMarkPaid) return;
     const paymentRef = prompt('Enter payment reference:');
     if (!paymentRef) return;
 
@@ -265,6 +276,77 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
     } else {
       alert(`Failed to mark commission as paid: ${result.error}`);
     }
+  };
+
+  const handleBatchApprove = async () => {
+    if (!user || !canApprove || selectedIds.size === 0) return;
+    const pendingIds = Array.from(selectedIds).filter(id => {
+      const c = commissions.find(comm => comm.id === id);
+      return c?.status === 'pending';
+    });
+    if (pendingIds.length === 0) {
+      alert('No pending commissions selected.');
+      return;
+    }
+    if (!confirm(`Approve ${pendingIds.length} pending commission(s)?`)) return;
+
+    setBatchProcessing(true);
+    const result = await commissionService.batchApproveCommissions(pendingIds, user.id);
+    setBatchProcessing(false);
+
+    if (result.success) {
+      alert(`${result.count} commission(s) approved.`);
+      setSelectedIds(new Set());
+      fetchCommissions();
+    } else {
+      alert(`Batch approve failed: ${result.error}`);
+    }
+  };
+
+  const handleBatchMarkPaid = async () => {
+    if (!canMarkPaid || selectedIds.size === 0) return;
+    const approvedIds = Array.from(selectedIds).filter(id => {
+      const c = commissions.find(comm => comm.id === id);
+      return c?.status === 'approved';
+    });
+    if (approvedIds.length === 0) {
+      alert('No approved commissions selected.');
+      return;
+    }
+    const paymentRef = prompt(`Enter payment reference for ${approvedIds.length} commission(s):`);
+    if (!paymentRef) return;
+
+    setBatchProcessing(true);
+    const result = await commissionService.batchMarkPaid(approvedIds, paymentRef);
+    setBatchProcessing(false);
+
+    if (result.success) {
+      alert(`${result.count} commission(s) marked as paid.`);
+      setSelectedIds(new Set());
+      fetchCommissions();
+    } else {
+      alert(`Batch mark paid failed: ${result.error}`);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredCommissions.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredCommissions.map(c => c.id)));
+    }
+  };
+
+  const toggleSelectOne = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   };
 
   const filteredCommissions = commissions.filter(commission => {
@@ -514,7 +596,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className={`grid grid-cols-1 ${summary.cancelled > 0 ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-4 mb-6`}>
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
@@ -571,6 +653,19 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
             <DollarSign className="h-8 w-8 text-green-600" />
           </div>
         </div>
+
+        {summary.cancelled > 0 && (
+          <div className="bg-red-50 rounded-lg shadow p-6 border border-red-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-red-700">Cancelled</p>
+                <p className="text-2xl font-bold text-red-900">${summary.cancelled.toFixed(2)}</p>
+                <p className="text-xs text-red-600 mt-1">Refunded / voided</p>
+              </div>
+              <Ban className="h-8 w-8 text-red-400" />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-lg shadow">
@@ -610,6 +705,41 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
               {groupByMonth ? 'Group by Month' : 'Show All'}
             </button>
           </div>
+
+          {/* Batch Actions Bar */}
+          {(canApprove || canMarkPaid) && selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <span className="text-sm font-medium text-blue-800">
+                {selectedIds.size} selected
+              </span>
+              {canApprove && (
+                <button
+                  onClick={handleBatchApprove}
+                  disabled={batchProcessing}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                >
+                  {batchProcessing ? <Loader className="h-3 w-3 animate-spin" /> : <CheckCircle className="h-3 w-3" />}
+                  Approve Selected
+                </button>
+              )}
+              {canMarkPaid && (
+                <button
+                  onClick={handleBatchMarkPaid}
+                  disabled={batchProcessing}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {batchProcessing ? <Loader className="h-3 w-3 animate-spin" /> : <DollarSign className="h-3 w-3" />}
+                  Mark Paid
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedIds(new Set())}
+                className="ml-auto text-xs text-blue-600 hover:text-blue-800"
+              >
+                Clear Selection
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -618,8 +748,8 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
             const isSalesRep = viewRole === 'sales_rep';
             const isDistributorRole = viewRole === 'distributor';
             const isRealAdmin = profile?.role === 'admin';
-            // Column count per role: Order, [SalesRep], Org, [OrderTotal], [Margin], Commission, [CoRep], Status, Date, Actions
-            const colCount = isAdmin ? 10 : isDistributorRole ? 7 : isSalesRep ? 5 : 7;
+            // Column count per role: Checkbox, Order, [SalesRep], Org, [OrderTotal], [Margin], Commission, [CoRep], Status, Date, Actions
+            const colCount = (canApprove || canMarkPaid ? 1 : 0) + (isAdmin ? 10 : isDistributorRole ? 7 : isSalesRep ? 5 : 7);
 
             // Helper to get the role-appropriate commission amount for a commission record
             const getMyAmount = (c: any) => {
@@ -632,6 +762,16 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                {(canApprove || canMarkPaid) && (
+                  <th className="px-3 py-3 w-8">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.size === filteredCommissions.length && filteredCommissions.length > 0}
+                      onChange={toggleSelectAll}
+                      className="rounded border-gray-300"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
                 {!isSalesRep && (
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sales Rep</th>
@@ -651,7 +791,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                 )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{isRealAdmin ? 'Actions' : ''}</th>
+                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">{canApprove || canMarkPaid ? 'Actions' : ''}</th>
               </tr>
             </thead>
             <tbody className="bg-white">
@@ -687,8 +827,22 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                         </td>
                       </tr>
                     )}
-                    {group.commissions.map((commission) => (
-                      <tr key={commission.id} className="hover:bg-gray-50 border-b border-gray-200">
+                    {group.commissions.map((commission) => {
+                      const orderRefunded = commission.order?.payment_status === 'refunded' || commission.order?.payment_status === 'partially_refunded';
+                      const isCancelled = commission.status === 'cancelled';
+                      return (
+                      <tr key={commission.id} className={`hover:bg-gray-50 border-b border-gray-200 ${isCancelled ? 'opacity-60 bg-red-50/30' : ''}`}>
+                        {(canApprove || canMarkPaid) && (
+                          <td className="px-3 py-4 w-8">
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.has(commission.id)}
+                              onChange={() => toggleSelectOne(commission.id)}
+                              className="rounded border-gray-300"
+                              disabled={isCancelled}
+                            />
+                          </td>
+                        )}
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
                           {onNavigate ? (
                             <button
@@ -770,10 +924,18 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                           </td>
                         )}
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-3 py-1 inline-flex items-center space-x-1 text-xs leading-5 font-semibold rounded-full border ${getStatusColor(commission.status)}`}>
-                            {getStatusIcon(commission.status)}
-                            <span>{commission.status}</span>
-                          </span>
+                          <div className="space-y-1">
+                            <span className={`px-3 py-1 inline-flex items-center space-x-1 text-xs leading-5 font-semibold rounded-full border ${getStatusColor(commission.status)}`}>
+                              {getStatusIcon(commission.status)}
+                              <span>{commission.status}</span>
+                            </span>
+                            {orderRefunded && (
+                              <div className="flex items-center text-[10px] text-red-600 font-medium">
+                                <RotateCcw className="h-3 w-3 mr-0.5" />
+                                Order {commission.order?.payment_status === 'partially_refunded' ? 'partially refunded' : 'refunded'}
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {new Date(commission.created_at).toLocaleDateString()}
@@ -786,18 +948,20 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                             >
                               <Eye className="h-4 w-4" />
                             </button>
-                            {isRealAdmin && commission.status === 'pending' && (
+                            {canApprove && commission.status === 'pending' && (
                               <button
                                 onClick={() => handleApproveCommission(commission.id)}
                                 className="text-green-600 hover:text-green-900"
+                                title="Approve"
                               >
                                 <CheckCircle className="h-4 w-4" />
                               </button>
                             )}
-                            {isRealAdmin && commission.status === 'approved' && (
+                            {canMarkPaid && commission.status === 'approved' && (
                               <button
                                 onClick={() => handleMarkPaid(commission.id)}
                                 className="text-blue-600 hover:text-blue-900"
+                                title="Mark as Paid"
                               >
                                 <DollarSign className="h-4 w-4" />
                               </button>
@@ -805,7 +969,8 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </React.Fragment>
                 ))
               )}
@@ -1094,10 +1259,26 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                   </div>
                 )}
 
+                {/* Cancelled / Refund Notice */}
+                {selectedCommission.status === 'cancelled' && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-center text-sm font-semibold text-red-800 mb-1">
+                      <Ban className="h-4 w-4 mr-1.5" />
+                      Commission Cancelled
+                    </div>
+                    {selectedCommission.order?.payment_status === 'refunded' && (
+                      <p className="text-xs text-red-700">This commission was cancelled because the order was refunded.</p>
+                    )}
+                    {selectedCommission.order?.payment_status === 'partially_refunded' && (
+                      <p className="text-xs text-red-700">This commission was cancelled due to a partial refund on the order.</p>
+                    )}
+                  </div>
+                )}
+
                 {selectedCommission.notes && (
                   <div>
                     <label className="text-sm text-gray-600">Notes</label>
-                    <p className="font-medium">{selectedCommission.notes}</p>
+                    <p className="font-medium whitespace-pre-wrap text-sm">{selectedCommission.notes}</p>
                   </div>
                 )}
 
@@ -1115,7 +1296,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                   >
                     Close
                   </button>
-                  {isRealAdmin && selectedCommission.status === 'pending' && (
+                  {canApprove && selectedCommission.status === 'pending' && (
                     <button
                       onClick={() => handleApproveCommission(selectedCommission.id)}
                       className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -1123,7 +1304,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                       Approve Commission
                     </button>
                   )}
-                  {isRealAdmin && selectedCommission.status === 'approved' && (
+                  {canMarkPaid && selectedCommission.status === 'approved' && (
                     <button
                       onClick={() => handleMarkPaid(selectedCommission.id)}
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
