@@ -9,11 +9,11 @@ interface SyncLog {
   entity_type: string;
   entity_id: string;
   quickbooks_id: string | null;
-  sync_type: string;
+  operation: string;
   status: string;
   error_message: string | null;
-  request_data: Record<string, any> | null;
-  response_data: Record<string, any> | null;
+  request_payload: Record<string, any> | null;
+  response_payload: Record<string, any> | null;
   created_at: string;
 }
 
@@ -736,10 +736,10 @@ export function QuickBooksManagement() {
         entity_type: log.entity_type,
         entity_id: log.entity_id,
         quickbooks_id: log.quickbooks_id || '',
-        sync_type: log.sync_type,
+        operation: log.operation,
         error_message: log.error_message || '',
-        request_data: log.request_data ? JSON.stringify(log.request_data) : '',
-        response_data: log.response_data ? JSON.stringify(log.response_data) : '',
+        request_payload: log.request_payload ? JSON.stringify(log.request_payload) : '',
+        response_payload: log.response_payload ? JSON.stringify(log.response_payload) : '',
       }));
 
       const csvHeaders = Object.keys(exportData[0]).join(',');
@@ -1221,7 +1221,7 @@ export function QuickBooksManagement() {
                             {log.entity_type}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {log.sync_type}
+                            {log.operation}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
                             {log.quickbooks_id || '-'}
@@ -1240,13 +1240,13 @@ export function QuickBooksManagement() {
                                 <div>
                                   <h4 className="font-medium text-gray-700 mb-1">Request Data</h4>
                                   <pre className="bg-white p-3 rounded border text-xs overflow-auto max-h-48 whitespace-pre-wrap">
-                                    {log.request_data ? JSON.stringify(log.request_data, null, 2) : 'No request data'}
+                                    {log.request_payload ? JSON.stringify(log.request_payload, null, 2) : 'No request data'}
                                   </pre>
                                 </div>
                                 <div>
                                   <h4 className="font-medium text-gray-700 mb-1">Response Data</h4>
                                   <pre className="bg-white p-3 rounded border text-xs overflow-auto max-h-48 whitespace-pre-wrap">
-                                    {log.response_data ? JSON.stringify(log.response_data, null, 2) : 'No response data'}
+                                    {log.response_payload ? JSON.stringify(log.response_payload, null, 2) : 'No response data'}
                                   </pre>
                                 </div>
                                 {log.error_message && (

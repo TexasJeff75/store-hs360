@@ -358,9 +358,9 @@ exports.handler = async (event) => {
     await supabase.from('quickbooks_sync_log').insert({
       entity_type: isACH ? 'payment_ach' : 'payment_charge',
       entity_id: logId,
-      sync_type: 'create',
+      operation: 'create',
       status: 'pending',
-      request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId },
+      request_payload: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId },
     }).then(({ error: logErr }) => {
         if (logErr) console.error('sync_log insert failed:', logErr.message);
       }).catch((e) => console.error('sync_log insert failed:', e.message));
@@ -409,11 +409,11 @@ exports.handler = async (event) => {
       await supabase.from('quickbooks_sync_log').insert({
         entity_type: isACH ? 'payment_ach' : 'payment_charge',
         entity_id: logId,
-        sync_type: 'create',
+        operation: 'create',
         status: 'failed',
-        request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId, intuit_tid: intuitTid },
+        request_payload: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId, intuit_tid: intuitTid },
         error_message: errorMsg,
-        response_data: { status: responseData?.status, httpStatus: qbResponse.status },
+        response_payload: { status: responseData?.status, httpStatus: qbResponse.status },
       }).then(({ error: logErr }) => {
         if (logErr) console.error('sync_log insert failed:', logErr.message);
       }).catch((e) => console.error('sync_log insert failed:', e.message));
@@ -436,11 +436,11 @@ exports.handler = async (event) => {
         entity_type: isACH ? 'payment_ach' : 'payment_charge',
         entity_id: logId,
         quickbooks_id: responseData.id,
-        sync_type: 'create',
+        operation: 'create',
         status: 'failed',
-        request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId, intuit_tid: intuitTid },
+        request_payload: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId, intuit_tid: intuitTid },
         error_message: 'Payment declined',
-        response_data: { id: responseData.id, status: 'DECLINED', amount: responseData.amount },
+        response_payload: { id: responseData.id, status: 'DECLINED', amount: responseData.amount },
       }).then(({ error: logErr }) => {
         if (logErr) console.error('sync_log insert failed:', logErr.message);
       }).catch((e) => console.error('sync_log insert failed:', e.message));
@@ -461,11 +461,12 @@ exports.handler = async (event) => {
       entity_type: isACH ? 'payment_ach' : 'payment_charge',
       entity_id: logId,
       quickbooks_id: responseData.id,
-      sync_type: 'create',
+      operation: 'create',
       status: 'success',
-      request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId, intuit_tid: intuitTid },
-      response_data: { id: responseData.id, status: responseData.status, amount: responseData.amount, authCode: responseData.authCode },
-      synced_at: new Date().toISOString(),
+      request_payload: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId, intuit_tid: intuitTid },
+      response_payload: { id: responseData.id, status: responseData.status, amount: responseData.amount, authCode: responseData.authCode },
+
+
     }).then(({ error: logErr }) => {
         if (logErr) console.error('sync_log insert failed:', logErr.message);
       }).catch((e) => console.error('sync_log insert failed:', e.message));

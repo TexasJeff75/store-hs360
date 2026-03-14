@@ -395,9 +395,9 @@ exports.handler = async (event) => {
       await supabase.from('quickbooks_sync_log').insert({
         entity_type: isACH ? 'vault_bank' : 'vault_card',
         entity_id: `vault_${Date.now()}`,
-        sync_type: 'create',
+        operation: 'create',
         status: 'failed',
-        request_data: { organizationId, paymentType, qbCustomerId, intuit_tid: vaultIntuitTid },
+        request_payload: { organizationId, paymentType, qbCustomerId, intuit_tid: vaultIntuitTid },
         error_message: errorMsg,
       }).then(({ error: logErr }) => {
         if (logErr) console.error('sync_log insert failed:', logErr.message);
@@ -447,11 +447,12 @@ exports.handler = async (event) => {
       entity_type: isACH ? 'vault_bank' : 'vault_card',
       entity_id: `vault_${Date.now()}`,
       quickbooks_id: reusableId,
-      sync_type: 'create',
+      operation: 'create',
       status: 'success',
-      request_data: { organizationId, paymentType, qbCustomerId, intuit_tid: vaultIntuitTid },
-      response_data: { reusableId, last4: lastFour },
-      synced_at: new Date().toISOString(),
+      request_payload: { organizationId, paymentType, qbCustomerId, intuit_tid: vaultIntuitTid },
+      response_payload: { reusableId, last4: lastFour },
+
+
     }).then(({ error: logErr }) => {
         if (logErr) console.error('sync_log insert failed:', logErr.message);
       }).catch((e) => console.error('sync_log insert failed:', e.message));

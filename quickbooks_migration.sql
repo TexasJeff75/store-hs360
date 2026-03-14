@@ -66,13 +66,12 @@ CREATE TABLE IF NOT EXISTS quickbooks_sync_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   entity_type text NOT NULL,
   entity_id text NOT NULL,
-  sync_type text NOT NULL,
+  operation text NOT NULL,
   status text NOT NULL,
   quickbooks_id text,
   error_message text,
-  request_data jsonb,
-  response_data jsonb,
-  synced_at timestamptz,
+  request_payload jsonb,
+  response_payload jsonb,
   created_at timestamptz DEFAULT now(),
   created_by uuid REFERENCES profiles(id)
 );
