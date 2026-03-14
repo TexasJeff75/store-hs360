@@ -314,8 +314,9 @@ exports.handler = async (event) => {
           || event.headers['client-ip']
           || event.headers['x-nf-client-connection-ip'];
         if (clientIp) {
+          const { encrypted, ...existingDeviceInfo } = data.context.deviceInfo || {};
           data.context.deviceInfo = {
-            ...data.context.deviceInfo,
+            ...existingDeviceInfo,
             ipAddress: clientIp,
           };
         }
