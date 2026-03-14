@@ -323,6 +323,7 @@ exports.handler = async (event) => {
       fetchOptions.body = JSON.stringify(data);
     }
 
+    console.log('QB API request:', method.toUpperCase(), url, usePaymentsAPI ? '(payments)' : '(accounting)');
     const qbResponse = await fetch(url, fetchOptions);
 
     // Capture intuit_tid from response headers for QB support troubleshooting
@@ -344,6 +345,18 @@ exports.handler = async (event) => {
 
       // Only include structured error details, never raw HTML
       const safeDetails = responseData?.Fault || responseData?.errors || undefined;
+
+      // Log QB error details to Netlify function logs for troubleshooting
+      console.error('QB API error:', JSON.stringify({
+        status: qbResponse.status,
+        endpoint,
+        method: method.toUpperCase(),
+        usePaymentsAPI,
+        error: errorMessage,
+        details: safeDetails,
+        intuit_tid: intuitTid,
+        response: responseData,
+      }));
 
       // Log failed API call for troubleshooting (best-effort, don't block response)
       supabase.from('quickbooks_sync_log').insert({
