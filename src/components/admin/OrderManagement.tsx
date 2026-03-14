@@ -6,6 +6,7 @@ import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Tr
 import type { Order, OrderItem, Shipment } from './orders/types';
 import { normalizeAddress } from './orders/types';
 import { activityLogService } from '../../services/activityLog';
+import RefundModal from './orders/RefundModal';
 
 const OrderManagement: React.FC = () => {
   const { user, profile, effectiveProfile, effectiveUserId } = useAuth();
@@ -37,6 +38,7 @@ const OrderManagement: React.FC = () => {
   const [orderCommission, setOrderCommission] = useState<any>(null);
   const [paymentLogs, setPaymentLogs] = useState<any[]>([]);
   const [paymentTransactions, setPaymentTransactions] = useState<any[]>([]);
+  const [showRefundModal, setShowRefundModal] = useState(false);
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -924,29 +926,10 @@ const OrderManagement: React.FC = () => {
                         </button>
                       </div>
                     )}
-                    {canManageOrders && order.payment_status === 'captured' && (
+                    {canManageOrders && (order.payment_status === 'captured' || order.payment_status === 'partially_refunded') && (
                       <div className="mt-3">
                         <button
-                          onClick={async () => {
-                            const input = prompt(`Refund this payment? Enter amount for partial refund, or leave blank for full refund of $${Number(order.total).toFixed(2)}:`);
-                            if (input === null) return;
-                            const amount = input.trim() === '' ? undefined : parseFloat(input);
-                            if (amount !== undefined && (isNaN(amount) || amount <= 0 || amount > Number(order.total))) {
-                              alert(`Invalid amount. Must be between $0.01 and $${Number(order.total).toFixed(2)}.`);
-                              return;
-                            }
-                            const result = await orderService.refundPayment(order.id, amount);
-                            if (result.success) {
-                              alert(`Refund of $${(amount || Number(order.total)).toFixed(2)} processed successfully.`);
-                              await fetchOrders();
-                              const { order: refreshed } = await orderService.getOrderById(order.id);
-                              if (refreshed) setSelectedOrder(refreshed);
-                              fetchPaymentLogs(order.id);
-                              fetchPaymentTransactions(order.id);
-                            } else {
-                              alert(`Refund failed: ${result.error}`);
-                            }
-                          }}
+                          onClick={() => setShowRefundModal(true)}
                           className="w-full px-3 py-1.5 text-xs font-medium text-red-700 bg-red-50 border border-red-200 rounded hover:bg-red-100"
                         >
                           Refund Payment
@@ -2360,6 +2343,35 @@ const OrderManagement: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Refund Modal */}
+      {showRefundModal && selectedOrder && (
+        <RefundModal
+          order={selectedOrder}
+          commission={orderCommission}
+          onClose={() => setShowRefundModal(false)}
+          onSubmit={async ({ amount, includeShipping, cancelCommission, reason }) => {
+            const result = await orderService.refundPayment(selectedOrder.id, {
+              amount,
+              includeShipping,
+              cancelCommission,
+              reason,
+              refundedBy: user?.email || user?.id || 'admin',
+            });
+            if (result.success) {
+              setShowRefundModal(false);
+              await fetchOrders();
+              const { order: refreshed } = await orderService.getOrderById(selectedOrder.id);
+              if (refreshed) setSelectedOrder(refreshed);
+              fetchOrderCommission(selectedOrder.id);
+              fetchPaymentLogs(selectedOrder.id);
+              fetchPaymentTransactions(selectedOrder.id);
+            } else {
+              throw new Error(result.error || 'Refund failed');
+            }
+          }}
+        />
       )}
     </div>
   );
