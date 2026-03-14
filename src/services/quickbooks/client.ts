@@ -124,12 +124,11 @@ export class QuickBooksClient {
         entity_type: entityType,
         entity_id: entityId,
         quickbooks_id: quickbooksId,
-        sync_type: syncType,
+        operation: syncType,
         status,
-        request_data: requestData,
-        response_data: responseData,
+        request_payload: requestData,
+        response_payload: responseData,
         error_message: errorMessage,
-        synced_at: status === 'success' ? new Date().toISOString() : null
       });
 
       if (error) {

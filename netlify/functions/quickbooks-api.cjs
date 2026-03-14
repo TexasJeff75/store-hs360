@@ -158,12 +158,12 @@ async function refreshTokens(creds, supabase) {
       await supabase.from('quickbooks_sync_log').insert({
         entity_type: 'oauth',
         entity_id: creds.realm_id,
-        sync_type: 'update',
+        operation: 'update',
         status: 'failed',
         error_message: isInvalidGrant
           ? 'Refresh token expired or revoked - reconnection required'
           : safeErrorMessage,
-        request_data: { action: 'auto_refresh', grant_type: 'refresh_token' },
+        request_payload: { action: 'auto_refresh', grant_type: 'refresh_token' },
         created_at: new Date().toISOString()
       });
     } catch (logError) {
@@ -349,10 +349,10 @@ exports.handler = async (event) => {
       supabase.from('quickbooks_sync_log').insert({
         entity_type: usePaymentsAPI ? 'payment_api' : 'accounting_api',
         entity_id: `api_${Date.now()}`,
-        sync_type: method.toLowerCase(),
+        operation: method.toLowerCase(),
         status: 'failed',
         error_message: errorMessage,
-        request_data: {
+        request_payload: {
           endpoint,
           method: method.toUpperCase(),
           requestId,
@@ -361,7 +361,7 @@ exports.handler = async (event) => {
           usePaymentsAPI,
           isQuery,
         },
-        response_data: safeDetails ? { fault: safeDetails } : undefined,
+        response_payload: safeDetails ? { fault: safeDetails } : undefined,
         created_at: new Date().toISOString(),
       }).then(({ error: logErr }) => {
         if (logErr) console.error('Failed to log QB API error to sync_log:', logErr.message);

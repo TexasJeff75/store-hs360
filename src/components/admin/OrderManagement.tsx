@@ -1016,7 +1016,7 @@ const OrderManagement: React.FC = () => {
                               'bg-gray-500'
                             }`} />
                             <span className="font-medium">{log.entity_type?.replace('payment_', '').replace('_', ' ').toUpperCase()}</span>
-                            <span className="text-gray-500">{log.sync_type}</span>
+                            <span className="text-gray-500">{log.operation}</span>
                             {log.quickbooks_id && <span className="text-gray-400 font-mono">QB: {log.quickbooks_id}</span>}
                           </div>
                           <div className="flex items-center space-x-2">

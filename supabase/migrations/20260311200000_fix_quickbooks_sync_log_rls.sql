@@ -6,6 +6,7 @@
 
 -- Fix INSERT: allow any authenticated user (was admin-only)
 DROP POLICY IF EXISTS "Admins can insert sync logs" ON quickbooks_sync_log;
+DROP POLICY IF EXISTS "Authenticated users can insert sync logs" ON quickbooks_sync_log;
 
 CREATE POLICY "Authenticated users can insert sync logs"
   ON quickbooks_sync_log FOR INSERT

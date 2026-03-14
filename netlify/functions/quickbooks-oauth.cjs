@@ -166,10 +166,10 @@ async function handleExchange(body) {
       await supabase.from('quickbooks_sync_log').insert({
         entity_type: 'oauth',
         entity_id: realmId || 'unknown',
-        sync_type: 'create',
+        operation: 'create',
         status: 'failed',
         error_message: safeMessage,
-        request_data: { action: 'exchange', grant_type: 'authorization_code', intuit_tid: exchangeIntuitTid },
+        request_payload: { action: 'exchange', grant_type: 'authorization_code', intuit_tid: exchangeIntuitTid },
         created_at: new Date().toISOString()
       });
     } catch (logError) {
@@ -215,10 +215,9 @@ async function handleExchange(body) {
     await supabase.from('quickbooks_sync_log').insert({
       entity_type: 'oauth',
       entity_id: realmId,
-      sync_type: 'create',
+      operation: 'create',
       status: 'success',
-      request_data: { action: 'exchange', grant_type: 'authorization_code', intuit_tid: exchangeIntuitTid },
-      synced_at: new Date().toISOString(),
+      request_payload: { action: 'exchange', grant_type: 'authorization_code', intuit_tid: exchangeIntuitTid },
       created_at: new Date().toISOString()
     });
   } catch (logError) {
@@ -299,12 +298,12 @@ async function handleRefresh() {
       await supabase.from('quickbooks_sync_log').insert({
         entity_type: 'oauth',
         entity_id: creds.realm_id,
-        sync_type: 'update',
+        operation: 'update',
         status: 'failed',
         error_message: isInvalidGrant
           ? 'Refresh token expired or revoked - reconnection required'
           : safeErrorMessage,
-        request_data: { action: 'refresh', grant_type: 'refresh_token', intuit_tid: refreshIntuitTid },
+        request_payload: { action: 'refresh', grant_type: 'refresh_token', intuit_tid: refreshIntuitTid },
         created_at: new Date().toISOString()
       });
     } catch (logError) {
