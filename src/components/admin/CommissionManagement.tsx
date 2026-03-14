@@ -349,6 +349,21 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
     });
   };
 
+  const handleCancelCommission = async (commissionId: string) => {
+    if (!user || !canApprove) return;
+    const reason = prompt('Reason for cancelling this commission:');
+    if (!reason || !reason.trim()) return;
+
+    const result = await commissionService.cancelCommission(commissionId, reason.trim(), user.email || user.id);
+    if (result.success) {
+      alert('Commission cancelled.');
+      fetchCommissions();
+      setSelectedCommission(null);
+    } else {
+      alert(`Failed to cancel commission: ${result.error}`);
+    }
+  };
+
   const filteredCommissions = commissions.filter(commission => {
     const matchesSearch =
       commission.sales_rep?.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -966,6 +981,15 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                                 <DollarSign className="h-4 w-4" />
                               </button>
                             )}
+                            {canApprove && (commission.status === 'pending' || commission.status === 'approved') && (
+                              <button
+                                onClick={() => handleCancelCommission(commission.id)}
+                                className="text-red-500 hover:text-red-700"
+                                title="Cancel Commission"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1310,6 +1334,14 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                       className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                       Mark as Paid
+                    </button>
+                  )}
+                  {canApprove && (selectedCommission.status === 'pending' || selectedCommission.status === 'approved') && (
+                    <button
+                      onClick={() => handleCancelCommission(selectedCommission.id)}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                    >
+                      Cancel Commission
                     </button>
                   )}
                 </div>
