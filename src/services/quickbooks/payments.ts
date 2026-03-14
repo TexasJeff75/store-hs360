@@ -360,9 +360,25 @@ export const quickbooksPayments = {
   },
 
   async voidCharge(chargeId: string): Promise<QBChargeResponse> {
+    // QB Payments API has no /void endpoint. For authorized (uncaptured) charges,
+    // capture then immediately refund. For already-captured charges, just refund.
     try {
       await qbClient.logSync('payment_void', chargeId, 'update', 'pending', chargeId);
-      const response = await qbClient.post<QBChargeResponse>(`payments/charges/${chargeId}/void`, {}, true);
+
+      // Try to capture first (may already be captured)
+      try {
+        const charge = await this.getCharge(chargeId);
+        if (charge.status !== 'CAPTURED' && charge.status !== 'SETTLED') {
+          await qbClient.post<QBChargeResponse>(`payments/charges/${chargeId}/capture`, {
+            amount: charge.amount,
+            context: { mobile: false, isEcommerce: true },
+          }, true);
+        }
+      } catch {
+        // Capture may fail if already captured — continue to refund
+      }
+
+      const response = await this.refundCharge(chargeId);
       await qbClient.logSync('payment_void', chargeId, 'update', 'success', chargeId, undefined, sanitizeResponseForLog(response));
       return response;
     } catch (error: any) {
@@ -392,9 +408,10 @@ export const quickbooksPayments = {
   },
 
   async voidECheck(echeckId: string): Promise<QBECheckResponse> {
+    // QB Payments API has no /void endpoint for echecks — use refund instead
     try {
       await qbClient.logSync('payment_ach_void', echeckId, 'update', 'pending', echeckId);
-      const response = await qbClient.post<QBECheckResponse>(`payments/echecks/${echeckId}/void`, {}, true);
+      const response = await this.refundECheck(echeckId);
       await qbClient.logSync('payment_ach_void', echeckId, 'update', 'success', echeckId, undefined, sanitizeResponseForLog(response));
       return response;
     } catch (error: any) {
