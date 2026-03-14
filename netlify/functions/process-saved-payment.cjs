@@ -361,7 +361,9 @@ exports.handler = async (event) => {
       sync_type: 'create',
       status: 'pending',
       request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId },
-    }).then(() => {}).catch(() => {});
+    }).then(({ error: logErr }) => {
+        if (logErr) console.error('sync_log insert failed:', logErr.message);
+      }).catch((e) => console.error('sync_log insert failed:', e.message));
 
     const qbResponse = await fetch(qbUrl, {
       method: 'POST',
@@ -412,7 +414,9 @@ exports.handler = async (event) => {
         request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId, intuit_tid: intuitTid },
         error_message: errorMsg,
         response_data: { status: responseData?.status, httpStatus: qbResponse.status },
-      }).then(() => {}).catch(() => {});
+      }).then(({ error: logErr }) => {
+        if (logErr) console.error('sync_log insert failed:', logErr.message);
+      }).catch((e) => console.error('sync_log insert failed:', e.message));
 
       return {
         statusCode: qbResponse.status >= 400 && qbResponse.status < 500 ? qbResponse.status : 502,
@@ -437,7 +441,9 @@ exports.handler = async (event) => {
         request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId, intuit_tid: intuitTid },
         error_message: 'Payment declined',
         response_data: { id: responseData.id, status: 'DECLINED', amount: responseData.amount },
-      }).then(() => {}).catch(() => {});
+      }).then(({ error: logErr }) => {
+        if (logErr) console.error('sync_log insert failed:', logErr.message);
+      }).catch((e) => console.error('sync_log insert failed:', e.message));
 
       return {
         statusCode: 402,
@@ -460,7 +466,9 @@ exports.handler = async (event) => {
       request_data: { amount, currency: currency || 'USD', paymentMethodId, isACH, requestId, intuit_tid: intuitTid },
       response_data: { id: responseData.id, status: responseData.status, amount: responseData.amount, authCode: responseData.authCode },
       synced_at: new Date().toISOString(),
-    }).then(() => {}).catch(() => {});
+    }).then(({ error: logErr }) => {
+        if (logErr) console.error('sync_log insert failed:', logErr.message);
+      }).catch((e) => console.error('sync_log insert failed:', e.message));
 
     return {
       statusCode: 200,
