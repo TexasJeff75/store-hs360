@@ -321,10 +321,7 @@ exports.handler = async (event) => {
     const paymentContext = {
       mobile: false,
       isEcommerce: true,
-      deviceInfo: {
-        encrypted: true,
-        ...(clientIp ? { ipAddress: clientIp } : {}),
-      },
+      ...(clientIp ? { deviceInfo: { ipAddress: clientIp } } : {}),
     };
 
     let qbUrl, requestBody;

@@ -193,7 +193,7 @@ export const quickbooksPayments = {
       currency,
       token,
       capture: false,
-      context: { mobile: false, isEcommerce: true, deviceInfo: { encrypted: true } },
+      context: { mobile: false, isEcommerce: true },
       description,
     };
     const logId = `auth_${Date.now()}`;
@@ -219,7 +219,7 @@ export const quickbooksPayments = {
       currency,
       cardOnFile: cardOnFileId,
       capture: false,
-      context: { mobile: false, isEcommerce: true, deviceInfo: { encrypted: true } },
+      context: { mobile: false, isEcommerce: true },
       description,
     };
     const logId = `auth_cof_${Date.now()}`;
@@ -245,7 +245,7 @@ export const quickbooksPayments = {
       currency,
       token,
       capture: true,
-      context: { mobile: false, isEcommerce: true, deviceInfo: { encrypted: true } },
+      context: { mobile: false, isEcommerce: true },
       description,
     };
     const logId = `charge_${Date.now()}`;
@@ -266,7 +266,7 @@ export const quickbooksPayments = {
   ): Promise<QBChargeResponse> {
     const captureData: QBCaptureRequest = {
       amount: amount.toFixed(2),
-      context: { mobile: false, isEcommerce: true, deviceInfo: { encrypted: true } },
+      context: { mobile: false, isEcommerce: true },
     };
     try {
       await qbClient.logSync('payment_capture', chargeId, 'update', 'pending', chargeId, captureData);
@@ -291,7 +291,7 @@ export const quickbooksPayments = {
       bankAccount,
       description,
       paymentMode: 'WEB',
-      context: { mobile: false, isEcommerce: true, deviceInfo: { encrypted: true } },
+      context: { mobile: false, isEcommerce: true },
     };
     const logId = `ach_${Date.now()}`;
     try {
@@ -317,7 +317,7 @@ export const quickbooksPayments = {
       bankAccountOnFile: token,
       description,
       paymentMode: 'WEB' as const,
-      context: { mobile: false, isEcommerce: true, deviceInfo: { encrypted: true } },
+      context: { mobile: false, isEcommerce: true },
     };
     const logId = `ach_token_${Date.now()}`;
     try {
