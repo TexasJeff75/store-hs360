@@ -198,7 +198,8 @@ class CommissionService {
           *,
           distributor:distributors(id, name, code),
           sales_rep:profiles!sales_rep_id(id, email, full_name),
-          organization:organizations(id, name)
+          organization:organizations(id, name),
+          order:orders!order_id(id, status, payment_status, order_number)
         `)
         .eq('sales_rep_id', salesRepId)
         .order('created_at', { ascending: false });
@@ -247,7 +248,8 @@ class CommissionService {
           *,
           distributor:distributors(id, name, code),
           sales_rep:profiles!sales_rep_id(id, email, full_name),
-          organization:organizations(id, name)
+          organization:organizations(id, name),
+          order:orders!order_id(id, status, payment_status, order_number)
         `)
         .in('sales_rep_id', salesRepIds)
         .order('created_at', { ascending: false });
@@ -510,7 +512,8 @@ class CommissionService {
           *,
           sales_rep:profiles!sales_rep_id(id, email),
           organization:organizations(id, name),
-          distributor:distributors(id, name, code)
+          distributor:distributors(id, name, code),
+          order:orders!order_id(id, status, payment_status, order_number)
         `)
         .order('created_at', { ascending: false });
 
@@ -778,6 +781,68 @@ class CommissionService {
       console.error('Error creating independent distributor:', error);
       return {
         error: error instanceof Error ? error.message : 'Failed to create independent distributor'
+      };
+    }
+  }
+
+  async batchApproveCommissions(
+    commissionIds: string[],
+    approvedBy: string,
+    notes?: string
+  ): Promise<{ success: boolean; count: number; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('commissions')
+        .update({
+          status: 'approved',
+          approved_by: approvedBy,
+          approved_at: new Date().toISOString(),
+          notes: notes || undefined
+        })
+        .in('id', commissionIds)
+        .eq('status', 'pending');
+
+      if (error) {
+        return { success: false, count: 0, error: error.message };
+      }
+
+      return { success: true, count: commissionIds.length };
+    } catch (error) {
+      console.error('Error batch approving commissions:', error);
+      return {
+        success: false,
+        count: 0,
+        error: error instanceof Error ? error.message : 'Failed to batch approve commissions'
+      };
+    }
+  }
+
+  async batchMarkPaid(
+    commissionIds: string[],
+    paymentReference: string
+  ): Promise<{ success: boolean; count: number; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('commissions')
+        .update({
+          status: 'paid',
+          paid_at: new Date().toISOString(),
+          payment_reference: paymentReference
+        })
+        .in('id', commissionIds)
+        .eq('status', 'approved');
+
+      if (error) {
+        return { success: false, count: 0, error: error.message };
+      }
+
+      return { success: true, count: commissionIds.length };
+    } catch (error) {
+      console.error('Error batch marking commissions paid:', error);
+      return {
+        success: false,
+        count: 0,
+        error: error instanceof Error ? error.message : 'Failed to batch mark commissions paid'
       };
     }
   }
