@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Loader, Package } from 'lucide-react';
+import { X, Save, Loader, Package, ImageIcon } from 'lucide-react';
 import { productService, Product, Category, Brand } from '@/services/productService';
 
 interface ProductFormProps {
@@ -35,6 +35,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, isOpen, onClose, onS
     weight_unit: 'lb',
     is_in_stock: true,
     is_active: true,
+    image_url: '',
+    extended_description: '',
+    reference_1: '',
+    reference_2: '',
+    reference_3: '',
   });
 
   useEffect(() => {
@@ -56,6 +61,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, isOpen, onClose, onS
           weight_unit: product.weightUnit || 'lb',
           is_in_stock: product.isInStock ?? true,
           is_active: product.isActive ?? true,
+          image_url: product.image || '',
+          extended_description: product.extendedDescription || '',
+          reference_1: product.reference1 || '',
+          reference_2: product.reference2 || '',
+          reference_3: product.reference3 || '',
         });
       } else {
         resetForm();
@@ -79,6 +89,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, isOpen, onClose, onS
       weight_unit: 'lb',
       is_in_stock: true,
       is_active: true,
+      image_url: '',
+      extended_description: '',
+      reference_1: '',
+      reference_2: '',
+      reference_3: '',
     });
     setError(null);
   };
@@ -159,6 +174,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, isOpen, onClose, onS
         weight_unit: form.weight_unit,
         is_in_stock: form.is_in_stock,
         is_active: form.is_active,
+        image_url: form.image_url.trim() || undefined,
+        extended_description: form.extended_description.trim() || undefined,
+        reference_1: form.reference_1.trim() || undefined,
+        reference_2: form.reference_2.trim() || undefined,
+        reference_3: form.reference_3.trim() || undefined,
       };
 
       let savedProduct: Product | null;
@@ -471,6 +491,36 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, isOpen, onClose, onS
               <div className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Product Image URL
+                  </label>
+                  <div className="flex space-x-2">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-2.5 text-gray-400">
+                        <ImageIcon className="h-4 w-4" />
+                      </span>
+                      <input
+                        type="url"
+                        value={form.image_url}
+                        onChange={(e) => setForm({ ...form, image_url: e.target.value })}
+                        className="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                        placeholder="https://example.com/image.jpg"
+                      />
+                    </div>
+                    {form.image_url && (
+                      <div className="w-10 h-10 rounded-lg border border-gray-200 overflow-hidden flex-shrink-0">
+                        <img
+                          src={form.image_url}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Description
                   </label>
                   <textarea
@@ -494,6 +544,46 @@ const ProductForm: React.FC<ProductFormProps> = ({ product, isOpen, onClose, onS
                     rows={4}
                     className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow resize-none font-mono text-sm"
                     placeholder="<p>Rich HTML description...</p>"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Extended Description
+                  </label>
+                  <textarea
+                    value={form.extended_description}
+                    onChange={(e) => setForm({ ...form, extended_description: e.target.value })}
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow resize-none"
+                    placeholder="Additional product details..."
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium text-gray-700">
+                    Reference Links
+                  </label>
+                  <input
+                    type="url"
+                    value={form.reference_1}
+                    onChange={(e) => setForm({ ...form, reference_1: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                    placeholder="Reference 1 URL"
+                  />
+                  <input
+                    type="url"
+                    value={form.reference_2}
+                    onChange={(e) => setForm({ ...form, reference_2: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                    placeholder="Reference 2 URL"
+                  />
+                  <input
+                    type="url"
+                    value={form.reference_3}
+                    onChange={(e) => setForm({ ...form, reference_3: e.target.value })}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-shadow"
+                    placeholder="Reference 3 URL"
                   />
                 </div>
               </div>

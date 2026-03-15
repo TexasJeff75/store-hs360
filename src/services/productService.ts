@@ -193,6 +193,10 @@ class ProductService {
     is_in_stock?: boolean;
     is_active?: boolean;
     image_url?: string;
+    extended_description?: string;
+    reference_1?: string;
+    reference_2?: string;
+    reference_3?: string;
     sort_order?: number;
     custom_fields?: Array<{ name: string; value: string }>;
   }): Promise<Product | null> {
@@ -229,6 +233,10 @@ class ProductService {
       is_in_stock: boolean;
       is_active: boolean;
       image_url: string;
+      extended_description: string;
+      reference_1: string;
+      reference_2: string;
+      reference_3: string;
       sort_order: number;
       custom_fields: Array<{ name: string; value: string }>;
     }>
