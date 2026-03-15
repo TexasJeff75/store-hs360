@@ -158,9 +158,17 @@ const ProductModal: React.FC<ProductModalProps> = ({
         <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900 truncate pr-4">
-              {product.name}
-            </h2>
+            <div className="flex items-center gap-3 min-w-0 pr-4">
+              <h2 className="text-xl font-semibold text-gray-900 truncate">
+                {product.name}
+              </h2>
+              {product.category && (
+                <span className="inline-flex flex-shrink-0 px-3 py-1 text-sm font-medium rounded-full bg-gradient-to-r from-pink-100 to-orange-100 text-pink-800">
+                  <Tag className="h-4 w-4 mr-1" />
+                  {product.category}
+                </span>
+              )}
+            </div>
             <button
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 transition-colors"
@@ -207,33 +215,26 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
               {/* Product Details */}
               <div className="space-y-6">
-                {/* Category and Rating */}
-                <div className="flex items-center justify-between">
-                  <span className="inline-flex px-3 py-1 text-sm font-medium rounded-full bg-gradient-to-r from-pink-100 to-orange-100 text-pink-800">
-                    <Tag className="h-4 w-4 mr-1" />
-                    {product.category}
-                  </span>
-                  
-                  {product.rating && product.rating > 0 && (
-                    <div className="flex items-center space-x-1">
-                      <div className="flex items-center">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-4 w-4 ${
-                              i < Math.floor(product.rating || 0)
-                                ? 'text-yellow-400 fill-current'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
-                      <span className="text-sm text-gray-600">
-                        {product.rating.toFixed(1)} ({product.reviews || 0} reviews)
-                      </span>
+                {/* Rating */}
+                {product.rating && product.rating > 0 && (
+                  <div className="flex items-center space-x-1">
+                    <div className="flex items-center">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`h-4 w-4 ${
+                            i < Math.floor(product.rating || 0)
+                              ? 'text-yellow-400 fill-current'
+                              : 'text-gray-300'
+                          }`}
+                        />
+                      ))}
                     </div>
-                  )}
-                </div>
+                    <span className="text-sm text-gray-600">
+                      {product.rating.toFixed(1)} ({product.reviews || 0} reviews)
+                    </span>
+                  </div>
+                )}
 
                 {/* Pricing */}
                 <div className="bg-gray-50 rounded-lg p-4">
@@ -400,20 +401,6 @@ const ProductModal: React.FC<ProductModalProps> = ({
                       <Repeat className="h-5 w-5" />
                       <span>Create Recurring Order</span>
                     </button>
-                  </div>
-                </div>
-
-                {/* Additional Product Info */}
-                <div className="border-t border-gray-200 pt-6">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="font-medium text-gray-900">Product ID:</span>
-                      <span className="ml-2 text-gray-600">#{product.id}</span>
-                    </div>
-                    <div>
-                      <span className="font-medium text-gray-900">Category:</span>
-                      <span className="ml-2 text-gray-600">{product.category}</span>
-                    </div>
                   </div>
                 </div>
 
