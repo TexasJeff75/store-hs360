@@ -43,7 +43,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
   const getSourceLabel = () => {
     switch (source) {
       case 'location': return 'Location Retail Price';
-      case 'organization': return 'Customer Retail Price';
+      case 'organization': return 'Contracted Pricing!';
       case 'individual': return 'Your Retail Price';
       default: return 'Retail Price';
     }
