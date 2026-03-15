@@ -52,6 +52,7 @@ export interface CreateOrderData {
   organizationId?: string;
   locationId?: string;
   notes?: string;
+  is_test_order?: boolean;
 }
 
 interface Order {
@@ -84,6 +85,7 @@ interface Order {
   backorder_reason?: string;
   vendor_brand?: string;
   is_sub_order?: boolean;
+  is_test_order?: boolean;
 }
 
 class OrderService {
@@ -139,7 +141,8 @@ class OrderService {
           organization_id: data.organizationId,
           location_id: data.locationId,
           sales_rep_id: salesRepId,
-          notes: data.notes
+          notes: data.notes,
+          is_test_order: data.is_test_order || false,
         })
         .select()
         .single();

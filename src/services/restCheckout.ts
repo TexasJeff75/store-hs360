@@ -198,7 +198,8 @@ class RestCheckoutService {
       expiry_year: number;
       verification_value?: string;
     },
-    paymentAuthId?: string
+    paymentAuthId?: string,
+    options?: { is_test_order?: boolean }
   ): Promise<CheckoutFlowResult> {
     try {
 
@@ -260,6 +261,7 @@ class RestCheckoutService {
         organizationId: session.organization_id,
         locationId: session.location_id || session.metadata?.location_id,
         notes: `Order placed via checkout session ${sessionId}`,
+        is_test_order: options?.is_test_order,
       };
 
       const result = await orderService.createOrder(orderData);

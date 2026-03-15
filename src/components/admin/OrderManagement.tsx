@@ -788,7 +788,15 @@ const OrderManagement: React.FC = () => {
         <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
             <div>
-              <h3 className="text-xl font-bold text-gray-900">Order Details</h3>
+              <div className="flex items-center gap-3">
+                <h3 className="text-xl font-bold text-gray-900">Order Details</h3>
+                {order.is_test_order && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-100 border border-amber-300 rounded-full text-xs font-semibold text-amber-900">
+                    <AlertTriangle className="h-3 w-3" />
+                    TEST ORDER
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-gray-500">ID: {order.id.slice(0, 8)}...</p>
             </div>
             <button
@@ -1746,6 +1754,14 @@ const OrderManagement: React.FC = () => {
                   <div className="p-4 hover:bg-gray-50 transition-colors">
                     <div className="flex items-center gap-4">
                       {/* Visual Indicator Badge */}
+                      {parent.is_test_order && (
+                        <div className="flex-shrink-0">
+                          <div className="flex items-center gap-2 px-3 py-1.5 bg-amber-100 border border-amber-300 rounded-full">
+                            <AlertTriangle className="h-3.5 w-3.5 text-amber-700" />
+                            <span className="text-xs font-semibold text-amber-900">TEST ORDER</span>
+                          </div>
+                        </div>
+                      )}
                       {isParentOrder && (
                         <div className="flex-shrink-0">
                           <div className="flex items-center gap-2 px-3 py-1.5 bg-purple-100 border border-purple-300 rounded-full">
