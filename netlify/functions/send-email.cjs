@@ -490,7 +490,10 @@ exports.handler = async (event) => {
     let emailSent = false;
     let errorMessage = null;
 
-    if (smtpUser && smtpPass) {
+    if (!smtpUser || !smtpPass) {
+      errorMessage = 'SMTP not configured (SMTP_USER / SMTP_PASS environment variables are not set)';
+      console.error('[send-email]', errorMessage);
+    } else {
       try {
         const transporter = nodemailer.createTransport({
           host: process.env.SMTP_HOST || 'smtp.office365.com',
@@ -510,11 +513,11 @@ exports.handler = async (event) => {
         });
 
         emailSent = true;
+        console.log(`[send-email] Sent "${payload.email_type}" email to ${payload.to}`);
       } catch (err) {
         errorMessage = err instanceof Error ? err.message : 'Failed to send via SMTP';
+        console.error('[send-email] SMTP error:', errorMessage);
       }
-    } else {
-      errorMessage = 'SMTP not configured (SMTP_USER / SMTP_PASS not set). Email logged but not sent.';
     }
 
     // Log to email_notifications table (best-effort, don't block the response)
@@ -528,7 +531,7 @@ exports.handler = async (event) => {
           email_type: payload.email_type,
           subject: payload.subject,
           body_html: htmlBody,
-          status: emailSent ? 'sent' : (smtpUser ? 'failed' : 'pending'),
+          status: emailSent ? 'sent' : 'failed',
           error_message: errorMessage,
           metadata: payload.template_data || {},
           sent_at: emailSent ? new Date().toISOString() : null,
@@ -537,16 +540,27 @@ exports.handler = async (event) => {
         .maybeSingle();
       emailLogId = emailLog?.id || null;
     } catch (logErr) {
-      console.warn('Failed to log email notification:', logErr instanceof Error ? logErr.message : logErr);
+      console.warn('[send-email] Failed to log email notification:', logErr instanceof Error ? logErr.message : logErr);
+    }
+
+    if (!emailSent) {
+      return {
+        statusCode: 502,
+        headers: corsHeaders,
+        body: JSON.stringify({
+          success: false,
+          error: errorMessage,
+          email_id: emailLogId,
+        }),
+      };
     }
 
     return {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
-        success: emailSent,
+        success: true,
         email_id: emailLogId,
-        warning: !smtpUser ? 'SMTP not configured. Email was logged but not delivered.' : undefined,
       }),
     };
   } catch (err) {
