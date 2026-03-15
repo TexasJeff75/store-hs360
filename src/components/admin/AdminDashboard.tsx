@@ -3,7 +3,7 @@ import {
   Users, Building2, MapPin, Settings, BarChart3, Package, ShoppingCart,
   TrendingUp, CreditCard, Repeat, Building, HelpCircle, PieChart,
   Shield, ChevronLeft, ChevronRight, DollarSign, FolderTree, MessageSquare, UserCheck,
-  LayoutDashboard, ArrowLeft, Eye, EyeOff, Menu, X, BookOpen
+  LayoutDashboard, ArrowLeft, Eye, EyeOff, Menu, X, BookOpen, Mail
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
@@ -29,6 +29,7 @@ import CostAdminManagement from './CostAdminManagement';
 import QuickBooksManagement from './QuickBooksManagement';
 import CategoryManagement from './CategoryManagement';
 import SiteSettingsManagement from './SiteSettingsManagement';
+import EmailTemplateManagement from './EmailTemplateManagement';
 import SupportTickets from '../SupportTickets';
 import SupportTicketManagement from './SupportTicketManagement';
 
@@ -185,6 +186,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
         { id: 'cost-admins', label: 'Cost Admins', icon: Shield, roles: ['admin'] },
         { id: 'quickbooks', label: 'QuickBooks', icon: BookOpen, roles: ['admin'] },
         { id: 'site-settings', label: 'Settings', icon: Settings, roles: ['admin'] },
+        { id: 'email-templates', label: 'Email Templates', icon: Mail, roles: ['admin'] },
       ],
     },
     // ── Analytics ──
@@ -264,6 +266,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
         return <CostAdminManagement />;
       case 'site-settings':
         return <SiteSettingsManagement />;
+      case 'email-templates':
+        return <EmailTemplateManagement />;
       case 'my-orgs':
         return <SalesRepDashboard />;
       case 'my-customers':
