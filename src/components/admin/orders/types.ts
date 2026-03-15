@@ -97,4 +97,5 @@ export interface Order {
   payment_captured_at?: string;
   sales_rep_id?: string;
   backorder_reason?: string;
+  is_test_order?: boolean;
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, CreditCard, Truck, MapPin, User, Lock, ArrowLeft, ArrowRight, Loader, AlertCircle, RefreshCw, CheckCircle, Clock, FileText, Printer } from 'lucide-react';
+import { X, CreditCard, Truck, MapPin, User, Lock, ArrowLeft, ArrowRight, Loader, AlertCircle, RefreshCw, CheckCircle, Clock, FileText, Printer, FlaskConical } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import PriceDisplay from '../PriceDisplay';
 import { restCheckoutService } from '@/services/restCheckout';
@@ -89,6 +89,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   } | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [testMode, setTestMode] = useState(false);
 
   // Form data
   const [shippingAddress, setShippingAddress] = useState<ShippingAddress>({
@@ -475,7 +476,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       let paymentLastFour = '';
       let paymentStatus = 'authorized';
 
-      if (paymentData.type === 'card') {
+      if (testMode && profile?.role === 'admin') {
+        // Test mode — skip actual payment processing
+        paymentAuthId = `TEST-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        paymentLastFour = paymentData.lastFour || '0000';
+        paymentStatus = 'authorized';
+      } else if (paymentData.type === 'card') {
         let authResponse;
 
         if (paymentData.savePaymentMethod && selectedOrgId && user?.id) {
@@ -663,11 +669,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         verification_value: '000',
       };
 
+      const isTestOrder = testMode && profile?.role === 'admin';
       const result = await restCheckoutService.processPayment(
         sessionId,
         checkoutId,
         sanitizedPaymentData,
-        paymentAuthId
+        paymentAuthId,
+        isTestOrder ? { is_test_order: true } : undefined
       );
 
       if (result.success && result.orderId) {
@@ -1106,21 +1114,72 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const renderPaymentStep = () => (
     <div className="space-y-6">
-      <div className="flex items-center space-x-2 mb-4">
-        <CreditCard className="h-5 w-5 text-blue-600" />
-        <h3 className="text-lg font-semibold">Payment Information</h3>
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center space-x-2">
+          <CreditCard className="h-5 w-5 text-blue-600" />
+          <h3 className="text-lg font-semibold">Payment Information</h3>
+        </div>
+        {profile?.role === 'admin' && (
+          <button
+            type="button"
+            onClick={() => setTestMode(!testMode)}
+            className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              testMode
+                ? 'bg-amber-100 border-2 border-amber-400 text-amber-800'
+                : 'bg-gray-100 border-2 border-transparent text-gray-500 hover:bg-gray-200'
+            }`}
+          >
+            <FlaskConical className="h-4 w-4" />
+            <span>Test Mode {testMode ? 'ON' : 'OFF'}</span>
+          </button>
+        )}
       </div>
 
-      <PaymentForm
-        onPaymentReady={() => {}}
-        onPaymentSubmit={(data) => {
-          setPaymentData(data);
-          setCurrentStep('review');
-        }}
-        billingAddress={billingAddress}
-        total={total}
-        organizationId={selectedOrgId}
-      />
+      {testMode && profile?.role === 'admin' ? (
+        <div className="space-y-4">
+          <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <FlaskConical className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-amber-800">Admin Test Mode</p>
+                <p className="text-sm text-amber-700 mt-1">
+                  No credit card will be charged. A simulated transaction will be created and the order will be flagged as a test order.
+                </p>
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setPaymentData({
+                type: 'card',
+                token: 'TEST-TOKEN',
+                lastFour: '0000',
+                cardholderName: 'Test Order',
+                expiryMonth: '12',
+                expiryYear: '99',
+                savePaymentMethod: false,
+              } as PaymentData);
+              setCurrentStep('review');
+            }}
+            className="w-full py-3 px-6 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors font-semibold flex items-center justify-center space-x-2"
+          >
+            <FlaskConical className="h-5 w-5" />
+            <span>Continue with Test Payment</span>
+          </button>
+        </div>
+      ) : (
+        <PaymentForm
+          onPaymentReady={() => {}}
+          onPaymentSubmit={(data) => {
+            setPaymentData(data);
+            setCurrentStep('review');
+          }}
+          billingAddress={billingAddress}
+          total={total}
+          organizationId={selectedOrgId}
+        />
+      )}
     </div>
   );
 
@@ -1137,12 +1196,21 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     <div className="space-y-6">
       <h3 className="text-lg font-semibold mb-4">Order Review</h3>
 
+      {testMode && profile?.role === 'admin' && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-3 flex items-center space-x-3">
+          <FlaskConical className="h-5 w-5 text-amber-600 flex-shrink-0" />
+          <p className="text-sm font-semibold text-amber-800">
+            TEST ORDER — No payment will be charged
+          </p>
+        </div>
+      )}
+
       <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
         <div className="flex items-center gap-3">
           <CreditCard className="h-5 w-5 text-gray-600" />
           <div>
             <p className="text-sm font-medium text-gray-900">Payment Method</p>
-            <p className="text-sm text-gray-600">{getPaymentSummary()}</p>
+            <p className="text-sm text-gray-600">{testMode ? 'Test Mode — No charge' : getPaymentSummary()}</p>
             {paymentData?.type === 'ach' && (
               <p className="text-xs text-amber-600 mt-1">ACH payments take 3-5 business days to settle</p>
             )}
@@ -1414,7 +1482,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           {/* Footer Navigation */}
           {!loading && !error && currentStep !== 'customer' && currentStep !== 'confirmation' && (
             <div className="border-t border-gray-200 p-6 bg-gray-50">
-              {currentStep === 'review' && (
+              {currentStep === 'review' && !(testMode && profile?.role === 'admin') && (
                 <div className="mb-4 flex justify-center">
                   <TurnstileWidget
                     onVerify={(token) => setTurnstileToken(token)}
@@ -1435,7 +1503,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
                 {currentStep === 'review' ? (
                   <button
                     onClick={handlePlaceOrder}
-                    disabled={loading || !turnstileToken}
+                    disabled={loading || (!(testMode && profile?.role === 'admin') && !turnstileToken)}
                     className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading ? (
