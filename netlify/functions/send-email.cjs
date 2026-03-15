@@ -21,16 +21,27 @@ function getSupabaseAdmin() {
 
 // ── Shared email wrapper ──
 
-const emailHeader = `
+function getLogoUrl() {
+  const siteUrl = process.env.SITE_URL || process.env.URL || '';
+  return siteUrl ? `${siteUrl.replace(/\/$/, '')}/Logo_web.webp` : '';
+}
+
+function buildEmailHeader() {
+  const logoUrl = getLogoUrl();
+  const logoHtml = logoUrl
+    ? `<img src="${logoUrl}" alt="HealthSpan360" width="48" height="48" style="display:block;margin:0 auto 12px auto;border-radius:8px;" />`
+    : '';
+  return `
   <div style="background: linear-gradient(135deg, #ec4899, #f97316); padding: 32px 24px; text-align: center;">
-    <h1 style="color: white; font-size: 24px; margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+    ${logoHtml}
+    <h1 style="color: white; font-size: 24px; margin: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-weight: 700;">
       HealthSpan360
     </h1>
-    <p style="color: rgba(255,255,255,0.85); font-size: 13px; margin: 4px 0 0 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+    <p style="color: rgba(255,255,255,0.85); font-size: 13px; margin: 4px 0 0 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
       Turning Insight Into Impact
     </p>
-  </div>
-`;
+  </div>`;
+}
 
 const emailFooter = `
   <div style="background: #f9fafb; padding: 24px; text-align: center; border-top: 1px solid #e5e7eb;">
@@ -46,7 +57,7 @@ function wrapEmail(content) {
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="margin: 0; padding: 0; background: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
   <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; margin-top: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-    ${emailHeader}
+    ${buildEmailHeader()}
     <div style="padding: 32px 24px;">
       ${content}
     </div>
@@ -76,7 +87,13 @@ function prepareTemplateData(emailType, data) {
       vars.item_rows = items
         .map(
           (i) =>
-            `<tr><td style="padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:14px;">${i.name}</td><td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:center;font-size:14px;">${i.quantity}</td><td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:right;font-size:14px;">$${Number(i.price * i.quantity).toFixed(2)}</td></tr>`
+            `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6;">
+              <div style="flex:1;">
+                <div style="font-size:14px;font-weight:500;color:#111827;">${i.name}</div>
+                <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Qty: ${i.quantity}</div>
+              </div>
+              <div style="font-size:14px;font-weight:600;color:#111827;">$${Number(i.price * i.quantity).toFixed(2)}</div>
+            </div>`
         )
         .join('');
       break;
@@ -108,23 +125,24 @@ function buildFallbackHtml(emailType, data) {
       const orderId = String(data.order_id || '').slice(0, 8).toUpperCase();
       const total = Number(data.total || 0).toFixed(2);
       const items = Array.isArray(data.items) ? data.items : [];
-      const itemRows = items
+      const itemCards = items
         .map(
           (i) =>
-            `<tr><td style="padding:8px 0;border-bottom:1px solid #f3f4f6;font-size:14px;">${i.name}</td><td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:center;font-size:14px;">${i.quantity}</td><td style="padding:8px 0;border-bottom:1px solid #f3f4f6;text-align:right;font-size:14px;">$${Number(i.price * i.quantity).toFixed(2)}</td></tr>`
+            `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6;">
+              <div style="flex:1;">
+                <div style="font-size:14px;font-weight:500;color:#111827;">${i.name}</div>
+                <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Qty: ${i.quantity}</div>
+              </div>
+              <div style="font-size:14px;font-weight:600;color:#111827;">$${Number(i.price * i.quantity).toFixed(2)}</div>
+            </div>`
         )
         .join('');
       return wrapEmail(`
         <h2 style="color:#111827;font-size:20px;margin:0 0 8px 0;">Order Confirmed</h2>
         <p style="color:#6b7280;font-size:14px;margin:0 0 24px 0;">Order #${orderId}</p>
-        <table style="width:100%;border-collapse:collapse;margin-bottom:24px;">
-          <thead><tr style="border-bottom:2px solid #e5e7eb;">
-            <th style="text-align:left;padding:8px 0;font-size:12px;text-transform:uppercase;color:#6b7280;">Item</th>
-            <th style="text-align:center;padding:8px 0;font-size:12px;text-transform:uppercase;color:#6b7280;">Qty</th>
-            <th style="text-align:right;padding:8px 0;font-size:12px;text-transform:uppercase;color:#6b7280;">Total</th>
-          </tr></thead>
-          <tbody>${itemRows}</tbody>
-        </table>
+        <div style="margin-bottom:24px;">
+          ${itemCards}
+        </div>
         <div style="background:#f9fafb;border-radius:8px;padding:16px;text-align:right;">
           <span style="font-size:16px;font-weight:700;color:#111827;">Total: $${total}</span>
         </div>
