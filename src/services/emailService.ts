@@ -1,5 +1,4 @@
 import { supabase } from './supabase';
-import { ENV } from '../config/env';
 
 export interface EmailNotification {
   id: string;
@@ -24,13 +23,9 @@ interface SendEmailParams {
 export const emailService = {
   async sendNotification(params: SendEmailParams): Promise<{ success: boolean; error?: string }> {
     try {
-      const supabaseUrl = ENV.SUPABASE_URL;
-      const anonKey = ENV.SUPABASE_ANON_KEY;
-
-      const response = await fetch(`${supabaseUrl}/functions/v1/send-email`, {
+      const response = await fetch('/.netlify/functions/send-email', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${anonKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(params),
