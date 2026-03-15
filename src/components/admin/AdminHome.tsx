@@ -13,7 +13,7 @@ export type ActiveTab =
   | 'quickbooks' | 'support'
   | 'organizations' | 'pricing' | 'products' | 'categories'
   | 'recurring-orders' | 'distributors' | 'salesreps'
-  | 'analytics' | 'profit-report' | 'cost-admins' | 'login-audit' | 'site-settings';
+  | 'analytics' | 'profit-report' | 'cost-admins' | 'login-audit' | 'site-settings' | 'email-templates';
 
 export interface PendingUser {
   id: string;
