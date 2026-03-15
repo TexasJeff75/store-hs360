@@ -20,7 +20,7 @@ import ImpersonationBanner from '@/components/ImpersonationBanner';
 import QuickBooksCallback from '@/components/QuickBooksCallback';
 import EULAPage from '@/components/legal/EULAPage';
 import PrivacyPolicyPage from '@/components/legal/PrivacyPolicyPage';
-import { productService, Product } from '@/services/productService';
+import { productService, Product, Category } from '@/services/productService';
 import { useErrorLogger } from '@/hooks/useErrorLogger';
 import { cacheService } from '@/services/cache';
 import { useAuth } from '@/contexts/AuthContext';
@@ -54,6 +54,7 @@ function AppContent() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [categoryTree, setCategoryTree] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -81,8 +82,12 @@ function AppContent() {
         setError(null);
         
         
-        const fetchedProducts = await productService.getProducts();
+        const [fetchedProducts, fetchedCategories] = await Promise.all([
+          productService.getProducts(),
+          productService.getCategories(),
+        ]);
         setProducts(fetchedProducts);
+        setCategoryTree(fetchedCategories);
         
       } catch (err) {
         const errorMessage = err instanceof Error && err.message === 'Request timeout' 
@@ -359,7 +364,8 @@ function AppContent() {
     .filter(product => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            product.benefits.some(benefit => benefit.toLowerCase().includes(searchTerm.toLowerCase()));
-      const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory;
+      const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory ||
+        categoryTree.some(parent => parent.name === selectedCategory && parent.children?.some(child => child.name === product.category));
       const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
       const matchesContractPricing = !showOnlyContractPricing || productsWithContractPricing.includes(product.id);
       return matchesSearch && matchesCategory && matchesPrice && matchesContractPricing;
@@ -654,6 +660,7 @@ function AppContent() {
                 <div className="lg:w-64 flex-shrink-0 space-y-6">
                   <ProductFilter
                     categories={Object.keys(productsByCategory)}
+                    categoryTree={categoryTree}
                     selectedCategory={selectedCategory}
                     onCategoryChange={setSelectedCategory}
                     priceRange={priceRange}

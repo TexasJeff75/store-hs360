@@ -1,8 +1,10 @@
 import React from 'react';
-import { Filter, X } from 'lucide-react';
+import { Filter, X, ChevronRight } from 'lucide-react';
+import { Category } from '../services/productService';
 
 interface ProductFilterProps {
   categories: string[];
+  categoryTree?: Category[];
   selectedCategory: string;
   onCategoryChange: (category: string) => void;
   priceRange: [number, number];
@@ -13,6 +15,7 @@ interface ProductFilterProps {
 
 const ProductFilter: React.FC<ProductFilterProps> = ({
   categories,
+  categoryTree,
   selectedCategory,
   onCategoryChange,
   priceRange,
@@ -20,6 +23,84 @@ const ProductFilter: React.FC<ProductFilterProps> = ({
   isOpen,
   onToggle
 }) => {
+  // Build hierarchical display: group categories that have products
+  const availableCategories = new Set(categories);
+
+  const renderCategoryTree = () => {
+    if (!categoryTree || categoryTree.length === 0) {
+      // Fallback to flat list if no tree available
+      return categories.map(category => (
+        <button
+          key={category}
+          onClick={() => onCategoryChange(category)}
+          className={`block w-full text-left px-3 py-2 rounded-lg transition-colors ${
+            selectedCategory === category
+              ? 'bg-pink-100 text-pink-800'
+              : 'text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          {category}
+        </button>
+      ));
+    }
+
+    return categoryTree
+      .filter(parent => {
+        // Show parent if it has products or any of its children have products
+        const childNames = (parent.children || []).map(c => c.name);
+        return availableCategories.has(parent.name) || childNames.some(n => availableCategories.has(n));
+      })
+      .map(parent => {
+        const childrenWithProducts = (parent.children || []).filter(c => availableCategories.has(c.name));
+        const parentHasProducts = availableCategories.has(parent.name);
+        const hasChildren = childrenWithProducts.length > 0;
+        const isParentSelected = selectedCategory === parent.name;
+        const isChildSelected = childrenWithProducts.some(c => c.name === selectedCategory);
+
+        return (
+          <div key={parent.id} className="space-y-1">
+            {/* Parent category */}
+            <button
+              onClick={() => onCategoryChange(parent.name)}
+              className={`block w-full text-left px-3 py-2 rounded-lg transition-colors font-medium ${
+                isParentSelected
+                  ? 'bg-pink-100 text-pink-800'
+                  : isChildSelected
+                    ? 'text-pink-700'
+                    : 'text-gray-900 hover:bg-gray-100'
+              }`}
+            >
+              <span className="flex items-center justify-between">
+                {parent.name}
+                {hasChildren && (
+                  <ChevronRight className={`h-4 w-4 transition-transform ${isParentSelected || isChildSelected ? 'rotate-90' : ''}`} />
+                )}
+              </span>
+            </button>
+
+            {/* Child categories */}
+            {hasChildren && (
+              <div className="ml-3 border-l-2 border-gray-200 pl-2 space-y-1">
+                {childrenWithProducts.map(child => (
+                  <button
+                    key={child.id}
+                    onClick={() => onCategoryChange(child.name)}
+                    className={`block w-full text-left px-3 py-1.5 rounded-lg transition-colors text-sm ${
+                      selectedCategory === child.name
+                        ? 'bg-pink-100 text-pink-800'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {child.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      });
+  };
+
   return (
     <>
       {/* Mobile Filter Button */}
@@ -54,26 +135,14 @@ const ProductFilter: React.FC<ProductFilterProps> = ({
               <button
                 onClick={() => onCategoryChange('all')}
                 className={`block w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                  selectedCategory === 'all' 
-                    ? 'bg-pink-100 text-pink-800' 
+                  selectedCategory === 'all'
+                    ? 'bg-pink-100 text-pink-800'
                     : 'text-gray-700 hover:bg-gray-100'
                 }`}
               >
                 All Products
               </button>
-              {categories.map(category => (
-                <button
-                  key={category}
-                  onClick={() => onCategoryChange(category)}
-                  className={`block w-full text-left px-3 py-2 rounded-lg transition-colors ${
-                    selectedCategory === category 
-                      ? 'bg-pink-100 text-pink-800' 
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  {category}
-                </button>
-              ))}
+              {renderCategoryTree()}
             </div>
           </div>
 
@@ -118,7 +187,7 @@ const ProductFilter: React.FC<ProductFilterProps> = ({
 
       {/* Mobile Overlay */}
       {isOpen && (
-        <div 
+        <div
           className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
           onClick={onToggle}
         ></div>
