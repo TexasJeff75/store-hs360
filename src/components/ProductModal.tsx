@@ -211,12 +211,45 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     ))}
                   </div>
                 )}
+
+                {/* Extended Description */}
+                {product.extendedDescription && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">Additional Information</h3>
+                    <div className="prose prose-sm text-gray-600">
+                      <p>{product.extendedDescription}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reference Links */}
+                {(product.reference1 || product.reference2 || product.reference3) && (
+                  <div>
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">References</h3>
+                    <div className="space-y-2">
+                      {[product.reference1, product.reference2, product.reference3]
+                        .filter(Boolean)
+                        .map((ref, index) => (
+                          <a
+                            key={index}
+                            href={ref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{ref}</span>
+                          </a>
+                        ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Product Details */}
               <div className="space-y-6">
                 {/* Rating */}
-                {product.rating && product.rating > 0 && (
+                {product.rating > 0 && (
                   <div className="flex items-center space-x-1">
                     <div className="flex items-center">
                       {[...Array(5)].map((_, i) => (
@@ -337,39 +370,6 @@ const ProductModal: React.FC<ProductModalProps> = ({
                       ) : (
                         <p>{product.plainTextDescription}</p>
                       )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Extended Description */}
-                {product.extendedDescription && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Additional Information</h3>
-                    <div className="prose prose-sm text-gray-600">
-                      <p>{product.extendedDescription}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Reference Links */}
-                {(product.reference1 || product.reference2 || product.reference3) && (
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-3">References</h3>
-                    <div className="space-y-2">
-                      {[product.reference1, product.reference2, product.reference3]
-                        .filter(Boolean)
-                        .map((ref, index) => (
-                          <a
-                            key={index}
-                            href={ref}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
-                          >
-                            <ExternalLink className="h-4 w-4 flex-shrink-0" />
-                            <span className="truncate">{ref}</span>
-                          </a>
-                        ))}
                     </div>
                   </div>
                 )}
