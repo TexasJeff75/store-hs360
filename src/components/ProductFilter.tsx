@@ -9,6 +9,7 @@ interface ProductFilterProps {
   onCategoryChange: (category: string) => void;
   priceRange: [number, number];
   onPriceRangeChange: (range: [number, number]) => void;
+  maxPrice?: number;
   isOpen: boolean;
   onToggle: () => void;
 }
@@ -20,6 +21,7 @@ const ProductFilter: React.FC<ProductFilterProps> = ({
   onCategoryChange,
   priceRange,
   onPriceRangeChange,
+  maxPrice = 10000,
   isOpen,
   onToggle
 }) => {
@@ -155,7 +157,7 @@ const ProductFilter: React.FC<ProductFilterProps> = ({
                 <input
                   type="number"
                   min="0"
-                  max="500"
+                  max={maxPrice}
                   value={priceRange[0]}
                   onChange={(e) => onPriceRangeChange([parseInt(e.target.value), priceRange[1]])}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
@@ -165,7 +167,7 @@ const ProductFilter: React.FC<ProductFilterProps> = ({
                 <input
                   type="number"
                   min="0"
-                  max="500"
+                  max={maxPrice}
                   value={priceRange[1]}
                   onChange={(e) => onPriceRangeChange([priceRange[0], parseInt(e.target.value)])}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
@@ -174,7 +176,7 @@ const ProductFilter: React.FC<ProductFilterProps> = ({
               <input
                 type="range"
                 min="0"
-                max="500"
+                max={maxPrice}
                 value={priceRange[1]}
                 onChange={(e) => onPriceRangeChange([priceRange[0], parseInt(e.target.value)])}
                 className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
