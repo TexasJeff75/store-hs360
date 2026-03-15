@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const nodemailer = require('nodemailer');
 
 const ALLOWED_ORIGIN = process.env.CORS_ALLOWED_ORIGIN || '*';
 
@@ -269,37 +270,36 @@ exports.handler = async (event) => {
       htmlBody = buildFallbackHtml(payload.email_type, payload.template_data || {});
     }
 
-    const resendKey = process.env.RESEND_API_KEY;
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
     let emailSent = false;
     let errorMessage = null;
 
-    if (resendKey) {
+    if (smtpUser && smtpPass) {
       try {
-        const response = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${resendKey}`,
-            'Content-Type': 'application/json',
+        const transporter = nodemailer.createTransport({
+          host: process.env.SMTP_HOST || 'smtp.office365.com',
+          port: Number(process.env.SMTP_PORT || 587),
+          secure: false, // STARTTLS
+          auth: {
+            user: smtpUser,
+            pass: smtpPass,
           },
-          body: JSON.stringify({
-            from: process.env.EMAIL_FROM || 'HealthSpan360 <noreply@hs360.co>',
-            to: [payload.to],
-            subject: payload.subject,
-            html: htmlBody,
-          }),
         });
 
-        if (response.ok) {
-          emailSent = true;
-        } else {
-          const errBody = await response.text();
-          errorMessage = `Resend API error: ${response.status} - ${errBody}`;
-        }
+        await transporter.sendMail({
+          from: process.env.EMAIL_FROM || smtpUser,
+          to: payload.to,
+          subject: payload.subject,
+          html: htmlBody,
+        });
+
+        emailSent = true;
       } catch (err) {
-        errorMessage = err instanceof Error ? err.message : 'Failed to send via Resend';
+        errorMessage = err instanceof Error ? err.message : 'Failed to send via SMTP';
       }
     } else {
-      errorMessage = 'No email provider configured (RESEND_API_KEY not set). Email logged but not sent.';
+      errorMessage = 'SMTP not configured (SMTP_USER / SMTP_PASS not set). Email logged but not sent.';
     }
 
     // Log to email_notifications table
@@ -311,7 +311,7 @@ exports.handler = async (event) => {
         email_type: payload.email_type,
         subject: payload.subject,
         body_html: htmlBody,
-        status: emailSent ? 'sent' : (resendKey ? 'failed' : 'pending'),
+        status: emailSent ? 'sent' : (smtpUser ? 'failed' : 'pending'),
         error_message: errorMessage,
         metadata: payload.template_data || {},
         sent_at: emailSent ? new Date().toISOString() : null,
@@ -325,7 +325,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({
         success: emailSent,
         email_id: emailLog?.id || null,
-        warning: !resendKey ? 'No email provider configured. Email was logged but not delivered.' : undefined,
+        warning: !smtpUser ? 'SMTP not configured. Email was logged but not delivered.' : undefined,
       }),
     };
   } catch (err) {
