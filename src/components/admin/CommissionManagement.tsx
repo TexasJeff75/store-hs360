@@ -508,7 +508,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                   <p className="text-xs text-gray-500">Active Org-Rep Assignments</p>
                   <p className="text-lg font-bold text-gray-900">{diagnostics.orgSalesRepEntries}</p>
                   {diagnostics.orgSalesRepEntries === 0 && (
-                    <p className="text-xs text-red-600 mt-1">No assignments! Go to Organizations to assign reps.</p>
+                    <p className="text-xs text-red-600 mt-1">No assignments! Go to Customers to assign reps.</p>
                   )}
                 </div>
                 <div className="bg-white rounded p-3 border border-green-200">
@@ -550,7 +550,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                             <td className="py-1 pr-3">
                               {!order.sales_rep_id && !order.organization_id && <span className="text-red-600">No rep or org</span>}
                               {!order.sales_rep_id && order.organization_id && <span className="text-red-600">No sales rep</span>}
-                              {order.sales_rep_id && !order.organization_id && <span className="text-red-600">No organization</span>}
+                              {order.sales_rep_id && !order.organization_id && <span className="text-red-600">No customer</span>}
                               {order.sales_rep_id && order.organization_id && <span className="text-orange-600">No org-rep assignment?</span>}
                             </td>
                             <td className="py-1">{new Date(order.created_at).toLocaleDateString()}</td>
@@ -583,13 +583,13 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
               <div className="text-blue-800 text-sm space-y-2">
                 <p>You don't have any commissions yet. Here's how commissions work:</p>
                 <ul className="list-disc list-inside space-y-1 ml-4">
-                  <li>When you complete an order for your assigned organizations</li>
+                  <li>When you complete an order for your assigned customers</li>
                   <li>The system automatically calculates your commission based on the profit margin</li>
                   <li>Your commissions appear here for tracking</li>
                   <li>Once approved, they'll be processed for payment</li>
                 </ul>
                 <p className="mt-3 font-medium">
-                  Start by creating orders for your organizations to earn commissions!
+                  Start by creating orders for your customers to earn commissions!
                 </p>
               </div>
             </>
@@ -597,14 +597,14 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
             <>
               <h3 className="font-semibold text-blue-900 mb-3">How Commissions Work</h3>
               <ol className="text-blue-800 text-sm space-y-2 list-decimal list-inside">
-                <li>Assign a sales rep to an organization (with commission rate)</li>
-                <li>Sales rep creates an order for that organization</li>
+                <li>Assign a sales rep to a customer (with commission rate)</li>
+                <li>Sales rep creates an order for that customer</li>
                 <li>When the order is marked as "completed", a commission is automatically calculated</li>
                 <li>Review and approve commissions here</li>
                 <li>Mark approved commissions as paid</li>
               </ol>
               <p className="text-blue-700 text-sm mt-4 italic">
-                <strong>Get Started:</strong> Go to the "Sales Reps" tab to assign sales reps to organizations with commission rates.
+                <strong>Get Started:</strong> Go to the "Sales Reps" tab to assign sales reps to customers with commission rates.
               </p>
             </>
           )}
@@ -690,7 +690,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search by sales rep, organization, or order..."
+                placeholder="Search by sales rep, customer, or order..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -791,7 +791,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                 {!isSalesRep && (
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sales Rep</th>
                 )}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
                 {!isSalesRep && (
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order Total</th>
                 )}
@@ -1055,7 +1055,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                     </div>
                   )}
                   <div>
-                    <label className="text-sm text-gray-600">Organization</label>
+                    <label className="text-sm text-gray-600">Customer</label>
                     <p className="font-medium">{selectedCommission.organization?.name || 'N/A'}</p>
                   </div>
                   <div>

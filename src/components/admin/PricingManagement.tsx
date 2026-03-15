@@ -142,7 +142,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
               <div>
                 <h2 className="text-2xl font-bold text-gray-900">Contract Pricing</h2>
                 <p className="text-sm text-gray-500">
-                  Set and manage pricing rules for organizations and users
+                  Set and manage pricing rules for customers and users
                 </p>
               </div>
             </div>
@@ -178,7 +178,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
               <div className="text-2xl font-bold text-gray-900">{entries.length}</div>
             </div>
             <div className="bg-white border border-gray-200 rounded-xl p-4">
-              <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Unique Organizations</div>
+              <div className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-1">Unique Customers</div>
               <div className="text-2xl font-bold text-emerald-600">
                 {new Set(entries.filter((e) => e.pricing_type === 'organization').map((e) => e.entity_id)).size}
               </div>
@@ -224,14 +224,14 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
           <div className="bg-white border border-gray-200 rounded-xl p-4 space-y-3">
             {!isScoped && (
               <>
-                <h3 className="text-sm font-semibold text-gray-700">Set Pricing For Organization</h3>
+                <h3 className="text-sm font-semibold text-gray-700">Set Pricing For Customer</h3>
                 <div className="flex flex-wrap gap-3">
                   <select
                     value={selectedOrgId}
                     onChange={(e) => setSelectedOrgId(e.target.value)}
                     className="flex-1 min-w-48 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   >
-                    <option value="">— Select an organization —</option>
+                    <option value="">— Select a customer —</option>
                     {organizations.map((o) => (
                       <option key={o.id} value={o.id}>
                         {o.name} {o.code ? `(${o.code})` : ''}
@@ -263,7 +263,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
 
                 {!selectedOrgId && (
                   <p className="text-xs text-gray-400">
-                    Select an organization above to view and edit product prices inline. You can also download a pre-filled CSV template and import bulk changes.
+                    Select a customer above to view and edit product prices inline. You can also download a pre-filled CSV template and import bulk changes.
                   </p>
                 )}
               </>
@@ -306,7 +306,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
           ) : (
             <div className="bg-white border border-dashed border-gray-300 rounded-xl py-16 text-center text-gray-400">
               <LayoutGrid className="mx-auto h-10 w-10 text-gray-300 mb-3" />
-              <p className="text-sm font-medium text-gray-500">Select an organization to manage pricing</p>
+              <p className="text-sm font-medium text-gray-500">Select a customer to manage pricing</p>
               <p className="text-xs mt-1">All products will be listed so you can set prices inline</p>
             </div>
           )}

@@ -170,7 +170,7 @@ const SalesRepAssignment: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Organization *
+                Customer *
               </label>
               <select
                 value={selectedOrg}
@@ -281,7 +281,7 @@ const SalesRepAssignment: React.FC = () => {
         columns={[
           {
             key: 'organization_name',
-            label: 'Organization',
+            label: 'Customer',
             sortable: true,
             filterable: true,
             render: (row) => (

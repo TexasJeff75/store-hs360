@@ -152,7 +152,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
         { id: 'my-recurring-orders', label: 'Recurring Orders', icon: Repeat, roles: ['customer'] },
         { id: 'addresses', label: 'Addresses', icon: MapPin, roles: ['customer'] },
         { id: 'payments', label: 'Payment Methods', icon: CreditCard, roles: ['customer'] },
-        { id: 'my-orgs', label: 'My Organizations', icon: Building2, roles: ['sales_rep'] },
+        { id: 'my-orgs', label: 'My Customers', icon: Building2, roles: ['sales_rep'] },
         { id: 'my-customers', label: 'My Customers', icon: Building2, roles: ['distributor'] },
         { id: 'my-sales-reps', label: 'My Sales Reps', icon: Users, roles: ['distributor'] },
         { id: 'my-delegates', label: 'Delegates', icon: UserCheck, roles: ['distributor'] },
@@ -165,7 +165,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onClose, initialTab }) 
       label: 'Operations',
       roles: ['admin', 'sales_rep'],
       items: [
-        { id: 'organizations', label: 'Organizations', icon: Building2, roles: ['admin'] },
+        { id: 'organizations', label: 'Customers', icon: Building2, roles: ['admin'] },
         { id: 'orders', label: 'Orders', icon: ShoppingCart, roles: ['admin', 'sales_rep'] },
         { id: 'recurring-orders', label: 'Recurring Orders', icon: Repeat, roles: ['admin'] },
         { id: 'commissions', label: 'Commissions', icon: TrendingUp, roles: ['admin', 'sales_rep'] },

@@ -177,13 +177,13 @@ const OrganizationManagement: React.FC = () => {
         setOrganizations(prev => prev.map(org => 
           org.id === selectedOrg.id ? selectedOrg : org
         ));
-        setModalMessage({ type: 'success', text: 'Organization updated successfully!' });
+        setModalMessage({ type: 'success', text: 'Customer updated successfully!' });
       } else {
         // Remove id, created_at, and updated_at properties to let Supabase auto-generate them
         const { id, created_at, updated_at, ...orgData } = selectedOrg;
         const newOrg = await multiTenantService.createOrganization(orgData);
         setOrganizations(prev => [newOrg, ...prev]);
-        setModalMessage({ type: 'success', text: 'Organization created successfully!' });
+        setModalMessage({ type: 'success', text: 'Customer created successfully!' });
       }
       
       // Refresh stats
@@ -203,7 +203,7 @@ const OrganizationManagement: React.FC = () => {
 
   const handleArchiveOrganization = async (orgId: string, isActive: boolean) => {
     const action = isActive ? 'archive' : 'restore';
-    if (!confirm(`Are you sure you want to ${action} this organization?`)) {
+    if (!confirm(`Are you sure you want to ${action} this customer?`)) {
       return;
     }
 
@@ -295,7 +295,7 @@ const OrganizationManagement: React.FC = () => {
               className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
             >
               <ArrowLeft className="h-5 w-5" />
-              <span>Back to Organizations</span>
+              <span>Back to Customers</span>
             </button>
           </div>
           
@@ -306,7 +306,7 @@ const OrganizationManagement: React.FC = () => {
             <div>
               <h2 className="text-2xl font-bold text-gray-900">{selectedOrgForSubManagement.name}</h2>
               <p className="text-gray-600">Code: {selectedOrgForSubManagement.code}</p>
-              <p className="text-gray-600">Manage addresses and pricing for this organization</p>
+              <p className="text-gray-600">Manage addresses and pricing for this customer</p>
             </div>
           </div>
         </div>
@@ -366,15 +366,15 @@ const OrganizationManagement: React.FC = () => {
     <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Management</h2>
-          <p className="text-gray-600">Manage organizations and their settings</p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Customer Management</h2>
+          <p className="text-gray-600">Manage customers and their settings</p>
         </div>
         <button
           onClick={handleCreateOrganization}
           className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
         >
           <Plus className="h-5 w-5" />
-          <span>Add Organization</span>
+          <span>Add Customer</span>
         </button>
       </div>
 
@@ -411,7 +411,7 @@ const OrganizationManagement: React.FC = () => {
             <div className="flex items-center space-x-2">
               <AlertCircle className="h-5 w-5 text-yellow-600" />
               <span className="text-sm font-medium text-yellow-800">
-                You have unsaved changes ({Object.keys(pendingChanges).length} organization{Object.keys(pendingChanges).length !== 1 ? 's' : ''})
+                You have unsaved changes ({Object.keys(pendingChanges).length} customer{Object.keys(pendingChanges).length !== 1 ? 's' : ''})
               </span>
             </div>
             <div className="flex items-center space-x-2">
@@ -447,7 +447,7 @@ const OrganizationManagement: React.FC = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search organizations by name, code, or description..."
+              placeholder="Search customers by name, code, or description..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -471,7 +471,7 @@ const OrganizationManagement: React.FC = () => {
           <div className="flex items-center">
             <Building2 className="h-8 w-8 text-purple-600" />
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Total Organizations</p>
+              <p className="text-sm font-medium text-gray-500">Total Customers</p>
               <p className="text-2xl font-semibold text-gray-900">{organizations.length}</p>
             </div>
           </div>
@@ -521,7 +521,7 @@ const OrganizationManagement: React.FC = () => {
                   Actions
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Organization
+                  Customer
                 </th>
                 <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Contact
@@ -549,7 +549,7 @@ const OrganizationManagement: React.FC = () => {
                       <button
                         onClick={() => handleEditOrganization(org)}
                         className="p-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
-                        title="Edit Organization"
+                        title="Edit Customer"
                       >
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -567,7 +567,7 @@ const OrganizationManagement: React.FC = () => {
                             ? 'text-orange-600 bg-orange-50 hover:bg-orange-100'
                             : 'text-green-600 bg-green-50 hover:bg-green-100'
                         }`}
-                        title={org.is_active ? 'Archive Organization' : 'Restore Organization'}
+                        title={org.is_active ? 'Archive Customer' : 'Restore Customer'}
                       >
                         <Archive className="h-4 w-4" />
                       </button>
@@ -675,11 +675,11 @@ const OrganizationManagement: React.FC = () => {
       {filteredOrganizations.length === 0 && (
         <div className="text-center py-12">
           <Building2 className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">No organizations found</h3>
+          <h3 className="mt-2 text-sm font-medium text-gray-900">No customers found</h3>
           <p className="mt-1 text-sm text-gray-500">
             {searchTerm 
               ? 'Try adjusting your search criteria.'
-              : 'Get started by creating your first organization.'
+              : 'Get started by creating your first customer.'
             }
           </p>
         </div>
@@ -696,7 +696,7 @@ const OrganizationManagement: React.FC = () => {
                 <div className="sm:flex sm:items-start">
                   <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
                     <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">
-                      {isEditing ? 'Edit Organization' : 'Create Organization'}
+                      {isEditing ? 'Edit Customer' : 'Create Customer'}
                     </h3>
 
                     {/* Modal Message */}
@@ -722,7 +722,7 @@ const OrganizationManagement: React.FC = () => {
                     <div className="space-y-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Organization Name *
+                          Customer Name *
                         </label>
                         <input
                           type="text"
@@ -736,13 +736,13 @@ const OrganizationManagement: React.FC = () => {
                             });
                           }}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                          placeholder="Enter organization name"
+                          placeholder="Enter customer name"
                         />
                       </div>
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Organization Code * {!isEditing && <span className="text-xs text-gray-500">(Auto-generated)</span>}
+                          Customer Code * {!isEditing && <span className="text-xs text-gray-500">(Auto-generated)</span>}
                         </label>
                         <input
                           type="text"
@@ -754,15 +754,15 @@ const OrganizationManagement: React.FC = () => {
                         />
                         <p className="text-xs text-gray-500 mt-1">
                           {isEditing 
-                            ? 'You can modify the code when editing existing organizations'
-                            : 'Code is automatically generated from the organization name'
+                            ? 'You can modify the code when editing existing customers'
+                            : 'Code is automatically generated from the customer name'
                           }
                         </p>
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Organization Type *
+                          Customer Type *
                         </label>
                         <select
                           value={selectedOrg.org_type || 'customer'}
@@ -875,7 +875,7 @@ const OrganizationManagement: React.FC = () => {
                           onChange={(e) => setSelectedOrg({...selectedOrg, description: e.target.value})}
                           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                           rows={2}
-                          placeholder="Organization description"
+                          placeholder="Customer description"
                         />
                       </div>
 
@@ -900,7 +900,7 @@ const OrganizationManagement: React.FC = () => {
                           ))}
                         </select>
                         <p className="text-xs text-gray-500 mt-1">
-                          Sales rep assigned to orders from this organization
+                          Sales rep assigned to orders from this customer
                         </p>
                       </div>
 
@@ -931,7 +931,7 @@ const OrganizationManagement: React.FC = () => {
                             onChange={(e) => setSelectedOrg({...selectedOrg, is_active: e.target.checked})}
                             className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
                           />
-                          <span className="ml-2 text-sm text-gray-700">Active Organization</span>
+                          <span className="ml-2 text-sm text-gray-700">Active Customer</span>
                         </label>
                       </div>
                     </div>
@@ -945,7 +945,7 @@ const OrganizationManagement: React.FC = () => {
                   disabled={!selectedOrg.name || !selectedOrg.code}
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isEditing ? 'Update' : 'Create'} Organization
+                  {isEditing ? 'Update' : 'Create'} Customer
                 </button>
                 <button
                   type="button"
@@ -972,7 +972,7 @@ const OrganizationManagement: React.FC = () => {
                   <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
                     <div className="flex items-center justify-between mb-6">
                       <h3 className="text-xl leading-6 font-medium text-gray-900">
-                        Organization Details
+                        Customer Details
                       </h3>
                       <span className={`px-3 py-1 rounded-full text-sm font-medium ${
                         selectedOrg.is_active 
@@ -987,14 +987,14 @@ const OrganizationManagement: React.FC = () => {
                       <div className="space-y-4">
                         <div>
                           <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Organization Name
+                            Customer Name
                           </label>
                           <p className="text-lg font-semibold text-gray-900">{selectedOrg.name}</p>
                         </div>
 
                         <div>
                           <label className="block text-sm font-medium text-gray-500 mb-1">
-                            Organization Code
+                            Customer Code
                           </label>
                           <p className="text-lg font-mono text-gray-900">{selectedOrg.code}</p>
                         </div>
@@ -1128,7 +1128,7 @@ const OrganizationManagement: React.FC = () => {
                   }}
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
                 >
-                  Edit Organization
+                  Edit Customer
                 </button>
                 <button
                   type="button"

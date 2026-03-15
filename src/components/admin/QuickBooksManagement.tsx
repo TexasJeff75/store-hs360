@@ -1080,7 +1080,7 @@ export function QuickBooksManagement() {
             <div className="mt-6 space-y-4">
               <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
                 <div>
-                  <h4 className="text-sm font-medium text-gray-900">Sync Organizations</h4>
+                  <h4 className="text-sm font-medium text-gray-900">Sync Customers</h4>
                   <p className="mt-1 text-sm text-gray-500">
                     Create or update QuickBooks customers from your organizations
                   </p>

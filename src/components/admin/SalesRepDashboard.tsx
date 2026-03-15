@@ -278,7 +278,7 @@ const SalesRepDashboard: React.FC = () => {
         .eq('id', editingOrg.id);
       if (updateError) throw updateError;
 
-      setSuccess('Organization updated');
+      setSuccess('Customer updated');
       setEditingOrg(null);
       fetchAssignedOrganizations();
     } catch (err) {
@@ -397,7 +397,7 @@ const SalesRepDashboard: React.FC = () => {
   ) => (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Organization Name *</label>
+        <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name *</label>
         <input
           type="text"
           required
@@ -546,7 +546,7 @@ const SalesRepDashboard: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">My Organizations</h2>
+          <h2 className="text-2xl font-bold text-gray-900">My Customers</h2>
           <p className="text-gray-600 mt-1">Manage your assigned customer accounts</p>
         </div>
         <button
@@ -572,7 +572,7 @@ const SalesRepDashboard: React.FC = () => {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search organizations by name, code, or contact..."
+            placeholder="Search customers by name, code, or contact..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -586,7 +586,7 @@ const SalesRepDashboard: React.FC = () => {
           <div className="flex items-center">
             <Building2 className="h-8 w-8 text-blue-600" />
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-500">Total Organizations</p>
+              <p className="text-sm font-medium text-gray-500">Total Customers</p>
               <p className="text-2xl font-semibold text-gray-900">{stats.totalOrgs}</p>
             </div>
           </div>
@@ -645,7 +645,7 @@ const SalesRepDashboard: React.FC = () => {
               {filteredOrgs.length === 0 && organizations.length === 0 ? (
                 <div className="px-6 py-12 text-center">
                   <Building2 className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                  <p className="text-gray-500">No organizations assigned yet</p>
+                  <p className="text-gray-500">No customers assigned yet</p>
                   <p className="text-sm text-gray-400 mt-1">Click "Add Customer" to create your first customer organization.</p>
                 </div>
               ) : (
@@ -654,7 +654,7 @@ const SalesRepDashboard: React.FC = () => {
                     <thead className="bg-gray-50">
                       <tr>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Organization</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer</th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stats</th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -675,7 +675,7 @@ const SalesRepDashboard: React.FC = () => {
                               <button
                                 onClick={() => setEditingOrg(org)}
                                 className="p-2 text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
-                                title="Edit Organization"
+                                title="Edit Customer"
                               >
                                 <Pencil className="h-4 w-4" />
                               </button>
@@ -771,7 +771,7 @@ const SalesRepDashboard: React.FC = () => {
             {filteredOrgs.length === 0 && organizations.length > 0 && (
               <div className="text-center py-12">
                 <Building2 className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No organizations found</h3>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No customers found</h3>
                 <p className="mt-1 text-sm text-gray-500">Try adjusting your search criteria.</p>
               </div>
             )}
