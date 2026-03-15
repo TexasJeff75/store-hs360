@@ -517,29 +517,35 @@ exports.handler = async (event) => {
       errorMessage = 'SMTP not configured (SMTP_USER / SMTP_PASS not set). Email logged but not sent.';
     }
 
-    // Log to email_notifications table
-    const { data: emailLog } = await supabase
-      .from('email_notifications')
-      .insert({
-        user_id: payload.user_id || null,
-        email_to: payload.to,
-        email_type: payload.email_type,
-        subject: payload.subject,
-        body_html: htmlBody,
-        status: emailSent ? 'sent' : (smtpUser ? 'failed' : 'pending'),
-        error_message: errorMessage,
-        metadata: payload.template_data || {},
-        sent_at: emailSent ? new Date().toISOString() : null,
-      })
-      .select('id')
-      .maybeSingle();
+    // Log to email_notifications table (best-effort, don't block the response)
+    let emailLogId = null;
+    try {
+      const { data: emailLog } = await supabase
+        .from('email_notifications')
+        .insert({
+          user_id: payload.user_id || null,
+          email_to: payload.to,
+          email_type: payload.email_type,
+          subject: payload.subject,
+          body_html: htmlBody,
+          status: emailSent ? 'sent' : (smtpUser ? 'failed' : 'pending'),
+          error_message: errorMessage,
+          metadata: payload.template_data || {},
+          sent_at: emailSent ? new Date().toISOString() : null,
+        })
+        .select('id')
+        .maybeSingle();
+      emailLogId = emailLog?.id || null;
+    } catch (logErr) {
+      console.warn('Failed to log email notification:', logErr instanceof Error ? logErr.message : logErr);
+    }
 
     return {
       statusCode: 200,
       headers: corsHeaders,
       body: JSON.stringify({
         success: emailSent,
-        email_id: emailLog?.id || null,
+        email_id: emailLogId,
         warning: !smtpUser ? 'SMTP not configured. Email was logged but not delivered.' : undefined,
       }),
     };
