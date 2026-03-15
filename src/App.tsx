@@ -56,7 +56,7 @@ function AppContent() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [categoryTree, setCategoryTree] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [priceRange, setPriceRange] = useState<[number, number]>([0, 500]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 10000]);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const { errors, logError, clearErrors } = useErrorLogger();
   const { user, profile, loading: authLoading, isPasswordRecovery, isImpersonating, effectiveUserId, effectiveProfile, stopImpersonation } = useAuth();
@@ -665,6 +665,7 @@ function AppContent() {
                     onCategoryChange={setSelectedCategory}
                     priceRange={priceRange}
                     onPriceRangeChange={setPriceRange}
+                    maxPrice={Math.ceil(Math.max(...products.map(p => p.price), 100))}
                     isOpen={isFilterOpen}
                     onToggle={() => setIsFilterOpen(!isFilterOpen)}
                   />
