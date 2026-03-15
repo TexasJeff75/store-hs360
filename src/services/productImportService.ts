@@ -25,6 +25,10 @@ export interface ImportRow {
   is_in_stock?: boolean;
   is_active?: boolean;
   image_url?: string;
+  extended_description?: string;
+  reference_1?: string;
+  reference_2?: string;
+  reference_3?: string;
   secret_cost?: number;
   contract_price?: number;
   pricing_type?: string;
@@ -51,7 +55,8 @@ const REQUIRED_COLUMNS = ['name', 'price'];
 const ALL_COLUMNS = [
   'name', 'sku', 'price', 'cost', 'original_price', 'category', 'brand',
   'description', 'condition', 'weight', 'weight_unit', 'is_in_stock',
-  'is_active', 'image_url', 'secret_cost', 'contract_price', 'pricing_type', 'entity_id',
+  'is_active', 'image_url', 'extended_description', 'reference_1', 'reference_2', 'reference_3',
+  'secret_cost', 'contract_price', 'pricing_type', 'entity_id',
 ];
 
 export function generateTemplate(): string {
@@ -59,7 +64,9 @@ export function generateTemplate(): string {
   const example = [
     '"Example Product"', '"SKU-001"', '99.99', '50.00', '129.99',
     '"Peptides"', '"ABM"', '"A sample product description"', '"New"',
-    '0.5', '"lb"', 'true', 'true', '"my-product.jpg"', '25.00', '""', '""', '""',
+    '0.5', '"lb"', 'true', 'true', '"my-product.jpg"',
+    '"Extended details about the product"', '"https://example.com/ref1"', '"https://example.com/ref2"', '"https://example.com/ref3"',
+    '25.00', '""', '""', '""',
   ].join(',');
   return `${headers}\n${example}`;
 }
@@ -225,6 +232,10 @@ export function validateImportData(
       is_in_stock: isInStock,
       is_active: isActive,
       image_url: getValue('image_url') || undefined,
+      extended_description: getValue('extended_description') || undefined,
+      reference_1: getValue('reference_1') || undefined,
+      reference_2: getValue('reference_2') || undefined,
+      reference_3: getValue('reference_3') || undefined,
       secret_cost: secretCost,
       contract_price: contractPrice,
       pricing_type: pricingType || undefined,
@@ -372,6 +383,10 @@ export async function importProducts(
       if (row.image_url) {
         productPayload.image_url = resolveImageUrl(row.image_url);
       }
+      if (row.extended_description) productPayload.extended_description = row.extended_description;
+      if (row.reference_1) productPayload.reference_1 = row.reference_1;
+      if (row.reference_2) productPayload.reference_2 = row.reference_2;
+      if (row.reference_3) productPayload.reference_3 = row.reference_3;
 
       let existingId: number | undefined;
       if (row.sku && skuMap.has(row.sku.toLowerCase())) {
@@ -485,11 +500,16 @@ export function exportProductsCSV(products: Array<{
   is_in_stock?: boolean;
   is_active?: boolean;
   image_url?: string;
+  extended_description?: string;
+  reference_1?: string;
+  reference_2?: string;
+  reference_3?: string;
   secret_cost?: number;
 }>): string {
   const headers = [
     'name', 'sku', 'price', 'cost', 'original_price', 'category', 'brand',
-    'description', 'condition', 'weight', 'weight_unit', 'is_in_stock', 'is_active', 'image_url', 'secret_cost',
+    'description', 'condition', 'weight', 'weight_unit', 'is_in_stock', 'is_active', 'image_url',
+    'extended_description', 'reference_1', 'reference_2', 'reference_3', 'secret_cost',
   ];
 
   const escapeCSV = (val: string | number | boolean | undefined | null): string => {
