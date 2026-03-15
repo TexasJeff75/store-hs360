@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { emailService } from './emailService';
 
 export interface SupportTicket {
   id: string;
@@ -59,6 +60,26 @@ export const supportTicketService = {
         console.error('Error creating ticket:', error);
         return null;
       }
+
+      // Send ticket created email (fire-and-forget)
+      if (ticket) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', data.user_id)
+          .maybeSingle();
+
+        if (profile?.email) {
+          emailService.sendNotification({
+            to: profile.email,
+            email_type: 'support_ticket_created',
+            subject: `Support Ticket Created — ${ticket.ticket_number}`,
+            template_data: { ticket_number: ticket.ticket_number, subject: data.subject },
+            user_id: data.user_id,
+          }).catch(err => console.warn('Failed to send ticket created email:', err));
+        }
+      }
+
       return ticket;
     } catch (error) {
       console.error('Error in createTicket:', error);
@@ -158,6 +179,30 @@ export const supportTicketService = {
         console.error('Error adding message:', error);
         return null;
       }
+
+      // Send reply notification email (fire-and-forget, skip internal notes)
+      if (data && !isInternalNote) {
+        const ticket = await this.getTicketById(ticketId);
+        if (ticket && ticket.user_id !== userId) {
+          // Reply is from someone other than the ticket owner — notify the owner
+          const { data: ownerProfile } = await supabase
+            .from('profiles')
+            .select('email')
+            .eq('id', ticket.user_id)
+            .maybeSingle();
+
+          if (ownerProfile?.email) {
+            emailService.sendNotification({
+              to: ownerProfile.email,
+              email_type: 'support_ticket_reply',
+              subject: `New Reply on Ticket ${ticket.ticket_number}`,
+              template_data: { ticket_number: ticket.ticket_number, message },
+              user_id: ticket.user_id,
+            }).catch(err => console.warn('Failed to send ticket reply email:', err));
+          }
+        }
+      }
+
       return data;
     } catch (error) {
       console.error('Error in addMessage:', error);
@@ -180,6 +225,29 @@ export const supportTicketService = {
         console.error('Error updating ticket status:', error);
         return false;
       }
+
+      // Send resolved notification email (fire-and-forget)
+      if (status === 'resolved') {
+        const ticket = await this.getTicketById(ticketId);
+        if (ticket) {
+          const { data: ownerProfile } = await supabase
+            .from('profiles')
+            .select('email')
+            .eq('id', ticket.user_id)
+            .maybeSingle();
+
+          if (ownerProfile?.email) {
+            emailService.sendNotification({
+              to: ownerProfile.email,
+              email_type: 'support_ticket_resolved',
+              subject: `Ticket ${ticket.ticket_number} Resolved`,
+              template_data: { ticket_number: ticket.ticket_number },
+              user_id: ticket.user_id,
+            }).catch(err => console.warn('Failed to send ticket resolved email:', err));
+          }
+        }
+      }
+
       return true;
     } catch (error) {
       console.error('Error in updateTicketStatus:', error);

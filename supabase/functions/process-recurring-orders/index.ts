@@ -217,6 +217,34 @@ Deno.serve(async (req: Request) => {
           .eq("scheduled_date", order.next_order_date)
           .eq("status", "processing");
 
+        // Send recurring order processed email (fire-and-forget)
+        if (profile?.email) {
+          const nextDate = calculateNextDate(
+            order.next_order_date,
+            order.frequency,
+            order.frequency_interval,
+          );
+          fetch(`${supabaseUrl}/functions/v1/send-email`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${serviceRoleKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              to: profile.email,
+              email_type: "recurring_order_processed",
+              subject: "Recurring Order Processed",
+              template_data: {
+                product_name: product.name,
+                quantity: order.quantity,
+                amount: totalAmount,
+                next_order_date: nextDate,
+              },
+              user_id: order.user_id,
+            }),
+          }).catch((e) => console.warn("Failed to send recurring order email:", e));
+        }
+
         results.succeeded++;
       } catch (err) {
         const errorMsg = err instanceof Error ? err.message : "Unknown error";
@@ -246,6 +274,39 @@ Deno.serve(async (req: Request) => {
           .eq("recurring_order_id", order.id)
           .eq("scheduled_date", order.next_order_date)
           .eq("status", "processing");
+
+        // Send recurring order failed email (fire-and-forget)
+        const { data: failProfile } = await supabase
+          .from("profiles")
+          .select("email")
+          .eq("id", order.user_id)
+          .maybeSingle();
+
+        if (failProfile?.email) {
+          const { data: failProduct } = await supabase
+            .from("products")
+            .select("name")
+            .eq("id", order.product_id)
+            .maybeSingle();
+
+          fetch(`${supabaseUrl}/functions/v1/send-email`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${serviceRoleKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              to: failProfile.email,
+              email_type: "recurring_order_failed",
+              subject: "Recurring Order Failed",
+              template_data: {
+                product_name: failProduct?.name || "Product",
+                error: errorMsg,
+              },
+              user_id: order.user_id,
+            }),
+          }).catch((e) => console.warn("Failed to send recurring order failure email:", e));
+        }
       }
     }
 

@@ -2,6 +2,7 @@ import { supabase } from './supabase';
 import { quickbooksPayments } from './quickbooks';
 import { activityLogService } from './activityLog';
 import { commissionService } from './commissionService';
+import { emailService } from './emailService';
 
 export interface RefundOptions {
   amount?: number;
@@ -161,6 +162,19 @@ class OrderService {
           location_id: data.locationId,
         },
       });
+
+      // Send order confirmation email (fire-and-forget)
+      emailService.sendNotification({
+        to: data.customerEmail,
+        email_type: 'order_confirmation',
+        subject: `Order Confirmed — #${order.id.slice(0, 8).toUpperCase()}`,
+        template_data: {
+          order_id: order.id,
+          total: data.total,
+          items: data.items.map(i => ({ name: i.name, quantity: i.quantity, price: i.price })),
+        },
+        user_id: data.userId,
+      }).catch(err => console.warn('Failed to send order confirmation email:', err));
 
       return { order };
     } catch (error) {
