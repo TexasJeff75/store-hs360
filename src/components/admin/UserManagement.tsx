@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { User, Mail, Shield, Clock, CheckCircle, Pencil, Trash2, Search, Filter, Key, AlertCircle, Save, RotateCcw, Plus, XCircle, Eye, Building2, FileText, Info } from 'lucide-react';
+import { User, Mail, Shield, Clock, CheckCircle, Pencil, Trash2, Search, Filter, Key, AlertCircle, Save, RotateCcw, Plus, XCircle, Eye, Building2, FileText, Info, Send } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import type { Profile } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
@@ -48,6 +48,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
   const [w9Consent, setW9Consent] = useState(false);
   const [modalMessage, setModalMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [sendingPasswordReset, setSendingPasswordReset] = useState(false);
+  const [sendingInvite, setSendingInvite] = useState<string | null>(null);
+  const [userAssociations, setUserAssociations] = useState<Record<string, { type: string; name: string }[]>>({});
   const [pendingChanges, setPendingChanges] = useState<{ [key: string]: Partial<Profile> }>({});
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -156,6 +158,66 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
 
       if (error) throw error;
       setUsers(data || []);
+
+      // Fetch org/distributor associations for all users
+      if (data && data.length > 0) {
+        const userIds = data.map(u => u.id);
+        const assocMap: Record<string, { type: string; name: string }[]> = {};
+
+        // Fetch organization memberships
+        const { data: orgRoles } = await supabase
+          .from('user_organization_roles')
+          .select('user_id, organizations(name)')
+          .in('user_id', userIds);
+
+        if (orgRoles) {
+          for (const row of orgRoles) {
+            const orgName = (row as any).organizations?.name;
+            if (orgName) {
+              if (!assocMap[row.user_id]) assocMap[row.user_id] = [];
+              assocMap[row.user_id].push({ type: 'org', name: orgName });
+            }
+          }
+        }
+
+        // Fetch distributor associations (for sales reps)
+        const { data: distReps } = await supabase
+          .from('distributor_sales_reps')
+          .select('sales_rep_id, distributors(name)')
+          .in('sales_rep_id', userIds)
+          .eq('is_active', true);
+
+        if (distReps) {
+          for (const row of distReps) {
+            const distName = (row as any).distributors?.name;
+            if (distName) {
+              if (!assocMap[row.sales_rep_id]) assocMap[row.sales_rep_id] = [];
+              assocMap[row.sales_rep_id].push({ type: 'distributor', name: distName });
+            }
+          }
+        }
+
+        // Fetch distributor entities (for distributor-role users)
+        const distUsers = data.filter(u => u.role === 'distributor');
+        if (distUsers.length > 0) {
+          const { data: dists } = await supabase
+            .from('distributors')
+            .select('user_id, name')
+            .in('user_id', distUsers.map(u => u.id))
+            .eq('is_active', true);
+
+          if (dists) {
+            for (const row of dists) {
+              if (row.user_id && row.name) {
+                if (!assocMap[row.user_id]) assocMap[row.user_id] = [];
+                assocMap[row.user_id].push({ type: 'distributor', name: row.name });
+              }
+            }
+          }
+        }
+
+        setUserAssociations(assocMap);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch users');
     } finally {
@@ -288,6 +350,35 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
       setModalMessage({ type: 'error', text: errorMessage });
     } finally {
       setSendingPasswordReset(false);
+    }
+  };
+
+  const handleSendInvite = async (userToInvite: Profile) => {
+    try {
+      setSendingInvite(userToInvite.id);
+      await emailService.sendNotification({
+        to: userToInvite.email,
+        email_type: 'user_invitation',
+        subject: 'You\'re Invited to HealthSpan360',
+        template_data: {
+          full_name: userToInvite.full_name || '',
+          email: userToInvite.email,
+          role: userToInvite.role || 'customer',
+          login_url: window.location.origin,
+        },
+        user_id: userToInvite.id,
+      });
+
+      // Also trigger a password reset so they can set their password
+      await supabase.auth.resetPasswordForEmail(userToInvite.email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+
+      setSaveMessage({ type: 'success', text: `Invite sent to ${userToInvite.email}` });
+    } catch (err) {
+      setSaveMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to send invite' });
+    } finally {
+      setSendingInvite(null);
     }
   };
 
@@ -883,6 +974,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Organization / Distributor
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Created
                 </th>
               </tr>
@@ -915,6 +1009,14 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                           title="Edit User"
                         >
                           <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleSendInvite(user)}
+                          disabled={sendingInvite === user.id}
+                          className="p-2 text-green-600 bg-green-50 hover:bg-green-100 rounded-lg transition-colors disabled:opacity-50"
+                          title={`Send invite to ${user.email}`}
+                        >
+                          <Send className="h-4 w-4" />
                         </button>
                         <button
                           onClick={() => deleteUser(user.id)}
@@ -966,6 +1068,27 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                         {user.approval_status === 'pending' && <Clock className="h-3 w-3" />}
                         <span className="capitalize">{user.approval_status}</span>
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {userAssociations[user.id]?.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {userAssociations[user.id].map((assoc, i) => (
+                            <span
+                              key={i}
+                              className={`inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full ${
+                                assoc.type === 'org'
+                                  ? 'bg-blue-100 text-blue-800'
+                                  : 'bg-indigo-100 text-indigo-800'
+                              }`}
+                            >
+                              <Building2 className="h-3 w-3 mr-1" />
+                              {assoc.name}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-gray-400">—</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(user.created_at).toLocaleDateString()}

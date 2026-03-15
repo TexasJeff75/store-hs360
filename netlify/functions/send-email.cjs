@@ -182,6 +182,14 @@ function prepareTemplateData(emailType, data) {
         : '';
       break;
     }
+
+    case 'user_invitation': {
+      vars.full_name = String(data.full_name || '');
+      vars.email = String(data.email || '');
+      vars.role = String(data.role || 'customer');
+      vars.login_url = String(data.login_url || '');
+      break;
+    }
   }
 
   return vars;
@@ -379,6 +387,41 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
         <h2 style="color:#111827;font-size:20px;margin:0 0 8px 0;">Ticket Resolved</h2>
         <p style="color:#6b7280;font-size:14px;margin:0 0 16px 0;">Your support ticket ${ticketNumber} has been marked as resolved.</p>
         <p style="color:#6b7280;font-size:14px;">If your issue isn't fully resolved, you can create a new ticket anytime.</p>
+      `);
+    }
+
+    case 'user_invitation': {
+      const fullName = String(data.full_name || '');
+      const email = String(data.email || '');
+      const role = String(data.role || 'customer');
+      const loginUrl = String(data.login_url || '#');
+      return wrap(`
+        <div style="text-align:center;padding-bottom:24px;border-bottom:1px solid #e5e7eb;margin-bottom:24px;">
+          <h2 style="color:#111827;font-size:22px;font-weight:700;margin:0 0 8px 0;">Welcome to HealthSpan360!</h2>
+          <p style="color:#6b7280;font-size:14px;margin:0;">You've been invited to join our platform.</p>
+        </div>
+        <div style="background:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;">
+          <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 12px 0;">Your Account Details</h3>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Email</span>
+            <span style="font-size:14px;font-weight:500;color:#111827;">${email}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Role</span>
+            <span style="font-size:14px;font-weight:500;color:#111827;">${role}</span>
+          </div>
+        </div>
+        <div style="text-align:center;margin-bottom:24px;">
+          <p style="color:#6b7280;font-size:14px;margin:0 0 16px 0;">
+            To get started, please set your password using the link below:
+          </p>
+          <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+            Get Started
+          </a>
+        </div>
+        <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0;">
+          You will also receive a separate email with a link to set your password.
+        </p>
       `);
     }
 
