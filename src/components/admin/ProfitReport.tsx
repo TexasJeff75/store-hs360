@@ -90,11 +90,18 @@ const ProfitReport: React.FC = () => {
       setError(null);
 
       // Fetch orders within date range
+      // Use lt (next day) instead of lte to avoid timezone issues where
+      // orders created late in the day are stored in UTC as the next day
+      const endDatePlusOne = new Date(endDate + 'T00:00:00');
+      endDatePlusOne.setDate(endDatePlusOne.getDate() + 1);
+      const endDateExclusive = endDatePlusOne.toISOString().split('T')[0];
+
       let query = supabase
         .from('orders')
         .select('*')
         .gte('created_at', startDate)
-        .lte('created_at', endDate + 'T23:59:59')
+        .lt('created_at', endDateExclusive)
+        .neq('is_test_order', true)
         .order('created_at', { ascending: false });
 
       if (statusFilter !== 'all') {
@@ -165,7 +172,12 @@ const ProfitReport: React.FC = () => {
         const grossProfit = revenue - totalCost;
         const profitMargin = revenue > 0 ? (grossProfit / revenue) * 100 : 0;
 
-        const comm = commissionMap.get(order.id) || { distributor_commission: 0, sales_rep_commission: 0, company_rep_commission: 0 };
+        // Zero out commissions for refunded/cancelled orders — no commission should be paid
+        const isRefundedOrCancelled = order.status === 'refunded' || order.status === 'cancelled';
+        const rawComm = commissionMap.get(order.id) || { distributor_commission: 0, sales_rep_commission: 0, company_rep_commission: 0 };
+        const comm = isRefundedOrCancelled
+          ? { distributor_commission: 0, sales_rep_commission: 0, company_rep_commission: 0 }
+          : rawComm;
         const netProfit = grossProfit - comm.distributor_commission - comm.sales_rep_commission - comm.company_rep_commission;
 
         return {
@@ -337,6 +349,8 @@ const ProfitReport: React.FC = () => {
                 <option value="completed">Completed</option>
                 <option value="processing">Processing</option>
                 <option value="pending">Pending</option>
+                <option value="refunded">Refunded</option>
+                <option value="cancelled">Cancelled</option>
               </select>
             </div>
           </div>
@@ -469,6 +483,8 @@ const ProfitReport: React.FC = () => {
               <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                 order.status === 'completed' ? 'bg-green-100 text-green-800' :
                 order.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                order.status === 'refunded' ? 'bg-red-100 text-red-800' :
+                order.status === 'cancelled' ? 'bg-red-100 text-red-800' :
                 'bg-gray-100 text-gray-800'
               }`}>
                 {order.status}

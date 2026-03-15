@@ -3,11 +3,14 @@ import { ShoppingCart, Star, Package } from 'lucide-react';
 import { Product } from '../services/productService';
 import PriceDisplay from './PriceDisplay';
 
+export type ViewMode = 'grid' | 'list';
+
 interface ProductGridProps {
   products: Product[];
   onAddToCart: (id: number, quantity: number) => void;
   onProductClick: (product: Product) => void;
   organizationId?: string;
+  viewMode?: ViewMode;
 }
 
 const ProductImage: React.FC<{ src: string; alt: string; className?: string; onClick?: () => void }> = ({ src, alt, className, onClick }) => {
@@ -36,7 +39,20 @@ const ProductImage: React.FC<{ src: string; alt: string; className?: string; onC
   );
 };
 
-const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProductClick, organizationId }) => {
+const getPlainDescription = (product: Product): string => {
+  if (product.plainTextDescription) {
+    return product.plainTextDescription;
+  }
+  try {
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = product.description || '';
+    return tempDiv.textContent || tempDiv.innerText || '';
+  } catch {
+    return '';
+  }
+};
+
+const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProductClick, organizationId, viewMode = 'grid' }) => {
   if (products.length === 0) {
     return (
       <div className="text-center py-16">
@@ -51,9 +67,114 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
     );
   }
 
+  if (viewMode === 'list') {
+    return (
+      <div className="space-y-3">
+        {products.map((product) => {
+          const desc = getPlainDescription(product);
+          return (
+            <div
+              key={product.id}
+              className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 flex items-center gap-4 p-4"
+            >
+              <div className="flex-shrink-0 w-24 h-24 relative rounded-lg overflow-hidden">
+                <ProductImage
+                  src={product.image}
+                  alt={product.name}
+                  className="w-24 h-24 object-cover cursor-pointer"
+                  onClick={() => onProductClick(product)}
+                />
+                <div className="absolute top-1 left-1">
+                  <span className="bg-gradient-to-r from-pink-500 to-orange-500 text-white px-1.5 py-0.5 rounded text-[10px] font-medium">
+                    {product.category}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex-1 min-w-0">
+                <h3
+                  className="font-semibold text-gray-900 cursor-pointer hover:text-pink-600 transition-colors truncate"
+                  onClick={() => onProductClick(product)}
+                >
+                  {product.name}
+                </h3>
+
+                {desc && (
+                  <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                    {desc.slice(0, 150)}{desc.length > 150 ? '...' : ''}
+                  </p>
+                )}
+
+                <div className="flex items-center gap-3 mt-2 flex-wrap">
+                  {product.rating > 0 && (
+                    <div className="flex items-center">
+                      <div className="flex items-center">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`h-3.5 w-3.5 ${
+                              i < Math.floor(product.rating)
+                                ? 'text-yellow-400 fill-current'
+                                : 'text-gray-300'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs text-gray-600 ml-1">({product.reviews})</span>
+                    </div>
+                  )}
+
+                  {product.benefits && Array.isArray(product.benefits) && product.benefits.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {product.benefits.slice(0, 3).map((benefit, index) => (
+                        <span
+                          key={index}
+                          className="text-xs bg-pink-50 text-pink-700 px-2 py-0.5 rounded-full"
+                        >
+                          {benefit}
+                        </span>
+                      ))}
+                      {product.benefits.length > 3 && (
+                        <span className="text-xs text-gray-500">
+                          +{product.benefits.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex-shrink-0 flex items-center gap-4">
+                <div className="text-right">
+                  <PriceDisplay
+                    productId={product.id}
+                    regularPrice={product.price}
+                    originalPrice={product.originalPrice}
+                    showSavings={true}
+                    organizationId={organizationId}
+                  />
+                </div>
+
+                <button
+                  onClick={() => onAddToCart(product.id, 1)}
+                  className="bg-gradient-to-r from-pink-500 to-orange-500 text-white py-2 px-4 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 flex items-center space-x-2 whitespace-nowrap"
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  <span>Add to Cart</span>
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-      {products.map((product) => (
+      {products.map((product) => {
+        const desc = getPlainDescription(product);
+        return (
         <div
           key={product.id}
           className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 border border-gray-100 group"
@@ -67,26 +188,11 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
             />
 
             {/* Description overlay on hover */}
-            {(product.plainTextDescription || product.description) && (
+            {desc && (
               <div className="absolute inset-0 bg-black bg-opacity-90 opacity-0 group-hover:opacity-100 transition-opacity duration-300 p-4 flex items-center justify-center cursor-pointer"
-                onClick={() => {
-                  onProductClick(product);
-                }}>
+                onClick={() => onProductClick(product)}>
                 <p className="text-white text-sm leading-relaxed overflow-y-auto max-h-full">
-                  {product.plainTextDescription
-                    ? product.plainTextDescription.slice(0, 200) + (product.plainTextDescription.length > 200 ? '...' : '')
-                    : (() => {
-                        try {
-                          const tempDiv = document.createElement('div');
-                          tempDiv.innerHTML = product.description || '';
-                          const text = tempDiv.textContent || tempDiv.innerText || '';
-                          return text.slice(0, 200) + (text.length > 200 ? '...' : '');
-                        } catch (error) {
-                          console.error('Error parsing product description for', product.name, error);
-                          return 'Description unavailable';
-                        }
-                      })()
-                  }
+                  {desc.slice(0, 200)}{desc.length > 200 ? '...' : ''}
                 </p>
               </div>
             )}
@@ -105,7 +211,7 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
             >
               {product.name}
             </h3>
-            
+
             {/* Rating */}
             {product.rating > 0 && (
               <div className="flex items-center mb-2">
@@ -114,8 +220,8 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
                     <Star
                       key={i}
                       className={`h-4 w-4 ${
-                        i < Math.floor(product.rating) 
-                          ? 'text-yellow-400 fill-current' 
+                        i < Math.floor(product.rating)
+                          ? 'text-yellow-400 fill-current'
                           : 'text-gray-300'
                       }`}
                     />
@@ -167,7 +273,8 @@ const ProductGrid: React.FC<ProductGridProps> = ({ products, onAddToCart, onProd
             </button>
           </div>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 };

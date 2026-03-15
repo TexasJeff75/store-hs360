@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { LayoutGrid, List } from 'lucide-react';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { FavoritesProvider } from '@/contexts/FavoritesContext';
 import Header from '@/components/Header';
@@ -6,7 +7,7 @@ import AuthModal from '@/components/AuthModal';
 import UserProfile from '@/components/UserProfile';
 import ResetPassword from '@/components/ResetPassword';
 import AdminDashboard from '@/components/admin/AdminDashboard';
-import ProductGrid from '@/components/ProductGrid';
+import ProductGrid, { ViewMode } from '@/components/ProductGrid';
 import ProductFilter from '@/components/ProductFilter';
 import FavoritesList from '@/components/FavoritesList';
 import ProductModal from '@/components/ProductModal';
@@ -67,6 +68,9 @@ function AppContent() {
   const [selectedOrganization, setSelectedOrganization] = useState<{id: string; name: string} | null>(null);
   const [userHasMultipleOrgs, setUserHasMultipleOrgs] = useState(false);
   const [showOnlyContractPricing, setShowOnlyContractPricing] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    return (localStorage.getItem('productViewMode') as ViewMode) || 'grid';
+  });
   const [productsWithContractPricing, setProductsWithContractPricing] = useState<number[]>([]);
   const [needsOrganizationSetup, setNeedsOrganizationSetup] = useState(false);
   const [checkingOrganization, setCheckingOrganization] = useState(true);
@@ -711,6 +715,31 @@ function AppContent() {
                     </p>
 
                     <div className="flex items-center space-x-4">
+                      <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                        <button
+                          onClick={() => { setViewMode('grid'); localStorage.setItem('productViewMode', 'grid'); }}
+                          className={`p-2 transition-colors ${
+                            viewMode === 'grid'
+                              ? 'bg-pink-500 text-white'
+                              : 'bg-white text-gray-500 hover:bg-gray-100'
+                          }`}
+                          title="Grid view"
+                        >
+                          <LayoutGrid className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => { setViewMode('list'); localStorage.setItem('productViewMode', 'list'); }}
+                          className={`p-2 transition-colors ${
+                            viewMode === 'list'
+                              ? 'bg-pink-500 text-white'
+                              : 'bg-white text-gray-500 hover:bg-gray-100'
+                          }`}
+                          title="List view"
+                        >
+                          <List className="h-4 w-4" />
+                        </button>
+                      </div>
+
                       {selectedOrganization && (
                         <div className="flex items-center space-x-2 bg-blue-50 text-blue-700 px-3 py-2 rounded-lg text-sm">
                           <span className="font-medium">{selectedOrganization.name}</span>
@@ -745,6 +774,7 @@ function AppContent() {
                     onAddToCart={addToCart}
                     onProductClick={handleProductClick}
                     organizationId={selectedOrganization?.id}
+                    viewMode={viewMode}
                   />
                 </div>
               </div>
