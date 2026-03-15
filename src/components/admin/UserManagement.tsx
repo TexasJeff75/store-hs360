@@ -4,6 +4,7 @@ import { supabase } from '@/services/supabase';
 import type { Profile } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { activityLogService } from '@/services/activityLog';
+import { emailService } from '@/services/emailService';
 
 interface UserManagementProps {
   onUserApproved?: () => void;
@@ -663,6 +664,13 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                               details: { email: user.email, assigned_role: role },
                             });
                           }
+                          emailService.sendNotification({
+                            to: user.email,
+                            email_type: 'account_approved',
+                            subject: 'Your Account Has Been Approved',
+                            template_data: { login_url: window.location.origin },
+                            user_id: user.id,
+                          }).catch(err => console.warn('Failed to send approval email:', err));
                         } catch (err) {
                           setSaveMessage({ type: 'error', text: 'Failed to approve user' });
                         }
@@ -700,6 +708,13 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                               details: { email: user.email },
                             });
                           }
+                          emailService.sendNotification({
+                            to: user.email,
+                            email_type: 'account_denied',
+                            subject: 'Account Update',
+                            template_data: {},
+                            user_id: user.id,
+                          }).catch(err => console.warn('Failed to send denial email:', err));
                         } catch (err) {
                           setSaveMessage({ type: 'error', text: 'Failed to deny user' });
                         }
