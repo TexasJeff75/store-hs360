@@ -83,6 +83,22 @@ function wrapEmail(content, headerHtml, footerHtml) {
 </html>`;
 }
 
+// ── Address formatting helper ──
+
+function formatAddressBlock(addr) {
+  if (!addr) return '';
+  const lines = [];
+  const name = [addr.firstName, addr.lastName].filter(Boolean).join(' ');
+  if (name) lines.push(`<div style="font-weight:500;color:#111827;">${name}</div>`);
+  if (addr.company) lines.push(`<div style="color:#6b7280;">${addr.company}</div>`);
+  if (addr.address1) lines.push(`<div style="color:#6b7280;">${addr.address1}</div>`);
+  if (addr.address2) lines.push(`<div style="color:#6b7280;">${addr.address2}</div>`);
+  const cityLine = [addr.city, addr.state].filter(Boolean).join(', ');
+  if (cityLine || addr.postalCode) lines.push(`<div style="color:#6b7280;">${cityLine} ${addr.postalCode || ''}</div>`);
+  if (addr.phone) lines.push(`<div style="color:#9ca3af;margin-top:4px;">Phone: ${addr.phone}</div>`);
+  return `<div style="font-size:14px;line-height:1.6;">${lines.join('')}</div>`;
+}
+
 // ── Pre-compute derived template variables ──
 
 function prepareTemplateData(emailType, data) {
@@ -98,7 +114,34 @@ function prepareTemplateData(emailType, data) {
   switch (emailType) {
     case 'order_confirmation': {
       vars.order_id = String(data.order_id || '').slice(0, 8).toUpperCase();
+      vars.formatted_subtotal = Number(data.subtotal || 0).toFixed(2);
+      vars.formatted_shipping = Number(data.shipping || 0).toFixed(2);
+      vars.formatted_tax = Number(data.tax || 0).toFixed(2);
       vars.formatted_total = Number(data.total || 0).toFixed(2);
+      vars.shipping_method = String(data.shipping_method || 'Standard');
+      vars.customer_email = String(data.customer_email || '');
+      vars.payment_method = String(data.payment_method || '');
+      vars.payment_last_four = String(data.payment_last_four || '');
+
+      // Format order date
+      if (data.order_date) {
+        try {
+          const d = new Date(data.order_date);
+          vars.order_date = d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+          vars.order_time = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        } catch (_) {
+          vars.order_date = '';
+          vars.order_time = '';
+        }
+      }
+
+      // Payment status badge
+      const ps = String(data.payment_status || 'pending');
+      const psColors = { authorized: '#dbeafe;color:#1e40af', captured: '#dcfce7;color:#166534', pending: '#fef3c7;color:#92400e', failed: '#fee2e2;color:#991b1b' };
+      const psLabels = { authorized: 'Authorized', captured: 'Captured', pending: 'Pending', failed: 'Failed' };
+      vars.payment_status_badge = `<span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;background:${psColors[ps] || psColors.pending}">${psLabels[ps] || ps}</span>`;
+
+      // Item cards
       const items = Array.isArray(data.items) ? data.items : [];
       vars.item_rows = items
         .map(
@@ -106,12 +149,29 @@ function prepareTemplateData(emailType, data) {
             `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6;">
               <div style="flex:1;">
                 <div style="font-size:14px;font-weight:500;color:#111827;">${i.name}</div>
-                <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Qty: ${i.quantity}</div>
+                <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Qty: ${i.quantity} &times; $${Number(i.price).toFixed(2)}</div>
               </div>
               <div style="font-size:14px;font-weight:600;color:#111827;">$${Number(i.price * i.quantity).toFixed(2)}</div>
             </div>`
         )
         .join('');
+
+      // Shipping address block
+      const sa = data.shipping_address;
+      if (sa && typeof sa === 'object') {
+        vars.shipping_address_html = formatAddressBlock(sa);
+      } else {
+        vars.shipping_address_html = '';
+      }
+
+      // Billing address block
+      const ba = data.billing_address;
+      if (ba && typeof ba === 'object') {
+        vars.billing_address_html = formatAddressBlock(ba);
+      } else {
+        vars.billing_address_html = '<em style="color:#9ca3af;">Same as shipping address</em>';
+      }
+
       break;
     }
     case 'recurring_order_processed': {
@@ -140,7 +200,29 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
   switch (emailType) {
     case 'order_confirmation': {
       const orderId = String(data.order_id || '').slice(0, 8).toUpperCase();
+      const subtotal = Number(data.subtotal || 0).toFixed(2);
+      const shippingAmt = Number(data.shipping || 0).toFixed(2);
+      const shippingMethod = String(data.shipping_method || 'Standard');
+      const tax = Number(data.tax || 0).toFixed(2);
       const total = Number(data.total || 0).toFixed(2);
+      const customerEmail = String(data.customer_email || '');
+      const paymentMethod = String(data.payment_method || '');
+      const paymentLastFour = String(data.payment_last_four || '');
+      const paymentStatus = String(data.payment_status || 'pending');
+
+      let orderDateStr = '';
+      if (data.order_date) {
+        try {
+          const d = new Date(data.order_date);
+          orderDateStr = d.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })
+            + ' at ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        } catch (_) { /* skip */ }
+      }
+
+      const psColors = { authorized: '#dbeafe;color:#1e40af', captured: '#dcfce7;color:#166534', pending: '#fef3c7;color:#92400e', failed: '#fee2e2;color:#991b1b' };
+      const psLabels = { authorized: 'Authorized', captured: 'Captured', pending: 'Pending', failed: 'Failed' };
+      const statusBadge = `<span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;background:${psColors[paymentStatus] || psColors.pending}">${psLabels[paymentStatus] || paymentStatus}</span>`;
+
       const items = Array.isArray(data.items) ? data.items : [];
       const itemCards = items
         .map(
@@ -148,20 +230,72 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
             `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6;">
               <div style="flex:1;">
                 <div style="font-size:14px;font-weight:500;color:#111827;">${i.name}</div>
-                <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Qty: ${i.quantity}</div>
+                <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Qty: ${i.quantity} &times; $${Number(i.price).toFixed(2)}</div>
               </div>
               <div style="font-size:14px;font-weight:600;color:#111827;">$${Number(i.price * i.quantity).toFixed(2)}</div>
             </div>`
         )
         .join('');
+
+      const shippingAddrHtml = data.shipping_address ? formatAddressBlock(data.shipping_address) : '';
+      const billingAddrHtml = data.billing_address ? formatAddressBlock(data.billing_address) : '<em style="color:#9ca3af;">Same as shipping address</em>';
+
       return wrap(`
-        <h2 style="color:#111827;font-size:20px;margin:0 0 8px 0;">Order Confirmed</h2>
-        <p style="color:#6b7280;font-size:14px;margin:0 0 24px 0;">Order #${orderId}</p>
-        <div style="margin-bottom:24px;">
+        <div style="text-align:center;padding-bottom:24px;border-bottom:1px solid #e5e7eb;margin-bottom:24px;">
+          <h2 style="color:#111827;font-size:22px;font-weight:700;margin:0 0 4px 0;">Order Confirmed</h2>
+          <p style="color:#6b7280;font-size:14px;margin:0;">Order #${orderId}</p>
+          ${orderDateStr ? `<p style="color:#9ca3af;font-size:13px;margin:4px 0 0 0;">${orderDateStr}</p>` : ''}
+        </div>
+
+        <!-- Payment Details -->
+        <div style="background:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;">
+          <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 12px 0;">Payment Details</h3>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Status</span>
+            ${statusBadge}
+          </div>
+          ${paymentMethod ? `<div style="display:flex;justify-content:space-between;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Method</span>
+            <span style="font-size:14px;font-weight:500;color:#111827;">${paymentMethod}${paymentLastFour ? ' ****' + paymentLastFour : ''}</span>
+          </div>` : ''}
+          ${customerEmail ? `<div style="display:flex;justify-content:space-between;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Email</span>
+            <span style="font-size:14px;color:#111827;">${customerEmail}</span>
+          </div>` : ''}
+        </div>
+
+        <!-- Items -->
+        <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 8px 0;">Items Ordered</h3>
+        <div style="margin-bottom:16px;">
           ${itemCards}
         </div>
-        <div style="background:#f9fafb;border-radius:8px;padding:16px;text-align:right;">
-          <span style="font-size:16px;font-weight:700;color:#111827;">Total: $${total}</span>
+
+        <!-- Totals -->
+        <div style="max-width:280px;margin-left:auto;margin-bottom:24px;">
+          <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;color:#6b7280;">
+            <span>Subtotal</span><span>$${subtotal}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;color:#6b7280;">
+            <span>Shipping (${shippingMethod})</span><span>$${shippingAmt}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;color:#6b7280;">
+            <span>Tax</span><span>$${tax}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0 0 0;margin-top:8px;border-top:2px solid #111827;font-size:16px;font-weight:700;color:#111827;">
+            <span>Total</span><span>$${total}</span>
+          </div>
+        </div>
+
+        <!-- Addresses -->
+        <div style="display:flex;gap:16px;">
+          <div style="flex:1;background:#f9fafb;border-radius:12px;padding:16px;">
+            <h4 style="font-size:13px;font-weight:600;color:#111827;margin:0 0 8px 0;">Shipping Address</h4>
+            ${shippingAddrHtml}
+          </div>
+          <div style="flex:1;background:#f9fafb;border-radius:12px;padding:16px;">
+            <h4 style="font-size:13px;font-weight:600;color:#111827;margin:0 0 8px 0;">Billing Address</h4>
+            ${billingAddrHtml}
+          </div>
         </div>
       `);
     }
