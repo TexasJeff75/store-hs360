@@ -356,7 +356,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
   const handleSendInvite = async (userToInvite: Profile) => {
     try {
       setSendingInvite(userToInvite.id);
-      await emailService.sendNotification({
+      const emailResult = await emailService.sendNotification({
         to: userToInvite.email,
         email_type: 'user_invitation',
         subject: 'You\'re Invited to HealthSpan360',
@@ -374,7 +374,11 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
         redirectTo: `${window.location.origin}/reset-password`,
       });
 
-      setSaveMessage({ type: 'success', text: `Invite sent to ${userToInvite.email}` });
+      if (emailResult.success) {
+        setSaveMessage({ type: 'success', text: `Invite sent to ${userToInvite.email}` });
+      } else {
+        setSaveMessage({ type: 'error', text: `Password reset email sent, but invite email failed: ${emailResult.error}` });
+      }
     } catch (err) {
       setSaveMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to send invite' });
     } finally {
