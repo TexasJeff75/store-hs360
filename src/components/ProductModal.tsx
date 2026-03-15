@@ -249,7 +249,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                 </div>
 
                 {/* Contract Pricing Options */}
-                {contractPrices.length > 0 && (
+                {contractPrices.length > 1 && (
                   <div className="border border-blue-200 rounded-lg p-4 bg-blue-50">
                     <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center">
                       <Tag className="h-4 w-4 mr-2" />
