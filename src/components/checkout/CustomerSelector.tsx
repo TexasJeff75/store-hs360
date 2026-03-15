@@ -236,7 +236,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
           <span>Who are you ordering for?</span>
         </h3>
         <p className="text-sm text-gray-600 mb-4">
-          Select whether you're ordering for yourself or on behalf of an organization
+          Select whether you're ordering for yourself or on behalf of a customer
         </p>
 
         <div className="space-y-3">
@@ -266,8 +266,8 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
                 className="mr-3"
               />
               <div>
-                <div className="font-medium">Organization</div>
-                <div className="text-sm text-gray-500">Place an order for an organization</div>
+                <div className="font-medium">Customer</div>
+                <div className="text-sm text-gray-500">Place an order for a customer</div>
               </div>
             </label>
           )}
@@ -296,7 +296,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center space-x-2">
               <Building2 className="h-4 w-4" />
-              <span>Select Organization *</span>
+              <span>Select Customer *</span>
             </label>
             <select
               value={selectedOrg}
@@ -304,7 +304,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
               className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               required
             >
-              <option value="">Choose an organization...</option>
+              <option value="">Choose a customer...</option>
               {organizations.map(org => (
                 <option key={org.id} value={org.id}>
                   {org.name} ({org.code})
@@ -321,7 +321,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
             disabled={!selectedOrg}
             className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
           >
-            Continue with Organization Order
+            Continue with Customer Order
           </button>
         </div>
       )}
@@ -331,7 +331,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center space-x-2">
               <Building2 className="h-4 w-4" />
-              <span>Select Organization</span>
+              <span>Select Customer</span>
             </label>
             <select
               value={selectedOrg}
@@ -341,7 +341,7 @@ const CustomerSelector: React.FC<CustomerSelectorProps> = ({ onSelect, currentUs
               }}
               className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
             >
-              <option value="">Choose an organization...</option>
+              <option value="">Choose a customer...</option>
               {organizations.map(org => (
                 <option key={org.id} value={org.id}>
                   {org.name} ({org.code})

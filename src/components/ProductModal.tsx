@@ -280,7 +280,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                                 </div>
                                 <div className="text-xs text-gray-600">
                                   {price.pricing_type === 'individual' && 'Individual Pricing'}
-                                  {price.pricing_type === 'organization' && 'Organization Pricing'}
+                                  {price.pricing_type === 'organization' && 'Customer Pricing'}
                                   {price.pricing_type === 'location' && 'Location Pricing'}
                                 </div>
                               </div>

@@ -37,6 +37,16 @@ type ApprovalStatus = 'pending' | 'approved' | 'denied';
 export interface Profile {
   id: string;
   email: string;
+  full_name?: string;
+  phone?: string;
+  company?: string;
+  title?: string;
+  address1?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  country?: string;
   approved: boolean;
   approval_status: ApprovalStatus;
   role: 'admin' | 'distributor' | 'sales_rep' | 'customer' | null;

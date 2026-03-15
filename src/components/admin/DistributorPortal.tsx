@@ -811,7 +811,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
             <Modal title="New Customer" onClose={() => { setShowAddCustomer(false); resetNewCustomer(); }}>
               <form onSubmit={handleCreateCustomer}>
                 <div className="space-y-4">
-                  <Field label="Organization Name *">
+                  <Field label="Customer Name *">
                     <input
                       type="text"
                       required

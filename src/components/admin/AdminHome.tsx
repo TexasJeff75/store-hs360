@@ -278,7 +278,7 @@ const AdminHome: React.FC<AdminHomeProps> = ({ pendingUsers, pendingCount, onNav
           onClick={() => onNavigate('users')}
         />
         <StatCard
-          label="Organizations"
+          label="Customers"
           value={stats.totalOrgs}
           icon={Building2}
           color="bg-indigo-500"
@@ -331,7 +331,7 @@ const AdminHome: React.FC<AdminHomeProps> = ({ pendingUsers, pendingCount, onNav
           {[
             { id: 'orders' as ActiveTab, label: 'View Orders', icon: ShoppingCart, color: 'text-blue-600 bg-blue-50 hover:bg-blue-100 border-blue-100' },
             { id: 'users' as ActiveTab, label: 'Manage Users', icon: Users, color: 'text-purple-600 bg-purple-50 hover:bg-purple-100 border-purple-100' },
-            { id: 'organizations' as ActiveTab, label: 'Organizations', icon: Building2, color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-indigo-100' },
+            { id: 'organizations' as ActiveTab, label: 'Customers', icon: Building2, color: 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-indigo-100' },
             { id: 'products' as ActiveTab, label: 'Products', icon: Package, color: 'text-teal-600 bg-teal-50 hover:bg-teal-100 border-teal-100' },
             { id: 'analytics' as ActiveTab, label: 'Analytics', icon: BarChart3, color: 'text-pink-600 bg-pink-50 hover:bg-pink-100 border-pink-100' },
             { id: 'support' as ActiveTab, label: 'Support', icon: MessageSquare, color: 'text-orange-600 bg-orange-50 hover:bg-orange-100 border-orange-100' },

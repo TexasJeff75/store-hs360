@@ -48,9 +48,9 @@ const HelpSection: React.FC<HelpSectionProps> = () => {
         {
           question: 'What is this dashboard?',
           answer: userRole === 'admin'
-            ? 'The Admin Dashboard is your central control panel for managing the entire platform. You can manage users, organizations, pricing, orders, commissions, and more.'
+            ? 'The Admin Dashboard is your central control panel for managing the entire platform. You can manage users, customers, pricing, orders, commissions, and more.'
             : userRole === 'sales_rep'
-            ? 'This is your Sales Dashboard where you can view orders from your assigned organizations and track your commission earnings.'
+            ? 'This is your Sales Dashboard where you can view orders from your assigned customers and track your commission earnings.'
             : userRole === 'distributor'
             ? 'This is your Distributor Dashboard where you can view commissions from your sales representatives.'
             : 'This is your Account Dashboard where you can manage orders, delivery locations, and payment methods.',
@@ -69,9 +69,9 @@ const HelpSection: React.FC<HelpSectionProps> = () => {
               ]
             : userRole === 'sales_rep'
             ? [
-                'View and manage orders from your assigned organizations',
+                'View and manage orders from your assigned customers',
                 'Track commission earnings from your sales',
-                'Access your organization assignments',
+                'Access your customer assignments',
                 'Contact support for assistance'
               ]
             : userRole === 'distributor'
@@ -83,7 +83,7 @@ const HelpSection: React.FC<HelpSectionProps> = () => {
               ]
             : [
                 'Manage all users and their roles',
-                'Create and manage organizations',
+                'Create and manage customers',
                 'Set pricing and commission structures',
                 'View all orders and approve commissions',
                 'Access comprehensive analytics'
@@ -102,8 +102,8 @@ const HelpSection: React.FC<HelpSectionProps> = () => {
           answer: userRole === 'customer'
             ? 'Click on the Orders tab to view your complete order history. You can see order status, tracking information, and order details.'
             : userRole === 'sales_rep'
-            ? 'The Orders tab shows all orders from organizations you manage. You can filter, search, and view detailed order information including commission details.'
-            : 'The Orders tab displays all orders across the platform. You can filter by organization, date range, status, and more.'
+            ? 'The Orders tab shows all orders from customers you manage. You can filter, search, and view detailed order information including commission details.'
+            : 'The Orders tab displays all orders across the platform. You can filter by customer, date range, status, and more.'
         },
         {
           question: 'What are the different order statuses?',
@@ -270,7 +270,7 @@ const HelpSection: React.FC<HelpSectionProps> = () => {
         {
           question: 'How do I view my commissions?',
           answer: userRole === 'sales_rep'
-            ? 'The Commissions tab shows all your commission earnings from orders placed by your assigned organizations. You can filter by date range and status.'
+            ? 'The Commissions tab shows all your commission earnings from orders placed by your assigned customers. You can filter by date range and status.'
             : 'The Commissions tab displays earnings from all sales representatives in your network. You can view individual rep performance and overall totals.'
         },
         {
@@ -290,17 +290,17 @@ const HelpSection: React.FC<HelpSectionProps> = () => {
     },
     {
       id: 'organizations',
-      title: 'My Organizations',
+      title: 'My Customers',
       icon: Building2,
       roles: ['sales_rep'],
       content: [
         {
-          question: 'What organizations am I assigned to?',
-          answer: 'The My Organizations tab shows all organizations you manage. You can view organization details, contact information, and order history.'
+          question: 'What customers am I assigned to?',
+          answer: 'The My Customers tab shows all customers you manage. You can view customer details, contact information, and order history.'
         },
         {
           question: 'How do I help my customers place orders?',
-          answer: 'You can view your organizations and their order history. Encourage customers to use the online ordering system for fastest processing. You can also assist them by phone if needed.',
+          answer: 'You can view your customers and their order history. Encourage customers to use the online ordering system for fastest processing. You can also assist them by phone if needed.',
           type: 'info'
         }
       ]
@@ -405,7 +405,7 @@ const HelpSection: React.FC<HelpSectionProps> = () => {
       case 'admin':
         return 'Everything you need to know about managing the platform';
       case 'sales_rep':
-        return 'Resources to help you manage your organizations and commissions';
+        return 'Resources to help you manage your customers and commissions';
       case 'distributor':
         return 'Track your team performance and commissions';
       default:

@@ -255,7 +255,7 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
     <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Users</h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Customer Users</h2>
           <p className="text-gray-600">Manage users assigned to this organization</p>
         </div>
         <div className="flex space-x-2">
@@ -310,7 +310,7 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
                   User
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Organization Role
+                  Customer Role
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -448,7 +448,7 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Organization Role *
+                          Customer Role *
                         </label>
                         <select
                           value={newUserData.role}
@@ -554,7 +554,7 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
                       
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Organization Role *
+                          Customer Role *
                         </label>
                         <select
                           value={selectedUser?.organizationRole || 'viewer'}

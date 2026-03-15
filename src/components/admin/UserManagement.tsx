@@ -176,7 +176,16 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
         .update({
           role: newRole,
           approval_status: selectedUser?.approval_status,
-          email: selectedUser?.email || originalUser?.email
+          email: selectedUser?.email || originalUser?.email,
+          full_name: selectedUser?.full_name || null,
+          phone: selectedUser?.phone || null,
+          title: selectedUser?.title || null,
+          company: selectedUser?.company || null,
+          address1: selectedUser?.address1 || null,
+          address2: selectedUser?.address2 || null,
+          city: selectedUser?.city || null,
+          state: selectedUser?.state || null,
+          postal_code: selectedUser?.postal_code || null,
         })
         .eq('id', userId);
 
@@ -910,11 +919,14 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                         </div>
                         <div className="ml-4">
                           <div className="text-sm font-medium text-gray-900">
-                            {user.email}
+                            {user.full_name || user.email}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            ID: {user.id.slice(0, 8)}...
-                          </div>
+                          {user.full_name && (
+                            <div className="text-xs text-gray-500">{user.email}</div>
+                          )}
+                          {user.phone && (
+                            <div className="text-xs text-gray-400">{user.phone}</div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -969,8 +981,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
         <div className="fixed inset-0 z-50 overflow-y-auto" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity"></div>
-            
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl sm:w-full max-h-[90vh] overflow-y-auto">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
                   <div className="mt-3 text-center sm:mt-0 sm:text-left w-full">
@@ -1047,6 +1059,104 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                         <p className="text-xs text-gray-500 mt-1">
                           Denied users cannot log in to the system.
                         </p>
+                      </div>
+
+                      {/* Contact Information */}
+                      <div className="pt-4 border-t border-gray-200">
+                        <h4 className="text-sm font-semibold text-gray-700 mb-3">Contact Information</h4>
+                        <div className="space-y-3">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Full Name</label>
+                            <input
+                              type="text"
+                              value={selectedUser.full_name || ''}
+                              onChange={(e) => setSelectedUser({...selectedUser, full_name: e.target.value})}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="John Doe"
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
+                              <input
+                                type="tel"
+                                value={selectedUser.phone || ''}
+                                onChange={(e) => setSelectedUser({...selectedUser, phone: e.target.value})}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                placeholder="(555) 123-4567"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-600 mb-1">Title</label>
+                              <input
+                                type="text"
+                                value={selectedUser.title || ''}
+                                onChange={(e) => setSelectedUser({...selectedUser, title: e.target.value})}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                placeholder="Manager"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Company</label>
+                            <input
+                              type="text"
+                              value={selectedUser.company || ''}
+                              onChange={(e) => setSelectedUser({...selectedUser, company: e.target.value})}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="Company name"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-600 mb-1">Address</label>
+                            <input
+                              type="text"
+                              value={selectedUser.address1 || ''}
+                              onChange={(e) => setSelectedUser({...selectedUser, address1: e.target.value})}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="Street address"
+                            />
+                          </div>
+                          <div>
+                            <input
+                              type="text"
+                              value={selectedUser.address2 || ''}
+                              onChange={(e) => setSelectedUser({...selectedUser, address2: e.target.value})}
+                              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              placeholder="Apt, suite, unit (optional)"
+                            />
+                          </div>
+                          <div className="grid grid-cols-6 gap-3">
+                            <div className="col-span-3">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+                              <input
+                                type="text"
+                                value={selectedUser.city || ''}
+                                onChange={(e) => setSelectedUser({...selectedUser, city: e.target.value})}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              />
+                            </div>
+                            <div className="col-span-1">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+                              <input
+                                type="text"
+                                value={selectedUser.state || ''}
+                                onChange={(e) => setSelectedUser({...selectedUser, state: e.target.value})}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                maxLength={2}
+                              />
+                            </div>
+                            <div className="col-span-2">
+                              <label className="block text-xs font-medium text-gray-600 mb-1">ZIP</label>
+                              <input
+                                type="text"
+                                value={selectedUser.postal_code || ''}
+                                onChange={(e) => setSelectedUser({...selectedUser, postal_code: e.target.value})}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                              />
+                            </div>
+                          </div>
+                        </div>
                       </div>
                       
                       {/* Password Reset Section */}
@@ -1167,6 +1277,20 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                         />
                       </div>
 
+                      {/* Phone */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Phone
+                        </label>
+                        <input
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          placeholder="(555) 123-4567"
+                        />
+                      </div>
+
                       {/* Role */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1262,7 +1386,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                                 }}
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                               />
-                              <span className="ml-2 text-sm text-gray-700">Create New Organization</span>
+                              <span className="ml-2 text-sm text-gray-700">Create New Customer</span>
                             </label>
                           </div>
 
@@ -1270,7 +1394,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                             <>
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Organization Name *
+                                  Customer Name *
                                 </label>
                                 <input
                                   type="text"
@@ -1282,7 +1406,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                               </div>
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Organization Code *
+                                  Customer Code *
                                 </label>
                                 <input
                                   type="text"
@@ -1297,7 +1421,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                           ) : (
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select Organization
+                                Select Customer
                               </label>
                               <select
                                 value={newUserOrganizationId}
@@ -1318,7 +1442,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                           {/* Org Role */}
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Organization Role
+                              Customer Role
                             </label>
                             <select
                               value={newUserOrganizationRole}
@@ -1526,7 +1650,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                                 }}
                                 className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                               />
-                              <span className="ml-2 text-sm text-gray-700">Create New Organization</span>
+                              <span className="ml-2 text-sm text-gray-700">Create New Distributor</span>
                             </label>
                           </div>
 
@@ -1534,7 +1658,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                             <>
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Organization Name *
+                                  Distributor Name *
                                 </label>
                                 <input
                                   type="text"
@@ -1546,7 +1670,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                               </div>
                               <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                  Organization Code *
+                                  Distributor Code *
                                 </label>
                                 <input
                                   type="text"
@@ -1561,7 +1685,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                           ) : (
                             <div>
                               <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select Distributor Organization
+                                Select Distributor
                               </label>
                               <select
                                 value={newUserOrganizationId}
