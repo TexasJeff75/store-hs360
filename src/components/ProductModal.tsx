@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, ShoppingCart, Star, Tag, Plus, Minus, Heart, Repeat, Package } from 'lucide-react';
+import { X, ShoppingCart, Star, Tag, Plus, Minus, Heart, Repeat, Package, ExternalLink } from 'lucide-react';
 import { Product } from '../services/productService';
 import PriceDisplay from './PriceDisplay';
 import { contractPricingService, ContractPrice } from '../services/contractPricing';
@@ -337,6 +337,39 @@ const ProductModal: React.FC<ProductModalProps> = ({
                       ) : (
                         <p>{product.plainTextDescription}</p>
                       )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Extended Description */}
+                {product.extendedDescription && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">Additional Information</h3>
+                    <div className="prose prose-sm text-gray-600">
+                      <p>{product.extendedDescription}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Reference Links */}
+                {(product.reference1 || product.reference2 || product.reference3) && (
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-3">References</h3>
+                    <div className="space-y-2">
+                      {[product.reference1, product.reference2, product.reference3]
+                        .filter(Boolean)
+                        .map((ref, index) => (
+                          <a
+                            key={index}
+                            href={ref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center space-x-2 text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                          >
+                            <ExternalLink className="h-4 w-4 flex-shrink-0" />
+                            <span className="truncate">{ref}</span>
+                          </a>
+                        ))}
                     </div>
                   </div>
                 )}

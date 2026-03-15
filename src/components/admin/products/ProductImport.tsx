@@ -118,6 +118,10 @@ const ProductImport: React.FC<ProductImportProps> = ({ isOpen, onClose, onImport
       is_in_stock: p.isInStock,
       is_active: p.isActive,
       image_url: p.image || undefined,
+      extended_description: p.extendedDescription,
+      reference_1: p.reference1,
+      reference_2: p.reference2,
+      reference_3: p.reference3,
       secret_cost: secretCosts?.[p.id]?.secret_cost,
     }));
     const csv = exportProductsCSV(exportData);

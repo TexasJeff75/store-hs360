@@ -24,6 +24,10 @@ export interface Product {
   benefits: string[];
   description?: string;
   plainTextDescription?: string;
+  extendedDescription?: string;
+  reference1?: string;
+  reference2?: string;
+  reference3?: string;
   customFields?: Array<{ name: string; value: string }>;
   rating: number;
   reviews: number;
@@ -66,6 +70,10 @@ interface DBProduct {
   is_active: boolean;
   image_url: string | null;
   sort_order: number;
+  extended_description: string | null;
+  reference_1: string | null;
+  reference_2: string | null;
+  reference_3: string | null;
   custom_fields: Array<{ name: string; value: string }> | null;
   categories?: { name: string } | null;
   brands?: { name: string } | null;
@@ -101,6 +109,10 @@ function mapDBProduct(row: DBProduct): Product {
     benefits,
     description: row.description || undefined,
     plainTextDescription: row.plain_text_description || undefined,
+    extendedDescription: row.extended_description || undefined,
+    reference1: row.reference_1 || undefined,
+    reference2: row.reference_2 || undefined,
+    reference3: row.reference_3 || undefined,
     customFields: customFields.length > 0 ? customFields : undefined,
     rating: 0,
     reviews: 0,
