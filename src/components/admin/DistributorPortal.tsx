@@ -218,13 +218,16 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
     try {
       setError(null);
       // 1. Create the organization
-      // Only include optional CRM columns when they have values — if the
-      // migration adding them hasn't been applied, omitting them avoids a
-      // PostgREST 400 error for unknown columns.
+      // Generate the ID client-side so we don't need .select('id') on the
+      // insert — the Supabase JS client's .insert().select() sends a
+      // `columns` query parameter that can trigger 400 errors.
+      const orgId = crypto.randomUUID();
       const orgInsert: Record<string, unknown> = {
+        id: orgId,
         name: newCustomer.name,
         code: newCustomer.code,
         is_active: true,
+        org_type: 'customer',
       };
       if (newCustomer.contact_name) orgInsert.contact_name = newCustomer.contact_name;
       if (newCustomer.contact_email) orgInsert.contact_email = newCustomer.contact_email;
@@ -234,19 +237,16 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       if (newCustomer.state) orgInsert.state = newCustomer.state;
       if (newCustomer.zip) orgInsert.zip = newCustomer.zip;
       if (newCustomer.description) orgInsert.description = newCustomer.description;
-      orgInsert.org_type = 'customer';
 
-      const { data: orgData, error: orgError } = await supabase
+      const { error: orgError } = await supabase
         .from('organizations')
-        .insert([orgInsert])
-        .select('id')
-        .single();
+        .insert([orgInsert]);
       if (orgError) throw orgError;
 
       // 2. Link it as a distributor customer
       const { error: linkError } = await supabase
         .from('distributor_customers')
-        .insert([{ distributor_id: distributor.id, organization_id: orgData.id, is_active: true }]);
+        .insert([{ distributor_id: distributor.id, organization_id: orgId, is_active: true }]);
       if (linkError) throw linkError;
 
       // 3. Create a user account + send invite email if contact email was provided
@@ -269,7 +269,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                   role: 'customer',
                   fullName: newCustomer.contact_name || undefined,
                   phone: newCustomer.contact_phone || undefined,
-                  organizationId: orgData.id,
+                  organizationId: orgId,
                   siteUrl: window.location.origin,
                 }),
               }
@@ -282,7 +282,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
               if (newCustomer.address && result.userId) {
                 await supabase.rpc('create_customer_address', {
                   p_user_id: result.userId,
-                  p_organization_id: orgData.id,
+                  p_organization_id: orgId,
                   p_address_type: 'shipping',
                   p_label: newCustomer.name,
                   p_first_name: nameParts[0] || '',
