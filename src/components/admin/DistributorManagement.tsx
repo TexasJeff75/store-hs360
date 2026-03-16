@@ -407,9 +407,20 @@ const DistributorManagement: React.FC = () => {
     try {
       setError(null);
       const payload = {
-        ...newDistributor,
-        commission_rate: Number(newDistributor.commission_rate),
+        profile_id: newDistributor.profile_id,
         user_id: newDistributor.profile_id,
+        name: newDistributor.name,
+        code: newDistributor.code,
+        commission_rate: Number(newDistributor.commission_rate),
+        commission_type: newDistributor.commission_type,
+        pricing_model: newDistributor.pricing_model,
+        notes: newDistributor.notes || null,
+        contact_name: newDistributor.contact_name || null,
+        address: newDistributor.address || null,
+        city: newDistributor.city || null,
+        state: newDistributor.state || null,
+        zip: newDistributor.zip || null,
+        phone: newDistributor.phone || null,
       };
       const { error: insertError } = await supabase.from('distributors').insert([payload]);
       if (insertError) throw insertError;
@@ -1740,6 +1751,7 @@ const DistributorManagement: React.FC = () => {
                     />
                     <input
                       type="password"
+                      autoComplete="new-password"
                       value={newUserPassword}
                       onChange={(e) => setNewUserPassword(e.target.value)}
                       className={inputCls}
@@ -2309,6 +2321,7 @@ const DistributorManagement: React.FC = () => {
                       />
                       <input
                         type="password"
+                        autoComplete="new-password"
                         value={newSalesRepPassword}
                         onChange={(e) => setNewSalesRepPassword(e.target.value)}
                         className={inputCls}
