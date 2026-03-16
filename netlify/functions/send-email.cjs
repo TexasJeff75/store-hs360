@@ -1,5 +1,4 @@
 const { createClient } = require('@supabase/supabase-js');
-const nodemailer = require('nodemailer');
 
 const ALLOWED_ORIGIN = process.env.CORS_ALLOWED_ORIGIN || '*';
 
@@ -485,41 +484,40 @@ exports.handler = async (event) => {
       htmlBody = buildFallbackHtml(payload.email_type, payload.template_data || {}, headerHtml, footerHtml);
     }
 
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
+    const resendApiKey = process.env.RESEND_API_KEY;
+    const emailFrom = process.env.EMAIL_FROM || 'HealthSpan360 <noreply@hs360.co>';
     let emailSent = false;
     let errorMessage = null;
 
-    if (!smtpUser || !smtpPass) {
-      errorMessage = 'SMTP not configured (SMTP_USER / SMTP_PASS environment variables are not set)';
+    if (!resendApiKey) {
+      errorMessage = 'RESEND_API_KEY environment variable is not set';
       console.error('[send-email]', errorMessage);
     } else {
       try {
-        const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST || 'smtp.office365.com',
-          port: Number(process.env.SMTP_PORT || 587),
-          secure: false, // STARTTLS
-          auth: {
-            user: smtpUser,
-            pass: smtpPass,
+        const res = await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${resendApiKey}`,
+            'Content-Type': 'application/json',
           },
-          connectionTimeout: 10000, // 10s to establish connection
-          greetingTimeout: 10000,   // 10s for server greeting
-          socketTimeout: 15000,     // 15s for socket inactivity
+          body: JSON.stringify({
+            from: emailFrom,
+            to: [payload.to],
+            subject: payload.subject,
+            html: htmlBody,
+          }),
         });
 
-        await transporter.sendMail({
-          from: process.env.EMAIL_FROM || smtpUser,
-          to: payload.to,
-          subject: payload.subject,
-          html: htmlBody,
-        });
+        if (!res.ok) {
+          const errBody = await res.json().catch(() => ({}));
+          throw new Error(errBody.message || `Resend API returned ${res.status}`);
+        }
 
         emailSent = true;
         console.log(`[send-email] Sent "${payload.email_type}" email to ${payload.to}`);
       } catch (err) {
-        errorMessage = err instanceof Error ? err.message : 'Failed to send via SMTP';
-        console.error('[send-email] SMTP error:', errorMessage);
+        errorMessage = err instanceof Error ? err.message : 'Failed to send via Resend';
+        console.error('[send-email] Resend error:', errorMessage);
       }
     }
 
