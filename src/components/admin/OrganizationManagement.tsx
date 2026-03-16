@@ -39,6 +39,8 @@ const OrganizationManagement: React.FC = () => {
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
+  const [createContactUser, setCreateContactUser] = useState(true);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
 
   useEffect(() => {
     fetchOrganizations();
@@ -123,6 +125,7 @@ const OrganizationManagement: React.FC = () => {
       updated_at: ''
     });
     setIsEditing(false);
+    setCreateContactUser(true);
     setIsModalOpen(true);
   };
 
@@ -190,7 +193,51 @@ const OrganizationManagement: React.FC = () => {
         const { id, created_at, updated_at, ...orgData } = selectedOrg;
         const newOrg = await multiTenantService.createOrganization(orgData);
         setOrganizations(prev => [newOrg, ...prev]);
-        setModalMessage({ type: 'success', text: 'Customer created successfully!' });
+
+        // Auto-create user account for the contact if email provided and checkbox is checked
+        if (createContactUser && selectedOrg.contact_email?.trim()) {
+          try {
+            setIsCreatingUser(true);
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              const response = await fetch(
+                `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    email: selectedOrg.contact_email.trim(),
+                    role: 'customer',
+                    fullName: selectedOrg.contact_name || undefined,
+                    phone: selectedOrg.contact_phone || undefined,
+                    organizationId: newOrg.id,
+                    orgRole: 'admin',
+                    isHouseAccount: (selectedOrg as any).is_house_account || false,
+                    salesRepId: (selectedOrg as any).default_sales_rep_id || undefined,
+                  }),
+                }
+              );
+              const result = await response.json();
+              if (result.success) {
+                const reactivatedNote = result.reactivated ? ' (reactivated existing account)' : '';
+                const inviteNote = result.inviteEmailSent ? ' An invite email has been sent.' : '';
+                setModalMessage({ type: 'success', text: `Customer created and user account set up for ${selectedOrg.contact_email}!${reactivatedNote}${inviteNote}` });
+              } else {
+                setModalMessage({ type: 'success', text: `Customer created, but user account creation failed: ${result.error}. You can create the user manually from User Management.` });
+              }
+            }
+          } catch (userErr) {
+            console.error('Auto-create user failed:', userErr);
+            setModalMessage({ type: 'success', text: 'Customer created, but user account creation failed. You can create the user manually from User Management.' });
+          } finally {
+            setIsCreatingUser(false);
+          }
+        } else {
+          setModalMessage({ type: 'success', text: 'Customer created successfully!' });
+        }
       }
       
       // Refresh stats
@@ -852,6 +899,26 @@ const OrganizationManagement: React.FC = () => {
                         </div>
                       </div>
 
+                      {/* Auto-create user account checkbox (only for new orgs with contact email) */}
+                      {!isEditing && selectedOrg.contact_email?.trim() && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                          <label className="flex items-center">
+                            <input
+                              type="checkbox"
+                              checked={createContactUser}
+                              onChange={(e) => setCreateContactUser(e.target.checked)}
+                              className="rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                            />
+                            <span className="ml-2 text-sm text-gray-700">
+                              Create user account for <strong>{selectedOrg.contact_email}</strong>
+                            </span>
+                          </label>
+                          <p className="text-xs text-gray-500 ml-6 mt-1">
+                            An invite email will be sent so they can set their password and log in as a customer admin.
+                          </p>
+                        </div>
+                      )}
+
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
                           Address
@@ -980,10 +1047,10 @@ const OrganizationManagement: React.FC = () => {
                 <button
                   type="button"
                   onClick={handleSaveOrganization}
-                  disabled={!selectedOrg.name || !selectedOrg.code}
+                  disabled={!selectedOrg.name || !selectedOrg.code || isCreatingUser}
                   className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isEditing ? 'Update' : 'Create'} Customer
+                  {isCreatingUser ? 'Creating User...' : isEditing ? 'Update' : 'Create'} Customer
                 </button>
                 <button
                   type="button"

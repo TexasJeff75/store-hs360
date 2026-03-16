@@ -36,6 +36,9 @@ interface CreateUserRequest {
   newOrgName?: string;
   newOrgCode?: string;
   orgType?: "customer" | "distributor";
+  contactName?: string;
+  contactEmail?: string;
+  contactPhone?: string;
   // Delegate creation (distributor adding a delegate user)
   delegateForDistributorId?: string;
   delegateNotes?: string;
@@ -130,7 +133,11 @@ Deno.serve(async (req: Request) => {
 
     // ═══════════════════════════════════════
     // 1. Create Auth user (random password — user sets their own via invite email)
+    //    If the user already exists (e.g. soft-deleted), reactivate them instead.
     // ═══════════════════════════════════════
+    let userId: string;
+    let reactivated = false;
+
     const tempPassword = crypto.randomUUID() + crypto.randomUUID();
     const { data: authData, error: createError } = await adminClient.auth.admin.createUser({
       email: body.email,
@@ -140,10 +147,43 @@ Deno.serve(async (req: Request) => {
     });
 
     if (createError) {
-      return jsonResponse({ success: false, error: createError.message }, 400);
-    }
+      // Check if this is a "user already exists" error — try to reactivate
+      const { data: existingUsers } = await adminClient.auth.admin.listUsers();
+      const existingUser = existingUsers?.users?.find(
+        (u: { email?: string }) => u.email?.toLowerCase() === body.email.toLowerCase()
+      );
 
-    const userId = authData.user.id;
+      if (!existingUser) {
+        return jsonResponse({ success: false, error: createError.message }, 400);
+      }
+
+      // Check if profile is soft-deleted
+      const { data: existingProfile } = await adminClient
+        .from("profiles")
+        .select("id, deleted_at")
+        .eq("id", existingUser.id)
+        .single();
+
+      if (existingProfile && !existingProfile.deleted_at) {
+        // User exists and is NOT deleted — genuinely duplicate
+        return jsonResponse({
+          success: false,
+          error: "A user with this email already exists and is active. Please use the existing account.",
+        }, 400);
+      }
+
+      // Reactivate: clear soft-delete flags, update auth password
+      userId = existingUser.id;
+      reactivated = true;
+
+      await adminClient.auth.admin.updateUserById(userId, {
+        password: tempPassword,
+        email_confirm: false,
+        user_metadata: { full_name: body.fullName || "" },
+      });
+    } else {
+      userId = authData.user.id;
+    }
 
     // ═══════════════════════════════════════
     // 2. Create/update profile
@@ -158,11 +198,13 @@ Deno.serve(async (req: Request) => {
         approved: true,
         full_name: body.fullName || null,
         phone: body.phone || null,
+        // Clear soft-delete fields when reactivating
+        ...(reactivated ? { deleted_at: null, deleted_by: null, is_approved: true } : {}),
       }, { onConflict: "id" });
 
     if (profileError) {
-      // Clean up auth user on profile failure
-      await adminClient.auth.admin.deleteUser(userId);
+      // Clean up auth user on profile failure (only if we just created it)
+      if (!reactivated) await adminClient.auth.admin.deleteUser(userId);
       return jsonResponse({ success: false, error: `Profile creation failed: ${profileError.message}` }, 500);
     }
 
@@ -236,6 +278,9 @@ Deno.serve(async (req: Request) => {
           is_house_account: body.role === "customer" && body.isHouseAccount === true,
           created_by: caller.id,
           is_active: true,
+          contact_name: body.contactName || null,
+          contact_email: body.contactEmail || null,
+          contact_phone: body.contactPhone || null,
         })
         .select("id")
         .single();
@@ -456,6 +501,7 @@ Deno.serve(async (req: Request) => {
       success: true,
       userId,
       inviteEmailSent: !inviteError,
+      reactivated,
     });
 
   } catch (err) {
