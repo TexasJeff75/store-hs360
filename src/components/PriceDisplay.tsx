@@ -95,7 +95,7 @@ const PriceDisplay: React.FC<PriceDisplayProps> = ({
           )}
 
           {/* Approval Pending Message */}
-          {user && profile?.role === 'pending' && (
+          {user && (profile?.role === 'pending' || profile?.approval_status === 'pending') && (
             <div className="text-xs text-yellow-600 mt-1">
               Account approval pending for special pricing
             </div>
