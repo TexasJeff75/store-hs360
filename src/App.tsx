@@ -400,6 +400,12 @@ function AppContent() {
     );
   }
 
+  // Password recovery must be checked BEFORE the !user gate — the session
+  // may not be established yet when the user arrives via the recovery link.
+  if (isPasswordRecovery) {
+    return <ResetPassword onComplete={() => window.location.reload()} />;
+  }
+
   // Show auth modal if user is not logged in
   if (!user) {
     return (
@@ -451,10 +457,6 @@ function AppContent() {
         />
       </div>
     );
-  }
-
-  if (isPasswordRecovery) {
-    return <ResetPassword onComplete={() => window.location.reload()} />;
   }
 
   // When impersonating, skip all approval/setup gates for the impersonated user

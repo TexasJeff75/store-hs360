@@ -216,14 +216,16 @@ Deno.serve(async (req: Request) => {
     // 3. Send password reset + custom invite email
     // ═══════════════════════════════════════
     // Generate a password recovery link so the user is prompted to set their own password.
-    // Using "recovery" (not "magiclink") ensures Supabase fires a PASSWORD_RECOVERY event,
-    // which the frontend detects to show the ResetPassword page.
+    // The redirect URL includes ?type=recovery so the frontend can reliably detect the
+    // recovery flow — the Supabase PASSWORD_RECOVERY event doesn't fire consistently
+    // with PKCE auth flow.
     const siteUrl = body.siteUrl || Deno.env.get("SITE_URL") || Deno.env.get("PUBLIC_SITE_URL") || "";
+    const redirectUrl = siteUrl ? `${siteUrl.replace(/\/$/, "")}?type=recovery` : undefined;
     const { data: resetData, error: resetError } = await adminClient.auth.admin.generateLink({
       type: "recovery",
       email: body.email,
       options: {
-        redirectTo: siteUrl || undefined,
+        redirectTo: redirectUrl,
       },
     });
     const loginUrl = resetData?.properties?.action_link || "";

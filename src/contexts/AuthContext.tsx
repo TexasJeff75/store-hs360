@@ -53,7 +53,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let mounted = true;
-    
+
+    // Detect recovery flow from URL params — Supabase's PASSWORD_RECOVERY event
+    // doesn't fire reliably with PKCE auth flow, so the invite email's redirect
+    // URL includes ?type=recovery as a fallback signal.
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('type') === 'recovery') {
+      setIsPasswordRecovery(true);
+      // Clean up the URL param without triggering a navigation
+      urlParams.delete('type');
+      const cleanUrl = urlParams.toString()
+        ? `${window.location.pathname}?${urlParams.toString()}${window.location.hash}`
+        : `${window.location.pathname}${window.location.hash}`;
+      window.history.replaceState({}, '', cleanUrl);
+    }
+
     // Get initial session with proper error handling
     const initializeAuth = async () => {
       try {
