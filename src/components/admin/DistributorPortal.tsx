@@ -189,7 +189,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
             .select('organization_id')
             .in('organization_id', orgIds),
           supabase
-            .from('organization_addresses')
+            .from('customer_addresses')
             .select('organization_id')
             .in('organization_id', orgIds),
         ]);
@@ -218,22 +218,27 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
     try {
       setError(null);
       // 1. Create the organization
+      // Only include optional CRM columns when they have values — if the
+      // migration adding them hasn't been applied, omitting them avoids a
+      // PostgREST 400 error for unknown columns.
+      const orgInsert: Record<string, unknown> = {
+        name: newCustomer.name,
+        code: newCustomer.code,
+        is_active: true,
+      };
+      if (newCustomer.contact_name) orgInsert.contact_name = newCustomer.contact_name;
+      if (newCustomer.contact_email) orgInsert.contact_email = newCustomer.contact_email;
+      if (newCustomer.contact_phone) orgInsert.contact_phone = newCustomer.contact_phone;
+      if (newCustomer.address) orgInsert.address = newCustomer.address;
+      if (newCustomer.city) orgInsert.city = newCustomer.city;
+      if (newCustomer.state) orgInsert.state = newCustomer.state;
+      if (newCustomer.zip) orgInsert.zip = newCustomer.zip;
+      if (newCustomer.description) orgInsert.description = newCustomer.description;
+      orgInsert.org_type = 'customer';
+
       const { data: orgData, error: orgError } = await supabase
         .from('organizations')
-        .insert([{
-          name: newCustomer.name,
-          code: newCustomer.code,
-          contact_name: newCustomer.contact_name || null,
-          contact_email: newCustomer.contact_email || null,
-          contact_phone: newCustomer.contact_phone || null,
-          address: newCustomer.address || null,
-          city: newCustomer.city || null,
-          state: newCustomer.state || null,
-          zip: newCustomer.zip || null,
-          description: newCustomer.description || null,
-          org_type: 'customer',
-          is_active: true,
-        }])
+        .insert([orgInsert])
         .select('id')
         .single();
       if (orgError) throw orgError;

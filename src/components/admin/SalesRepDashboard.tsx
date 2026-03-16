@@ -130,7 +130,7 @@ const SalesRepDashboard: React.FC = () => {
             .select('organization_id')
             .in('organization_id', orgIds),
           supabase
-            .from('organization_addresses')
+            .from('customer_addresses')
             .select('organization_id')
             .in('organization_id', orgIds),
         ]);
