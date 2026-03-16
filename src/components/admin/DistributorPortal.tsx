@@ -218,30 +218,50 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
     try {
       setError(null);
       // 1. Create the organization
-      // Only include optional CRM columns when they have values — if the
-      // migration adding them hasn't been applied, omitting them avoids a
-      // PostgREST 400 error for unknown columns.
-      const orgInsert: Record<string, unknown> = {
+      // Build the insert with all fields, but fall back to core-only columns
+      // if the CRM migration (contact_name, address, city, state, zip, org_type)
+      // hasn't been applied yet.
+      const coreFields: Record<string, unknown> = {
         name: newCustomer.name,
         code: newCustomer.code,
         is_active: true,
       };
-      if (newCustomer.contact_name) orgInsert.contact_name = newCustomer.contact_name;
-      if (newCustomer.contact_email) orgInsert.contact_email = newCustomer.contact_email;
-      if (newCustomer.contact_phone) orgInsert.contact_phone = newCustomer.contact_phone;
-      if (newCustomer.address) orgInsert.address = newCustomer.address;
-      if (newCustomer.city) orgInsert.city = newCustomer.city;
-      if (newCustomer.state) orgInsert.state = newCustomer.state;
-      if (newCustomer.zip) orgInsert.zip = newCustomer.zip;
-      if (newCustomer.description) orgInsert.description = newCustomer.description;
-      orgInsert.org_type = 'customer';
+      if (newCustomer.contact_email) coreFields.contact_email = newCustomer.contact_email;
+      if (newCustomer.contact_phone) coreFields.contact_phone = newCustomer.contact_phone;
+      if (newCustomer.description) coreFields.description = newCustomer.description;
 
-      const { data: orgData, error: orgError } = await supabase
+      const crmFields: Record<string, unknown> = {};
+      if (newCustomer.contact_name) crmFields.contact_name = newCustomer.contact_name;
+      if (newCustomer.address) crmFields.address = newCustomer.address;
+      if (newCustomer.city) crmFields.city = newCustomer.city;
+      if (newCustomer.state) crmFields.state = newCustomer.state;
+      if (newCustomer.zip) crmFields.zip = newCustomer.zip;
+      crmFields.org_type = 'customer';
+
+      let orgData: { id: string };
+      // Try with all columns first, fall back to core-only if migration not applied
+      const { data: fullData, error: fullError } = await supabase
         .from('organizations')
-        .insert([orgInsert])
+        .insert([{ ...coreFields, ...crmFields }])
         .select('id')
         .single();
-      if (orgError) throw orgError;
+
+      if (fullError) {
+        // If 400 (unknown column), retry with only original-schema columns
+        if (fullError.code === '42703' || fullError.message?.includes('column') || fullError.code === 'PGRST204') {
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('organizations')
+            .insert([coreFields])
+            .select('id')
+            .single();
+          if (fallbackError) throw fallbackError;
+          orgData = fallbackData;
+        } else {
+          throw fullError;
+        }
+      } else {
+        orgData = fullData;
+      }
 
       // 2. Link it as a distributor customer
       const { error: linkError } = await supabase
