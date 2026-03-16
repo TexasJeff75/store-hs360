@@ -217,30 +217,21 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
     if (!distributor) return;
     try {
       setError(null);
-      // 1. Create the organization
-      // Generate the ID client-side so we don't need .select('id') on the
-      // insert — the Supabase JS client's .insert().select() sends a
-      // `columns` query parameter that can trigger 400 errors.
-      const orgId = crypto.randomUUID();
-      const orgInsert: Record<string, unknown> = {
-        id: orgId,
-        name: newCustomer.name,
-        code: newCustomer.code,
-        is_active: true,
-        org_type: 'customer',
-      };
-      if (newCustomer.contact_name) orgInsert.contact_name = newCustomer.contact_name;
-      if (newCustomer.contact_email) orgInsert.contact_email = newCustomer.contact_email;
-      if (newCustomer.contact_phone) orgInsert.contact_phone = newCustomer.contact_phone;
-      if (newCustomer.address) orgInsert.address = newCustomer.address;
-      if (newCustomer.city) orgInsert.city = newCustomer.city;
-      if (newCustomer.state) orgInsert.state = newCustomer.state;
-      if (newCustomer.zip) orgInsert.zip = newCustomer.zip;
-      if (newCustomer.description) orgInsert.description = newCustomer.description;
-
-      const { error: orgError } = await supabase
-        .from('organizations')
-        .insert([orgInsert]);
+      // 1. Create the organization via RPC to bypass PostgREST's `columns`
+      //    parameter which causes 400 errors with quoted column names.
+      const { data: orgId, error: orgError } = await supabase.rpc('create_organization', {
+        p_name: newCustomer.name,
+        p_code: newCustomer.code,
+        p_org_type: 'customer',
+        p_contact_name: newCustomer.contact_name || null,
+        p_contact_email: newCustomer.contact_email || null,
+        p_contact_phone: newCustomer.contact_phone || null,
+        p_address: newCustomer.address || null,
+        p_city: newCustomer.city || null,
+        p_state: newCustomer.state || null,
+        p_zip: newCustomer.zip || null,
+        p_description: newCustomer.description || null,
+      });
       if (orgError) throw orgError;
 
       // 2. Link it as a distributor customer
