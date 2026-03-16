@@ -1934,9 +1934,11 @@ const DistributorManagement: React.FC = () => {
                 >
                   <span>
                     <span className="font-medium">Commission Settings</span>
-                    <span className="text-gray-400 ml-2">
-                      Default: {commissionRateLabel(newDistributor.commission_type, newDistributor.commission_rate)} {getCommissionTypeConfig(newDistributor.commission_type).label}
-                    </span>
+                    {newDistributor.commission_rate !== '' && newDistributor.commission_rate !== undefined && (
+                      <span className="text-gray-400 ml-2">
+                        {commissionRateLabel(newDistributor.commission_type, newDistributor.commission_rate)} {getCommissionTypeConfig(newDistributor.commission_type).label}
+                      </span>
+                    )}
                   </span>
                   <ChevronDown className={`h-4 w-4 transition-transform ${showCommissionFields ? 'rotate-180' : ''}`} />
                 </button>
