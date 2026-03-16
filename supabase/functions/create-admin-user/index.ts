@@ -105,10 +105,10 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ success: false, error: "Invalid role" }, 400);
     }
 
-    // Distributors can only create sales_rep or distributor (delegate) users
+    // Distributors can create sales_rep, distributor (delegate), or customer users
     if (callerIsDistributor) {
-      if (!["sales_rep", "distributor"].includes(body.role)) {
-        return jsonResponse({ success: false, error: "Distributors can only create sales reps and delegates" }, 403);
+      if (!["sales_rep", "distributor", "customer"].includes(body.role)) {
+        return jsonResponse({ success: false, error: "Distributors can only create sales reps, delegates, and customers" }, 403);
       }
       // Verify the distributor owns the distributorId or delegateForDistributorId they're targeting
       const targetDistId = body.distributorId || body.delegateForDistributorId;
