@@ -129,10 +129,12 @@ Deno.serve(async (req: Request) => {
     }
 
     // ═══════════════════════════════════════
-    // 1. Create Auth user (no password — invite flow)
+    // 1. Create Auth user (random password — user sets their own via invite email)
     // ═══════════════════════════════════════
+    const tempPassword = crypto.randomUUID() + crypto.randomUUID();
     const { data: authData, error: createError } = await adminClient.auth.admin.createUser({
       email: body.email,
+      password: tempPassword,
       email_confirm: false,
       user_metadata: { full_name: body.fullName || "" },
     });
