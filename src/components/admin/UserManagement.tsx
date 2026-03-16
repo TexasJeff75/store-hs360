@@ -567,6 +567,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
             contactEmail: createNewOrganization ? (newOrgContactEmail || undefined) : undefined,
             contactPhone: createNewOrganization ? (newOrgContactPhone || undefined) : undefined,
             orgType: newUserRole === 'distributor' ? 'distributor' : 'customer',
+            siteUrl: window.location.origin,
           }),
         }
       );
