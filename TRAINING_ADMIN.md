@@ -336,7 +336,7 @@ The pricing system uses a three-tier hierarchy. When a customer views a product,
 - Used for user-specific negotiated pricing
 
 ### 4. Retail/List Price (Fallback)
-- Default price from the BigCommerce product catalog
+- Default price from the product catalog
 
 ### Managing Pricing Rules
 For each pricing tier:
@@ -361,15 +361,16 @@ Navigate to **Settings > Products**.
 - Sort by price, cost, inventory, or brand
 - View product details: SKU, brand, category, retail price, cost, images
 
-### Product Sync
-Products are synced from BigCommerce:
-- Use the import function to pull new products from BigCommerce
-- Product data (SKU, brand, category, price, cost, images) is overwritten on each sync
-- **Do not modify product data directly** — changes will be overwritten
-
 ### Creating Products
-- Products can also be created manually within the system
+- Create products manually through the admin interface
 - Set all required fields: name, SKU, brand, category, price, cost
+
+### Importing Products
+- Import products in bulk via CSV upload
+- Each row can include: name, SKU, price, cost, category, brand, description, weight, images, and more
+- The import validates data and reports errors per row
+- Existing products (matched by SKU) are updated; new products are created
+- You can also include secret costs and contract pricing in the import
 
 ### Contract Pricing Count
 Each product shows how many pricing rules exist for it, helping you identify products with custom pricing.
