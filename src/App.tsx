@@ -137,28 +137,85 @@ function AppContent() {
         if (userChanged) {
           setCheckingOrganization(true);
         }
-        const { data, error } = await supabase
-          .from('user_organization_roles')
-          .select(`
-            organization_id,
-            organizations!inner(id, name, code, is_active)
-          `)
-          .eq('user_id', effectiveUserId)
-          .eq('organizations.is_active', true);
 
-        if (!error && data && data.length > 0) {
-          setUserHasMultipleOrgs(data.length > 1);
-          setNeedsOrganizationSetup(false);
+        const role = effectiveProfile?.role;
 
-          if (data.length === 1) {
-            setSelectedOrganization(data[0].organizations);
-          } else if (isImpersonating) {
-            setSelectedOrganization(data[0].organizations);
+        if (role === 'distributor') {
+          // Distributors: look up their customer orgs via distributor_customers
+          const { data: distData } = await supabase
+            .from('distributors')
+            .select('id')
+            .eq('profile_id', effectiveUserId)
+            .eq('is_active', true)
+            .maybeSingle();
+
+          if (distData) {
+            const { data: custData, error: custError } = await supabase
+              .from('distributor_customers')
+              .select('organizations!inner(id, name, code, is_active)')
+              .eq('distributor_id', distData.id)
+              .eq('is_active', true)
+              .eq('organizations.is_active', true);
+
+            if (!custError && custData && custData.length > 0) {
+              const orgs = custData.map((row: any) => row.organizations);
+              setUserHasMultipleOrgs(orgs.length > 1);
+              setNeedsOrganizationSetup(false);
+              if (orgs.length === 1) {
+                setSelectedOrganization(orgs[0]);
+              }
+            } else {
+              // Distributor has no customers assigned yet — don't show FirstTimeSetup
+              setUserHasMultipleOrgs(false);
+              setNeedsOrganizationSetup(false);
+            }
+          } else {
+            setNeedsOrganizationSetup(false);
+          }
+        } else if (role === 'sales_rep') {
+          // Sales reps: look up assigned orgs via organization_sales_reps
+          const { data: repData, error: repError } = await supabase
+            .from('organization_sales_reps')
+            .select('organizations:organization_id(id, name, code, is_active)')
+            .eq('sales_rep_id', effectiveUserId)
+            .eq('is_active', true);
+
+          if (!repError && repData && repData.length > 0) {
+            const orgs = repData.map((row: any) => row.organizations).filter((o: any) => o && o.is_active);
+            setUserHasMultipleOrgs(orgs.length > 1);
+            setNeedsOrganizationSetup(false);
+            if (orgs.length === 1) {
+              setSelectedOrganization(orgs[0]);
+            }
+          } else {
+            setUserHasMultipleOrgs(false);
+            setNeedsOrganizationSetup(false);
           }
         } else {
-          setNeedsOrganizationSetup(true);
-          if (isImpersonating) {
-            setSelectedOrganization(null);
+          // Customer / admin / impersonation: use user_organization_roles
+          const { data, error } = await supabase
+            .from('user_organization_roles')
+            .select(`
+              organization_id,
+              organizations!inner(id, name, code, is_active)
+            `)
+            .eq('user_id', effectiveUserId)
+            .eq('organizations.is_active', true);
+
+          if (!error && data && data.length > 0) {
+            setUserHasMultipleOrgs(data.length > 1);
+            setNeedsOrganizationSetup(false);
+
+            if (data.length === 1) {
+              setSelectedOrganization(data[0].organizations);
+            } else if (isImpersonating) {
+              setSelectedOrganization(data[0].organizations);
+            }
+          } else {
+            setNeedsOrganizationSetup(true);
+            if (isImpersonating) {
+              setSelectedOrganization(null);
+            }
           }
         }
       } catch (error) {
