@@ -5,6 +5,9 @@ import {
   ChevronDown, ChevronRight, UserPlus, Pencil, Upload,
 } from 'lucide-react';
 import { supabase } from '@/services/supabase';
+import { softDeleteService } from '@/services/softDeleteService';
+import { useAuth } from '@/contexts/AuthContext';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 import DistributorPricingImport from './DistributorPricingImport';
 import WholesalePricingGrid from './WholesalePricingGrid';
 
@@ -208,7 +211,11 @@ interface RepCustomerLink {
 // ── Component ────────────────────────────────────────────────────────────────
 
 const DistributorManagement: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [distributors, setDistributors] = useState<Distributor[]>([]);
+  const [deleteTargetDistributor, setDeleteTargetDistributor] = useState<Distributor | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<SalesRep[]>([]);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
@@ -297,6 +304,7 @@ const DistributorManagement: React.FC = () => {
         supabase
           .from('distributors')
           .select('*, profiles!distributors_profile_id_fkey(email)')
+          .is('deleted_at', null)
           .order('created_at', { ascending: false }),
         supabase
           .from('organizations')
@@ -629,16 +637,29 @@ const DistributorManagement: React.FC = () => {
     }
   };
 
-  const handleDeleteDistributor = async (id: string) => {
-    if (!confirm('Delete this distributor? All associated sales rep relationships will also be removed.')) return;
+  const handleDeleteDistributor = (distributor: Distributor) => {
+    setDeleteTargetDistributor(distributor);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDeleteDistributor = async () => {
+    if (!deleteTargetDistributor || !currentUser) return;
+    setIsDeleting(true);
     try {
       setError(null);
-      const { error: deleteError } = await supabase.from('distributors').delete().eq('id', id);
-      if (deleteError) throw deleteError;
+      const result = await softDeleteService.deleteDistributor(deleteTargetDistributor.id, currentUser.id);
+      if (!result.success) {
+        setError(result.error || 'Failed to delete distributor');
+        return;
+      }
       setSuccess('Distributor deleted');
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete distributor');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+      setDeleteTargetDistributor(null);
     }
   };
 
@@ -1187,7 +1208,7 @@ const DistributorManagement: React.FC = () => {
                         <Pencil className="h-4 w-4 text-gray-500" />
                       </button>
                       <button
-                        onClick={() => handleDeleteDistributor(distributor.id)}
+                        onClick={() => handleDeleteDistributor(distributor)}
                         className="p-2 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete"
                       >
@@ -2276,6 +2297,20 @@ const DistributorManagement: React.FC = () => {
           }
         />
       )}
+
+      <ConfirmDeleteModal
+        isOpen={showDeleteModal}
+        title="Delete Distributor"
+        entityName={deleteTargetDistributor?.name || ''}
+        cascadeWarnings={[
+          'Sales rep relationships will be marked as orphaned',
+          'Commission rules will be marked as orphaned',
+          'Wholesale pricing records will be marked as orphaned',
+        ]}
+        onConfirm={confirmDeleteDistributor}
+        onCancel={() => { setShowDeleteModal(false); setDeleteTargetDistributor(null); }}
+        isProcessing={isDeleting}
+      />
     </div>
   );
 };

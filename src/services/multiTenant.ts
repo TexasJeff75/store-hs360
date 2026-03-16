@@ -9,6 +9,7 @@ export const multiTenantService = {
       .from('organizations')
       .select('*')
       .eq('is_active', true)
+      .is('deleted_at', null)
       .order('name');
 
     if (error) throw error;

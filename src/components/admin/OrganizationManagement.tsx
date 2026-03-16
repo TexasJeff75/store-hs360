@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { Building2, Plus, Pencil, Trash2, Search, MapPin, Users, Mail, Phone, AlertCircle, CheckCircle, Eye, Archive, ArrowLeft, Settings, DollarSign, Save, RotateCcw, UserCheck, Home } from 'lucide-react';
 import { multiTenantService } from '@/services/multiTenant';
 import { supabase } from '@/services/supabase';
+import { softDeleteService } from '@/services/softDeleteService';
+import { useAuth } from '@/contexts/AuthContext';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 import AddressManagement from './AddressManagement';
 import PricingManagement from './PricingManagement';
 import CustomerUserManagement from './CustomerUserManagement';
@@ -15,7 +18,11 @@ interface SalesRep {
 }
 
 const OrganizationManagement: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [showDeleteOrgModal, setShowDeleteOrgModal] = useState(false);
+  const [deleteTargetOrg, setDeleteTargetOrg] = useState<Organization | null>(null);
+  const [isDeletingOrg, setIsDeletingOrg] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -214,6 +221,30 @@ const OrganizationManagement: React.FC = () => {
       ));
     } catch (err) {
       setError(err instanceof Error ? err.message : `Failed to ${action} organization`);
+    }
+  };
+
+  const handleDeleteOrganization = (org: Organization) => {
+    setDeleteTargetOrg(org);
+    setShowDeleteOrgModal(true);
+  };
+
+  const confirmDeleteOrganization = async () => {
+    if (!deleteTargetOrg || !currentUser) return;
+    setIsDeletingOrg(true);
+    try {
+      const result = await softDeleteService.deleteOrganization(deleteTargetOrg.id, currentUser.id);
+      if (!result.success) {
+        setError(result.error || 'Failed to delete organization');
+        return;
+      }
+      setOrganizations(prev => prev.filter(o => o.id !== deleteTargetOrg.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete organization');
+    } finally {
+      setIsDeletingOrg(false);
+      setShowDeleteOrgModal(false);
+      setDeleteTargetOrg(null);
     }
   };
 
@@ -570,6 +601,13 @@ const OrganizationManagement: React.FC = () => {
                         title={org.is_active ? 'Archive Customer' : 'Restore Customer'}
                       >
                         <Archive className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteOrganization(org)}
+                        className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                        title="Delete Customer"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </button>
                     </div>
                   </td>
@@ -1142,6 +1180,19 @@ const OrganizationManagement: React.FC = () => {
           </div>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={showDeleteOrgModal}
+        title="Delete Organization"
+        entityName={deleteTargetOrg?.name || ''}
+        cascadeWarnings={[
+          'Organization pricing records will be marked as orphaned',
+          'Sales rep assignments will be marked as orphaned',
+        ]}
+        onConfirm={confirmDeleteOrganization}
+        onCancel={() => { setShowDeleteOrgModal(false); setDeleteTargetOrg(null); }}
+        isProcessing={isDeletingOrg}
+      />
     </div>
   );
 };
