@@ -182,6 +182,9 @@ function prepareTemplateData(emailType, data) {
       break;
     }
 
+    case 'customer_invitation':
+    case 'distributor_invitation':
+    case 'sales_rep_invitation':
     case 'user_invitation': {
       vars.full_name = String(data.full_name || '');
       vars.email = String(data.email || '');
@@ -389,6 +392,116 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
       `);
     }
 
+    case 'customer_invitation': {
+      const fullName = String(data.full_name || '');
+      const email = String(data.email || '');
+      const loginUrl = String(data.login_url || '#');
+      return wrap(`
+        <div style="text-align:center;padding-bottom:24px;border-bottom:1px solid #e5e7eb;margin-bottom:24px;">
+          <h2 style="color:#111827;font-size:22px;font-weight:700;margin:0 0 8px 0;">Welcome to HealthSpan360!</h2>
+          <p style="color:#6b7280;font-size:14px;margin:0;">You've been invited to join our platform as a customer.</p>
+        </div>
+        <div style="background:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;">
+          <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 12px 0;">Your Account Details</h3>
+          ${fullName ? `<div style="display:flex;justify-content:space-between;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Name</span>
+            <span style="font-size:14px;font-weight:500;color:#111827;">${fullName}</span>
+          </div>` : ''}
+          <div style="display:flex;justify-content:space-between;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Email</span>
+            <span style="font-size:14px;font-weight:500;color:#111827;">${email}</span>
+          </div>
+        </div>
+        <div style="text-align:center;margin-bottom:24px;">
+          <p style="color:#6b7280;font-size:14px;margin:0 0 16px 0;">
+            To get started, please set your password using the link below:
+          </p>
+          <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+            Set Up Your Password
+          </a>
+        </div>
+        <p style="color:#6b7280;font-size:13px;text-align:center;margin:0;">
+          Once your password is set, you can browse products and place orders.
+        </p>
+      `);
+    }
+
+    case 'distributor_invitation': {
+      const fullName = String(data.full_name || '');
+      const email = String(data.email || '');
+      const loginUrl = String(data.login_url || '#');
+      return wrap(`
+        <div style="text-align:center;padding-bottom:24px;border-bottom:1px solid #e5e7eb;margin-bottom:24px;">
+          <h2 style="color:#111827;font-size:22px;font-weight:700;margin:0 0 8px 0;">Welcome to HealthSpan360!</h2>
+          <p style="color:#6b7280;font-size:14px;margin:0;">You've been set up as a distributor on our platform.</p>
+        </div>
+        <div style="background:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;">
+          <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 12px 0;">Your Account Details</h3>
+          ${fullName ? `<div style="display:flex;justify-content:space-between;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Name</span>
+            <span style="font-size:14px;font-weight:500;color:#111827;">${fullName}</span>
+          </div>` : ''}
+          <div style="display:flex;justify-content:space-between;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Email</span>
+            <span style="font-size:14px;font-weight:500;color:#111827;">${email}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Role</span>
+            <span style="font-size:14px;font-weight:500;color:#111827;">Distributor</span>
+          </div>
+        </div>
+        <div style="text-align:center;margin-bottom:24px;">
+          <p style="color:#6b7280;font-size:14px;margin:0 0 16px 0;">
+            To get started, please set your password using the link below:
+          </p>
+          <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+            Set Up Your Password
+          </a>
+        </div>
+        <p style="color:#6b7280;font-size:13px;text-align:center;margin:0;">
+          Once your password is set, you can manage your sales reps, set product pricing, and view commission reports from your distributor portal.
+        </p>
+      `);
+    }
+
+    case 'sales_rep_invitation': {
+      const fullName = String(data.full_name || '');
+      const email = String(data.email || '');
+      const loginUrl = String(data.login_url || '#');
+      return wrap(`
+        <div style="text-align:center;padding-bottom:24px;border-bottom:1px solid #e5e7eb;margin-bottom:24px;">
+          <h2 style="color:#111827;font-size:22px;font-weight:700;margin:0 0 8px 0;">Welcome to HealthSpan360!</h2>
+          <p style="color:#6b7280;font-size:14px;margin:0;">You've been set up as a sales representative on our platform.</p>
+        </div>
+        <div style="background:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;">
+          <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 12px 0;">Your Account Details</h3>
+          ${fullName ? `<div style="display:flex;justify-content:space-between;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Name</span>
+            <span style="font-size:14px;font-weight:500;color:#111827;">${fullName}</span>
+          </div>` : ''}
+          <div style="display:flex;justify-content:space-between;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Email</span>
+            <span style="font-size:14px;font-weight:500;color:#111827;">${email}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Role</span>
+            <span style="font-size:14px;font-weight:500;color:#111827;">Sales Representative</span>
+          </div>
+        </div>
+        <div style="text-align:center;margin-bottom:24px;">
+          <p style="color:#6b7280;font-size:14px;margin:0 0 16px 0;">
+            To get started, please set your password using the link below:
+          </p>
+          <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
+            Set Up Your Password
+          </a>
+        </div>
+        <p style="color:#6b7280;font-size:13px;text-align:center;margin:0;">
+          Once your password is set, you can view your assigned organizations, track commissions, and manage customer relationships.
+        </p>
+      `);
+    }
+
     case 'user_invitation': {
       const fullName = String(data.full_name || '');
       const email = String(data.email || '');
@@ -401,6 +514,10 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
         </div>
         <div style="background:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;">
           <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 12px 0;">Your Account Details</h3>
+          ${fullName ? `<div style="display:flex;justify-content:space-between;padding:6px 0;">
+            <span style="font-size:14px;color:#6b7280;">Name</span>
+            <span style="font-size:14px;font-weight:500;color:#111827;">${fullName}</span>
+          </div>` : ''}
           <div style="display:flex;justify-content:space-between;padding:6px 0;">
             <span style="font-size:14px;color:#6b7280;">Email</span>
             <span style="font-size:14px;font-weight:500;color:#111827;">${email}</span>
@@ -415,12 +532,9 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
             To get started, please set your password using the link below:
           </p>
           <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
-            Get Started
+            Set Up Your Password
           </a>
         </div>
-        <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0;">
-          You will also receive a separate email with a link to set your password.
-        </p>
       `);
     }
 
@@ -464,14 +578,32 @@ exports.handler = async (event) => {
     const { headerHtml, footerHtml } = await getEmailSettings(supabase);
 
     // Try DB template first, fall back to hardcoded
+    // For role-specific invitation types, also try generic user_invitation as fallback
+    const INVITATION_TYPES = ['customer_invitation', 'distributor_invitation', 'sales_rep_invitation'];
     let htmlBody;
     try {
-      const { data: template } = await supabase
+      let template = null;
+
+      // Look up the specific template
+      const { data: specificTemplate } = await supabase
         .from('email_templates')
         .select('body_html, is_active')
         .eq('email_type', payload.email_type)
         .eq('is_active', true)
         .maybeSingle();
+
+      template = specificTemplate;
+
+      // If role-specific invitation template not found, try generic user_invitation
+      if (!template && INVITATION_TYPES.includes(payload.email_type)) {
+        const { data: genericTemplate } = await supabase
+          .from('email_templates')
+          .select('body_html, is_active')
+          .eq('email_type', 'user_invitation')
+          .eq('is_active', true)
+          .maybeSingle();
+        template = genericTemplate;
+      }
 
       if (template && template.body_html) {
         const vars = prepareTemplateData(payload.email_type, payload.template_data || {});
