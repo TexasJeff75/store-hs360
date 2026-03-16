@@ -211,10 +211,16 @@ Deno.serve(async (req: Request) => {
     // ═══════════════════════════════════════
     // 3. Send password reset + custom invite email
     // ═══════════════════════════════════════
-    // Generate a password reset link so the user can set their own password
+    // Generate a password recovery link so the user is prompted to set their own password.
+    // Using "recovery" (not "magiclink") ensures Supabase fires a PASSWORD_RECOVERY event,
+    // which the frontend detects to show the ResetPassword page.
+    const siteUrl = Deno.env.get("SITE_URL") || Deno.env.get("PUBLIC_SITE_URL") || "";
     const { data: resetData, error: resetError } = await adminClient.auth.admin.generateLink({
-      type: "magiclink",
+      type: "recovery",
       email: body.email,
+      options: {
+        redirectTo: siteUrl || undefined,
+      },
     });
     const loginUrl = resetData?.properties?.action_link || "";
     if (resetError) {
@@ -222,7 +228,6 @@ Deno.serve(async (req: Request) => {
     }
 
     // Send the custom invite email via the send-email Netlify function
-    const siteUrl = Deno.env.get("SITE_URL") || Deno.env.get("PUBLIC_SITE_URL") || "";
     const sendEmailUrl = siteUrl ? `${siteUrl.replace(/\/$/, "")}/.netlify/functions/send-email` : "";
 
     let inviteError: Error | null = null;

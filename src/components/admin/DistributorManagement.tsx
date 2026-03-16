@@ -282,7 +282,6 @@ const DistributorManagement: React.FC = () => {
   // Inline user creation state
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUserEmail, setNewUserEmail] = useState('');
-  const [newUserPassword, setNewUserPassword] = useState('');
   const [isCreatingUser, setIsCreatingUser] = useState(false);
 
   // Auto-code and commission collapse
@@ -292,7 +291,6 @@ const DistributorManagement: React.FC = () => {
   // Inline sales rep user creation state
   const [showCreateSalesRepUser, setShowCreateSalesRepUser] = useState(false);
   const [newSalesRepEmail, setNewSalesRepEmail] = useState('');
-  const [newSalesRepPassword, setNewSalesRepPassword] = useState('');
   const [isCreatingSalesRepUser, setIsCreatingSalesRepUser] = useState(false);
 
   const [newDistributorSalesRep, setNewDistributorSalesRep] = useState({
@@ -446,7 +444,6 @@ const DistributorManagement: React.FC = () => {
       setShowCommissionFields(false);
       setShowCreateUser(false);
       setNewUserEmail('');
-      setNewUserPassword('');
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create distributor');
@@ -454,12 +451,8 @@ const DistributorManagement: React.FC = () => {
   };
 
   const handleCreateDistributorUser = async () => {
-    if (!newUserEmail.trim() || !newUserPassword.trim()) {
-      setError('Email and password are required');
-      return;
-    }
-    if (newUserPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (!newUserEmail.trim()) {
+      setError('Email is required');
       return;
     }
     try {
@@ -478,9 +471,8 @@ const DistributorManagement: React.FC = () => {
           },
           body: JSON.stringify({
             email: newUserEmail,
-            password: newUserPassword,
             role: 'distributor',
-            is_approved: true,
+            fullName: newDistributor.name || undefined,
           }),
         }
       );
@@ -496,7 +488,6 @@ const DistributorManagement: React.FC = () => {
       // Refresh data and auto-select the new user
       const createdEmail = newUserEmail.trim().toLowerCase();
       setNewUserEmail('');
-      setNewUserPassword('');
       setShowCreateUser(false);
 
       // Re-fetch to get the new user in availableUsers
@@ -535,12 +526,8 @@ const DistributorManagement: React.FC = () => {
   };
 
   const handleCreateSalesRepUser = async () => {
-    if (!newSalesRepEmail.trim() || !newSalesRepPassword.trim()) {
-      setError('Email and password are required');
-      return;
-    }
-    if (newSalesRepPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (!newSalesRepEmail.trim()) {
+      setError('Email is required');
       return;
     }
     try {
@@ -562,9 +549,7 @@ const DistributorManagement: React.FC = () => {
           },
           body: JSON.stringify({
             email: newSalesRepEmail,
-            password: newSalesRepPassword,
             role: 'sales_rep',
-            is_approved: true,
           }),
         }
       );
@@ -584,7 +569,6 @@ const DistributorManagement: React.FC = () => {
       }
 
       setNewSalesRepEmail('');
-      setNewSalesRepPassword('');
       setShowCreateSalesRepUser(false);
 
       // Re-fetch sales reps to include the new or existing user
@@ -1700,7 +1684,6 @@ const DistributorManagement: React.FC = () => {
           setShowAddDistributor(false);
           setShowCreateUser(false);
           setNewUserEmail('');
-          setNewUserPassword('');
           setCodeManuallyEdited(false);
           setShowCommissionFields(false);
         }}>
@@ -1736,7 +1719,7 @@ const DistributorManagement: React.FC = () => {
                       <span className="text-sm font-medium text-purple-700">Create New User</span>
                       <button
                         type="button"
-                        onClick={() => { setShowCreateUser(false); setNewUserEmail(''); setNewUserPassword(''); }}
+                        onClick={() => { setShowCreateUser(false); setNewUserEmail(''); }}
                         className="text-gray-400 hover:text-gray-600"
                       >
                         <X className="h-4 w-4" />
@@ -1749,14 +1732,6 @@ const DistributorManagement: React.FC = () => {
                       className={inputCls}
                       placeholder="Email address"
                     />
-                    <input
-                      type="password"
-                      autoComplete="new-password"
-                      value={newUserPassword}
-                      onChange={(e) => setNewUserPassword(e.target.value)}
-                      className={inputCls}
-                      placeholder="Password (min 6 characters)"
-                    />
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -1768,14 +1743,14 @@ const DistributorManagement: React.FC = () => {
                       </button>
                       <button
                         type="button"
-                        onClick={() => { setShowCreateUser(false); setNewUserEmail(''); setNewUserPassword(''); }}
+                        onClick={() => { setShowCreateUser(false); setNewUserEmail(''); }}
                         className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
                       >
                         Cancel
                       </button>
                     </div>
                     <p className="text-xs text-gray-500">
-                      User will be created with the <strong>distributor</strong> role and auto-approved.
+                      An invite email will be sent so the user can set their own password.
                     </p>
                   </div>
                 )}
@@ -2012,7 +1987,6 @@ const DistributorManagement: React.FC = () => {
                   setShowAddDistributor(false);
                   setShowCreateUser(false);
                   setNewUserEmail('');
-                  setNewUserPassword('');
                   setCodeManuallyEdited(false);
                   setShowCommissionFields(false);
                 }}
@@ -2257,7 +2231,7 @@ const DistributorManagement: React.FC = () => {
         return (
           <Modal
             title={`Add Sales Rep — ${dist?.name ?? ''}`}
-            onClose={() => { setShowAddSalesRep(false); setShowCreateSalesRepUser(false); setNewSalesRepEmail(''); setNewSalesRepPassword(''); }}
+            onClose={() => { setShowAddSalesRep(false); setShowCreateSalesRepUser(false); setNewSalesRepEmail(''); }}
           >
             {dist && (
               <div className="mb-4 px-3 py-2 bg-violet-50 border border-violet-100 rounded-lg text-xs text-violet-700">
@@ -2306,7 +2280,7 @@ const DistributorManagement: React.FC = () => {
                         <span className="text-sm font-medium text-purple-700">Create New Sales Rep</span>
                         <button
                           type="button"
-                          onClick={() => { setShowCreateSalesRepUser(false); setNewSalesRepEmail(''); setNewSalesRepPassword(''); }}
+                          onClick={() => { setShowCreateSalesRepUser(false); setNewSalesRepEmail(''); }}
                           className="text-gray-400 hover:text-gray-600"
                         >
                           <X className="h-4 w-4" />
@@ -2319,14 +2293,6 @@ const DistributorManagement: React.FC = () => {
                         className={inputCls}
                         placeholder="Email address"
                       />
-                      <input
-                        type="password"
-                        autoComplete="new-password"
-                        value={newSalesRepPassword}
-                        onChange={(e) => setNewSalesRepPassword(e.target.value)}
-                        className={inputCls}
-                        placeholder="Password (min 6 characters)"
-                      />
                       <div className="flex gap-2">
                         <button
                           type="button"
@@ -2338,14 +2304,14 @@ const DistributorManagement: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => { setShowCreateSalesRepUser(false); setNewSalesRepEmail(''); setNewSalesRepPassword(''); }}
+                          onClick={() => { setShowCreateSalesRepUser(false); setNewSalesRepEmail(''); }}
                           className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
                         >
                           Cancel
                         </button>
                       </div>
                       <p className="text-xs text-gray-500">
-                        User will be created with the <strong>sales_rep</strong> role and auto-approved.
+                        An invite email will be sent so the user can set their own password.
                       </p>
                     </div>
                   )}
@@ -2449,7 +2415,7 @@ const DistributorManagement: React.FC = () => {
               <div className="mt-6 flex gap-3 justify-end border-t border-gray-100 pt-4">
                 <button
                   type="button"
-                  onClick={() => { setShowAddSalesRep(false); setShowCreateSalesRepUser(false); setNewSalesRepEmail(''); setNewSalesRepPassword(''); }}
+                  onClick={() => { setShowAddSalesRep(false); setShowCreateSalesRepUser(false); setNewSalesRepEmail(''); }}
                   className={cancelBtnCls}
                 >
                   Cancel

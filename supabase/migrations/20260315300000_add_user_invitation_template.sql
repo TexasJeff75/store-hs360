@@ -26,18 +26,18 @@ VALUES (
     To get started, please set your password using the link below:
   </p>
   <a href="{{login_url}}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
-    Get Started
+    Set Up Your Password
   </a>
 </div>
 
 <p style="color:#9ca3af;font-size:12px;text-align:center;margin:0;">
-  You will also receive a separate email with a link to set your password.
+  This link will expire in 24 hours. If it expires, contact your administrator for a new invitation.
 </p>$$,
   '[
     {"key":"full_name","description":"Invited user full name","example":"John Doe"},
     {"key":"email","description":"Invited user email address","example":"john@example.com"},
     {"key":"role","description":"Assigned role","example":"customer"},
-    {"key":"login_url","description":"URL to the login page","example":"https://store.healthspan360.com"}
+    {"key":"login_url","description":"Password setup URL (recovery link)","example":"https://store.healthspan360.com"}
   ]'::jsonb,
   true
 )
