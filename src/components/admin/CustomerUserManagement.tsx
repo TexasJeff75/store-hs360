@@ -101,6 +101,7 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
             role: 'customer',
             organizationId: organizationId,
             orgRole: newUserData.role,
+            siteUrl: window.location.origin,
           }),
         }
       );

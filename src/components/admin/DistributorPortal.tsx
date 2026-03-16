@@ -348,6 +348,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
             distributorId: distributor.id,
             commissionSplitType: newSalesRep.commission_split_type,
             salesRepRate: newSalesRep.sales_rep_rate,
+            siteUrl: window.location.origin,
             distributorOverrideRate: newSalesRep.commission_split_type === 'fixed_with_override'
               ? newSalesRep.distributor_override_rate : undefined,
           }),
@@ -444,6 +445,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
             fullName: newDelegateFullName,
             delegateForDistributorId: distributor.id,
             delegateNotes: delegateNotes || null,
+            siteUrl: window.location.origin,
           }),
         }
       );

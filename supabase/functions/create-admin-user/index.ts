@@ -24,6 +24,8 @@ interface CreateUserRequest {
   commissionSplitType?: "percentage_of_distributor" | "fixed_with_override";
   salesRepRate?: number;
   distributorOverrideRate?: number;
+  // Skip role-specific entity creation (user/profile only)
+  skipEntityCreation?: boolean;
   // W-9 fields (for independent sales rep or distributor)
   taxId?: string;
   taxIdType?: "ein" | "ssn";
@@ -42,6 +44,8 @@ interface CreateUserRequest {
   // Delegate creation (distributor adding a delegate user)
   delegateForDistributorId?: string;
   delegateNotes?: string;
+  // Frontend can pass site URL for email delivery
+  siteUrl?: string;
 }
 
 function jsonResponse(body: Record<string, unknown>, status = 200) {
@@ -214,7 +218,7 @@ Deno.serve(async (req: Request) => {
     // Generate a password recovery link so the user is prompted to set their own password.
     // Using "recovery" (not "magiclink") ensures Supabase fires a PASSWORD_RECOVERY event,
     // which the frontend detects to show the ResetPassword page.
-    const siteUrl = Deno.env.get("SITE_URL") || Deno.env.get("PUBLIC_SITE_URL") || "";
+    const siteUrl = body.siteUrl || Deno.env.get("SITE_URL") || Deno.env.get("PUBLIC_SITE_URL") || "";
     const { data: resetData, error: resetError } = await adminClient.auth.admin.generateLink({
       type: "recovery",
       email: body.email,
@@ -267,8 +271,17 @@ Deno.serve(async (req: Request) => {
     }
 
     // ═══════════════════════════════════════
-    // 4. Role-specific setup
+    // 4. Role-specific setup (skip if caller handles entity creation)
     // ═══════════════════════════════════════
+    if (body.skipEntityCreation) {
+      return jsonResponse({
+        success: true,
+        userId,
+        inviteEmailSent: !inviteError,
+        reactivated,
+      });
+    }
+
     let organizationId = body.organizationId;
 
     // Handle org creation if requested
