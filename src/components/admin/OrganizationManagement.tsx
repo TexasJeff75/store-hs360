@@ -217,6 +217,7 @@ const OrganizationManagement: React.FC = () => {
                     orgRole: 'admin',
                     isHouseAccount: (selectedOrg as any).is_house_account || false,
                     salesRepId: (selectedOrg as any).default_sales_rep_id || undefined,
+                    siteUrl: window.location.origin,
                   }),
                 }
               );

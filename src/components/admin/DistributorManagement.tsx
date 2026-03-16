@@ -398,18 +398,60 @@ const DistributorManagement: React.FC = () => {
 
   const handleCreateDistributor = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newDistributor.commission_rate === '' || isNaN(Number(newDistributor.commission_rate))) {
-      setError('Commission rate is required');
-      return;
-    }
     try {
       setError(null);
-      const payload = {
-        profile_id: newDistributor.profile_id,
-        user_id: newDistributor.profile_id,
+
+      // If creating a new user inline, create the user first
+      let profileId = newDistributor.profile_id;
+      if (showCreateUser && newUserEmail.trim()) {
+        if (!newUserEmail.trim()) {
+          setError('Email is required for new user');
+          return;
+        }
+        setIsCreatingUser(true);
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error('No active session');
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              email: newUserEmail,
+              role: 'distributor',
+              fullName: newDistributor.name || undefined,
+              skipEntityCreation: true,
+              siteUrl: window.location.origin,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || `Request failed with status ${response.status}`);
+        }
+
+        const result = await response.json();
+        if (!result.success) throw new Error(result.error || 'User creation failed');
+        profileId = result.userId;
+        setIsCreatingUser(false);
+      }
+
+      if (!profileId) {
+        setError('Please select or create a user');
+        return;
+      }
+
+      const hasCommissionRate = newDistributor.commission_rate !== '' && !isNaN(Number(newDistributor.commission_rate));
+      const payload: Record<string, unknown> = {
+        profile_id: profileId,
+        user_id: profileId,
         name: newDistributor.name,
         code: newDistributor.code,
-        commission_rate: Number(newDistributor.commission_rate),
         commission_type: newDistributor.commission_type,
         pricing_model: newDistributor.pricing_model,
         notes: newDistributor.notes || null,
@@ -420,10 +462,13 @@ const DistributorManagement: React.FC = () => {
         zip: newDistributor.zip || null,
         phone: newDistributor.phone || null,
       };
+      if (hasCommissionRate) {
+        payload.commission_rate = Number(newDistributor.commission_rate);
+      }
       const { error: insertError } = await supabase.from('distributors').insert([payload]);
       if (insertError) throw insertError;
 
-      setSuccess('Distributor created successfully');
+      setSuccess(showCreateUser && newUserEmail ? 'User and distributor created successfully. An invite email has been sent.' : 'Distributor created successfully');
       setShowAddDistributor(false);
       setNewDistributor({
         profile_id: '',
@@ -447,9 +492,12 @@ const DistributorManagement: React.FC = () => {
       fetchData();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create distributor');
+    } finally {
+      setIsCreatingUser(false);
     }
   };
 
+  // Legacy handler kept for reference — user creation is now merged into handleCreateDistributor
   const handleCreateDistributorUser = async () => {
     if (!newUserEmail.trim()) {
       setError('Email is required');
@@ -473,6 +521,7 @@ const DistributorManagement: React.FC = () => {
             email: newUserEmail,
             role: 'distributor',
             fullName: newDistributor.name || undefined,
+            siteUrl: window.location.origin,
           }),
         }
       );
@@ -550,6 +599,7 @@ const DistributorManagement: React.FC = () => {
           body: JSON.stringify({
             email: newSalesRepEmail,
             role: 'sales_rep',
+            siteUrl: window.location.origin,
           }),
         }
       );
@@ -1694,7 +1744,7 @@ const DistributorManagement: React.FC = () => {
                 {!showCreateUser ? (
                   <div className="flex gap-2">
                     <select
-                      required
+                      required={!showCreateUser}
                       value={newDistributor.profile_id}
                       onChange={(e) => setNewDistributor({ ...newDistributor, profile_id: e.target.value })}
                       className={`${selectCls} flex-1`}
@@ -1727,30 +1777,14 @@ const DistributorManagement: React.FC = () => {
                     </div>
                     <input
                       type="email"
+                      required
                       value={newUserEmail}
                       onChange={(e) => setNewUserEmail(e.target.value)}
                       className={inputCls}
                       placeholder="Email address"
                     />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleCreateDistributorUser}
-                        disabled={isCreatingUser}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-700 rounded-lg disabled:opacity-50"
-                      >
-                        {isCreatingUser ? 'Creating...' : 'Create & Select'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => { setShowCreateUser(false); setNewUserEmail(''); }}
-                        className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800"
-                      >
-                        Cancel
-                      </button>
-                    </div>
                     <p className="text-xs text-gray-500">
-                      An invite email will be sent so the user can set their own password.
+                      A new user will be created and an invite email sent when you save the distributor.
                     </p>
                   </div>
                 )}
@@ -1996,8 +2030,8 @@ const DistributorManagement: React.FC = () => {
               >
                 Cancel
               </button>
-              <button type="submit" className={primaryBtnCls}>
-                Create Distributor
+              <button type="submit" disabled={isCreatingUser} className={primaryBtnCls}>
+                {isCreatingUser ? 'Creating User & Distributor...' : showCreateUser && newUserEmail ? 'Create User & Distributor' : 'Create Distributor'}
               </button>
             </div>
           </form>
