@@ -3,6 +3,7 @@ import {
   Users, Building, Plus, Trash2, X, Save,
   TrendingUp, DollarSign, Building2, Percent, Package,
   ChevronDown, ChevronRight, UserPlus, Pencil, Upload,
+  Search, Eye, ArrowLeft, Settings, Archive, CheckCircle, AlertCircle,
 } from 'lucide-react';
 import { supabase } from '@/services/supabase';
 import { softDeleteService } from '@/services/softDeleteService';
@@ -208,6 +209,8 @@ interface RepCustomerLink {
   is_active: boolean;
 }
 
+type DistSubTab = 'sales_reps' | 'commission_rules' | 'wholesale_pricing' | 'customers';
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 const DistributorManagement: React.FC = () => {
@@ -217,6 +220,14 @@ const DistributorManagement: React.FC = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [availableUsers, setAvailableUsers] = useState<SalesRep[]>([]);
+  // New UI state for table layout
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedDistForSub, setSelectedDistForSub] = useState<Distributor | null>(null);
+  const [activeSubTab, setActiveSubTab] = useState<DistSubTab>('sales_reps');
+  const [viewingDistributor, setViewingDistributor] = useState<Distributor | null>(null);
+  const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [salesReps, setSalesReps] = useState<SalesRep[]>([]);
   const [distributorCustomers, setDistributorCustomers] = useState<DistributorCustomer[]>([]);
@@ -979,23 +990,394 @@ const DistributorManagement: React.FC = () => {
     }
   };
 
-  if (loading) {
+  const filteredDistributors = distributors.filter(d => {
+    const matchesSearch =
+      d.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      d.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (d.profiles?.email && d.profiles.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (d.contact_name && d.contact_name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' && d.is_active) ||
+      (statusFilter === 'inactive' && !d.is_active);
+    return matchesSearch && matchesStatus;
+  });
+
+  // ── Sub-management view ──────────────────────────────────────────────────
+  if (selectedDistForSub) {
+    const dist = selectedDistForSub;
+    const typeConfig = getCommissionTypeConfig(dist.commission_type ?? 'percent_margin');
+    const rateDisplay = commissionRateLabel(dist.commission_type ?? 'percent_margin', dist.commission_rate);
+    const reps = getDistributorSalesReps(dist.id);
+    const custOrgs = getDistributorCustomerOrgs(dist.id);
+
+    const subTabs: { id: DistSubTab; label: string; icon: typeof Users; count: number }[] = [
+      { id: 'sales_reps', label: 'Sales Reps', icon: Users, count: reps.length },
+      { id: 'commission_rules', label: 'Commission Rules', icon: DollarSign, count: getDistributorRules(dist.id).length },
+      { id: 'wholesale_pricing', label: 'Wholesale Pricing', icon: Package, count: getDistributorPricing(dist.id).length },
+      { id: 'customers', label: 'Customers', icon: Building2, count: custOrgs.length },
+    ];
+
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500" />
+      <div className="p-6">
+        {/* Alerts */}
+        {error && <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>}
+        {success && <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">{success}</div>}
+
+        {/* Sub-management header */}
+        <div className="mb-6">
+          <div className="flex items-center space-x-4 mb-4">
+            <button
+              onClick={() => { setSelectedDistForSub(null); setActiveSubTab('sales_reps'); }}
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors"
+            >
+              <ArrowLeft className="h-5 w-5" />
+              <span>Back to Distributors</span>
+            </button>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            <div className="p-3 bg-gradient-to-br from-pink-500 to-orange-500 rounded-lg">
+              <Building className="h-8 w-8 text-white" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900">{dist.name}</h2>
+              <p className="text-gray-600">Code: {dist.code} · {dist.profiles?.email ?? 'N/A'}</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                  dist.distributor_class === 'independent' ? 'bg-sky-100 text-sky-700' : 'bg-indigo-100 text-indigo-700'
+                }`}>
+                  {dist.distributor_class === 'independent' ? 'Independent' : 'Company'}
+                </span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                  dist.pricing_model === 'wholesale' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                }`}>
+                  {dist.pricing_model === 'wholesale' ? 'Wholesale' : 'Margin Split'}
+                </span>
+                {dist.pricing_model !== 'wholesale' && (
+                  <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                    {rateDisplay} {typeConfig.label}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sub-tabs */}
+        <div className="border-b border-gray-200 mb-6">
+          <nav className="-mb-px flex space-x-8">
+            {subTabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveSubTab(tab.id)}
+                  className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeSubTab === tab.id
+                      ? 'border-pink-500 text-pink-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span>{tab.label} ({tab.count})</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Sub-tab content */}
+        <div>
+          {/* ── Sales Reps Tab ── */}
+          {activeSubTab === 'sales_reps' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Sales Representatives</h3>
+                <button
+                  onClick={() => { setSelectedDistributor(dist.id); setShowAddSalesRep(true); }}
+                  className="flex items-center gap-2 px-3 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 text-sm"
+                >
+                  <Plus className="h-4 w-4" />
+                  Add Sales Rep
+                </button>
+              </div>
+              {reps.length === 0 ? (
+                <div className="bg-white border border-dashed border-gray-300 rounded-lg py-12 text-center">
+                  <Users className="mx-auto h-8 w-8 text-gray-300 mb-2" />
+                  <p className="text-sm text-gray-500">No sales representatives assigned</p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rep</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Split Type</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rate</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned Customers</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {reps.map((dsr) => {
+                        const splitLabel =
+                          dsr.commission_split_type === 'percentage_of_distributor'
+                            ? `${dsr.sales_rep_rate}% of dist. commission`
+                            : `Fixed ${dsr.sales_rep_rate}${typeConfig.isFlat ? '$' : '%'} + ${dsr.distributor_override_rate ?? 0}${typeConfig.isFlat ? '$' : '%'} override`;
+                        const repCustLinks = getRepCustomerLinks(dist.id, dsr.sales_rep_id);
+                        const assignedOrgIds = new Set(repCustLinks.map(rc => rc.organization_id));
+                        const availableCustOrgs = custOrgs.filter(dc => !assignedOrgIds.has(dc.organization_id));
+                        return (
+                          <tr key={dsr.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4">
+                              <p className="text-sm font-medium text-gray-900">{dsr.profiles?.full_name || dsr.profiles?.email}</p>
+                              {dsr.profiles?.full_name && <p className="text-xs text-gray-500">{dsr.profiles.email}</p>}
+                              {dsr.profiles?.phone && <p className="text-xs text-gray-400">{dsr.profiles.phone}</p>}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-xs px-2 py-1 rounded-full bg-violet-50 text-violet-700">
+                                {dsr.commission_split_type === 'percentage_of_distributor' ? '% of Distributor' : 'Fixed + Override'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-700">{splitLabel}</td>
+                            <td className="px-6 py-4">
+                              <div className="flex flex-wrap gap-1.5">
+                                {repCustLinks.map((rc) => {
+                                  const org = organizations.find(o => o.id === rc.organization_id);
+                                  return (
+                                    <span key={rc.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 rounded-full text-xs">
+                                      {org?.name ?? 'Unknown'}
+                                      <button onClick={() => handleRemoveRepCustomer(rc.id)} className="ml-0.5 hover:bg-green-200 rounded-full p-0.5" title="Remove">
+                                        <X className="h-3 w-3" />
+                                      </button>
+                                    </span>
+                                  );
+                                })}
+                                {availableCustOrgs.length > 0 && (
+                                  <select
+                                    className="text-xs px-2 py-1 border border-gray-200 rounded-lg text-gray-600 bg-white"
+                                    value=""
+                                    onChange={(e) => { if (e.target.value) handleAddRepCustomer(dist.id, dsr.sales_rep_id, e.target.value); }}
+                                  >
+                                    <option value="">+ Assign...</option>
+                                    {availableCustOrgs.map((dc) => (
+                                      <option key={dc.organization_id} value={dc.organization_id}>{dc.organizations.name}</option>
+                                    ))}
+                                  </select>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <button onClick={() => handleRemoveSalesRepFromDistributor(dsr.id)} className="p-1.5 hover:bg-red-50 rounded-lg" title="Remove">
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Commission Rules Tab ── */}
+          {activeSubTab === 'commission_rules' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Commission Rules</h3>
+                {dist.pricing_model !== 'wholesale' && (
+                  <button
+                    onClick={() => setShowAddRule(dist.id)}
+                    className="flex items-center gap-2 px-3 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-700 text-sm"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add Rule
+                  </button>
+                )}
+              </div>
+              {dist.pricing_model === 'wholesale' ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">
+                  Wholesale distributors don't use commission rules. They earn the spread between wholesale and customer price.
+                </div>
+              ) : getDistributorRules(dist.id).length === 0 ? (
+                <div className="bg-white border border-dashed border-gray-300 rounded-lg py-12 text-center">
+                  <DollarSign className="mx-auto h-8 w-8 text-gray-300 mb-2" />
+                  <p className="text-sm text-gray-500">No per-product or per-category rules</p>
+                  <p className="text-xs text-gray-400 mt-1">All items use the distributor default: {rateDisplay} {typeConfig.label}</p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Scope</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Target</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Commission</th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {getDistributorRules(dist.id).map((rule) => {
+                        const rCfg = getCommissionTypeConfig(rule.commission_type);
+                        const productName = rule.product_id ? products.find((p) => p.id === rule.product_id)?.name ?? `#${rule.product_id}` : null;
+                        const categoryName = rule.category_id ? categories.find((c) => c.id === rule.category_id)?.name ?? 'Unknown' : null;
+                        const customerName = rule.organization_id ? organizations.find((o) => o.id === rule.organization_id)?.name ?? 'Unknown' : null;
+                        return (
+                          <tr key={rule.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4">
+                              <span className={`text-xs px-2 py-1 rounded-full ${rule.scope === 'product' ? 'bg-blue-50 text-blue-700' : 'bg-purple-50 text-purple-700'}`}>
+                                {rule.scope === 'product' ? 'Product' : 'Category'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900">{productName || categoryName}</td>
+                            <td className="px-6 py-4">
+                              <span className={`text-xs px-2 py-1 rounded-full ${customerName ? 'bg-indigo-50 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>
+                                {customerName || 'All customers'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <p className="text-sm font-medium text-gray-900">{commissionRateLabel(rule.commission_type, rule.commission_rate)}</p>
+                              <p className="text-xs text-gray-500">{rCfg.label}{rule.use_customer_price ? ' · uses customer price' : ''}</p>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <button onClick={() => handleDeleteCommissionRule(rule.id)} className="p-1.5 hover:bg-red-50 rounded-lg" title="Remove">
+                                <Trash2 className="h-4 w-4 text-red-500" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── Wholesale Pricing Tab ── */}
+          {activeSubTab === 'wholesale_pricing' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Wholesale Product Pricing</h3>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowPricingImport({ distributorId: dist.id, distributorName: dist.name })}
+                    className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 text-sm"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Import CSV
+                  </button>
+                </div>
+              </div>
+              {dist.pricing_model !== 'wholesale' ? (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 text-sm text-amber-700">
+                  This distributor uses the Margin Split model. Wholesale pricing only applies to Wholesale distributors.
+                </div>
+              ) : (
+                <WholesalePricingGrid
+                  products={products}
+                  pricing={getDistributorPricing(dist.id)}
+                  distributorId={dist.id}
+                  onRefresh={fetchData}
+                />
+              )}
+            </div>
+          )}
+
+          {/* ── Customers Tab ── */}
+          {activeSubTab === 'customers' && (
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Customer Organizations</h3>
+              </div>
+              {(() => {
+                const linkedOrgIds = new Set(custOrgs.map(dc => dc.organization_id));
+                const availableOrgs = organizations.filter(o => !linkedOrgIds.has(o.id));
+                return (
+                  <>
+                    {availableOrgs.length > 0 && (
+                      <div className="mb-4">
+                        <select
+                          className="text-sm px-3 py-2 border border-gray-300 rounded-lg text-gray-600 bg-white"
+                          value=""
+                          onChange={(e) => { if (e.target.value) handleAddCustomerOrg(dist.id, e.target.value); }}
+                        >
+                          <option value="">+ Add customer organization...</option>
+                          {availableOrgs.map((org) => (
+                            <option key={org.id} value={org.id}>{org.name} ({org.code})</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {custOrgs.length === 0 ? (
+                      <div className="bg-white border border-dashed border-gray-300 rounded-lg py-12 text-center">
+                        <Building2 className="mx-auto h-8 w-8 text-gray-300 mb-2" />
+                        <p className="text-sm text-gray-500">No customer organizations linked</p>
+                      </div>
+                    ) : (
+                      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                        <table className="min-w-full divide-y divide-gray-200">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Customer</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
+                              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-200">
+                            {custOrgs.map((dc) => (
+                              <tr key={dc.id} className="hover:bg-gray-50">
+                                <td className="px-6 py-4 text-sm font-medium text-gray-900">{dc.organizations.name}</td>
+                                <td className="px-6 py-4 text-sm text-gray-500">{dc.organizations.code}</td>
+                                <td className="px-6 py-4 text-right">
+                                  <button onClick={() => handleRemoveCustomerOrg(dc.id)} className="p-1.5 hover:bg-red-50 rounded-lg" title="Remove">
+                                    <Trash2 className="h-4 w-4 text-red-500" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          )}
+        </div>
+
+        {/* Modals that work inside sub-management view */}
+        {renderModals()}
       </div>
     );
   }
 
+  // ── Loading state ──────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="animate-pulse space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-24 bg-gray-200 rounded-lg"></div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Main list view ─────────────────────────────────────────────────────────
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="mb-6 flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">Distributor Management</h2>
-          <p className="text-gray-600 mt-1">
-            Manage distributors, their customer accounts, commission structures, and sales rep hierarchies
-          </p>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Distributor Management</h2>
+          <p className="text-gray-600">Manage distributors, commission structures, and sales rep hierarchies</p>
         </div>
         <button
           onClick={() => setShowAddDistributor(true)}
@@ -1008,509 +1390,299 @@ const DistributorManagement: React.FC = () => {
 
       {/* Alerts */}
       {error && (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{error}</div>
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center space-x-2">
+          <AlertCircle className="h-5 w-5 text-red-600" />
+          <span className="text-sm text-red-700">{error}</span>
+        </div>
       )}
       {success && (
-        <div className="p-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">{success}</div>
-      )}
-
-      {/* Empty state */}
-      {distributors.length === 0 && (
-        <div className="bg-white border border-dashed border-gray-300 rounded-xl py-16 text-center">
-          <Building className="mx-auto h-10 w-10 text-gray-300 mb-3" />
-          <p className="text-sm font-medium text-gray-500">No distributors yet</p>
-          <p className="text-xs text-gray-400 mt-1">Click "Add Distributor" to create one</p>
+        <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg flex items-center space-x-2">
+          <CheckCircle className="h-5 w-5 text-green-600" />
+          <span className="text-sm text-green-700">{success}</span>
         </div>
       )}
 
-      {/* Distributors list */}
-      <div className="grid gap-6">
-        {distributors.map((distributor) => {
-          const typeConfig = getCommissionTypeConfig(distributor.commission_type ?? 'percent_margin');
-          const rateDisplay = commissionRateLabel(distributor.commission_type ?? 'percent_margin', distributor.commission_rate);
-          const reps = getDistributorSalesReps(distributor.id);
+      {/* Search + Filter */}
+      <div className="mb-6">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search by name, code, email, or contact..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+            />
+          </div>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+          >
+            <option value="all">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+        </div>
+      </div>
 
-          return (
-            <div key={distributor.id} className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-              {editingDistributor?.id === distributor.id ? (
-                /* ── Edit mode ─────────────────────────────────────────── */
-                <EditDistributorForm
-                  distributor={editingDistributor}
-                  onChange={setEditingDistributor}
-                  onSave={handleUpdateDistributor}
-                  onCancel={() => setEditingDistributor(null)}
-                  salesReps={salesReps}
-                />
-              ) : (
-                /* ── View mode ─────────────────────────────────────────── */
-                <>
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-start gap-4">
-                      <div className="p-3 bg-gradient-to-br from-pink-500 to-orange-500 rounded-lg shrink-0">
-                        <Building className="h-6 w-6 text-white" />
+      {/* Summary Stats */}
+      <div className="mb-6 grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <Building className="h-8 w-8 text-pink-600" />
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Total</p>
+              <p className="text-2xl font-semibold text-gray-900">{distributors.length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <CheckCircle className="h-8 w-8 text-green-600" />
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Active</p>
+              <p className="text-2xl font-semibold text-gray-900">{distributors.filter(d => d.is_active).length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <Archive className="h-8 w-8 text-gray-600" />
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Inactive</p>
+              <p className="text-2xl font-semibold text-gray-900">{distributors.filter(d => !d.is_active).length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <Users className="h-8 w-8 text-sky-600" />
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Independent</p>
+              <p className="text-2xl font-semibold text-gray-900">{distributors.filter(d => d.distributor_class === 'independent').length}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+          <div className="flex items-center">
+            <Building2 className="h-8 w-8 text-indigo-600" />
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-500">Company</p>
+              <p className="text-2xl font-semibold text-gray-900">{distributors.filter(d => d.distributor_class === 'company').length}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Distributors Table */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Distributor</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type / Model</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stats</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredDistributors.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-500">
+                    {distributors.length === 0 ? 'No distributors yet. Click "Add Distributor" to create one.' : 'No distributors match your search.'}
+                  </td>
+                </tr>
+              ) : filteredDistributors.map((distributor) => {
+                const reps = getDistributorSalesReps(distributor.id);
+                const rules = getDistributorRules(distributor.id);
+                const custOrgs = getDistributorCustomerOrgs(distributor.id);
+                const pricing = getDistributorPricing(distributor.id);
+                return (
+                  <tr key={distributor.id} className={distributor.is_active ? 'hover:bg-gray-50' : 'bg-gray-50'}>
+                    {/* Actions */}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => { setViewingDistributor(distributor); setIsViewModalOpen(true); }}
+                          className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                          title="View Details"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => { setEditingDistributor(distributor); setIsEditModalOpen(true); }}
+                          className="p-2 text-pink-600 bg-pink-50 hover:bg-pink-100 rounded-lg transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => { setSelectedDistForSub(distributor); setActiveSubTab('sales_reps'); }}
+                          className="p-2 text-emerald-600 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors"
+                          title="Manage Sales Reps, Rules & Pricing"
+                        >
+                          <Settings className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteDistributor(distributor)}
+                          className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
-                      <div className="min-w-0">
-                        <h3 className="text-xl font-semibold text-gray-900">{distributor.name}</h3>
-                        <p className="text-sm text-gray-500">Code: {distributor.code}</p>
-                        <p className="text-sm text-gray-500">User: {distributor.profiles?.email ?? 'N/A'}</p>
+                    </td>
 
-                        {/* Customer organizations */}
-                        {(() => {
-                          const custOrgs = getDistributorCustomerOrgs(distributor.id);
-                          const linkedOrgIds = new Set(custOrgs.map(dc => dc.organization_id));
-                          const availableOrgs = organizations.filter(o => !linkedOrgIds.has(o.id));
-                          return (
-                            <div className="mt-2">
-                              <div className="flex items-center gap-1.5 mb-1.5 text-xs font-medium text-gray-500">
-                                <Building2 className="h-3.5 w-3.5" />
-                                Customers ({custOrgs.length})
-                              </div>
-                              {custOrgs.length > 0 ? (
-                                <div className="flex flex-wrap gap-1.5">
-                                  {custOrgs.map((dc) => (
-                                    <span key={dc.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full text-xs">
-                                      {dc.organizations.name}
-                                      <span className="text-indigo-400">({dc.organizations.code})</span>
-                                      <button
-                                        onClick={() => handleRemoveCustomerOrg(dc.id)}
-                                        className="ml-0.5 hover:bg-indigo-200 rounded-full p-0.5 transition-colors"
-                                        title="Remove"
-                                      >
-                                        <X className="h-3 w-3" />
-                                      </button>
-                                    </span>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-xs text-gray-400 italic">No customers linked</p>
-                              )}
-                              {availableOrgs.length > 0 && (
-                                <select
-                                  className="mt-1.5 text-xs px-2 py-1 border border-gray-200 rounded-lg text-gray-600 bg-white"
-                                  value=""
-                                  onChange={(e) => {
-                                    if (e.target.value) handleAddCustomerOrg(distributor.id, e.target.value);
-                                  }}
-                                >
-                                  <option value="">+ Add customer...</option>
-                                  {availableOrgs.map((org) => (
-                                    <option key={org.id} value={org.id}>{org.name} ({org.code})</option>
-                                  ))}
-                                </select>
-                              )}
-                            </div>
-                          );
-                        })()}
+                    {/* Distributor */}
+                    <td className="px-6 py-4">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{distributor.name}</p>
+                        <p className="text-xs text-gray-500">Code: {distributor.code}</p>
+                        <p className="text-xs text-gray-500">{distributor.profiles?.email ?? 'No user'}</p>
+                      </div>
+                    </td>
 
-                        {(distributor.contact_name || distributor.phone) && (
-                          <p className="text-xs text-gray-500 mt-1">
-                            {distributor.contact_name && <span>{distributor.contact_name}</span>}
-                            {distributor.contact_name && distributor.phone && <span> · </span>}
-                            {distributor.phone && <span>{distributor.phone}</span>}
-                          </p>
-                        )}
+                    {/* Contact */}
+                    <td className="px-6 py-4">
+                      <div>
+                        {distributor.contact_name && <p className="text-sm text-gray-900">{distributor.contact_name}</p>}
+                        {distributor.phone && <p className="text-xs text-gray-500">{distributor.phone}</p>}
                         {distributor.address && (
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {distributor.address}
-                            {distributor.city && `, ${distributor.city}`}
-                            {distributor.state && `, ${distributor.state}`}
-                            {distributor.zip && ` ${distributor.zip}`}
+                          <p className="text-xs text-gray-400">
+                            {distributor.address}{distributor.city ? `, ${distributor.city}` : ''}{distributor.state ? `, ${distributor.state}` : ''}{distributor.zip ? ` ${distributor.zip}` : ''}
                           </p>
                         )}
-                        {distributor.notes && (
-                          <p className="text-sm text-gray-500 mt-1">{distributor.notes}</p>
+                        {!distributor.contact_name && !distributor.phone && !distributor.address && (
+                          <span className="text-xs text-gray-400">—</span>
                         )}
                       </div>
-                    </div>
+                    </td>
 
-                    {/* Right-side badges + actions */}
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-                      {/* Distributor class badge */}
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        distributor.distributor_class === 'independent'
-                          ? 'bg-sky-100 text-sky-700'
-                          : 'bg-indigo-100 text-indigo-700'
-                      }`}>
-                        {distributor.distributor_class === 'independent' ? 'Independent' : 'Company'}
-                      </span>
+                    {/* Type / Model */}
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          distributor.distributor_class === 'independent' ? 'bg-sky-100 text-sky-700' : 'bg-indigo-100 text-indigo-700'
+                        }`}>
+                          {distributor.distributor_class === 'independent' ? 'Independent' : 'Company'}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          distributor.pricing_model === 'wholesale' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {distributor.pricing_model === 'wholesale' ? 'Wholesale' : 'Margin Split'}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          distributor.w9_status === 'verified' ? 'bg-green-100 text-green-700' : distributor.w9_status === 'received' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          W-9: {distributor.w9_status === 'verified' ? 'Verified' : distributor.w9_status === 'received' ? 'Received' : 'Pending'}
+                        </span>
+                      </div>
+                    </td>
 
-                      {/* W-9 status badge */}
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        distributor.w9_status === 'verified'
-                          ? 'bg-green-100 text-green-700'
-                          : distributor.w9_status === 'received'
-                            ? 'bg-yellow-100 text-yellow-700'
-                            : 'bg-red-100 text-red-700'
-                      }`}>
-                        W-9: {distributor.w9_status === 'verified' ? 'Verified' : distributor.w9_status === 'received' ? 'Received' : 'Pending'}
-                      </span>
+                    {/* Stats */}
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3 text-xs text-gray-600">
+                        <span className="flex items-center gap-1" title="Sales Reps">
+                          <Users className="h-3.5 w-3.5" /> {reps.length}
+                        </span>
+                        <span className="flex items-center gap-1" title="Commission Rules">
+                          <DollarSign className="h-3.5 w-3.5" /> {rules.length}
+                        </span>
+                        <span className="flex items-center gap-1" title="Customers">
+                          <Building2 className="h-3.5 w-3.5" /> {custOrgs.length}
+                        </span>
+                        {distributor.pricing_model === 'wholesale' && (
+                          <span className="flex items-center gap-1" title="Wholesale Prices">
+                            <Package className="h-3.5 w-3.5" /> {pricing.length}
+                          </span>
+                        )}
+                      </div>
+                    </td>
 
+                    {/* Status */}
+                    <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                         distributor.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'
                       }`}>
                         {distributor.is_active ? 'Active' : 'Inactive'}
                       </span>
-
-                      {/* Pricing model badge */}
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        (distributor.pricing_model) === 'wholesale'
-                          ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {(distributor.pricing_model) === 'wholesale' ? 'Wholesale' : 'Margin Split'}
-                      </span>
-
-                      {/* Commission type badge (margin_split only) */}
-                      {(distributor.pricing_model ?? 'margin_split') === 'margin_split' && (
-                      <span className="flex items-center gap-1 px-2.5 py-1 bg-violet-100 text-violet-700 rounded-full text-xs font-medium">
-                        {typeConfig.isFlat
-                          ? <Package className="h-3.5 w-3.5" />
-                          : <Percent className="h-3.5 w-3.5" />}
-                        {typeConfig.label}
-                      </span>
-                      )}
-
-                      {/* Rate badge (margin_split only) */}
-                      {(distributor.pricing_model ?? 'margin_split') === 'margin_split' && (
-                      <span className="flex items-center gap-1 px-2.5 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
-                        <TrendingUp className="h-3.5 w-3.5" />
-                        {rateDisplay}
-                      </span>
-                      )}
-
-                      {distributor.distributor_class === 'independent' && (
-                        <button
-                          onClick={async () => {
-                            if (confirm(`Promote "${distributor.name}" from Independent to Company? This will allow them to manage sub-reps.`)) {
-                              const { error } = await supabase
-                                .from('distributors')
-                                .update({ distributor_class: 'company' })
-                                .eq('id', distributor.id);
-                              if (error) {
-                                alert('Failed to promote: ' + error.message);
-                              } else {
-                                fetchData();
-                              }
-                            }
-                          }}
-                          className="px-2.5 py-1 text-xs font-medium bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-lg transition-colors"
-                          title="Promote to Company"
-                        >
-                          Promote to Company
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => setEditingDistributor(distributor)}
-                        className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                        title="Edit"
-                      >
-                        <Pencil className="h-4 w-4 text-gray-500" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteDistributor(distributor)}
-                        className="p-2 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Commission / pricing explanation */}
-                  <div className="mb-4 px-3 py-2 bg-gray-50 rounded-lg text-xs text-gray-600">
-                    {(distributor.pricing_model) === 'wholesale' ? (
-                      <>
-                        <strong>Model:</strong> Wholesale — distributor buys at wholesale price, keeps spread to customer price.
-                        {' '}Your margin = wholesale − cost.
-                        {reps.length > 0 && (
-                          <>
-                            {' · '}
-                            <strong>Sales person splits your margin:</strong>{' '}
-                            {reps.map((dsr) =>
-                              `${dsr.profiles?.email?.split('@')[0]} → ${dsr.sales_rep_rate}% of distributor spread`
-                            ).join(', ')}
-                          </>
-                        )}
-                      </>
-                    ) : (
-                      <>
-                        <strong>Commission basis:</strong> {typeConfig.description}
-                        {' · '}
-                        <strong>Distributor earns:</strong> {rateDisplay}
-                        {reps.length > 0 && (
-                          <>
-                            {' · '}
-                            <strong>Sales rep splits:</strong>{' '}
-                            {reps.map((dsr) => {
-                              const repEarns =
-                                dsr.commission_split_type === 'percentage_of_distributor'
-                                  ? `${dsr.sales_rep_rate}% of dist. commission`
-                                  : typeConfig.isFlat
-                                    ? `$${dsr.sales_rep_rate} per ${distributor.commission_type === 'flat_per_unit' ? 'unit' : 'order'}`
-                                    : `${dsr.sales_rep_rate}% rate`;
-                              return `${dsr.profiles?.email?.split('@')[0]} → ${repEarns}`;
-                            }).join(', ')}
-                          </>
-                        )}
-                      </>
-                    )}
-                    {distributor.company_rep_id && (() => {
-                      const companyRep = salesReps.find((r) => r.id === distributor.company_rep_id);
-                      return (
-                        <>
-                          {' · '}
-                          <strong>Company rep:</strong>{' '}
-                          {companyRep?.email?.split('@')[0] ?? 'Unknown'} → {distributor.company_rep_rate ?? 0}% of your margin
-                        </>
-                      );
-                    })()}
-                  </div>
-
-                  {/* Commission Rules — only for margin_split distributors */}
-                  {(distributor.pricing_model ?? 'margin_split') === 'margin_split' && (
-                  <div className="pt-4 border-t border-gray-200 mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <DollarSign className="h-4 w-4" />
-                        Commission Rules ({getDistributorRules(distributor.id).length})
-                      </h4>
-                      <button
-                        onClick={() => setShowAddRule(distributor.id)}
-                        className="text-sm px-3 py-1 bg-violet-50 text-violet-600 rounded-lg hover:bg-violet-100 transition-colors"
-                      >
-                        Add Rule
-                      </button>
-                    </div>
-
-                    {getDistributorRules(distributor.id).length === 0 ? (
-                      <p className="text-sm text-gray-400 italic">
-                        No per-product or per-category rules — all items use the distributor default ({rateDisplay} {typeConfig.label})
-                      </p>
-                    ) : (
-                      <div className="space-y-2">
-                        {getDistributorRules(distributor.id).map((rule) => {
-                          const rCfg = getCommissionTypeConfig(rule.commission_type);
-                          const productName = rule.product_id
-                            ? products.find((p) => p.id === rule.product_id)?.name ?? `Product #${rule.product_id}`
-                            : null;
-                          const categoryName = rule.category_id
-                            ? categories.find((c) => c.id === rule.category_id)?.name ?? 'Unknown Category'
-                            : null;
-                          const customerName = rule.organization_id
-                            ? organizations.find((o) => o.id === rule.organization_id)?.name ?? 'Unknown Customer'
-                            : null;
-                          return (
-                            <div key={rule.id} className="flex items-center justify-between p-3 bg-violet-50 rounded-lg">
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {rule.scope === 'product' ? (
-                                    <span className="inline-flex items-center gap-1">
-                                      <Package className="h-3.5 w-3.5 text-violet-500" />
-                                      {productName}
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1">
-                                      <Building2 className="h-3.5 w-3.5 text-violet-500" />
-                                      Category: {categoryName}
-                                    </span>
-                                  )}
-                                  {customerName ? (
-                                    <span className="ml-2 text-xs px-1.5 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">
-                                      {customerName}
-                                    </span>
-                                  ) : (
-                                    <span className="ml-2 text-xs px-1.5 py-0.5 bg-gray-100 text-gray-500 rounded-full">
-                                      All customers
-                                    </span>
-                                  )}
-                                </p>
-                                <p className="text-xs text-gray-500 mt-0.5">
-                                  <span className="font-medium text-gray-700">
-                                    {commissionRateLabel(rule.commission_type, rule.commission_rate)}
-                                  </span>
-                                  {' · '}{rCfg.label}
-                                  {rule.use_customer_price && (
-                                    <span className="ml-2 text-amber-600 font-medium">
-                                      (uses customer price)
-                                    </span>
-                                  )}
-                                  {rule.notes && <span className="ml-2 text-gray-400">{rule.notes}</span>}
-                                </p>
-                              </div>
-                              <button
-                                onClick={() => handleDeleteCommissionRule(rule.id)}
-                                className="p-1 hover:bg-red-100 rounded transition-colors"
-                                title="Remove"
-                              >
-                                <Trash2 className="h-4 w-4 text-red-500" />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                  )}
-
-                  {/* Wholesale Product Pricing — only for wholesale distributors */}
-                  {(distributor.pricing_model) === 'wholesale' && (
-                  <div className="pt-4 border-t border-gray-200 mb-4">
-                    <div className="flex items-center justify-between">
-                      <button
-                        onClick={() => setExpandedPricing((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(distributor.id)) next.delete(distributor.id);
-                          else next.add(distributor.id);
-                          return next;
-                        })}
-                        className="flex items-center gap-2 text-sm font-semibold text-gray-700 hover:text-gray-900 transition-colors"
-                      >
-                        {expandedPricing.has(distributor.id) ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                        <DollarSign className="h-4 w-4" />
-                        Wholesale Product Pricing ({getDistributorPricing(distributor.id).length})
-                      </button>
-                      {expandedPricing.has(distributor.id) && (
-                        <button
-                          onClick={() => setShowPricingImport({ distributorId: distributor.id, distributorName: distributor.name })}
-                          className="text-sm px-3 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors flex items-center gap-1"
-                        >
-                          <Upload className="h-3.5 w-3.5" />
-                          Import CSV
-                        </button>
-                      )}
-                    </div>
-
-                    {expandedPricing.has(distributor.id) && (
-                      <div className="mt-3">
-                        <WholesalePricingGrid
-                          products={products}
-                          pricing={getDistributorPricing(distributor.id)}
-                          distributorId={distributor.id}
-                          onRefresh={fetchData}
-                        />
-                      </div>
-                    )}
-                  </div>
-                  )}
-
-                  {/* Sales reps */}
-                  <div className="pt-4 border-t border-gray-200">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
-                        <Users className="h-4 w-4" />
-                        Sales Representatives ({reps.length})
-                      </h4>
-                      <button
-                        onClick={() => { setSelectedDistributor(distributor.id); setShowAddSalesRep(true); }}
-                        className="text-sm px-3 py-1 bg-pink-50 text-pink-600 rounded-lg hover:bg-pink-100 transition-colors"
-                      >
-                        Add Sales Rep
-                      </button>
-                    </div>
-
-                    {reps.length === 0 ? (
-                      <p className="text-sm text-gray-400 italic">No sales representatives assigned</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {reps.map((dsr) => {
-                          const splitLabel =
-                            dsr.commission_split_type === 'percentage_of_distributor'
-                              ? `${dsr.sales_rep_rate}% of distributor commission`
-                              : `Fixed ${dsr.sales_rep_rate}${typeConfig.isFlat ? '$' : '%'} + ${dsr.distributor_override_rate ?? 0}${typeConfig.isFlat ? '$' : '%'} override`;
-                          const repCustLinks = getRepCustomerLinks(distributor.id, dsr.sales_rep_id);
-                          const assignedOrgIds = new Set(repCustLinks.map(rc => rc.organization_id));
-                          const custOrgs = getDistributorCustomerOrgs(distributor.id);
-                          const availableCustOrgs = custOrgs.filter(dc => !assignedOrgIds.has(dc.organization_id));
-                          return (
-                            <div key={dsr.id} className="p-3 bg-gray-50 rounded-lg">
-                              <div className="flex items-center justify-between">
-                                <div>
-                                  <p className="text-sm font-medium text-gray-900">
-                                    {dsr.profiles?.full_name || dsr.profiles?.email}
-                                  </p>
-                                  {dsr.profiles?.full_name && (
-                                    <p className="text-xs text-gray-500">{dsr.profiles.email}</p>
-                                  )}
-                                  <p className="text-xs text-gray-500 mt-0.5">
-                                    Split: <span className="font-medium text-gray-700">{splitLabel}</span>
-                                    {dsr.notes && <span className="ml-2 text-gray-400">{dsr.notes}</span>}
-                                  </p>
-                                  {dsr.profiles?.phone && (
-                                    <p className="text-xs text-gray-400 mt-0.5">Phone: {dsr.profiles.phone}</p>
-                                  )}
-                                </div>
-                                <button
-                                  onClick={() => handleRemoveSalesRepFromDistributor(dsr.id)}
-                                  className="p-1 hover:bg-red-100 rounded transition-colors"
-                                  title="Remove"
-                                >
-                                  <Trash2 className="h-4 w-4 text-red-500" />
-                                </button>
-                              </div>
-                              {/* Rep → Customer assignments */}
-                              <div className="mt-2 ml-1 pt-2 border-t border-gray-200">
-                                <div className="flex items-center gap-1.5 mb-1.5 text-xs font-medium text-gray-500">
-                                  <Building2 className="h-3 w-3" />
-                                  Assigned Customers ({repCustLinks.length})
-                                </div>
-                                {repCustLinks.length > 0 && (
-                                  <div className="flex flex-wrap gap-1.5 mb-1.5">
-                                    {repCustLinks.map((rc) => {
-                                      const org = organizations.find(o => o.id === rc.organization_id);
-                                      return (
-                                        <span key={rc.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 rounded-full text-xs">
-                                          {org?.name ?? 'Unknown'}
-                                          <button
-                                            onClick={() => handleRemoveRepCustomer(rc.id)}
-                                            className="ml-0.5 hover:bg-green-200 rounded-full p-0.5 transition-colors"
-                                            title="Remove"
-                                          >
-                                            <X className="h-3 w-3" />
-                                          </button>
-                                        </span>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                                {availableCustOrgs.length > 0 ? (
-                                  <select
-                                    className="text-xs px-2 py-1 border border-gray-200 rounded-lg text-gray-600 bg-white"
-                                    value=""
-                                    onChange={(e) => {
-                                      if (e.target.value) handleAddRepCustomer(distributor.id, dsr.sales_rep_id, e.target.value);
-                                    }}
-                                  >
-                                    <option value="">+ Assign customer...</option>
-                                    {availableCustOrgs.map((dc) => (
-                                      <option key={dc.organization_id} value={dc.organization_id}>
-                                        {dc.organizations.name} ({dc.organizations.code})
-                                      </option>
-                                    ))}
-                                  </select>
-                                ) : custOrgs.length === 0 ? (
-                                  <p className="text-xs text-gray-400 italic">Add customers to the distributor first</p>
-                                ) : repCustLinks.length === custOrgs.length ? (
-                                  <p className="text-xs text-gray-400 italic">All customers assigned</p>
-                                ) : null}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          );
-        })}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
 
+      {/* View Modal */}
+      {isViewModalOpen && viewingDistributor && (
+        <Modal title="Distributor Details" onClose={() => { setIsViewModalOpen(false); setViewingDistributor(null); }}>
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div><p className="text-xs text-gray-500">Name</p><p className="text-sm font-medium">{viewingDistributor.name}</p></div>
+              <div><p className="text-xs text-gray-500">Code</p><p className="text-sm font-medium">{viewingDistributor.code}</p></div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><p className="text-xs text-gray-500">User</p><p className="text-sm">{viewingDistributor.profiles?.email ?? 'N/A'}</p></div>
+              <div><p className="text-xs text-gray-500">Class</p><p className="text-sm">{viewingDistributor.distributor_class === 'independent' ? 'Independent' : 'Company'}</p></div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><p className="text-xs text-gray-500">Pricing Model</p><p className="text-sm">{viewingDistributor.pricing_model === 'wholesale' ? 'Wholesale' : 'Margin Split'}</p></div>
+              <div><p className="text-xs text-gray-500">Status</p><p className="text-sm">{viewingDistributor.is_active ? 'Active' : 'Inactive'}</p></div>
+            </div>
+            {viewingDistributor.pricing_model !== 'wholesale' && (
+              <div className="grid grid-cols-2 gap-4">
+                <div><p className="text-xs text-gray-500">Commission Type</p><p className="text-sm">{getCommissionTypeConfig(viewingDistributor.commission_type).label}</p></div>
+                <div><p className="text-xs text-gray-500">Rate</p><p className="text-sm">{commissionRateLabel(viewingDistributor.commission_type, viewingDistributor.commission_rate)}</p></div>
+              </div>
+            )}
+            {(viewingDistributor.contact_name || viewingDistributor.phone) && (
+              <div className="grid grid-cols-2 gap-4">
+                <div><p className="text-xs text-gray-500">Contact</p><p className="text-sm">{viewingDistributor.contact_name || '—'}</p></div>
+                <div><p className="text-xs text-gray-500">Phone</p><p className="text-sm">{viewingDistributor.phone || '—'}</p></div>
+              </div>
+            )}
+            {viewingDistributor.address && (
+              <div><p className="text-xs text-gray-500">Address</p><p className="text-sm">{viewingDistributor.address}{viewingDistributor.city ? `, ${viewingDistributor.city}` : ''}{viewingDistributor.state ? `, ${viewingDistributor.state}` : ''}{viewingDistributor.zip ? ` ${viewingDistributor.zip}` : ''}</p></div>
+            )}
+            {viewingDistributor.notes && (
+              <div><p className="text-xs text-gray-500">Notes</p><p className="text-sm">{viewingDistributor.notes}</p></div>
+            )}
+            <div className="grid grid-cols-2 gap-4">
+              <div><p className="text-xs text-gray-500">W-9 Status</p><p className="text-sm">{viewingDistributor.w9_status}</p></div>
+              <div><p className="text-xs text-gray-500">Created</p><p className="text-sm">{new Date(viewingDistributor.created_at).toLocaleDateString()}</p></div>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit Modal */}
+      {isEditModalOpen && editingDistributor && (
+        <Modal title="Edit Distributor" onClose={() => { setIsEditModalOpen(false); setEditingDistributor(null); }}>
+          <EditDistributorForm
+            distributor={editingDistributor}
+            onChange={setEditingDistributor}
+            onSave={() => { handleUpdateDistributor(); setIsEditModalOpen(false); }}
+            onCancel={() => { setIsEditModalOpen(false); setEditingDistributor(null); }}
+            salesReps={salesReps}
+          />
+        </Modal>
+      )}
+
+      {renderModals()}
+    </div>
+  );
+
+  // ── Shared modals (extracted so they work in both list and sub-management views) ──
+  function renderModals() {
+    return (
+      <>
       {/* ── Add Distributor Modal ────────────────────────────────────────────── */}
       {showAddDistributor && (
         <Modal title="Add New Distributor" onClose={() => {
@@ -2311,8 +2483,9 @@ const DistributorManagement: React.FC = () => {
         onCancel={() => { setShowDeleteModal(false); setDeleteTargetDistributor(null); }}
         isProcessing={isDeleting}
       />
-    </div>
-  );
+      </>
+    );
+  }
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
