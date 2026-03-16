@@ -352,14 +352,26 @@ Deno.serve(async (req: Request) => {
         }
 
         // Assign user to organization
+        // First delete any existing role for this user+org (handles NULL location_id uniqueness issue)
         await adminClient
           .from("user_organization_roles")
-          .upsert({
+          .delete()
+          .eq("user_id", userId)
+          .eq("organization_id", organizationId)
+          .is("location_id", null);
+
+        const { error: roleError } = await adminClient
+          .from("user_organization_roles")
+          .insert({
             user_id: userId,
             organization_id: organizationId,
             role: body.orgRole || "member",
             is_primary: true,
-          }, { onConflict: "user_id,organization_id,location_id" });
+          });
+
+        if (roleError) {
+          console.error("Failed to assign user to organization:", roleError);
+        }
 
         // Assign sales rep if not a house account
         if (!body.isHouseAccount && body.salesRepId) {

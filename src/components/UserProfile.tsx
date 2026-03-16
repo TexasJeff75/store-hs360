@@ -23,21 +23,27 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
     setLoading(false);
   };
 
-  const getRoleDisplay = (role: string) => {
+  const getRoleDisplay = (role: string, approvalStatus?: string) => {
+    // Check approval status first — if pending, show pending regardless of role
+    if (approvalStatus === 'pending' || role === 'pending') {
+      return { text: 'Pending Approval', color: 'text-yellow-700 bg-yellow-100', icon: Clock };
+    }
     switch (role) {
       case 'admin':
         return { text: 'Administrator', color: 'text-purple-700 bg-purple-100', icon: Shield };
-      case 'approved':
-        return { text: 'Approved User', color: 'text-green-700 bg-green-100', icon: CheckCircle };
-      case 'pending':
+      case 'sales_rep':
+        return { text: 'Sales Rep', color: 'text-blue-700 bg-blue-100', icon: CheckCircle };
+      case 'distributor':
+        return { text: 'Distributor', color: 'text-indigo-700 bg-indigo-100', icon: CheckCircle };
+      case 'customer':
       default:
-        return { text: 'Pending Approval', color: 'text-yellow-700 bg-yellow-100', icon: Clock };
+        return { text: 'Customer', color: 'text-green-700 bg-green-100', icon: CheckCircle };
     }
   };
 
   if (!isOpen || !user || !profile) return null;
 
-  const roleInfo = getRoleDisplay(profile.role);
+  const roleInfo = getRoleDisplay(profile.role, profile.approval_status);
   const RoleIcon = roleInfo.icon;
 
   return (
@@ -122,7 +128,7 @@ const UserProfile: React.FC<UserProfileProps> = ({ isOpen, onClose }) => {
               </div>
 
               {/* Status Message */}
-              {profile.role === 'pending' && (
+              {(profile.role === 'pending' || profile.approval_status === 'pending') && (
                 <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <p className="text-yellow-700 text-sm">
                     <strong>Account Pending:</strong> Your account is under review. 
