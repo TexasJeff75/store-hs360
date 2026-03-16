@@ -58,10 +58,6 @@ ALTER TABLE organization_pricing
   ADD COLUMN IF NOT EXISTS is_orphaned boolean DEFAULT false,
   ADD COLUMN IF NOT EXISTS orphaned_reason text;
 
-ALTER TABLE location_pricing
-  ADD COLUMN IF NOT EXISTS is_orphaned boolean DEFAULT false,
-  ADD COLUMN IF NOT EXISTS orphaned_reason text;
-
 -- 3. Partial indexes for query performance
 -- ============================================================================
 
