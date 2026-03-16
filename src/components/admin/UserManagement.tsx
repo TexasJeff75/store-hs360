@@ -30,6 +30,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
   const [createNewOrganization, setCreateNewOrganization] = useState(false);
   const [newOrgName, setNewOrgName] = useState('');
   const [newOrgCode, setNewOrgCode] = useState('');
+  const [newOrgContactName, setNewOrgContactName] = useState('');
+  const [newOrgContactEmail, setNewOrgContactEmail] = useState('');
+  const [newOrgContactPhone, setNewOrgContactPhone] = useState('');
   const [organizations, setOrganizations] = useState<any[]>([]);
   const [loadingOrgs, setLoadingOrgs] = useState(false);
   // Role-specific state
@@ -473,6 +476,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
     setCreateNewOrganization(false);
     setNewOrgName('');
     setNewOrgCode('');
+    setNewOrgContactName('');
+    setNewOrgContactEmail('');
+    setNewOrgContactPhone('');
     setFullName('');
     setPhone('');
     setIsHouseAccount(false);
@@ -557,6 +563,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
             createOrganization: createNewOrganization,
             newOrgName: createNewOrganization ? newOrgName : undefined,
             newOrgCode: createNewOrganization ? newOrgCode : undefined,
+            contactName: createNewOrganization ? (newOrgContactName || undefined) : undefined,
+            contactEmail: createNewOrganization ? (newOrgContactEmail || undefined) : undefined,
+            contactPhone: createNewOrganization ? (newOrgContactPhone || undefined) : undefined,
             orgType: newUserRole === 'distributor' ? 'distributor' : 'customer',
           }),
         }
@@ -573,13 +582,14 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
         throw new Error(result.error || 'User creation failed');
       }
 
+      const reactivatedNote = result.reactivated ? ' (reactivated previous account)' : '';
       const inviteNote = result.inviteEmailSent
         ? ' An invite email has been sent.'
         : ' Note: invite email could not be sent. Use "Send Password Reset" to send manually.';
 
       setModalMessage({
         type: 'success',
-        text: `User created successfully!${inviteNote}`
+        text: `User ${result.reactivated ? 'reactivated' : 'created'} successfully!${reactivatedNote}${inviteNote}`
       });
 
       await fetchUsers();
@@ -1538,6 +1548,44 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                                   className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                                   placeholder="e.g., ACME"
                                   maxLength={10}
+                                />
+                              </div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Contact Name
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={newOrgContactName}
+                                    onChange={(e) => setNewOrgContactName(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="Primary contact"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Contact Email
+                                  </label>
+                                  <input
+                                    type="email"
+                                    value={newOrgContactEmail}
+                                    onChange={(e) => setNewOrgContactEmail(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                    placeholder="contact@company.com"
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                  Contact Phone
+                                </label>
+                                <input
+                                  type="tel"
+                                  value={newOrgContactPhone}
+                                  onChange={(e) => setNewOrgContactPhone(e.target.value)}
+                                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                  placeholder="(555) 123-4567"
                                 />
                               </div>
                             </>
