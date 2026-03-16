@@ -244,7 +244,64 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
         .insert([{ distributor_id: distributor.id, organization_id: orgData.id, is_active: true }]);
       if (linkError) throw linkError;
 
-      setSuccess('Customer created and added');
+      // 3. Create a user account + send invite email if contact email was provided
+      let inviteWarning = '';
+      if (newCustomer.contact_email) {
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session) {
+            const nameParts = (newCustomer.contact_name || '').trim().split(/\s+/);
+            const response = await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin-user`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${session.access_token}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                  email: newCustomer.contact_email,
+                  role: 'customer',
+                  fullName: newCustomer.contact_name || undefined,
+                  phone: newCustomer.contact_phone || undefined,
+                  organizationId: orgData.id,
+                  siteUrl: window.location.origin,
+                }),
+              }
+            );
+            const result = await response.json();
+            if (!result.success) {
+              inviteWarning = ` (Note: could not create user account — ${result.error})`;
+            } else {
+              // 4. Seed a customer_addresses record so the address is available at checkout
+              if (newCustomer.address && result.userId) {
+                await supabase.rpc('create_customer_address', {
+                  p_user_id: result.userId,
+                  p_organization_id: orgData.id,
+                  p_address_type: 'shipping',
+                  p_label: newCustomer.name,
+                  p_first_name: nameParts[0] || '',
+                  p_last_name: nameParts.slice(1).join(' ') || '',
+                  p_company: newCustomer.name,
+                  p_address1: newCustomer.address,
+                  p_city: newCustomer.city,
+                  p_state_or_province: newCustomer.state,
+                  p_postal_code: newCustomer.zip,
+                  p_country_code: 'US',
+                  p_phone: newCustomer.contact_phone || null,
+                  p_email: newCustomer.contact_email || null,
+                  p_is_default: true,
+                });
+              }
+            }
+          }
+        } catch (inviteErr) {
+          console.error('Invite email failed (non-fatal):', inviteErr);
+          inviteWarning = ' (Note: invite email could not be sent)';
+        }
+      }
+
+      setSuccess(`Customer created and added${inviteWarning}`);
       setShowAddCustomer(false);
       resetNewCustomer();
       fetchData();
