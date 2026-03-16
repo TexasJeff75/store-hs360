@@ -161,30 +161,40 @@ Deno.serve(async (req: Request) => {
         return jsonResponse({ success: false, error: createError.message }, 400);
       }
 
-      // Check if profile is soft-deleted
+      // Check if profile is soft-deleted or pending approval
       const { data: existingProfile } = await adminClient
         .from("profiles")
-        .select("id, deleted_at")
+        .select("id, deleted_at, approval_status, role")
         .eq("id", existingUser.id)
         .single();
 
       if (existingProfile && !existingProfile.deleted_at) {
-        // User exists and is NOT deleted — genuinely duplicate
-        return jsonResponse({
-          success: false,
-          error: "A user with this email already exists and is active. Please use the existing account.",
-        }, 400);
+        // User exists and is active — check if they're pending approval
+        // (e.g. self-registered, now being claimed by a distributor/admin)
+        if (existingProfile.approval_status === "pending" || !existingProfile.role || existingProfile.role === "customer") {
+          // Adopt the existing user: approve them and update their role
+          userId = existingUser.id;
+          reactivated = false;
+          // Skip auth user creation — they already exist
+          // Fall through to profile upsert + role-specific setup below
+        } else {
+          // User exists, is approved, and has a non-customer role — genuinely duplicate
+          return jsonResponse({
+            success: false,
+            error: "A user with this email already exists and is active. Please use the existing account.",
+          }, 400);
+        }
+      } else {
+        // Profile is soft-deleted — reactivate
+        userId = existingUser.id;
+        reactivated = true;
+
+        await adminClient.auth.admin.updateUserById(userId, {
+          password: tempPassword,
+          email_confirm: false,
+          user_metadata: { full_name: body.fullName || "" },
+        });
       }
-
-      // Reactivate: clear soft-delete flags, update auth password
-      userId = existingUser.id;
-      reactivated = true;
-
-      await adminClient.auth.admin.updateUserById(userId, {
-        password: tempPassword,
-        email_confirm: false,
-        user_metadata: { full_name: body.fullName || "" },
-      });
     } else {
       userId = authData.user.id;
     }
