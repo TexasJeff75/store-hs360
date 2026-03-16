@@ -503,6 +503,9 @@ exports.handler = async (event) => {
             user: smtpUser,
             pass: smtpPass,
           },
+          connectionTimeout: 10000, // 10s to establish connection
+          greetingTimeout: 10000,   // 10s for server greeting
+          socketTimeout: 15000,     // 15s for socket inactivity
         });
 
         await transporter.sendMail({
