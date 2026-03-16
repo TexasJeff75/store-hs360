@@ -167,12 +167,56 @@ Deno.serve(async (req: Request) => {
     }
 
     // ═══════════════════════════════════════
-    // 3. Send invite email
+    // 3. Send password reset + custom invite email
     // ═══════════════════════════════════════
-    const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(body.email);
-    if (inviteError) {
-      console.error("Invite email failed (non-fatal):", inviteError.message);
-      // Non-fatal — user is created, admin can resend later
+    // Generate a password reset link so the user can set their own password
+    const { data: resetData, error: resetError } = await adminClient.auth.admin.generateLink({
+      type: "magiclink",
+      email: body.email,
+    });
+    const loginUrl = resetData?.properties?.action_link || "";
+    if (resetError) {
+      console.error("Password reset link failed (non-fatal):", resetError.message);
+    }
+
+    // Send the custom invite email via the send-email Netlify function
+    const siteUrl = Deno.env.get("SITE_URL") || Deno.env.get("PUBLIC_SITE_URL") || "";
+    const sendEmailUrl = siteUrl ? `${siteUrl.replace(/\/$/, "")}/.netlify/functions/send-email` : "";
+
+    let inviteError: Error | null = null;
+    if (sendEmailUrl) {
+      try {
+        const emailRes = await fetch(sendEmailUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            to: body.email,
+            email_type: "user_invitation",
+            subject: "You're Invited to HealthSpan360",
+            template_data: {
+              full_name: body.fullName || "",
+              email: body.email,
+              role: body.role,
+              login_url: loginUrl || siteUrl,
+            },
+            user_id: userId,
+          }),
+        });
+        if (!emailRes.ok) {
+          const errBody = await emailRes.json().catch(() => ({}));
+          throw new Error((errBody as Record<string, string>).error || `send-email returned ${emailRes.status}`);
+        }
+      } catch (err) {
+        inviteError = err instanceof Error ? err : new Error("Failed to send invite email");
+        console.error("Invite email failed (non-fatal):", inviteError.message);
+      }
+    } else {
+      // Fallback to Supabase built-in invite if SITE_URL not configured
+      const { error: supaInviteErr } = await adminClient.auth.admin.inviteUserByEmail(body.email);
+      if (supaInviteErr) {
+        inviteError = supaInviteErr;
+        console.error("Invite email failed (non-fatal):", supaInviteErr.message);
+      }
     }
 
     // ═══════════════════════════════════════
