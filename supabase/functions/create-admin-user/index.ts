@@ -234,6 +234,21 @@ Deno.serve(async (req: Request) => {
     // Send the custom invite email via the send-email Netlify function
     const sendEmailUrl = siteUrl ? `${siteUrl.replace(/\/$/, "")}/.netlify/functions/send-email` : "";
 
+    // Use role-specific email template type so admins can customize per-role
+    const emailTypeMap: Record<string, string> = {
+      customer: "customer_invitation",
+      distributor: "distributor_invitation",
+      sales_rep: "sales_rep_invitation",
+    };
+    const emailType = emailTypeMap[body.role] || "user_invitation";
+
+    const subjectMap: Record<string, string> = {
+      customer: "Welcome to HealthSpan360",
+      distributor: "Welcome to HealthSpan360 — Distributor Account",
+      sales_rep: "Welcome to HealthSpan360 — Sales Rep Account",
+    };
+    const emailSubject = subjectMap[body.role] || "You're Invited to HealthSpan360";
+
     let inviteError: Error | null = null;
     if (sendEmailUrl) {
       try {
@@ -242,8 +257,8 @@ Deno.serve(async (req: Request) => {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             to: body.email,
-            email_type: "user_invitation",
-            subject: "You're Invited to HealthSpan360",
+            email_type: emailType,
+            subject: emailSubject,
             template_data: {
               full_name: body.fullName || "",
               email: body.email,
