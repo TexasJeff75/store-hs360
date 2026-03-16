@@ -202,6 +202,7 @@ class CommissionService {
           order:orders!order_id(id, status, payment_status, order_number)
         `)
         .eq('sales_rep_id', salesRepId)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (status) {
@@ -252,6 +253,7 @@ class CommissionService {
           order:orders!order_id(id, status, payment_status, order_number)
         `)
         .in('sales_rep_id', salesRepIds)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (status) {
@@ -515,6 +517,7 @@ class CommissionService {
           distributor:distributors(id, name, code),
           order:orders!order_id(id, status, payment_status, order_number)
         `)
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (filters?.status) {

@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { orderService } from '../../services/orderService';
-import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle, DollarSign, FileText, Activity } from 'lucide-react';
+import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle, DollarSign, FileText, Activity, Trash2 } from 'lucide-react';
 import type { Order, OrderItem, Shipment } from './orders/types';
 import { normalizeAddress } from './orders/types';
 import { activityLogService } from '../../services/activityLog';
+import { softDeleteService } from '../../services/softDeleteService';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 import RefundModal from './orders/RefundModal';
 
 const OrderManagement: React.FC = () => {
@@ -39,6 +41,9 @@ const OrderManagement: React.FC = () => {
   const [paymentLogs, setPaymentLogs] = useState<any[]>([]);
   const [paymentTransactions, setPaymentTransactions] = useState<any[]>([]);
   const [showRefundModal, setShowRefundModal] = useState(false);
+  const [showDeleteOrderModal, setShowDeleteOrderModal] = useState(false);
+  const [deleteTargetOrder, setDeleteTargetOrder] = useState<Order | null>(null);
+  const [isDeletingOrder, setIsDeletingOrder] = useState(false);
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -186,7 +191,8 @@ const OrderManagement: React.FC = () => {
 
       let query = supabase
         .from('orders')
-        .select('*');
+        .select('*')
+        .is('deleted_at', null);
 
       // Use effective profile/user for data display (supports impersonation)
       const viewRole = effectiveProfile?.role ?? profile?.role;
@@ -780,6 +786,31 @@ const OrderManagement: React.FC = () => {
     }
   };
 
+  const handleDeleteOrder = (order: Order) => {
+    setDeleteTargetOrder(order);
+    setShowDeleteOrderModal(true);
+  };
+
+  const confirmDeleteOrder = async () => {
+    if (!deleteTargetOrder || !user) return;
+    setIsDeletingOrder(true);
+    try {
+      const result = await softDeleteService.deleteOrder(deleteTargetOrder.id, user.id);
+      if (!result.success) {
+        alert(result.error || 'Failed to delete order');
+        return;
+      }
+      setOrders(prev => prev.filter(o => o.id !== deleteTargetOrder.id));
+      setSelectedOrder(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete order');
+    } finally {
+      setIsDeletingOrder(false);
+      setShowDeleteOrderModal(false);
+      setDeleteTargetOrder(null);
+    }
+  };
+
   const OrderDetailsModal = ({ order }: { order: Order }) => (
     <div className="fixed inset-0 z-50 overflow-y-auto" onClick={e => e.stopPropagation()}>
       <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20">
@@ -799,12 +830,23 @@ const OrderManagement: React.FC = () => {
               </div>
               <p className="text-sm text-gray-500">ID: {order.id.slice(0, 8)}...</p>
             </div>
-            <button
-              onClick={() => setSelectedOrder(null)}
-              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              {canManageOrders && (
+                <button
+                  onClick={() => handleDeleteOrder(order)}
+                  className="p-2 text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                  title="Delete Order"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              )}
+              <button
+                onClick={() => setSelectedOrder(null)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
 
           <div className="p-6 space-y-6">
@@ -1805,6 +1847,15 @@ const OrderManagement: React.FC = () => {
                         >
                           {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                         </button>
+                        {canManageOrders && (
+                          <button
+                            onClick={() => handleDeleteOrder(parent)}
+                            className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
+                            title="Delete Order"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
                       </div>
                       <div className="flex-1 grid grid-cols-1 md:grid-cols-9 gap-4 items-center">
                         <div>
@@ -2389,6 +2440,19 @@ const OrderManagement: React.FC = () => {
           }}
         />
       )}
+
+      <ConfirmDeleteModal
+        isOpen={showDeleteOrderModal}
+        title="Delete Order"
+        entityName={deleteTargetOrder ? `Order #${deleteTargetOrder.id.slice(0, 8).toUpperCase()}` : ''}
+        cascadeWarnings={[
+          'Commission records for this order will be archived',
+          'Commission line items will be marked as orphaned',
+        ]}
+        onConfirm={confirmDeleteOrder}
+        onCancel={() => { setShowDeleteOrderModal(false); setDeleteTargetOrder(null); }}
+        isProcessing={isDeletingOrder}
+      />
     </div>
   );
 };

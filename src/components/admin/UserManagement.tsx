@@ -5,6 +5,8 @@ import type { Profile } from '@/services/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { activityLogService } from '@/services/activityLog';
 import { emailService } from '@/services/emailService';
+import { softDeleteService } from '@/services/softDeleteService';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface UserManagementProps {
   onUserApproved?: () => void;
@@ -53,6 +55,9 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
   const [pendingChanges, setPendingChanges] = useState<{ [key: string]: Partial<Profile> }>({});
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Profile | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
 
   useEffect(() => {
@@ -154,6 +159,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -386,22 +392,29 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
     }
   };
 
-  const deleteUser = async (userId: string) => {
-    if (!confirm('Are you sure you want to delete this user? This action cannot be undone.')) {
-      return;
-    }
+  const handleDeleteUser = (user: Profile) => {
+    setDeleteTarget(user);
+    setShowDeleteModal(true);
+  };
 
+  const confirmDeleteUser = async () => {
+    if (!deleteTarget || !currentUser) return;
+    setIsDeleting(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', userId);
-
-      if (error) throw error;
-      
-      setUsers(prev => prev.filter(user => user.id !== userId));
+      const result = await softDeleteService.deleteProfile(deleteTarget.id, currentUser.id);
+      if (!result.success) {
+        setSaveMessage({ type: 'error', text: result.error || 'Failed to delete user' });
+        return;
+      }
+      setUsers(prev => prev.filter(u => u.id !== deleteTarget.id));
+      onUserApproved?.();
+      setSaveMessage({ type: 'success', text: `User ${deleteTarget.email} deleted` });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to delete user');
+      setSaveMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to delete user' });
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -821,23 +834,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                     <XCircle className="h-4 w-4" />
                   </button>
                   <button
-                    onClick={async () => {
-                      if (confirm(`Delete user ${user.email}?`)) {
-                        try {
-                          const { error } = await supabase
-                            .from('profiles')
-                            .delete()
-                            .eq('id', user.id);
-
-                          if (error) throw error;
-                          await fetchUsers();
-                          onUserApproved?.();
-                          setSaveMessage({ type: 'success', text: 'User deleted!' });
-                        } catch (err) {
-                          setSaveMessage({ type: 'error', text: 'Failed to delete user' });
-                        }
-                      }
-                    }}
+                    onClick={() => handleDeleteUser(user)}
                     className="p-2 text-red-600 hover:bg-red-50 rounded-md"
                     title="Delete user"
                   >
@@ -902,23 +899,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                     <option value="admin">Admin</option>
                   </select>
                   <button
-                    onClick={async () => {
-                      if (confirm(`Delete user ${user.email}?`)) {
-                        try {
-                          const { error } = await supabase
-                            .from('profiles')
-                            .delete()
-                            .eq('id', user.id);
-
-                          if (error) throw error;
-                          await fetchUsers();
-                          onUserApproved?.();
-                          setSaveMessage({ type: 'success', text: 'User deleted!' });
-                        } catch (err) {
-                          setSaveMessage({ type: 'error', text: 'Failed to delete user' });
-                        }
-                      }
-                    }}
+                    onClick={() => handleDeleteUser(user)}
                     className="p-2 text-red-600 hover:bg-red-50 rounded-md"
                     title="Delete user"
                   >
@@ -1023,7 +1004,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
                           <Send className="h-4 w-4" />
                         </button>
                         <button
-                          onClick={() => deleteUser(user.id)}
+                          onClick={() => handleDeleteUser(user)}
                           className="p-2 text-red-600 bg-red-50 hover:bg-red-100 rounded-lg transition-colors"
                           title="Delete User"
                         >
@@ -1985,6 +1966,22 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
           </div>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={showDeleteModal}
+        title="Delete User"
+        entityName={deleteTarget?.email || ''}
+        cascadeWarnings={[
+          'Orders placed by this user will be archived',
+          'Commission records for this sales rep will be archived',
+          'Sales rep assignments will be marked as orphaned',
+          'Contract pricing records will be marked as orphaned',
+          'The user will no longer be able to log in',
+        ]}
+        onConfirm={confirmDeleteUser}
+        onCancel={() => { setShowDeleteModal(false); setDeleteTarget(null); }}
+        isProcessing={isDeleting}
+      />
     </div>
   );
 };

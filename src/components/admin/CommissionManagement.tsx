@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter, AlertTriangle, ChevronDown, ChevronRight, Printer, ExternalLink, FileText, Loader, Ban, RotateCcw } from 'lucide-react';
+import { DollarSign, TrendingUp, Clock, CheckCircle, XCircle, Eye, Search, Filter, AlertTriangle, ChevronDown, ChevronRight, Printer, ExternalLink, FileText, Loader, Ban, RotateCcw, Trash2 } from 'lucide-react';
 import { commissionService, Commission, CommissionLineItem } from '../../services/commissionService';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../services/supabase';
+import { softDeleteService } from '../../services/softDeleteService';
+import ConfirmDeleteModal from './ConfirmDeleteModal';
 
 interface DiagnosticData {
   totalOrders: number;
@@ -44,6 +46,9 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
   const [lineItems, setLineItems] = useState<CommissionLineItem[]>([]);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loadingLineItems, setLoadingLineItems] = useState(false);
+  const [showDeleteCommissionModal, setShowDeleteCommissionModal] = useState(false);
+  const [deleteTargetCommission, setDeleteTargetCommission] = useState<any | null>(null);
+  const [isDeletingCommission, setIsDeletingCommission] = useState(false);
 
   // Use effective identity for data fetching & display (supports impersonation)
   // Use real profile for admin-only actions (approve, pay, diagnostics)
@@ -361,6 +366,31 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
       setSelectedCommission(null);
     } else {
       alert(`Failed to cancel commission: ${result.error}`);
+    }
+  };
+
+  const handleDeleteCommission = (commission: any) => {
+    setDeleteTargetCommission(commission);
+    setShowDeleteCommissionModal(true);
+  };
+
+  const confirmDeleteCommission = async () => {
+    if (!deleteTargetCommission || !user) return;
+    setIsDeletingCommission(true);
+    try {
+      const result = await softDeleteService.deleteCommission(deleteTargetCommission.id, user.id);
+      if (!result.success) {
+        alert(result.error || 'Failed to delete commission');
+        return;
+      }
+      fetchCommissions();
+      setSelectedCommission(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to delete commission');
+    } finally {
+      setIsDeletingCommission(false);
+      setShowDeleteCommissionModal(false);
+      setDeleteTargetCommission(null);
     }
   };
 
@@ -1344,6 +1374,15 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
                       Cancel Commission
                     </button>
                   )}
+                  {profile?.role === 'admin' && (
+                    <button
+                      onClick={() => handleDeleteCommission(selectedCommission)}
+                      className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 flex items-center gap-1"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1351,6 +1390,18 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
         </div>
         );
       })()}
+
+      <ConfirmDeleteModal
+        isOpen={showDeleteCommissionModal}
+        title="Delete Commission"
+        entityName={deleteTargetCommission ? `Commission for Order #${deleteTargetCommission.order_id?.slice(0, 8).toUpperCase()}` : ''}
+        cascadeWarnings={[
+          'Commission line items will be marked as orphaned',
+        ]}
+        onConfirm={confirmDeleteCommission}
+        onCancel={() => { setShowDeleteCommissionModal(false); setDeleteTargetCommission(null); }}
+        isProcessing={isDeletingCommission}
+      />
     </div>
   );
 };
