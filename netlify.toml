@@ -38,6 +38,11 @@
   to = "/.netlify/functions/vault-payment-method"
   status = 200
 
+[[redirects]]
+  from = "/api/send-password-reset"
+  to = "/.netlify/functions/send-password-reset"
+  status = 200
+
 # SPA fallback - must be last
 # IMPORTANT: Do not use force = true, as it would override function routes
 [[redirects]]
