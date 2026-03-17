@@ -3,7 +3,7 @@ import {
   Mail, Save, Loader, AlertCircle, CheckCircle, ToggleLeft, ToggleRight,
   RotateCcw, Info, Bold, Italic, Underline, Link, Type, List, Code, Image,
   AlignLeft, AlignCenter, AlignRight, Minus, Square, Palette,
-  ChevronDown, ChevronRight, Settings,
+  ChevronDown, ChevronRight, Settings, Eye, FileCode,
 } from 'lucide-react';
 import { emailTemplateService, type EmailTemplate } from '@/services/emailTemplateService';
 import { emailSettingsService, type EmailSettings } from '@/services/emailSettingsService';
@@ -20,17 +20,33 @@ function buildFullPreview(headerHtml: string, bodyHtml: string, footerHtml: stri
   }
   html = html.replace(/\{\{\w+\}\}/g, '');
 
+  // Mirror the table-based layout used in send-email.cjs for accurate preview
   return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin: 0; padding: 0; background: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-  <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; margin-top: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-    ${headerHtml}
-    <div style="padding: 32px 24px;">
-      ${html}
-    </div>
-    ${footerHtml}
-  </div>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;" bgcolor="#f3f4f6">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f3f4f6;" bgcolor="#f3f4f6">
+    <tr>
+      <td align="center" style="padding:24px 0;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;background-color:#ffffff;border-radius:8px;overflow:hidden;" bgcolor="#ffffff">
+          <tr>
+            <td>${headerHtml}</td>
+          </tr>
+          <tr>
+            <td style="padding:32px 24px;">
+              ${html}
+            </td>
+          </tr>
+          <tr>
+            <td>${footerHtml}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
 }
@@ -120,7 +136,7 @@ const TOOLBAR_ITEMS: ToolbarItem[] = [
   // Components
   { group: 'component', icon: <Square className="h-3.5 w-3.5" />, label: 'Button',
     action: (ta, v, s) => insertAtCursor(ta, v, s,
-      '<div style="text-align:center;margin:24px 0;">\n  <a href="#" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Button Text</a>\n</div>') },
+      '<div style="text-align:center;margin:24px 0;">\n  <!--[if mso]>\n  <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="#" style="height:44px;v-text-anchor:middle;width:200px;" arcsize="18%" strokecolor="#ec4899" fillcolor="#ec4899">\n    <w:anchorlock/>\n    <center style="color:#ffffff;font-family:sans-serif;font-size:14px;font-weight:bold;">Button Text</center>\n  </v:roundrect>\n  <![endif]-->\n  <!--[if !mso]><!-->\n  <a href="#" style="display:inline-block;background-color:#ec4899;color:#ffffff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">Button Text</a>\n  <!--<![endif]-->\n</div>') },
   { group: 'component', icon: <Image className="h-3.5 w-3.5" />, label: 'Info Box',
     action: (ta, v, s) => insertAtCursor(ta, v, s,
       '<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;margin:16px 0;">\n  <p style="color:#1e40af;font-size:14px;margin:0;">Info content here</p>\n</div>') },
@@ -132,7 +148,7 @@ const TOOLBAR_ITEMS: ToolbarItem[] = [
       '<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:16px 0;">\n  <p style="color:#991b1b;font-size:14px;margin:0;">Warning content here</p>\n</div>') },
   { group: 'component', icon: <List className="h-3.5 w-3.5" />, label: 'Item Card',
     action: (ta, v, s) => insertAtCursor(ta, v, s,
-      '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6;">\n  <div style="flex:1;">\n    <div style="font-size:14px;font-weight:500;color:#111827;">Item Name</div>\n    <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Qty: 1</div>\n  </div>\n  <div style="font-size:14px;font-weight:600;color:#111827;">$0.00</div>\n</div>') },
+      '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-bottom:1px solid #f3f4f6;">\n  <tr>\n    <td style="padding:12px 0;">\n      <div style="font-size:14px;font-weight:500;color:#111827;">Item Name</div>\n      <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Qty: 1</div>\n    </td>\n    <td style="padding:12px 0;text-align:right;white-space:nowrap;">\n      <div style="font-size:14px;font-weight:600;color:#111827;">$0.00</div>\n    </td>\n  </tr>\n</table>') },
   { group: 'component', icon: <Minus className="h-3.5 w-3.5" />, label: 'Divider',
     action: (ta, v, s) => insertAtCursor(ta, v, s,
       '<hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;" />') },
@@ -259,6 +275,7 @@ const EmailTemplateManagement: React.FC = () => {
   const [savingSettings, setSavingSettings] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [showCode, setShowCode] = useState(false);
 
   useEffect(() => {
     loadAll();
@@ -612,17 +629,42 @@ const EmailTemplateManagement: React.FC = () => {
               </p>
             )}
 
-            {/* Live preview */}
+            {/* Live preview with code toggle */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Preview</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-sm font-medium text-gray-700">Preview</label>
+                <button
+                  type="button"
+                  onClick={() => setShowCode(!showCode)}
+                  className="flex items-center space-x-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border border-gray-300 hover:bg-gray-50"
+                >
+                  {showCode ? (
+                    <>
+                      <Eye className="h-3.5 w-3.5 text-gray-600" />
+                      <span className="text-gray-700">Preview</span>
+                    </>
+                  ) : (
+                    <>
+                      <FileCode className="h-3.5 w-3.5 text-gray-600" />
+                      <span className="text-gray-700">View Code</span>
+                    </>
+                  )}
+                </button>
+              </div>
               <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-100">
-                <iframe
-                  srcDoc={buildFullPreview(editHeader, editBody, editFooter, selected.variables)}
-                  className="w-full border-0"
-                  style={{ height: '600px' }}
-                  title="Email preview"
-                  sandbox=""
-                />
+                {showCode ? (
+                  <pre className="p-4 text-xs font-mono text-gray-800 bg-gray-50 overflow-auto whitespace-pre-wrap break-words" style={{ maxHeight: '600px' }}>
+                    {buildFullPreview(editHeader, editBody, editFooter, selected.variables)}
+                  </pre>
+                ) : (
+                  <iframe
+                    srcDoc={buildFullPreview(editHeader, editBody, editFooter, selected.variables)}
+                    className="w-full border-0"
+                    style={{ height: '600px' }}
+                    title="Email preview"
+                    sandbox=""
+                  />
+                )}
               </div>
             </div>
           </div>
