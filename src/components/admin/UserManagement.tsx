@@ -345,7 +345,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
       setModalMessage(null);
       
       const { error } = await supabase.auth.resetPasswordForEmail(selectedUser.email, {
-        redirectTo: `${window.location.origin}/reset-password`
+        redirectTo: `${window.location.origin}/reset-password?type=recovery`
       });
       
       if (error) throw error;
@@ -380,7 +380,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
 
       // Also trigger a password reset so they can set their password
       await supabase.auth.resetPasswordForEmail(userToInvite.email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${window.location.origin}/reset-password?type=recovery`,
       });
 
       if (emailResult.success) {
