@@ -27,7 +27,7 @@ interface UserOption {
   full_name?: string;
 }
 
-export function usePricingData() {
+export function usePricingData(organizationId?: string) {
   const [entries, setEntries] = useState<EnrichedPricingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +40,9 @@ export function usePricingData() {
     setLoading(true);
     setError(null);
     try {
-      const data = await contractPricingService.getAllPricingEntries();
+      const data = organizationId
+        ? await contractPricingService.getOrganizationPricingEntries(organizationId)
+        : await contractPricingService.getAllPricingEntries();
 
       const enriched: EnrichedPricingEntry[] = data.map((entry: any) => {
         let entity_name = 'Unknown';
@@ -67,7 +69,7 @@ export function usePricingData() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [organizationId]);
 
   const fetchProducts = useCallback(async () => {
     try {
