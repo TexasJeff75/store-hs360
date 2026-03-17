@@ -195,7 +195,7 @@ const CustomerUserManagement: React.FC<CustomerUserManagementProps> = ({ organiz
       setModalMessage(null);
       
       const { error } = await supabase.auth.resetPasswordForEmail(selectedUser.email, {
-        redirectTo: `${window.location.origin}/reset-password`
+        redirectTo: `${window.location.origin}/reset-password?type=recovery`
       });
       
       if (error) throw error;

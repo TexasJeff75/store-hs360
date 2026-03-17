@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Lock, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../services/supabase';
 
 interface ResetPasswordProps {
   onComplete: () => void;
@@ -15,6 +16,26 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ onComplete }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [sessionReady, setSessionReady] = useState(false);
+  const [sessionError, setSessionError] = useState(false);
+
+  useEffect(() => {
+    // Wait for Supabase to establish the session from the recovery link.
+    // Poll for up to 8 seconds since the PKCE code exchange is async.
+    let attempts = 0;
+    const maxAttempts = 16;
+    const interval = setInterval(async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        setSessionReady(true);
+        clearInterval(interval);
+      } else if (++attempts >= maxAttempts) {
+        setSessionError(true);
+        clearInterval(interval);
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
 
   const validatePassword = (password: string): string | null => {
     if (password.length < 8) {
@@ -62,6 +83,36 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ onComplete }) => {
       }, 2000);
     }
   };
+
+  if (sessionError) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-red-100 mb-4">
+            <Lock className="h-10 w-10 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Link Expired or Already Used</h2>
+          <p className="text-gray-600 mb-4">
+            This password reset link is no longer valid. Links expire after 1 hour and can only be used once.
+          </p>
+          <p className="text-sm text-gray-500">
+            Please contact your administrator to send a new password reset link.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!sessionReady) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-blue-50 to-cyan-50 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-8 max-w-md w-full text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Verifying your reset link...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (success) {
     return (
