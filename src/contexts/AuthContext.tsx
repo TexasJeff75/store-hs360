@@ -22,7 +22,7 @@ interface AuthContextType {
   effectiveProfile: Profile | null;
   startImpersonation: (userId: string) => Promise<void>;
   stopImpersonation: () => void;
-  signUp: (email: string, password: string, captchaToken?: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, captchaToken?: string, contactFields?: Partial<Profile>) => Promise<{ error: any }>;
   signIn: (email: string, password: string, ageVerified: boolean, captchaToken?: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: any }>;
@@ -246,7 +246,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, captchaToken?: string) => {
+  const signUp = async (email: string, password: string, captchaToken?: string, contactFields?: Partial<Profile>) => {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
@@ -255,17 +255,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 
     if (!error && data.user) {
-      // Create profile
+      // Create profile with contact fields
+      const profileData: Record<string, any> = {
+        id: data.user.id,
+        email: data.user.email,
+        role: 'pending',
+        is_approved: false,
+      };
+
+      if (contactFields) {
+        const allowedFields = ['full_name', 'phone', 'company', 'title', 'address1', 'address2', 'city', 'state', 'postal_code'];
+        for (const field of allowedFields) {
+          const value = contactFields[field as keyof Profile];
+          if (value) {
+            profileData[field] = value;
+          }
+        }
+      }
+
       const { error: profileError } = await supabase
         .from('profiles')
-        .insert([
-          {
-            id: data.user.id,
-            email: data.user.email,
-            role: 'pending',
-            is_approved: false,
-          },
-        ]);
+        .insert([profileData]);
 
       if (profileError) {
         console.error('Error creating profile:', profileError);

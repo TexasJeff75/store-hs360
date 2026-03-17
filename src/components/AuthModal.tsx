@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { X, Mail, Lock, User, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, Mail, Lock, User, AlertCircle, CheckCircle, Phone, Building2, MapPin, Briefcase } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import TurnstileWidget from './TurnstileWidget';
 
@@ -14,6 +14,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [company, setCompany] = useState('');
+  const [title, setTitle] = useState('');
+  const [address1, setAddress1] = useState('');
+  const [address2, setAddress2] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
+  const [postalCode, setPostalCode] = useState('');
   const [ageVerified, setAgeVerified] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +43,15 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
     setEmail('');
     setPassword('');
     setConfirmPassword('');
+    setFullName('');
+    setPhone('');
+    setCompany('');
+    setTitle('');
+    setAddress1('');
+    setAddress2('');
+    setCity('');
+    setState('');
+    setPostalCode('');
     setAgeVerified(false);
     setError(null);
     setSuccess(null);
@@ -88,7 +106,17 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
           }, 1000);
         }
       } else {
-        const { error } = await signUp(email, password, turnstileToken || undefined);
+        const { error } = await signUp(email, password, turnstileToken || undefined, {
+          full_name: fullName,
+          phone,
+          company,
+          title,
+          address1,
+          address2,
+          city,
+          state,
+          postal_code: postalCode,
+        });
         if (error) {
           console.error('Sign up error:', error);
           if (error.message.includes('User already registered')) {
@@ -221,6 +249,179 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                     <Lock className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                   </div>
                 </div>
+              )}
+
+              {/* Contact Fields (Sign Up Only) */}
+              {mode === 'signup' && (
+                <>
+                  {/* Full Name */}
+                  <div>
+                    <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-1">
+                      Full Name
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="fullName"
+                        name="fullName"
+                        type="text"
+                        autoComplete="name"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        required
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        placeholder="Enter your full name"
+                      />
+                      <User className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                    </div>
+                  </div>
+
+                  {/* Phone */}
+                  <div>
+                    <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone Number
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="phone"
+                        name="phone"
+                        type="tel"
+                        autoComplete="tel"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        required
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        placeholder="Enter your phone number"
+                      />
+                      <Phone className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                    </div>
+                  </div>
+
+                  {/* Company */}
+                  <div>
+                    <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-1">
+                      Company
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="company"
+                        name="company"
+                        type="text"
+                        autoComplete="organization"
+                        value={company}
+                        onChange={(e) => setCompany(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        placeholder="Enter your company name"
+                      />
+                      <Building2 className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                    </div>
+                  </div>
+
+                  {/* Title */}
+                  <div>
+                    <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+                      Job Title
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="title"
+                        name="title"
+                        type="text"
+                        autoComplete="organization-title"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        placeholder="Enter your job title"
+                      />
+                      <Briefcase className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                    </div>
+                  </div>
+
+                  {/* Address */}
+                  <div>
+                    <label htmlFor="address1" className="block text-sm font-medium text-gray-700 mb-1">
+                      Street Address
+                    </label>
+                    <div className="relative">
+                      <input
+                        id="address1"
+                        name="address1"
+                        type="text"
+                        autoComplete="address-line1"
+                        value={address1}
+                        onChange={(e) => setAddress1(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        placeholder="Enter your street address"
+                      />
+                      <MapPin className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="address2" className="block text-sm font-medium text-gray-700 mb-1">
+                      Address Line 2
+                    </label>
+                    <input
+                      id="address2"
+                      name="address2"
+                      type="text"
+                      autoComplete="address-line2"
+                      value={address2}
+                      onChange={(e) => setAddress2(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                      placeholder="Apt, suite, unit, etc. (optional)"
+                    />
+                  </div>
+
+                  {/* City, State, Zip */}
+                  <div className="grid grid-cols-6 gap-3">
+                    <div className="col-span-3">
+                      <label htmlFor="city" className="block text-sm font-medium text-gray-700 mb-1">
+                        City
+                      </label>
+                      <input
+                        id="city"
+                        name="city"
+                        type="text"
+                        autoComplete="address-level2"
+                        value={city}
+                        onChange={(e) => setCity(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        placeholder="City"
+                      />
+                    </div>
+                    <div className="col-span-1">
+                      <label htmlFor="state" className="block text-sm font-medium text-gray-700 mb-1">
+                        State
+                      </label>
+                      <input
+                        id="state"
+                        name="state"
+                        type="text"
+                        autoComplete="address-level1"
+                        value={state}
+                        onChange={(e) => setState(e.target.value)}
+                        maxLength={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        placeholder="ST"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label htmlFor="postalCode" className="block text-sm font-medium text-gray-700 mb-1">
+                        ZIP Code
+                      </label>
+                      <input
+                        id="postalCode"
+                        name="postalCode"
+                        type="text"
+                        autoComplete="postal-code"
+                        value={postalCode}
+                        onChange={(e) => setPostalCode(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                        placeholder="ZIP"
+                      />
+                    </div>
+                  </div>
+                </>
               )}
 
               {/* Age Verification Checkbox */}
