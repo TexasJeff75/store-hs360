@@ -31,17 +31,102 @@ UPDATE email_templates SET body_html = $$<h2 style="color:#111827;font-size:20px
 </div>$$
 WHERE email_type = 'account_approved';
 
--- Update order_confirmation template: replace flex item rows with table-based layout
-UPDATE email_templates SET body_html = $$<h2 style="color:#111827;font-size:20px;margin:0 0 8px 0;">Order Confirmed</h2>
-<p style="color:#6b7280;font-size:14px;margin:0 0 24px 0;">Order #{{order_id}}</p>
-<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:24px;">
-  <thead><tr style="border-bottom:2px solid #e5e7eb;">
-    <th style="text-align:left;padding:8px 0;font-size:12px;text-transform:uppercase;color:#6b7280;">Item</th>
-    <th style="text-align:right;padding:8px 0;font-size:12px;text-transform:uppercase;color:#6b7280;">Total</th>
-  </tr></thead>
-  <tbody>{{item_rows}}</tbody>
+-- Update order_confirmation template to match the OrderReceipt component layout
+UPDATE email_templates SET body_html = $$<!-- Header -->
+<div style="text-align:center;padding-bottom:24px;border-bottom:1px solid #e5e7eb;margin-bottom:24px;">
+  <h2 style="color:#111827;font-size:22px;font-weight:700;margin:0 0 4px 0;">Order Confirmed</h2>
+  <p style="color:#6b7280;font-size:14px;margin:0;">Order #{{order_id}}</p>
+  <p style="color:#9ca3af;font-size:13px;margin:4px 0 0 0;">{{order_date}} at {{order_time}}</p>
+</div>
+
+<!-- Payment Details -->
+<div style="background-color:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;" bgcolor="#f9fafb">
+  <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 12px 0;">Payment Details</h3>
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+    <tr>
+      <td style="padding:6px 0;font-size:14px;color:#6b7280;">Status</td>
+      <td style="padding:6px 0;text-align:right;">{{payment_status_badge}}</td>
+    </tr>
+    <tr>
+      <td style="padding:6px 0;font-size:14px;color:#6b7280;">Method</td>
+      <td style="padding:6px 0;text-align:right;font-size:14px;font-weight:500;color:#111827;">{{payment_method_display}}</td>
+    </tr>
+    {{transaction_id_html}}
+    <tr>
+      <td style="padding:6px 0;font-size:14px;color:#6b7280;">Email</td>
+      <td style="padding:6px 0;text-align:right;font-size:14px;color:#111827;">{{customer_email}}</td>
+    </tr>
+  </table>
+  {{payment_info_html}}
+</div>
+
+<!-- Items Ordered -->
+<h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 8px 0;">Items Ordered</h3>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:16px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+  <thead>
+    <tr style="background-color:#f9fafb;" bgcolor="#f9fafb">
+      <th style="padding:10px 8px 10px 12px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:500;border-bottom:2px solid #e5e7eb;">Item</th>
+      <th style="padding:10px 8px;text-align:center;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:500;border-bottom:2px solid #e5e7eb;">Qty</th>
+      <th style="padding:10px 8px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:500;border-bottom:2px solid #e5e7eb;">Price</th>
+      <th style="padding:10px 12px 10px 8px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:500;border-bottom:2px solid #e5e7eb;">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{item_rows}}
+  </tbody>
 </table>
-<div style="background-color:#f9fafb;border-radius:8px;padding:16px;text-align:right;" bgcolor="#f9fafb">
-  <span style="font-size:16px;font-weight:700;color:#111827;">Total: ${{formatted_total}}</span>
-</div>$$
+
+<!-- Totals -->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="280" align="right" style="margin-bottom:24px;">
+  <tr>
+    <td style="padding:4px 0;font-size:14px;color:#6b7280;">Subtotal</td>
+    <td style="padding:4px 0;font-size:14px;color:#6b7280;text-align:right;">${{formatted_subtotal}}</td>
+  </tr>
+  <tr>
+    <td style="padding:4px 0;font-size:14px;color:#6b7280;">Shipping ({{shipping_method}})</td>
+    <td style="padding:4px 0;font-size:14px;color:#6b7280;text-align:right;">${{formatted_shipping}}</td>
+  </tr>
+  <tr>
+    <td style="padding:4px 0;font-size:14px;color:#6b7280;">Tax</td>
+    <td style="padding:4px 0;font-size:14px;color:#6b7280;text-align:right;">${{formatted_tax}}</td>
+  </tr>
+  <tr>
+    <td style="padding:8px 0 0 0;border-top:2px solid #111827;font-size:16px;font-weight:700;color:#111827;">Total</td>
+    <td style="padding:8px 0 0 0;border-top:2px solid #111827;font-size:16px;font-weight:700;color:#111827;text-align:right;">${{formatted_total}}</td>
+  </tr>
+</table>
+<div style="clear:both;"></div>
+
+<!-- Addresses -->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+  <tr>
+    <td width="48%" valign="top" style="background-color:#f9fafb;border-radius:12px;padding:16px;" bgcolor="#f9fafb">
+      <h4 style="font-size:13px;font-weight:600;color:#111827;margin:0 0 8px 0;">Shipping Address</h4>
+      {{shipping_address_html}}
+    </td>
+    <td width="4%"></td>
+    <td width="48%" valign="top" style="background-color:#f9fafb;border-radius:12px;padding:16px;" bgcolor="#f9fafb">
+      <h4 style="font-size:13px;font-weight:600;color:#111827;margin:0 0 8px 0;">Billing Address</h4>
+      {{billing_address_html}}
+    </td>
+  </tr>
+</table>$$,
+variables = '[
+  {"key":"order_id","description":"Short order ID (first 8 chars, uppercased)","example":"A1B2C3D4"},
+  {"key":"order_date","description":"Formatted order date","example":"Monday, March 17, 2026"},
+  {"key":"order_time","description":"Formatted order time","example":"2:30 PM"},
+  {"key":"payment_status_badge","description":"Pre-rendered payment status badge HTML","example":"<span style=\"display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;background:#dcfce7;color:#166534\">Payment Captured</span>"},
+  {"key":"payment_method_display","description":"Payment method with masked card number","example":"Visa ****4242"},
+  {"key":"transaction_id_html","description":"Pre-rendered transaction ID row (empty if none)","example":""},
+  {"key":"customer_email","description":"Customer email address","example":"customer@example.com"},
+  {"key":"payment_info_html","description":"Status-specific info message (empty for captured/failed)","example":""},
+  {"key":"item_rows","description":"Pre-rendered HTML table rows for order items","example":"<tr><td>Vitamin D3</td><td>2</td><td>$14.99</td><td>$29.98</td></tr>"},
+  {"key":"formatted_subtotal","description":"Subtotal formatted with 2 decimals","example":"129.97"},
+  {"key":"shipping_method","description":"Shipping method name","example":"Standard"},
+  {"key":"formatted_shipping","description":"Shipping cost formatted with 2 decimals","example":"9.99"},
+  {"key":"formatted_tax","description":"Tax formatted with 2 decimals","example":"10.03"},
+  {"key":"formatted_total","description":"Total formatted with 2 decimals","example":"149.99"},
+  {"key":"shipping_address_html","description":"Pre-rendered shipping address block","example":"<div>John Doe<br>123 Main St</div>"},
+  {"key":"billing_address_html","description":"Pre-rendered billing address block","example":"<em>Same as shipping address</em>"}
+]'::jsonb
 WHERE email_type = 'order_confirmation';

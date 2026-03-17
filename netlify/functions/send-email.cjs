@@ -190,6 +190,7 @@ function prepareTemplateData(emailType, data) {
       vars.customer_email = String(data.customer_email || '');
       vars.payment_method = String(data.payment_method || '');
       vars.payment_last_four = String(data.payment_last_four || '');
+      vars.transaction_id = String(data.transaction_id || '');
 
       // Format order date
       if (data.order_date) {
@@ -206,22 +207,46 @@ function prepareTemplateData(emailType, data) {
       // Payment status badge
       const ps = String(data.payment_status || 'pending');
       const psColors = { authorized: '#dbeafe;color:#1e40af', captured: '#dcfce7;color:#166534', pending: '#fef3c7;color:#92400e', failed: '#fee2e2;color:#991b1b' };
-      const psLabels = { authorized: 'Authorized', captured: 'Captured', pending: 'Pending', failed: 'Failed' };
+      const psLabels = { authorized: 'Payment Authorized', captured: 'Payment Captured', pending: 'Payment Pending', failed: 'Payment Failed' };
       vars.payment_status_badge = `<span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;background:${psColors[ps] || psColors.pending}">${psLabels[ps] || ps}</span>`;
 
-      // Item cards — use table rows for Outlook compatibility (no flexbox)
+      // Payment method display
+      const pm = vars.payment_method;
+      const plf = vars.payment_last_four;
+      vars.payment_method_display = pm ? `${pm}${plf ? ' ****' + plf : ''}` : '';
+
+      // Transaction ID row (pre-rendered, empty if no transaction_id)
+      vars.transaction_id_html = data.transaction_id
+        ? `<tr>
+            <td style="padding:6px 0;font-size:14px;color:#6b7280;">Transaction ID</td>
+            <td style="padding:6px 0;text-align:right;font-size:12px;font-family:monospace;font-weight:500;color:#374151;">${String(data.transaction_id)}</td>
+          </tr>`
+        : '';
+
+      // Payment status info message (matches receipt component)
+      const formattedTotal = vars.formatted_total;
+      if (ps === 'authorized') {
+        vars.payment_info_html = `<div style="background-color:#dbeafe;border:1px solid #bfdbfe;border-radius:8px;padding:12px;margin-top:12px;" bgcolor="#dbeafe">
+          <p style="color:#1e40af;font-size:12px;margin:0;">Your card has been authorized for $${formattedTotal}. The charge will be captured when your order ships.</p>
+        </div>`;
+      } else if (ps === 'pending') {
+        vars.payment_info_html = `<div style="background-color:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px;margin-top:12px;" bgcolor="#fef3c7">
+          <p style="color:#92400e;font-size:12px;margin:0;">Your ACH payment is being processed. This typically takes 3-5 business days to settle.</p>
+        </div>`;
+      } else {
+        vars.payment_info_html = '';
+      }
+
+      // Item rows — 4-column format matching receipt (Item, Qty, Price, Total)
       const items = Array.isArray(data.items) ? data.items : [];
       vars.item_rows = items
         .map(
           (i) =>
-            `<tr style="border-bottom:1px solid #f3f4f6;">
-              <td style="padding:12px 0;">
-                <div style="font-size:14px;font-weight:500;color:#111827;">${i.name}</div>
-                <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Qty: ${i.quantity} &times; $${Number(i.price).toFixed(2)}</div>
-              </td>
-              <td style="padding:12px 0;text-align:right;white-space:nowrap;">
-                <div style="font-size:14px;font-weight:600;color:#111827;">$${Number(i.price * i.quantity).toFixed(2)}</div>
-              </td>
+            `<tr>
+              <td style="padding:12px 8px 12px 12px;font-size:14px;font-weight:500;color:#111827;border-bottom:1px solid #f3f4f6;">${i.name}</td>
+              <td style="padding:12px 8px;font-size:14px;color:#374151;text-align:center;border-bottom:1px solid #f3f4f6;">${i.quantity}</td>
+              <td style="padding:12px 8px;font-size:14px;color:#374151;text-align:right;border-bottom:1px solid #f3f4f6;">$${Number(i.price).toFixed(2)}</td>
+              <td style="padding:12px 12px 12px 8px;font-size:14px;font-weight:600;color:#111827;text-align:right;border-bottom:1px solid #f3f4f6;">$${Number(i.price * i.quantity).toFixed(2)}</td>
             </tr>`
         )
         .join('');
@@ -304,28 +329,37 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
       const psLabels = { authorized: 'Authorized', captured: 'Captured', pending: 'Pending', failed: 'Failed' };
       const statusBadge = `<span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;background:${psColors[paymentStatus] || psColors.pending}">${psLabels[paymentStatus] || paymentStatus}</span>`;
 
+      const transactionId = String(data.transaction_id || '');
       const items = Array.isArray(data.items) ? data.items : [];
-      const itemCards = items
+      const itemRows = items
         .map(
           (i) =>
-            `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-bottom:1px solid #f3f4f6;">
-              <tr>
-                <td style="padding:12px 0;">
-                  <div style="font-size:14px;font-weight:500;color:#111827;">${i.name}</div>
-                  <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Qty: ${i.quantity} &times; $${Number(i.price).toFixed(2)}</div>
-                </td>
-                <td style="padding:12px 0;text-align:right;white-space:nowrap;">
-                  <div style="font-size:14px;font-weight:600;color:#111827;">$${Number(i.price * i.quantity).toFixed(2)}</div>
-                </td>
-              </tr>
-            </table>`
+            `<tr>
+              <td style="padding:12px 8px 12px 12px;font-size:14px;font-weight:500;color:#111827;border-bottom:1px solid #f3f4f6;">${i.name}</td>
+              <td style="padding:12px 8px;font-size:14px;color:#374151;text-align:center;border-bottom:1px solid #f3f4f6;">${i.quantity}</td>
+              <td style="padding:12px 8px;font-size:14px;color:#374151;text-align:right;border-bottom:1px solid #f3f4f6;">$${Number(i.price).toFixed(2)}</td>
+              <td style="padding:12px 12px 12px 8px;font-size:14px;font-weight:600;color:#111827;text-align:right;border-bottom:1px solid #f3f4f6;">$${Number(i.price * i.quantity).toFixed(2)}</td>
+            </tr>`
         )
         .join('');
 
       const shippingAddrHtml = data.shipping_address ? formatAddressBlock(data.shipping_address) : '';
       const billingAddrHtml = data.billing_address ? formatAddressBlock(data.billing_address) : '<em style="color:#9ca3af;">Same as shipping address</em>';
 
+      // Status-specific info message (matching receipt component)
+      let paymentInfoHtml = '';
+      if (paymentStatus === 'authorized') {
+        paymentInfoHtml = `<div style="background-color:#dbeafe;border:1px solid #bfdbfe;border-radius:8px;padding:12px;margin-top:12px;" bgcolor="#dbeafe">
+          <p style="color:#1e40af;font-size:12px;margin:0;">Your card has been authorized for $${total}. The charge will be captured when your order ships.</p>
+        </div>`;
+      } else if (paymentStatus === 'pending') {
+        paymentInfoHtml = `<div style="background-color:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px;margin-top:12px;" bgcolor="#fef3c7">
+          <p style="color:#92400e;font-size:12px;margin:0;">Your ACH payment is being processed. This typically takes 3-5 business days to settle.</p>
+        </div>`;
+      }
+
       return wrap(`
+        <!-- Header -->
         <div style="text-align:center;padding-bottom:24px;border-bottom:1px solid #e5e7eb;margin-bottom:24px;">
           <h2 style="color:#111827;font-size:22px;font-weight:700;margin:0 0 4px 0;">Order Confirmed</h2>
           <p style="color:#6b7280;font-size:14px;margin:0;">Order #${orderId}</p>
@@ -344,18 +378,33 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
               <td style="padding:6px 0;font-size:14px;color:#6b7280;">Method</td>
               <td style="padding:6px 0;text-align:right;font-size:14px;font-weight:500;color:#111827;">${paymentMethod}${paymentLastFour ? ' ****' + paymentLastFour : ''}</td>
             </tr>` : ''}
+            ${transactionId ? `<tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Transaction ID</td>
+              <td style="padding:6px 0;text-align:right;font-size:12px;font-family:monospace;font-weight:500;color:#374151;">${transactionId}</td>
+            </tr>` : ''}
             ${customerEmail ? `<tr>
               <td style="padding:6px 0;font-size:14px;color:#6b7280;">Email</td>
               <td style="padding:6px 0;text-align:right;font-size:14px;color:#111827;">${customerEmail}</td>
             </tr>` : ''}
           </table>
+          ${paymentInfoHtml}
         </div>
 
-        <!-- Items -->
+        <!-- Items Ordered -->
         <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 8px 0;">Items Ordered</h3>
-        <div style="margin-bottom:16px;">
-          ${itemCards}
-        </div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:16px;border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;">
+          <thead>
+            <tr style="background-color:#f9fafb;" bgcolor="#f9fafb">
+              <th style="padding:10px 8px 10px 12px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:500;border-bottom:2px solid #e5e7eb;">Item</th>
+              <th style="padding:10px 8px;text-align:center;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:500;border-bottom:2px solid #e5e7eb;">Qty</th>
+              <th style="padding:10px 8px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:500;border-bottom:2px solid #e5e7eb;">Price</th>
+              <th style="padding:10px 12px 10px 8px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:0.5px;color:#6b7280;font-weight:500;border-bottom:2px solid #e5e7eb;">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRows}
+          </tbody>
+        </table>
 
         <!-- Totals -->
         <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="280" align="right" style="margin-bottom:24px;">
