@@ -29,16 +29,6 @@ function getLogoUrl() {
   return siteUrl ? `${siteUrl}/Logo_web.webp` : '';
 }
 
-/**
- * Resolve relative src/href attributes to absolute URLs.
- * Email clients cannot resolve relative paths — images and links must be absolute.
- */
-function resolveRelativeUrls(html) {
-  const siteUrl = getSiteUrl();
-  if (!siteUrl) return html;
-  // Replace src="/..." and href="/..." (but not src="//..." or href="http...")
-  return html.replace(/(src|href)="\/(?!\/)/g, `$1="${siteUrl}/`);
-}
 
 /**
  * Outlook-compatible button using VML fallback.
@@ -99,10 +89,15 @@ async function getEmailSettings(supabase) {
 }
 
 function wrapEmail(content, headerHtml, footerHtml) {
-  // Resolve any relative URLs in all HTML parts
-  const header = resolveRelativeUrls(headerHtml);
-  const body = resolveRelativeUrls(content);
-  const footer = resolveRelativeUrls(footerHtml);
+  // Resolve relative src/href to absolute URLs (email clients can't resolve relative paths).
+  // Cache siteUrl once rather than calling getSiteUrl() per part.
+  const siteUrl = getSiteUrl();
+  const resolveUrls = siteUrl
+    ? (html) => html.replace(/(src|href)="\/(?!\/)/g, `$1="${siteUrl}/`)
+    : (html) => html;
+  const header = resolveUrls(headerHtml);
+  const body = resolveUrls(content);
+  const footer = resolveUrls(footerHtml);
 
   // Use table-based layout for Outlook compatibility.
   // Outlook's Word renderer doesn't support max-width on divs, border-radius, or box-shadow.
@@ -167,6 +162,34 @@ function formatAddressBlock(addr) {
   return `<div style="font-size:14px;line-height:1.6;">${lines.join('')}</div>`;
 }
 
+function buildOrderItemRows(items) {
+  return (Array.isArray(items) ? items : [])
+    .map(
+      (i) =>
+        `<tr>
+              <td style="padding:12px 8px 12px 12px;font-size:14px;font-weight:500;color:#111827;border-bottom:1px solid #f3f4f6;">${i.name}</td>
+              <td style="padding:12px 8px;font-size:14px;color:#374151;text-align:center;border-bottom:1px solid #f3f4f6;">${i.quantity}</td>
+              <td style="padding:12px 8px;font-size:14px;color:#374151;text-align:right;border-bottom:1px solid #f3f4f6;">$${Number(i.price).toFixed(2)}</td>
+              <td style="padding:12px 12px 12px 8px;font-size:14px;font-weight:600;color:#111827;text-align:right;border-bottom:1px solid #f3f4f6;">$${Number(i.price * i.quantity).toFixed(2)}</td>
+            </tr>`
+    )
+    .join('');
+}
+
+function buildPaymentInfoHtml(status, total) {
+  if (status === 'authorized') {
+    return `<div style="background-color:#dbeafe;border:1px solid #bfdbfe;border-radius:8px;padding:12px;margin-top:12px;" bgcolor="#dbeafe">
+          <p style="color:#1e40af;font-size:12px;margin:0;">Your card has been authorized for $${total}. The charge will be captured when your order ships.</p>
+        </div>`;
+  }
+  if (status === 'pending') {
+    return `<div style="background-color:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px;margin-top:12px;" bgcolor="#fef3c7">
+          <p style="color:#92400e;font-size:12px;margin:0;">Your ACH payment is being processed. This typically takes 3-5 business days to settle.</p>
+        </div>`;
+  }
+  return '';
+}
+
 // ── Pre-compute derived template variables ──
 
 function prepareTemplateData(emailType, data) {
@@ -224,32 +247,10 @@ function prepareTemplateData(emailType, data) {
         : '';
 
       // Payment status info message (matches receipt component)
-      const formattedTotal = vars.formatted_total;
-      if (ps === 'authorized') {
-        vars.payment_info_html = `<div style="background-color:#dbeafe;border:1px solid #bfdbfe;border-radius:8px;padding:12px;margin-top:12px;" bgcolor="#dbeafe">
-          <p style="color:#1e40af;font-size:12px;margin:0;">Your card has been authorized for $${formattedTotal}. The charge will be captured when your order ships.</p>
-        </div>`;
-      } else if (ps === 'pending') {
-        vars.payment_info_html = `<div style="background-color:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px;margin-top:12px;" bgcolor="#fef3c7">
-          <p style="color:#92400e;font-size:12px;margin:0;">Your ACH payment is being processed. This typically takes 3-5 business days to settle.</p>
-        </div>`;
-      } else {
-        vars.payment_info_html = '';
-      }
+      vars.payment_info_html = buildPaymentInfoHtml(ps, vars.formatted_total);
 
       // Item rows — 4-column format matching receipt (Item, Qty, Price, Total)
-      const items = Array.isArray(data.items) ? data.items : [];
-      vars.item_rows = items
-        .map(
-          (i) =>
-            `<tr>
-              <td style="padding:12px 8px 12px 12px;font-size:14px;font-weight:500;color:#111827;border-bottom:1px solid #f3f4f6;">${i.name}</td>
-              <td style="padding:12px 8px;font-size:14px;color:#374151;text-align:center;border-bottom:1px solid #f3f4f6;">${i.quantity}</td>
-              <td style="padding:12px 8px;font-size:14px;color:#374151;text-align:right;border-bottom:1px solid #f3f4f6;">$${Number(i.price).toFixed(2)}</td>
-              <td style="padding:12px 12px 12px 8px;font-size:14px;font-weight:600;color:#111827;text-align:right;border-bottom:1px solid #f3f4f6;">$${Number(i.price * i.quantity).toFixed(2)}</td>
-            </tr>`
-        )
-        .join('');
+      vars.item_rows = buildOrderItemRows(data.items);
 
       // Shipping address block
       const sa = data.shipping_address;
@@ -330,33 +331,10 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
       const statusBadge = `<span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;background:${psColors[paymentStatus] || psColors.pending}">${psLabels[paymentStatus] || paymentStatus}</span>`;
 
       const transactionId = String(data.transaction_id || '');
-      const items = Array.isArray(data.items) ? data.items : [];
-      const itemRows = items
-        .map(
-          (i) =>
-            `<tr>
-              <td style="padding:12px 8px 12px 12px;font-size:14px;font-weight:500;color:#111827;border-bottom:1px solid #f3f4f6;">${i.name}</td>
-              <td style="padding:12px 8px;font-size:14px;color:#374151;text-align:center;border-bottom:1px solid #f3f4f6;">${i.quantity}</td>
-              <td style="padding:12px 8px;font-size:14px;color:#374151;text-align:right;border-bottom:1px solid #f3f4f6;">$${Number(i.price).toFixed(2)}</td>
-              <td style="padding:12px 12px 12px 8px;font-size:14px;font-weight:600;color:#111827;text-align:right;border-bottom:1px solid #f3f4f6;">$${Number(i.price * i.quantity).toFixed(2)}</td>
-            </tr>`
-        )
-        .join('');
-
+      const itemRows = buildOrderItemRows(data.items);
       const shippingAddrHtml = data.shipping_address ? formatAddressBlock(data.shipping_address) : '';
       const billingAddrHtml = data.billing_address ? formatAddressBlock(data.billing_address) : '<em style="color:#9ca3af;">Same as shipping address</em>';
-
-      // Status-specific info message (matching receipt component)
-      let paymentInfoHtml = '';
-      if (paymentStatus === 'authorized') {
-        paymentInfoHtml = `<div style="background-color:#dbeafe;border:1px solid #bfdbfe;border-radius:8px;padding:12px;margin-top:12px;" bgcolor="#dbeafe">
-          <p style="color:#1e40af;font-size:12px;margin:0;">Your card has been authorized for $${total}. The charge will be captured when your order ships.</p>
-        </div>`;
-      } else if (paymentStatus === 'pending') {
-        paymentInfoHtml = `<div style="background-color:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px;margin-top:12px;" bgcolor="#fef3c7">
-          <p style="color:#92400e;font-size:12px;margin:0;">Your ACH payment is being processed. This typically takes 3-5 business days to settle.</p>
-        </div>`;
-      }
+      const paymentInfoHtml = buildPaymentInfoHtml(paymentStatus, total);
 
       return wrap(`
         <!-- Header -->
