@@ -20,9 +20,40 @@ function getSupabaseAdmin() {
 
 // ── Shared email wrapper ──
 
+function getSiteUrl() {
+  return (process.env.SITE_URL || process.env.URL || '').replace(/\/$/, '');
+}
+
 function getLogoUrl() {
-  const siteUrl = process.env.SITE_URL || process.env.URL || '';
-  return siteUrl ? `${siteUrl.replace(/\/$/, '')}/Logo_web.webp` : '';
+  const siteUrl = getSiteUrl();
+  return siteUrl ? `${siteUrl}/Logo_web.webp` : '';
+}
+
+/**
+ * Resolve relative src/href attributes to absolute URLs.
+ * Email clients cannot resolve relative paths — images and links must be absolute.
+ */
+function resolveRelativeUrls(html) {
+  const siteUrl = getSiteUrl();
+  if (!siteUrl) return html;
+  // Replace src="/..." and href="/..." (but not src="//..." or href="http...")
+  return html.replace(/(src|href)="\/(?!\/)/g, `$1="${siteUrl}/`);
+}
+
+/**
+ * Outlook-compatible button using VML fallback.
+ * Outlook's Word renderer doesn't support border-radius or gradients on <a> tags.
+ */
+function outlookButton(href, text, bgColor = '#ec4899') {
+  return `<!--[if mso]>
+<v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${href}" style="height:44px;v-text-anchor:middle;width:200px;" arcsize="18%" strokecolor="${bgColor}" fillcolor="${bgColor}">
+  <w:anchorlock/>
+  <center style="color:#ffffff;font-family:sans-serif;font-size:14px;font-weight:bold;">${text}</center>
+</v:roundrect>
+<![endif]-->
+<!--[if !mso]><!-->
+<a href="${href}" style="display:inline-block;background-color:${bgColor};color:#ffffff;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">${text}</a>
+<!--<![endif]-->`;
 }
 
 function defaultHeaderHtml() {
@@ -30,12 +61,13 @@ function defaultHeaderHtml() {
   const logoHtml = logoUrl
     ? `<img src="${logoUrl}" alt="HealthSpan360" width="48" height="48" style="display:block;margin:0 auto 12px auto;border-radius:8px;" />`
     : '';
-  return `<div style="background: linear-gradient(135deg, #ec4899, #f97316); padding: 32px 24px; text-align: center;">
+  // Use bgcolor attribute for Outlook (it ignores CSS background/gradient)
+  return `<div style="background-color:#ec4899;background:linear-gradient(135deg,#ec4899,#f97316);padding:32px 24px;text-align:center;" bgcolor="#ec4899">
     ${logoHtml}
-    <h1 style="color: white; font-size: 24px; margin: 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-weight: 700;">
+    <h1 style="color:white;font-size:24px;margin:0;font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-weight:700;">
       HealthSpan360
     </h1>
-    <p style="color: rgba(255,255,255,0.85); font-size: 13px; margin: 4px 0 0 0; font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+    <p style="color:rgba(255,255,255,0.85);font-size:13px;margin:4px 0 0 0;font-family:'Poppins',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
       Turning Insight Into Impact
     </p>
   </div>`;
@@ -67,17 +99,54 @@ async function getEmailSettings(supabase) {
 }
 
 function wrapEmail(content, headerHtml, footerHtml) {
+  // Resolve any relative URLs in all HTML parts
+  const header = resolveRelativeUrls(headerHtml);
+  const body = resolveRelativeUrls(content);
+  const footer = resolveRelativeUrls(footerHtml);
+
+  // Use table-based layout for Outlook compatibility.
+  // Outlook's Word renderer doesn't support max-width on divs, border-radius, or box-shadow.
   return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
-<body style="margin: 0; padding: 0; background: #f3f4f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
-  <div style="max-width: 600px; margin: 0 auto; background: white; border-radius: 8px; overflow: hidden; margin-top: 24px; margin-bottom: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
-    ${headerHtml}
-    <div style="padding: 32px 24px;">
-      ${content}
-    </div>
-    ${footerHtml}
-  </div>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <!--[if gte mso 9]>
+  <xml>
+    <o:OfficeDocumentSettings>
+      <o:AllowPNG/>
+      <o:PixelsPerInch>96</o:PixelsPerInch>
+    </o:OfficeDocumentSettings>
+  </xml>
+  <![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;" bgcolor="#f3f4f6">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f3f4f6;" bgcolor="#f3f4f6">
+    <tr>
+      <td align="center" style="padding:24px 0;">
+        <!--[if (gte mso 9)|(IE)]>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600"><tr><td>
+        <![endif]-->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:600px;background-color:#ffffff;border-radius:8px;overflow:hidden;" bgcolor="#ffffff">
+          <tr>
+            <td>${header}</td>
+          </tr>
+          <tr>
+            <td style="padding:32px 24px;">
+              ${body}
+            </td>
+          </tr>
+          <tr>
+            <td>${footer}</td>
+          </tr>
+        </table>
+        <!--[if (gte mso 9)|(IE)]>
+        </td></tr></table>
+        <![endif]-->
+      </td>
+    </tr>
+  </table>
 </body>
 </html>`;
 }
@@ -140,18 +209,20 @@ function prepareTemplateData(emailType, data) {
       const psLabels = { authorized: 'Authorized', captured: 'Captured', pending: 'Pending', failed: 'Failed' };
       vars.payment_status_badge = `<span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:13px;font-weight:600;background:${psColors[ps] || psColors.pending}">${psLabels[ps] || ps}</span>`;
 
-      // Item cards
+      // Item cards — use table rows for Outlook compatibility (no flexbox)
       const items = Array.isArray(data.items) ? data.items : [];
       vars.item_rows = items
         .map(
           (i) =>
-            `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6;">
-              <div style="flex:1;">
+            `<tr style="border-bottom:1px solid #f3f4f6;">
+              <td style="padding:12px 0;">
                 <div style="font-size:14px;font-weight:500;color:#111827;">${i.name}</div>
                 <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Qty: ${i.quantity} &times; $${Number(i.price).toFixed(2)}</div>
-              </div>
-              <div style="font-size:14px;font-weight:600;color:#111827;">$${Number(i.price * i.quantity).toFixed(2)}</div>
-            </div>`
+              </td>
+              <td style="padding:12px 0;text-align:right;white-space:nowrap;">
+                <div style="font-size:14px;font-weight:600;color:#111827;">$${Number(i.price * i.quantity).toFixed(2)}</div>
+              </td>
+            </tr>`
         )
         .join('');
 
@@ -237,13 +308,17 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
       const itemCards = items
         .map(
           (i) =>
-            `<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid #f3f4f6;">
-              <div style="flex:1;">
-                <div style="font-size:14px;font-weight:500;color:#111827;">${i.name}</div>
-                <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Qty: ${i.quantity} &times; $${Number(i.price).toFixed(2)}</div>
-              </div>
-              <div style="font-size:14px;font-weight:600;color:#111827;">$${Number(i.price * i.quantity).toFixed(2)}</div>
-            </div>`
+            `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-bottom:1px solid #f3f4f6;">
+              <tr>
+                <td style="padding:12px 0;">
+                  <div style="font-size:14px;font-weight:500;color:#111827;">${i.name}</div>
+                  <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Qty: ${i.quantity} &times; $${Number(i.price).toFixed(2)}</div>
+                </td>
+                <td style="padding:12px 0;text-align:right;white-space:nowrap;">
+                  <div style="font-size:14px;font-weight:600;color:#111827;">$${Number(i.price * i.quantity).toFixed(2)}</div>
+                </td>
+              </tr>
+            </table>`
         )
         .join('');
 
@@ -258,20 +333,22 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
         </div>
 
         <!-- Payment Details -->
-        <div style="background:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;">
+        <div style="background-color:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;" bgcolor="#f9fafb">
           <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 12px 0;">Payment Details</h3>
-          <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Status</span>
-            ${statusBadge}
-          </div>
-          ${paymentMethod ? `<div style="display:flex;justify-content:space-between;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Method</span>
-            <span style="font-size:14px;font-weight:500;color:#111827;">${paymentMethod}${paymentLastFour ? ' ****' + paymentLastFour : ''}</span>
-          </div>` : ''}
-          ${customerEmail ? `<div style="display:flex;justify-content:space-between;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Email</span>
-            <span style="font-size:14px;color:#111827;">${customerEmail}</span>
-          </div>` : ''}
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+            <tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Status</td>
+              <td style="padding:6px 0;text-align:right;">${statusBadge}</td>
+            </tr>
+            ${paymentMethod ? `<tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Method</td>
+              <td style="padding:6px 0;text-align:right;font-size:14px;font-weight:500;color:#111827;">${paymentMethod}${paymentLastFour ? ' ****' + paymentLastFour : ''}</td>
+            </tr>` : ''}
+            ${customerEmail ? `<tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Email</td>
+              <td style="padding:6px 0;text-align:right;font-size:14px;color:#111827;">${customerEmail}</td>
+            </tr>` : ''}
+          </table>
         </div>
 
         <!-- Items -->
@@ -281,32 +358,40 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
         </div>
 
         <!-- Totals -->
-        <div style="max-width:280px;margin-left:auto;margin-bottom:24px;">
-          <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;color:#6b7280;">
-            <span>Subtotal</span><span>$${subtotal}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;color:#6b7280;">
-            <span>Shipping (${shippingMethod})</span><span>$${shippingAmt}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:14px;color:#6b7280;">
-            <span>Tax</span><span>$${tax}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:8px 0 0 0;margin-top:8px;border-top:2px solid #111827;font-size:16px;font-weight:700;color:#111827;">
-            <span>Total</span><span>$${total}</span>
-          </div>
-        </div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="280" align="right" style="margin-bottom:24px;">
+          <tr>
+            <td style="padding:4px 0;font-size:14px;color:#6b7280;">Subtotal</td>
+            <td style="padding:4px 0;font-size:14px;color:#6b7280;text-align:right;">$${subtotal}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;font-size:14px;color:#6b7280;">Shipping (${shippingMethod})</td>
+            <td style="padding:4px 0;font-size:14px;color:#6b7280;text-align:right;">$${shippingAmt}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0;font-size:14px;color:#6b7280;">Tax</td>
+            <td style="padding:4px 0;font-size:14px;color:#6b7280;text-align:right;">$${tax}</td>
+          </tr>
+          <tr>
+            <td style="padding:8px 0 0 0;border-top:2px solid #111827;font-size:16px;font-weight:700;color:#111827;">Total</td>
+            <td style="padding:8px 0 0 0;border-top:2px solid #111827;font-size:16px;font-weight:700;color:#111827;text-align:right;">$${total}</td>
+          </tr>
+        </table>
+        <div style="clear:both;"></div>
 
         <!-- Addresses -->
-        <div style="display:flex;gap:16px;">
-          <div style="flex:1;background:#f9fafb;border-radius:12px;padding:16px;">
-            <h4 style="font-size:13px;font-weight:600;color:#111827;margin:0 0 8px 0;">Shipping Address</h4>
-            ${shippingAddrHtml}
-          </div>
-          <div style="flex:1;background:#f9fafb;border-radius:12px;padding:16px;">
-            <h4 style="font-size:13px;font-weight:600;color:#111827;margin:0 0 8px 0;">Billing Address</h4>
-            ${billingAddrHtml}
-          </div>
-        </div>
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+          <tr>
+            <td width="48%" valign="top" style="background-color:#f9fafb;border-radius:12px;padding:16px;" bgcolor="#f9fafb">
+              <h4 style="font-size:13px;font-weight:600;color:#111827;margin:0 0 8px 0;">Shipping Address</h4>
+              ${shippingAddrHtml}
+            </td>
+            <td width="4%"></td>
+            <td width="48%" valign="top" style="background-color:#f9fafb;border-radius:12px;padding:16px;" bgcolor="#f9fafb">
+              <h4 style="font-size:13px;font-weight:600;color:#111827;margin:0 0 8px 0;">Billing Address</h4>
+              ${billingAddrHtml}
+            </td>
+          </tr>
+        </table>
       `);
     }
 
@@ -345,9 +430,7 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
         <h2 style="color:#111827;font-size:20px;margin:0 0 8px 0;">Account Approved</h2>
         <p style="color:#6b7280;font-size:14px;margin:0 0 24px 0;">Your account has been approved. You can now log in and start placing orders.</p>
         <div style="text-align:center;margin:24px 0;">
-          <a href="${String(data.login_url || '#')}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
-            Log In Now
-          </a>
+          ${outlookButton(String(data.login_url || '#'), 'Log In Now')}
         </div>
       `);
 
@@ -401,24 +484,24 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
           <h2 style="color:#111827;font-size:22px;font-weight:700;margin:0 0 8px 0;">Welcome to HealthSpan360!</h2>
           <p style="color:#6b7280;font-size:14px;margin:0;">You've been invited to join our platform as a customer.</p>
         </div>
-        <div style="background:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;">
+        <div style="background-color:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;" bgcolor="#f9fafb">
           <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 12px 0;">Your Account Details</h3>
-          ${fullName ? `<div style="display:flex;justify-content:space-between;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Name</span>
-            <span style="font-size:14px;font-weight:500;color:#111827;">${fullName}</span>
-          </div>` : ''}
-          <div style="display:flex;justify-content:space-between;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Email</span>
-            <span style="font-size:14px;font-weight:500;color:#111827;">${email}</span>
-          </div>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+            ${fullName ? `<tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Name</td>
+              <td style="padding:6px 0;font-size:14px;font-weight:500;color:#111827;text-align:right;">${fullName}</td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Email</td>
+              <td style="padding:6px 0;font-size:14px;font-weight:500;color:#111827;text-align:right;">${email}</td>
+            </tr>
+          </table>
         </div>
         <div style="text-align:center;margin-bottom:24px;">
           <p style="color:#6b7280;font-size:14px;margin:0 0 16px 0;">
             To get started, please set your password using the link below:
           </p>
-          <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
-            Set Up Your Password
-          </a>
+          ${outlookButton(loginUrl, 'Set Up Your Password')}
         </div>
         <p style="color:#6b7280;font-size:13px;text-align:center;margin:0;">
           Once your password is set, you can browse products and place orders.
@@ -435,28 +518,28 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
           <h2 style="color:#111827;font-size:22px;font-weight:700;margin:0 0 8px 0;">Welcome to HealthSpan360!</h2>
           <p style="color:#6b7280;font-size:14px;margin:0;">You've been set up as a distributor on our platform.</p>
         </div>
-        <div style="background:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;">
+        <div style="background-color:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;" bgcolor="#f9fafb">
           <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 12px 0;">Your Account Details</h3>
-          ${fullName ? `<div style="display:flex;justify-content:space-between;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Name</span>
-            <span style="font-size:14px;font-weight:500;color:#111827;">${fullName}</span>
-          </div>` : ''}
-          <div style="display:flex;justify-content:space-between;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Email</span>
-            <span style="font-size:14px;font-weight:500;color:#111827;">${email}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Role</span>
-            <span style="font-size:14px;font-weight:500;color:#111827;">Distributor</span>
-          </div>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+            ${fullName ? `<tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Name</td>
+              <td style="padding:6px 0;font-size:14px;font-weight:500;color:#111827;text-align:right;">${fullName}</td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Email</td>
+              <td style="padding:6px 0;font-size:14px;font-weight:500;color:#111827;text-align:right;">${email}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Role</td>
+              <td style="padding:6px 0;font-size:14px;font-weight:500;color:#111827;text-align:right;">Distributor</td>
+            </tr>
+          </table>
         </div>
         <div style="text-align:center;margin-bottom:24px;">
           <p style="color:#6b7280;font-size:14px;margin:0 0 16px 0;">
             To get started, please set your password using the link below:
           </p>
-          <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
-            Set Up Your Password
-          </a>
+          ${outlookButton(loginUrl, 'Set Up Your Password')}
         </div>
         <p style="color:#6b7280;font-size:13px;text-align:center;margin:0;">
           Once your password is set, you can manage your sales reps, set product pricing, and view commission reports from your distributor portal.
@@ -473,28 +556,28 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
           <h2 style="color:#111827;font-size:22px;font-weight:700;margin:0 0 8px 0;">Welcome to HealthSpan360!</h2>
           <p style="color:#6b7280;font-size:14px;margin:0;">You've been set up as a sales representative on our platform.</p>
         </div>
-        <div style="background:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;">
+        <div style="background-color:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;" bgcolor="#f9fafb">
           <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 12px 0;">Your Account Details</h3>
-          ${fullName ? `<div style="display:flex;justify-content:space-between;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Name</span>
-            <span style="font-size:14px;font-weight:500;color:#111827;">${fullName}</span>
-          </div>` : ''}
-          <div style="display:flex;justify-content:space-between;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Email</span>
-            <span style="font-size:14px;font-weight:500;color:#111827;">${email}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Role</span>
-            <span style="font-size:14px;font-weight:500;color:#111827;">Sales Representative</span>
-          </div>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+            ${fullName ? `<tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Name</td>
+              <td style="padding:6px 0;font-size:14px;font-weight:500;color:#111827;text-align:right;">${fullName}</td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Email</td>
+              <td style="padding:6px 0;font-size:14px;font-weight:500;color:#111827;text-align:right;">${email}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Role</td>
+              <td style="padding:6px 0;font-size:14px;font-weight:500;color:#111827;text-align:right;">Sales Representative</td>
+            </tr>
+          </table>
         </div>
         <div style="text-align:center;margin-bottom:24px;">
           <p style="color:#6b7280;font-size:14px;margin:0 0 16px 0;">
             To get started, please set your password using the link below:
           </p>
-          <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
-            Set Up Your Password
-          </a>
+          ${outlookButton(loginUrl, 'Set Up Your Password')}
         </div>
         <p style="color:#6b7280;font-size:13px;text-align:center;margin:0;">
           Once your password is set, you can view your assigned organizations, track commissions, and manage customer relationships.
@@ -512,28 +595,28 @@ function buildFallbackHtml(emailType, data, headerHtml, footerHtml) {
           <h2 style="color:#111827;font-size:22px;font-weight:700;margin:0 0 8px 0;">Welcome to HealthSpan360!</h2>
           <p style="color:#6b7280;font-size:14px;margin:0;">You've been invited to join our platform.</p>
         </div>
-        <div style="background:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;">
+        <div style="background-color:#f9fafb;border-radius:12px;padding:20px;margin-bottom:24px;" bgcolor="#f9fafb">
           <h3 style="font-size:14px;font-weight:600;color:#111827;margin:0 0 12px 0;">Your Account Details</h3>
-          ${fullName ? `<div style="display:flex;justify-content:space-between;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Name</span>
-            <span style="font-size:14px;font-weight:500;color:#111827;">${fullName}</span>
-          </div>` : ''}
-          <div style="display:flex;justify-content:space-between;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Email</span>
-            <span style="font-size:14px;font-weight:500;color:#111827;">${email}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;padding:6px 0;">
-            <span style="font-size:14px;color:#6b7280;">Role</span>
-            <span style="font-size:14px;font-weight:500;color:#111827;">${role}</span>
-          </div>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+            ${fullName ? `<tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Name</td>
+              <td style="padding:6px 0;font-size:14px;font-weight:500;color:#111827;text-align:right;">${fullName}</td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Email</td>
+              <td style="padding:6px 0;font-size:14px;font-weight:500;color:#111827;text-align:right;">${email}</td>
+            </tr>
+            <tr>
+              <td style="padding:6px 0;font-size:14px;color:#6b7280;">Role</td>
+              <td style="padding:6px 0;font-size:14px;font-weight:500;color:#111827;text-align:right;">${role}</td>
+            </tr>
+          </table>
         </div>
         <div style="text-align:center;margin-bottom:24px;">
           <p style="color:#6b7280;font-size:14px;margin:0 0 16px 0;">
             To get started, please set your password using the link below:
           </p>
-          <a href="${loginUrl}" style="display:inline-block;background:linear-gradient(135deg,#ec4899,#f97316);color:white;padding:12px 32px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
-            Set Up Your Password
-          </a>
+          ${outlookButton(loginUrl, 'Set Up Your Password')}
         </div>
       `);
     }
