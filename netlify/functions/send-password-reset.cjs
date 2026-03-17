@@ -117,7 +117,7 @@ exports.handler = async (event) => {
             Reset Password
           </a>
         </p>
-        <p style="color:#6b7280;font-size:14px;">This link expires in 1 hour. If you did not request a password reset, you can ignore this email.</p>
+        <p style="color:#6b7280;font-size:14px;">This link can only be used once. If you did not request a password reset, you can ignore this email.</p>
         <p style="color:#9ca3af;font-size:12px;margin-top:24px;">If the button doesn't work, copy and paste this link into your browser:<br>
           <a href="${recoveryLink}" style="color:#6b7280;">${recoveryLink}</a>
         </p>
