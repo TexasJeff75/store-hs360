@@ -344,11 +344,17 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
       setSendingPasswordReset(true);
       setModalMessage(null);
       
-      const { error } = await supabase.auth.resetPasswordForEmail(selectedUser.email, {
-        redirectTo: `${window.location.origin}/reset-password?type=recovery`
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/send-password-reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({ email: selectedUser.email }),
       });
-      
-      if (error) throw error;
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || 'Failed to send password reset email');
       
       setModalMessage({ 
         type: 'success', 
@@ -378,9 +384,15 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
         user_id: userToInvite.id,
       });
 
-      // Also trigger a password reset so they can set their password
-      await supabase.auth.resetPasswordForEmail(userToInvite.email, {
-        redirectTo: `${window.location.origin}/reset-password?type=recovery`,
+      // Also send a password reset so they can set their password
+      const { data: { session: inviteSession } } = await supabase.auth.getSession();
+      await fetch('/api/send-password-reset', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${inviteSession?.access_token}`,
+        },
+        body: JSON.stringify({ email: userToInvite.email }),
       });
 
       if (emailResult.success) {
