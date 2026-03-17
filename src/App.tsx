@@ -610,32 +610,45 @@ function AppContent() {
               Discover our comprehensive range of health and wellness solutions
             </p>
 
-            {/* Organization Selector Button - Only show if user has multiple organizations */}
-            {userHasMultipleOrgs && (
-              <div className="flex justify-center">
-                <button
-                  onClick={() => setIsOrgSelectorOpen(true)}
-                  className="inline-flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all duration-200 shadow-md hover:shadow-lg"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                  <span className="font-medium">
-                    Change Customer ({selectedOrganization?.name})
-                  </span>
-                </button>
-              </div>
-            )}
-            {selectedOrganization && !userHasMultipleOrgs && (
-              <div className="flex justify-center">
-                <div className="inline-flex items-center space-x-2 bg-blue-50 text-blue-700 px-6 py-3 rounded-lg">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                  <span className="font-medium">Ordering for: {selectedOrganization.name}</span>
-                </div>
-              </div>
-            )}
+            {/* Organization Selector Button */}
+            {(() => {
+              const viewRole = effectiveProfile?.role ?? profile?.role;
+              const isSalesRepOrDistributor = viewRole === 'sales_rep' || viewRole === 'distributor';
+              const showSelectorButton = userHasMultipleOrgs || isSalesRepOrDistributor;
+
+              if (showSelectorButton) {
+                return (
+                  <div className="flex justify-center">
+                    <button
+                      onClick={() => setIsOrgSelectorOpen(true)}
+                      className="inline-flex items-center space-x-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white px-6 py-3 rounded-lg hover:from-purple-600 hover:to-blue-600 transition-all duration-200 shadow-md hover:shadow-lg"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      <span className="font-medium">
+                        {selectedOrganization ? `Change Customer (${selectedOrganization.name})` : 'Select Customer'}
+                      </span>
+                    </button>
+                  </div>
+                );
+              }
+
+              if (selectedOrganization) {
+                return (
+                  <div className="flex justify-center">
+                    <div className="inline-flex items-center space-x-2 bg-blue-50 text-blue-700 px-6 py-3 rounded-lg">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      <span className="font-medium">Ordering for: {selectedOrganization.name}</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              return null;
+            })()}
           </div>
           
           {loading ? (

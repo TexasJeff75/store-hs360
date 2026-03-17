@@ -12,6 +12,7 @@ import RefundModal from './orders/RefundModal';
 
 const OrderManagement: React.FC = () => {
   const { user, profile, effectiveProfile, effectiveUserId } = useAuth();
+  const isAdmin = profile?.role === 'admin';
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -953,7 +954,7 @@ const OrderManagement: React.FC = () => {
                         Captured: {new Date(order.payment_captured_at).toLocaleString()}
                       </div>
                     )}
-                    {canManageOrders && order.payment_status === 'authorized' && (
+                    {isAdmin && order.payment_status === 'authorized' && (
                       <div className="mt-3">
                         <button
                           onClick={async () => {
@@ -1459,7 +1460,7 @@ const OrderManagement: React.FC = () => {
                   <Truck className="h-4 w-4 mr-2" />
                   Shipment Tracking
                 </h4>
-                {canManageOrders && !showAddShipment && (
+                {isAdmin && !showAddShipment && (
                   <button
                     onClick={() => setShowAddShipment(true)}
                     className="flex items-center space-x-1 px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700 transition-colors"
@@ -1608,7 +1609,7 @@ const OrderManagement: React.FC = () => {
                             <p className="text-sm text-gray-600 mt-2 italic">{shipment.notes}</p>
                           )}
                         </div>
-                        {canManageOrders && (
+                        {isAdmin && (
                           <button
                             onClick={() => removeShipment(order.id, shipment.tracking_number)}
                             className="text-red-600 hover:text-red-800 p-1"
