@@ -15,6 +15,7 @@ type SubManagementTab = 'addresses' | 'pricing' | 'users';
 interface SalesRep {
   id: string;
   email: string;
+  role: string;
 }
 
 const OrganizationManagement: React.FC = () => {
@@ -95,8 +96,8 @@ const OrganizationManagement: React.FC = () => {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, email')
-        .eq('role', 'sales_rep')
+        .select('id, email, role')
+        .in('role', ['sales_rep', 'distributor'])
         .order('email');
 
       if (error) throw error;
@@ -1001,7 +1002,7 @@ const OrganizationManagement: React.FC = () => {
                           <option value="">No Default Sales Rep</option>
                           {salesReps.map(rep => (
                             <option key={rep.id} value={rep.id}>
-                              {rep.email}
+                              {rep.email}{rep.role === 'distributor' ? ' (Distributor)' : ''}
                             </option>
                           ))}
                         </select>
