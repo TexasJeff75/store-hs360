@@ -20,6 +20,8 @@ export interface ContractPrice {
 }
 
 class ContractPricingService {
+  private pendingOrgPricingRequests = new Map<string, Promise<ContractPrice[]>>();
+
   /**
    * Get contract price for a specific entity and product
    */
@@ -104,25 +106,42 @@ class ContractPricingService {
    * Returns all tiers, caller should filter by quantity
    */
   async getOrganizationPricing(organizationId: string): Promise<ContractPrice[]> {
-    try {
-      const { data, error } = await supabase
-        .from('contract_pricing')
-        .select('*')
-        .eq('pricing_type', 'organization')
-        .eq('entity_id', organizationId)
-        .lte('effective_date', new Date().toISOString())
-        .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString())
-        .order('min_quantity', { ascending: true }); // Order by quantity tiers
+    const cacheKey = `org_pricing_all_${organizationId}`;
 
-      if (error) {
-        throw error;
+    // Return from cache if available
+    const cached = cacheService.get<ContractPrice[]>(cacheKey);
+    if (cached) return cached;
+
+    // Deduplicate concurrent requests for the same org
+    const pending = this.pendingOrgPricingRequests.get(cacheKey);
+    if (pending) return pending;
+
+    const request = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('contract_pricing')
+          .select('*')
+          .eq('pricing_type', 'organization')
+          .eq('entity_id', organizationId)
+          .lte('effective_date', new Date().toISOString())
+          .or('expiry_date.is.null,expiry_date.gte.' + new Date().toISOString())
+          .order('min_quantity', { ascending: true });
+
+        if (error) throw error;
+
+        const result = data || [];
+        cacheService.set(cacheKey, result, CacheTTL.pricing);
+        return result;
+      } catch (error) {
+        console.error('Error fetching organization pricing:', error);
+        return [];
+      } finally {
+        this.pendingOrgPricingRequests.delete(cacheKey);
       }
+    })();
 
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching organization pricing:', error);
-      return [];
-    }
+    this.pendingOrgPricingRequests.set(cacheKey, request);
+    return request;
   }
 
   /**
@@ -356,9 +375,11 @@ class ContractPricingService {
     // Clear specific cache entries
     const contractPriceKey = `contract_price_${pricingType}_${entityId}_${productId}`;
     const entityPricesKey = `entity_prices_${pricingType}_${entityId}`;
-    
+    const orgPricingAllKey = `org_pricing_all_${entityId}`;
+
     cacheService.delete(contractPriceKey);
     cacheService.delete(entityPricesKey);
+    cacheService.delete(orgPricingAllKey);
     
     // Clear effective price cache for this user/product combination
     // Note: We can't easily clear all quantity variations, so we'll let them expire naturally

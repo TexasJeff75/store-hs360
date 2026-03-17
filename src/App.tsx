@@ -80,21 +80,23 @@ function AppContent() {
     window.location.search.includes('realmId=');
 
   useEffect(() => {
+    if (authLoading) return;
+
     const fetchData = async () => {
       try {
         setLoading(true);
         setError(null);
-        
-        
+
+
         const [fetchedProducts, fetchedCategories] = await Promise.all([
           productService.getProducts(),
           productService.getCategories(),
         ]);
         setProducts(fetchedProducts);
         setCategoryTree(fetchedCategories);
-        
+
       } catch (err) {
-        const errorMessage = err instanceof Error && err.message === 'Request timeout' 
+        const errorMessage = err instanceof Error && err.message === 'Request timeout'
           ? 'Request timed out. Please check your connection and try again.'
           : 'Failed to load product data. Please try again later.';
         setError(errorMessage);
@@ -105,7 +107,7 @@ function AppContent() {
     };
 
     fetchData();
-  }, [logError]);
+  }, [logError, authLoading]);
 
   // Reset org selection when impersonation changes
   useEffect(() => {
