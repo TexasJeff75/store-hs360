@@ -27,7 +27,7 @@ const PricingManagement: React.FC<PricingManagementProps> = ({ organizationId })
     fetchPricingData,
     savePricing,
     deletePricing,
-  } = usePricingData();
+  } = usePricingData(organizationId);
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
