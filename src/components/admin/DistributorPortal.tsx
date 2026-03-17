@@ -240,6 +240,19 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
         .insert([{ distributor_id: distributor.id, organization_id: orgId, is_active: true }]);
       if (linkError) throw linkError;
 
+      // 2b. Assign the distributor as the default sales rep for the new org
+      const { error: repError } = await supabase
+        .from('organization_sales_reps')
+        .upsert([{
+          organization_id: orgId,
+          sales_rep_id: distributor.profile_id,
+          distributor_id: distributor.id,
+          is_active: true,
+        }], { onConflict: 'organization_id,sales_rep_id', ignoreDuplicates: true });
+      if (repError) {
+        console.error('Failed to assign distributor as default sales rep (non-fatal):', repError);
+      }
+
       // 3. Create a user account + send invite email if contact email was provided
       let inviteWarning = '';
       if (newCustomer.contact_email) {
