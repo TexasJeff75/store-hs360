@@ -812,12 +812,12 @@ const OrderManagement: React.FC = () => {
     }
   };
 
-  const OrderDetailsModal = ({ order }: { order: Order }) => (
+  const renderOrderDetailsModal = (order: Order) => (
     <div className="fixed inset-0 z-50 overflow-y-auto" onClick={e => e.stopPropagation()}>
-      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20">
+      <div className="flex items-start justify-center min-h-screen pt-4 px-4 pb-20">
         <div className="fixed inset-0 bg-black bg-opacity-50"></div>
 
-        <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+        <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto mt-8">
           <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
             <div>
               <div className="flex items-center gap-3">
@@ -1595,13 +1595,13 @@ const OrderManagement: React.FC = () => {
                             {shipment.shipped_date && (
                               <div>
                                 <span className="text-gray-500">Shipped:</span>
-                                <span className="ml-2">{new Date(shipment.shipped_date).toLocaleDateString()}</span>
+                                <span className="ml-2">{new Date(shipment.shipped_date + 'T00:00:00').toLocaleDateString()}</span>
                               </div>
                             )}
                             {shipment.estimated_delivery && (
                               <div>
                                 <span className="text-gray-500">Est. Delivery:</span>
-                                <span className="ml-2">{new Date(shipment.estimated_delivery).toLocaleDateString()}</span>
+                                <span className="ml-2">{new Date(shipment.estimated_delivery + 'T00:00:00').toLocaleDateString()}</span>
                               </div>
                             )}
                           </div>
@@ -1990,13 +1990,13 @@ const OrderManagement: React.FC = () => {
                                       {shipment.shipped_date && (
                                         <div>
                                           <span className="text-gray-500">Shipped:</span>
-                                          <span className="ml-2">{new Date(shipment.shipped_date).toLocaleDateString()}</span>
+                                          <span className="ml-2">{new Date(shipment.shipped_date + 'T00:00:00').toLocaleDateString()}</span>
                                         </div>
                                       )}
                                       {shipment.estimated_delivery && (
                                         <div>
                                           <span className="text-gray-500">Est. Delivery:</span>
-                                          <span className="ml-2">{new Date(shipment.estimated_delivery).toLocaleDateString()}</span>
+                                          <span className="ml-2">{new Date(shipment.estimated_delivery + 'T00:00:00').toLocaleDateString()}</span>
                                         </div>
                                       )}
                                     </div>
@@ -2099,7 +2099,7 @@ const OrderManagement: React.FC = () => {
         )}
       </div>
 
-      {selectedOrder && <OrderDetailsModal order={selectedOrder} />}
+      {selectedOrder && renderOrderDetailsModal(selectedOrder)}
 
       {showBackorderModal && selectedOrder && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4" onClick={e => e.stopPropagation()}>
