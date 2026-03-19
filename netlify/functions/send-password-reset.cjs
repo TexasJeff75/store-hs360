@@ -94,10 +94,20 @@ exports.handler = async (event) => {
       return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: linkError.message }) };
     }
 
-    const recoveryLink = linkData?.properties?.action_link;
-    if (!recoveryLink) {
+    // Build link to our own app with the token_hash instead of using Supabase's
+    // action_link. The action_link goes through Supabase's server which consumes
+    // the one-time token on first hit — enterprise email security scanners
+    // (Microsoft Safe Links, Proofpoint, etc.) pre-fetch links and consume the
+    // token before the real user clicks. By linking directly to our app with the
+    // token_hash, the token is only exchanged client-side via verifyOtp() when
+    // real JavaScript executes in the user's browser.
+    const tokenHash = linkData?.properties?.hashed_token;
+    if (!tokenHash) {
       return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: 'Failed to generate recovery link' }) };
     }
+
+    const recoveryLink = `${recoveryRedirect}${recoveryRedirect.includes('?') ? '&' : '?'}token_hash=${encodeURIComponent(tokenHash)}`;
+
 
     // ── Send email via Resend ──
     const resendApiKey = process.env.RESEND_API_KEY;
