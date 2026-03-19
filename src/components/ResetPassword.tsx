@@ -20,21 +20,60 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ onComplete }) => {
   const [sessionError, setSessionError] = useState(false);
 
   useEffect(() => {
-    // Wait for Supabase to establish the session from the recovery link.
-    // Poll for up to 8 seconds since the PKCE code exchange is async.
-    let attempts = 0;
-    const maxAttempts = 16;
-    const interval = setInterval(async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
+    let cancelled = false;
+
+    const establishSession = async () => {
+      // Check if we have a token_hash in the URL — this means the link points
+      // directly to our app (scanner-safe) and we need to exchange the token
+      // client-side via verifyOtp instead of relying on Supabase's server redirect.
+      const urlParams = new URLSearchParams(window.location.search);
+      const tokenHash = urlParams.get('token_hash');
+
+      if (tokenHash) {
+        // Clean token_hash from URL immediately to prevent re-use on refresh
+        urlParams.delete('token_hash');
+        urlParams.delete('type');
+        const cleanUrl = urlParams.toString()
+          ? `${window.location.pathname}?${urlParams.toString()}`
+          : window.location.pathname;
+        window.history.replaceState({}, '', cleanUrl);
+
+        const { error } = await supabase.auth.verifyOtp({
+          token_hash: tokenHash,
+          type: 'recovery',
+        });
+
+        if (cancelled) return;
+
+        if (error) {
+          console.error('verifyOtp failed:', error.message);
+          setSessionError(true);
+          return;
+        }
+
         setSessionReady(true);
-        clearInterval(interval);
-      } else if (++attempts >= maxAttempts) {
-        setSessionError(true);
-        clearInterval(interval);
+        return;
       }
-    }, 500);
-    return () => clearInterval(interval);
+
+      // Fallback: no token_hash — wait for Supabase to establish session from
+      // a PKCE code exchange (legacy links or links through Supabase's server).
+      let attempts = 0;
+      const maxAttempts = 16;
+      const interval = setInterval(async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (cancelled) { clearInterval(interval); return; }
+        if (session) {
+          setSessionReady(true);
+          clearInterval(interval);
+        } else if (++attempts >= maxAttempts) {
+          setSessionError(true);
+          clearInterval(interval);
+        }
+      }, 500);
+    };
+
+    establishSession();
+    return () => { cancelled = true; };
   }, []);
 
   const validatePassword = (password: string): string | null => {

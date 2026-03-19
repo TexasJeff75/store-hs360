@@ -238,7 +238,15 @@ Deno.serve(async (req: Request) => {
         redirectTo: redirectUrl,
       },
     });
-    const loginUrl = resetData?.properties?.action_link || "";
+    // Build link to the app with token_hash instead of using Supabase's action_link.
+    // Email security scanners (Safe Links, Proofpoint) pre-fetch URLs and consume
+    // the one-time token. By linking to our app with token_hash, the exchange only
+    // happens client-side via verifyOtp() in a real browser.
+    const tokenHash = resetData?.properties?.hashed_token || "";
+    const baseUrl = siteUrl ? `${siteUrl.replace(/\/$/, "")}` : "";
+    const loginUrl = tokenHash && baseUrl
+      ? `${baseUrl}?type=recovery&token_hash=${encodeURIComponent(tokenHash)}`
+      : resetData?.properties?.action_link || "";
     if (resetError) {
       console.error("Password reset link failed (non-fatal):", resetError.message);
     }
