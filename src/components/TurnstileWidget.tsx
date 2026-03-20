@@ -79,6 +79,13 @@ export default function TurnstileWidget({ onVerify, onExpire, onError, action }:
     };
   }, [renderWidget]);
 
+  // If no site key is configured, auto-verify so checkout isn't blocked
+  useEffect(() => {
+    if (!SITE_KEY) {
+      onVerifyRef.current('no-sitekey');
+    }
+  }, []);
+
   if (!SITE_KEY) {
     return null;
   }

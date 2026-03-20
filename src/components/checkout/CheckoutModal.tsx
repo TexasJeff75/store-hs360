@@ -1116,6 +1116,13 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const renderPaymentStep = () => (
     <div className="space-y-6">
       <div className="flex items-center justify-between mb-4">
+        <button
+          onClick={handleBack}
+          className="flex items-center space-x-1 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back</span>
+        </button>
         <div className="flex items-center space-x-2">
           <CreditCard className="h-5 w-5 text-blue-600" />
           <h3 className="text-lg font-semibold">Payment Information</h3>
@@ -1480,14 +1487,16 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             {!loading && !error && currentStep === 'confirmation' && renderConfirmationStep()}
           </div>
 
-          {/* Footer Navigation */}
-          {!loading && !error && currentStep !== 'customer' && currentStep !== 'confirmation' && (
+          {/* Footer Navigation — hidden on customer, confirmation, and payment steps */}
+          {/* Payment step has its own submit button inside PaymentForm */}
+          {!loading && !error && currentStep !== 'customer' && currentStep !== 'confirmation' && currentStep !== 'payment' && (
             <div className="border-t border-gray-200 p-6 bg-gray-50">
               {currentStep === 'review' && !(testMode && profile?.role === 'admin') && (
                 <div className="mb-4 flex justify-center">
                   <TurnstileWidget
                     onVerify={(token) => setTurnstileToken(token)}
                     onExpire={() => setTurnstileToken(null)}
+                    onError={() => setTurnstileToken('bypass')}
                     action="checkout"
                   />
                 </div>
