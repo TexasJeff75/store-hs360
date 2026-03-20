@@ -411,7 +411,8 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           sessionId,
           cartId,
           billingAddr,
-          shippingAddr
+          shippingAddr,
+          shippingCost
         );
 
         if (checkoutResult.success && checkoutResult.checkoutId) {

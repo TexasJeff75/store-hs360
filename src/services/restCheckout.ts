@@ -144,20 +144,38 @@ class RestCheckoutService {
     sessionId: string,
     cartId: string,
     billingAddress: AddressData,
-    shippingAddress: AddressData
+    shippingAddress: AddressData,
+    shippingCost?: number
   ): Promise<CheckoutFlowResult> {
     try {
       const checkoutId = `checkout_${sessionId}`;
 
+      // Build update payload, including shipping cost if provided
+      const updateData: Record<string, any> = {
+        checkout_id: checkoutId,
+        billing_address: billingAddress,
+        shipping_address: shippingAddress,
+        status: 'processing',
+        updated_at: new Date().toISOString(),
+      };
+
+      if (shippingCost !== undefined) {
+        // Recalculate total with the actual shipping cost
+        const { data: session } = await supabase
+          .from('checkout_sessions')
+          .select('subtotal, tax')
+          .eq('id', sessionId)
+          .maybeSingle();
+
+        if (session) {
+          updateData.shipping = shippingCost;
+          updateData.total = session.subtotal + (session.tax || 0) + shippingCost;
+        }
+      }
+
       const { error } = await supabase
         .from('checkout_sessions')
-        .update({
-          checkout_id: checkoutId,
-          billing_address: billingAddress,
-          shipping_address: shippingAddress,
-          status: 'processing',
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', sessionId);
 
       if (error) {
