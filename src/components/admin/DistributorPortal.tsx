@@ -50,6 +50,14 @@ interface DistributorDelegate {
   profiles?: { email: string; full_name?: string };
 }
 
+interface RepCustomerLink {
+  id: string;
+  distributor_id: string;
+  sales_rep_id: string;
+  organization_id: string;
+  is_active: boolean;
+}
+
 interface DistributorPortalProps {
   view: 'customers' | 'sales-reps' | 'delegates';
 }
@@ -90,6 +98,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
   const [customers, setCustomers] = useState<DistributorCustomer[]>([]);
   const [salesReps, setSalesReps] = useState<DistributorSalesRep[]>([]);
   const [delegates, setDelegates] = useState<DistributorDelegate[]>([]);
+  const [repCustomerLinks, setRepCustomerLinks] = useState<RepCustomerLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -155,7 +164,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
 
       setDistributor(distData);
 
-      const [custRes, repsRes, delegatesRes] = await Promise.all([
+      const [custRes, repsRes, delegatesRes, repCustRes] = await Promise.all([
         supabase
           .from('distributor_customers')
           .select('*, organizations(id, name, code, description, contact_name, contact_email, contact_phone, city, state, is_active)')
@@ -173,12 +182,18 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
           .eq('distributor_id', distData.id)
           .eq('is_active', true)
           .order('created_at', { ascending: false }),
+        supabase
+          .from('distributor_rep_customers')
+          .select('*')
+          .eq('distributor_id', distData.id)
+          .eq('is_active', true),
       ]);
 
       const custData = (custRes.data as DistributorCustomer[]) || [];
       if (!custRes.error) setCustomers(custData);
       if (!repsRes.error) setSalesReps((repsRes.data as DistributorSalesRep[]) || []);
       if (!delegatesRes.error) setDelegates((delegatesRes.data as DistributorDelegate[]) || []);
+      if (!repCustRes.error) setRepCustomerLinks((repCustRes.data as RepCustomerLink[]) || []);
 
       // Fetch org stats for customer orgs
       if (custData.length > 0) {
@@ -439,6 +454,41 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
       setError(err instanceof Error ? err.message : 'Failed to create user');
     } finally {
       setIsCreatingRepUser(false);
+    }
+  };
+
+  // ── Rep-customer assignment handlers ────────────────────────────────────────
+
+  const getRepCustomerLinks = (salesRepId: string) =>
+    repCustomerLinks.filter((rc) => rc.sales_rep_id === salesRepId);
+
+  const handleAddRepCustomer = async (salesRepId: string, organizationId: string) => {
+    if (!distributor) return;
+    try {
+      setError(null);
+      const { error: insertError } = await supabase.from('distributor_rep_customers').insert([{
+        distributor_id: distributor.id,
+        sales_rep_id: salesRepId,
+        organization_id: organizationId,
+      }]);
+      if (insertError) throw insertError;
+      setSuccess('Customer assigned to rep');
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to assign customer to rep');
+    }
+  };
+
+  const handleRemoveRepCustomer = async (id: string) => {
+    if (!confirm('Remove this customer assignment from the rep?')) return;
+    try {
+      setError(null);
+      const { error: deleteError } = await supabase.from('distributor_rep_customers').delete().eq('id', id);
+      if (deleteError) throw deleteError;
+      setSuccess('Customer removed from rep');
+      fetchData();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove customer from rep');
     }
   };
 
@@ -1100,6 +1150,7 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Commission</th>
                       <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Customers</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -1178,6 +1229,41 @@ const DistributorPortal: React.FC<DistributorPortalProps> = ({ view }) => {
                             }`}>
                               {dsr.is_active ? 'Active' : 'Inactive'}
                             </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap gap-1.5">
+                              {getRepCustomerLinks(dsr.sales_rep_id).map((rc) => {
+                                const cust = customers.find(c => c.organization_id === rc.organization_id);
+                                return (
+                                  <span key={rc.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-50 text-green-700 rounded-full text-xs">
+                                    {cust?.organizations?.name ?? 'Unknown'}
+                                    <button
+                                      onClick={() => handleRemoveRepCustomer(rc.id)}
+                                      className="ml-0.5 hover:bg-green-200 rounded-full p-0.5"
+                                      title="Remove assignment"
+                                    >
+                                      <X className="h-3 w-3" />
+                                    </button>
+                                  </span>
+                                );
+                              })}
+                              {(() => {
+                                const assignedOrgIds = new Set(getRepCustomerLinks(dsr.sales_rep_id).map(rc => rc.organization_id));
+                                const available = customers.filter(c => !assignedOrgIds.has(c.organization_id));
+                                return available.length > 0 ? (
+                                  <select
+                                    className="text-xs px-2 py-1 border border-gray-200 rounded-lg text-gray-600 bg-white"
+                                    value=""
+                                    onChange={(e) => { if (e.target.value) handleAddRepCustomer(dsr.sales_rep_id, e.target.value); }}
+                                  >
+                                    <option value="">+ Assign...</option>
+                                    {available.map((c) => (
+                                      <option key={c.organization_id} value={c.organization_id}>{c.organizations?.name}</option>
+                                    ))}
+                                  </select>
+                                ) : null;
+                              })()}
+                            </div>
                           </td>
                         </tr>
                       );
