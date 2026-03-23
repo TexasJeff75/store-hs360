@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { orderService } from '../../services/orderService';
-import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle, DollarSign, FileText, Activity, Trash2 } from 'lucide-react';
+import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle, DollarSign, FileText, Activity, Trash2, UserCheck } from 'lucide-react';
 import type { Order, OrderItem, Shipment } from './orders/types';
 import { normalizeAddress } from './orders/types';
 import { activityLogService } from '../../services/activityLog';
@@ -45,6 +45,8 @@ const OrderManagement: React.FC = () => {
   const [showDeleteOrderModal, setShowDeleteOrderModal] = useState(false);
   const [deleteTargetOrder, setDeleteTargetOrder] = useState<Order | null>(null);
   const [isDeletingOrder, setIsDeletingOrder] = useState(false);
+  const [availableSalesReps, setAvailableSalesReps] = useState<{ id: string; full_name: string; email: string }[]>([]);
+  const [orderSalesRepName, setOrderSalesRepName] = useState<string | null>(null);
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -66,6 +68,8 @@ const OrderManagement: React.FC = () => {
       fetchOrderCommission(selectedOrder.id);
       fetchPaymentLogs(selectedOrder.id);
       fetchPaymentTransactions(selectedOrder.id);
+      fetchAvailableSalesReps(selectedOrder);
+      resolveOrderSalesRepName(selectedOrder);
     } else {
       setSubOrders([]);
       setShowSubOrders(false);
@@ -73,6 +77,8 @@ const OrderManagement: React.FC = () => {
       setOrderCommission(null);
       setPaymentLogs([]);
       setPaymentTransactions([]);
+      setAvailableSalesReps([]);
+      setOrderSalesRepName(null);
     }
   }, [selectedOrder?.id]);
 
@@ -96,6 +102,91 @@ const OrderManagement: React.FC = () => {
       setSelectedOrderOrgName(null);
     }
 
+  };
+
+  const resolveOrderSalesRepName = async (order: Order) => {
+    if (order.sales_rep_id) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', order.sales_rep_id)
+        .maybeSingle();
+      setOrderSalesRepName(data?.full_name || data?.email || null);
+    } else {
+      setOrderSalesRepName(null);
+    }
+  };
+
+  const fetchAvailableSalesReps = async (order: Order) => {
+    try {
+      const viewRole = effectiveProfile?.role ?? profile?.role;
+      const viewUserId = effectiveUserId ?? user?.id;
+
+      if (viewRole === 'distributor' && viewUserId) {
+        // Distributors see their own sales reps
+        const { data: dist } = await supabase
+          .from('distributors')
+          .select('id, profile_id')
+          .eq('profile_id', viewUserId)
+          .maybeSingle();
+
+        if (dist) {
+          const { data: reps } = await supabase
+            .from('distributor_sales_reps')
+            .select('sales_rep_id, profiles!distributor_sales_reps_sales_rep_id_fkey(id, full_name, email)')
+            .eq('distributor_id', dist.id)
+            .eq('is_active', true);
+
+          const repList: { id: string; full_name: string; email: string }[] = [];
+          // Add the distributor themselves
+          const { data: distProfile } = await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .eq('id', dist.profile_id)
+            .maybeSingle();
+          if (distProfile) repList.push(distProfile);
+
+          if (reps) {
+            for (const r of reps) {
+              const p = r.profiles as any;
+              if (p?.id) repList.push({ id: p.id, full_name: p.full_name || '', email: p.email });
+            }
+          }
+          setAvailableSalesReps(repList);
+        }
+      } else if (viewRole === 'admin') {
+        // Admins see all sales reps + distributors
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('role', ['sales_rep', 'distributor'])
+          .order('full_name', { ascending: true });
+        setAvailableSalesReps(data || []);
+      } else {
+        setAvailableSalesReps([]);
+      }
+    } catch (error) {
+      console.error('Error fetching available sales reps:', error);
+      setAvailableSalesReps([]);
+    }
+  };
+
+  const handleChangeSalesRep = async (orderId: string, salesRepId: string | null) => {
+    const result = await orderService.updateOrderSalesRep(orderId, salesRepId);
+    if (result.success) {
+      if (selectedOrder?.id === orderId) {
+        const updated = { ...selectedOrder, sales_rep_id: salesRepId ?? undefined };
+        setSelectedOrder(updated);
+        resolveOrderSalesRepName(updated);
+        // Refresh commission if order is completed (trigger will recalculate)
+        if (selectedOrder.status === 'completed') {
+          fetchOrderCommission(orderId);
+        }
+      }
+      fetchOrders();
+    } else {
+      alert(result.error || 'Failed to update sales rep');
+    }
   };
 
   const fetchOrderCommission = async (orderId: string) => {
@@ -909,6 +1000,32 @@ const OrderManagement: React.FC = () => {
                           <span className="text-gray-400 italic text-xs">Loading…</span>
                         )}
                       </p>
+                    </div>
+                  )}
+                  {canManageOrders && (effectiveProfile?.role ?? profile?.role) !== 'customer' && (
+                    <div>
+                      <span className="text-gray-600">Sales Rep:</span>
+                      <div className="mt-1">
+                        {availableSalesReps.length > 0 ? (
+                          <select
+                            value={order.sales_rep_id || ''}
+                            onChange={(e) => handleChangeSalesRep(order.id, e.target.value || null)}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="">No Sales Rep</option>
+                            {availableSalesReps.map((rep) => (
+                              <option key={rep.id} value={rep.id}>
+                                {rep.full_name || rep.email}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <p className="font-medium flex items-center">
+                            <UserCheck className="h-3 w-3 mr-1 text-purple-600" />
+                            {orderSalesRepName || (order.sales_rep_id ? 'Loading...' : 'None')}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

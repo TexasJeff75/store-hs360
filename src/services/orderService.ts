@@ -281,6 +281,34 @@ class OrderService {
     }
   }
 
+  async updateOrderSalesRep(
+    orderId: string,
+    salesRepId: string | null
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({
+          sales_rep_id: salesRepId,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) {
+        console.error('Error updating order sales rep:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Error updating order sales rep:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update sales rep'
+      };
+    }
+  }
+
   async getOrderById(orderId: string): Promise<{ order: Order | null; error?: string }> {
     try {
       const { data, error } = await supabase
