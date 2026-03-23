@@ -238,21 +238,32 @@ class CommissionService {
 
       const salesRepIds = salesReps?.map(sr => sr.sales_rep_id) || [];
 
-      if (salesRepIds.length === 0) {
-        return { commissions: [] };
+      // Also get the distributor's own profile_id (they may be assigned directly as sales rep)
+      const { data: distData } = await supabase
+        .from('distributors')
+        .select('profile_id')
+        .eq('id', distributorId)
+        .maybeSingle();
+
+      if (distData?.profile_id && !salesRepIds.includes(distData.profile_id)) {
+        salesRepIds.push(distData.profile_id);
       }
 
-      // Get all commissions for these sales reps
+      // Query by both sales_rep_id (for sub-reps) AND distributor_id (for direct assignments)
+      // This catches commissions whether the distributor was assigned via a sub-rep or directly
+      const selectFields = `
+        *,
+        distributor:distributors(id, name, code),
+        sales_rep:profiles!sales_rep_id(id, email, full_name),
+        organization:organizations(id, name),
+        order:orders!order_id(id, status, payment_status, order_number)
+      `;
+
+      // Build query: commissions where distributor_id matches OR sales_rep_id is one of the reps
       let query = supabase
         .from('commissions')
-        .select(`
-          *,
-          distributor:distributors(id, name, code),
-          sales_rep:profiles!sales_rep_id(id, email, full_name),
-          organization:organizations(id, name),
-          order:orders!order_id(id, status, payment_status, order_number)
-        `)
-        .in('sales_rep_id', salesRepIds)
+        .select(selectFields)
+        .or(`distributor_id.eq.${distributorId}${salesRepIds.length > 0 ? `,sales_rep_id.in.(${salesRepIds.join(',')})` : ''}`)
         .is('deleted_at', null)
         .order('created_at', { ascending: false });
 
@@ -335,22 +346,22 @@ class CommissionService {
 
       const salesRepIds = salesReps?.map(sr => sr.sales_rep_id) || [];
 
-      if (salesRepIds.length === 0) {
-        return {
-          summary: {
-            total_commissions: 0,
-            pending_amount: 0,
-            approved_amount: 0,
-            paid_amount: 0,
-            total_orders: 0
-          }
-        };
+      // Also get distributor's own profile_id
+      const { data: distData } = await supabase
+        .from('distributors')
+        .select('profile_id')
+        .eq('id', distributorId)
+        .maybeSingle();
+
+      if (distData?.profile_id && !salesRepIds.includes(distData.profile_id)) {
+        salesRepIds.push(distData.profile_id);
       }
 
+      // Query by distributor_id OR sales_rep_id to catch all commission records
       const { data, error } = await supabase
         .from('commissions')
-        .select('distributor_commission, status')
-        .in('sales_rep_id', salesRepIds);
+        .select('distributor_commission, sales_rep_commission, commission_amount, status')
+        .or(`distributor_id.eq.${distributorId}${salesRepIds.length > 0 ? `,sales_rep_id.in.(${salesRepIds.join(',')})` : ''}`);
 
       if (error) throw error;
 

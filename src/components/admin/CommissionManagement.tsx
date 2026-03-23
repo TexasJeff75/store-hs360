@@ -71,7 +71,7 @@ const CommissionManagement: React.FC<CommissionManagementProps> = ({ onNavigate 
         const { data: distributorData } = await supabase
           .from('distributors')
           .select('id')
-          .eq('user_id', viewUserId!)
+          .eq('profile_id', viewUserId!)
           .eq('is_active', true)
           .maybeSingle();
 
