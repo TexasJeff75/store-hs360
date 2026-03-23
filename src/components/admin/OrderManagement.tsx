@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { orderService } from '../../services/orderService';
-import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle, DollarSign, FileText, Activity, Trash2, UserCheck } from 'lucide-react';
+import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle, DollarSign, FileText, Activity, Trash2, UserCheck, RefreshCw } from 'lucide-react';
 import type { Order, OrderItem, Shipment } from './orders/types';
 import { normalizeAddress } from './orders/types';
 import { activityLogService } from '../../services/activityLog';
@@ -179,8 +179,9 @@ const OrderManagement: React.FC = () => {
         setSelectedOrder(updated);
         resolveOrderSalesRepName(updated);
         // Refresh commission if order is completed (trigger will recalculate)
+        // Delay to allow the DB trigger to finish before fetching
         if (selectedOrder.status === 'completed') {
-          fetchOrderCommission(orderId);
+          setTimeout(() => fetchOrderCommission(orderId), 1500);
         }
       }
       fetchOrders();
@@ -206,6 +207,38 @@ const OrderManagement: React.FC = () => {
     } catch (error) {
       console.error('Error fetching commission:', error);
       setOrderCommission(null);
+    }
+  };
+
+  const [isRecalculating, setIsRecalculating] = useState(false);
+
+  const recalculateCommission = async (order: Order) => {
+    if (order.status !== 'completed') {
+      alert('Commission can only be calculated for completed orders.');
+      return;
+    }
+    setIsRecalculating(true);
+    try {
+      // Touch the order's updated_at to re-fire the commission trigger
+      // The trigger fires on UPDATE OF status, sales_rep_id, items, total
+      // We update total to itself to re-trigger
+      const { error } = await supabase
+        .from('orders')
+        .update({ total: order.total, updated_at: new Date().toISOString() })
+        .eq('id', order.id);
+
+      if (error) {
+        alert('Failed to recalculate commission: ' + error.message);
+        return;
+      }
+
+      // Wait for the trigger to complete, then fetch updated commission
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      await fetchOrderCommission(order.id);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to recalculate commission');
+    } finally {
+      setIsRecalculating(false);
     }
   };
 
@@ -1280,10 +1313,23 @@ const OrderManagement: React.FC = () => {
               <div className={`border rounded-lg p-4 ${
                 orderCommission ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
               }`}>
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
-                  <DollarSign className="h-4 w-4 mr-2 text-green-600" />
-                  Commission Status
-                </h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-semibold text-gray-900 flex items-center">
+                    <DollarSign className="h-4 w-4 mr-2 text-green-600" />
+                    Commission Status
+                  </h4>
+                  {isOrderAdmin && order.status === 'completed' && (
+                    <button
+                      onClick={() => recalculateCommission(order)}
+                      disabled={isRecalculating}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-green-700 bg-green-100 hover:bg-green-200 border border-green-300 rounded-lg transition-colors disabled:opacity-50"
+                      title="Re-run commission calculation for this order"
+                    >
+                      <RefreshCw className={`h-3.5 w-3.5 ${isRecalculating ? 'animate-spin' : ''}`} />
+                      {isRecalculating ? 'Recalculating...' : 'Recalculate'}
+                    </button>
+                  )}
+                </div>
                 {orderCommission ? (
                   <div className="space-y-3">
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
@@ -1391,6 +1437,16 @@ const OrderManagement: React.FC = () => {
                           <li>Commission trigger may not have fired (check database triggers)</li>
                           <li>Commission rate may be set to 0%</li>
                         </ul>
+                        {isOrderAdmin && order.sales_rep_id && (
+                          <button
+                            onClick={() => recalculateCommission(order)}
+                            disabled={isRecalculating}
+                            className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-amber-800 bg-amber-200 hover:bg-amber-300 border border-amber-400 rounded-lg transition-colors disabled:opacity-50"
+                          >
+                            <RefreshCw className={`h-3.5 w-3.5 ${isRecalculating ? 'animate-spin' : ''}`} />
+                            {isRecalculating ? 'Recalculating...' : 'Recalculate Commission'}
+                          </button>
+                        )}
                       </div>
                     ) : (
                       <p className="text-gray-500 italic">
