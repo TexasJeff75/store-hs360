@@ -45,7 +45,7 @@ const OrderManagement: React.FC = () => {
   const [showDeleteOrderModal, setShowDeleteOrderModal] = useState(false);
   const [deleteTargetOrder, setDeleteTargetOrder] = useState<Order | null>(null);
   const [isDeletingOrder, setIsDeletingOrder] = useState(false);
-  const [availableSalesReps, setAvailableSalesReps] = useState<{ id: string; full_name: string; email: string }[]>([]);
+  const [availableSalesReps, setAvailableSalesReps] = useState<{ id: string; full_name: string; email: string; role?: string; distributor_name?: string }[]>([]);
   const [orderSalesRepName, setOrderSalesRepName] = useState<string | null>(null);
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
@@ -155,13 +155,57 @@ const OrderManagement: React.FC = () => {
           setAvailableSalesReps(repList);
         }
       } else if (viewRole === 'admin') {
-        // Admins see all sales reps + distributors
-        const { data } = await supabase
+        // Admins see all sales reps + distributors with role labels
+        const { data: profileData } = await supabase
           .from('profiles')
-          .select('id, full_name, email')
+          .select('id, full_name, email, role')
           .in('role', ['sales_rep', 'distributor'])
           .order('full_name', { ascending: true });
-        setAvailableSalesReps(data || []);
+
+        if (profileData) {
+          // For distributors, fetch their company name from the distributors table
+          const distributorProfileIds = profileData.filter(p => p.role === 'distributor').map(p => p.id);
+          let distributorNames: Record<string, string> = {};
+          if (distributorProfileIds.length > 0) {
+            const { data: distData } = await supabase
+              .from('distributors')
+              .select('profile_id, name')
+              .in('profile_id', distributorProfileIds);
+            if (distData) {
+              for (const d of distData) {
+                distributorNames[d.profile_id] = d.name;
+              }
+            }
+          }
+
+          // Also fetch which distributor each sales_rep belongs to
+          const salesRepIds = profileData.filter(p => p.role === 'sales_rep').map(p => p.id);
+          let repDistributorMap: Record<string, string> = {};
+          if (salesRepIds.length > 0) {
+            const { data: dsrData } = await supabase
+              .from('distributor_sales_reps')
+              .select('sales_rep_id, distributors!inner(name)')
+              .in('sales_rep_id', salesRepIds)
+              .eq('is_active', true);
+            if (dsrData) {
+              for (const dsr of dsrData) {
+                const dist = dsr.distributors as any;
+                if (dist?.name) {
+                  repDistributorMap[dsr.sales_rep_id] = dist.name;
+                }
+              }
+            }
+          }
+
+          setAvailableSalesReps(profileData.map(p => ({
+            ...p,
+            distributor_name: p.role === 'distributor'
+              ? distributorNames[p.id]
+              : repDistributorMap[p.id],
+          })));
+        } else {
+          setAvailableSalesReps([]);
+        }
       } else {
         setAvailableSalesReps([]);
       }
@@ -1046,11 +1090,17 @@ const OrderManagement: React.FC = () => {
                             className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           >
                             <option value="">No Sales Rep</option>
-                            {availableSalesReps.map((rep) => (
-                              <option key={rep.id} value={rep.id}>
-                                {rep.full_name || rep.email}
-                              </option>
-                            ))}
+                            {availableSalesReps.map((rep) => {
+                              const roleLabel = rep.role === 'distributor' ? 'Distributor' : 'Rep';
+                              const distInfo = rep.role === 'sales_rep' && rep.distributor_name
+                                ? ` — ${rep.distributor_name}`
+                                : '';
+                              return (
+                                <option key={rep.id} value={rep.id}>
+                                  [{roleLabel}] {rep.full_name || rep.email}{distInfo}
+                                </option>
+                              );
+                            })}
                           </select>
                         ) : (
                           <p className="font-medium flex items-center">
