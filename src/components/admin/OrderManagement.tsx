@@ -1975,39 +1975,34 @@ const OrderManagement: React.FC = () => {
                           </button>
                         )}
                       </div>
-                      <div className="flex-1 grid grid-cols-1 md:grid-cols-9 gap-4 items-center">
-                        <div>
+                      <div className="flex-1 grid grid-cols-2 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.8fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] gap-x-4 gap-y-2 items-center">
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Order ID</p>
                           <p className="text-sm font-mono font-medium text-gray-900">{parent.id.slice(0, 8)}...</p>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Customer</p>
-                          <p className="text-sm text-gray-900">{parent.customer_email}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500 mb-1">Organization</p>
-                          {parent.organization_id ? (
-                            <p className="text-sm text-gray-900 flex items-center">
-                              <Building2 className="h-3 w-3 mr-1 text-green-600" />
-                              {organizationNames[parent.organization_id] || <span className="text-gray-400 italic text-xs">Resolving…</span>}
+                          <p className="text-sm text-gray-900 truncate" title={parent.customer_email}>{parent.customer_email}</p>
+                          {parent.organization_id && (
+                            <p className="text-xs text-gray-600 truncate flex items-center mt-0.5" title={organizationNames[parent.organization_id] || ''}>
+                              <Building2 className="h-3 w-3 mr-1 flex-shrink-0 text-green-600" />
+                              {organizationNames[parent.organization_id] || <span className="text-gray-400 italic">Resolving…</span>}
                             </p>
-                          ) : (
-                            <p className="text-sm text-gray-400">—</p>
                           )}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Date</p>
                           <p className="text-sm text-gray-900">{new Date(parent.created_at).toLocaleDateString()}</p>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Tracking</p>
                           {parent.shipments && parent.shipments.length > 0 ? (
                             <div className="space-y-1">
                               {parent.shipments.slice(0, 2).map((shipment, idx) => (
-                                <div key={idx} className="flex items-center space-x-2">
-                                  <Truck className="h-3 w-3 text-blue-600" />
-                                  <span className="text-xs font-mono text-gray-900">{shipment.tracking_number}</span>
-                                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${getShipmentStatusColor(shipment.status)}`}>
+                                <div key={idx} className="flex items-center space-x-1">
+                                  <Truck className="h-3 w-3 flex-shrink-0 text-blue-600" />
+                                  <span className="text-xs font-mono text-gray-900 truncate">{shipment.tracking_number}</span>
+                                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded flex-shrink-0 ${getShipmentStatusColor(shipment.status)}`}>
                                     {shipment.status.replace('_', ' ')}
                                   </span>
                                 </div>
@@ -2020,17 +2015,17 @@ const OrderManagement: React.FC = () => {
                             <p className="text-sm text-gray-400">No tracking</p>
                           )}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Total</p>
                           <p className="text-sm font-semibold text-gray-900">${Number(parent.total).toFixed(2)}</p>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Status</p>
-                          <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getStatusColor(parent.status)}`}>
+                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getStatusColor(parent.status)}`}>
                             {parent.status}
                           </span>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Payment</p>
                           {parent.payment_status ? (
                             <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getPaymentStatusColor(parent.payment_status)}`}>
