@@ -211,15 +211,15 @@ const UserManagement: React.FC<UserManagementProps> = ({ onUserApproved, onClose
         if (distUsers.length > 0) {
           const { data: dists } = await supabase
             .from('distributors')
-            .select('user_id, name')
-            .in('user_id', distUsers.map(u => u.id))
+            .select('profile_id, name')
+            .in('profile_id', distUsers.map(u => u.id))
             .eq('is_active', true);
 
           if (dists) {
             for (const row of dists) {
-              if (row.user_id && row.name) {
-                if (!assocMap[row.user_id]) assocMap[row.user_id] = [];
-                assocMap[row.user_id].push({ type: 'distributor', name: row.name });
+              if (row.profile_id && row.name) {
+                if (!assocMap[row.profile_id]) assocMap[row.profile_id] = [];
+                assocMap[row.profile_id].push({ type: 'distributor', name: row.name });
               }
             }
           }

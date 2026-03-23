@@ -1,12 +1,12 @@
 /*
   # Add missing columns to distributors table
 
-  The DistributorManagement component references commission_type, organization_id,
-  and user_id columns that don't exist in the original migration.
+  The DistributorManagement component references commission_type and user_id
+  columns that don't exist in the original migration.
 
   - commission_type: Controls how commissions are calculated (percent_margin, flat_per_order, etc.)
-  - organization_id: Links a distributor to an organization
   - user_id: References the auth user (same as profile_id, needed for RLS policies)
+  - organization_id was moved to distributor_customers junction table (see 20260306200003)
 */
 
 -- Add commission_type column
@@ -22,5 +22,6 @@ ALTER TABLE distributors ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES profil
 UPDATE distributors SET user_id = profile_id WHERE user_id IS NULL;
 
 -- Add indexes
-CREATE INDEX IF NOT EXISTS idx_distributors_organization ON distributors(organization_id) WHERE organization_id IS NOT NULL;
+-- Note: organization_id was removed from distributors (see 20260306200003)
+-- so the index on organization_id is no longer needed.
 CREATE INDEX IF NOT EXISTS idx_distributors_user_id ON distributors(user_id);
