@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { orderService } from '../../services/orderService';
-import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle, DollarSign, FileText, Activity, Trash2 } from 'lucide-react';
+import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle, DollarSign, FileText, Activity, Trash2, UserCheck } from 'lucide-react';
 import type { Order, OrderItem, Shipment } from './orders/types';
 import { normalizeAddress } from './orders/types';
 import { activityLogService } from '../../services/activityLog';
@@ -45,6 +45,8 @@ const OrderManagement: React.FC = () => {
   const [showDeleteOrderModal, setShowDeleteOrderModal] = useState(false);
   const [deleteTargetOrder, setDeleteTargetOrder] = useState<Order | null>(null);
   const [isDeletingOrder, setIsDeletingOrder] = useState(false);
+  const [availableSalesReps, setAvailableSalesReps] = useState<{ id: string; full_name: string; email: string }[]>([]);
+  const [orderSalesRepName, setOrderSalesRepName] = useState<string | null>(null);
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -66,6 +68,8 @@ const OrderManagement: React.FC = () => {
       fetchOrderCommission(selectedOrder.id);
       fetchPaymentLogs(selectedOrder.id);
       fetchPaymentTransactions(selectedOrder.id);
+      fetchAvailableSalesReps(selectedOrder);
+      resolveOrderSalesRepName(selectedOrder);
     } else {
       setSubOrders([]);
       setShowSubOrders(false);
@@ -73,6 +77,8 @@ const OrderManagement: React.FC = () => {
       setOrderCommission(null);
       setPaymentLogs([]);
       setPaymentTransactions([]);
+      setAvailableSalesReps([]);
+      setOrderSalesRepName(null);
     }
   }, [selectedOrder?.id]);
 
@@ -96,6 +102,91 @@ const OrderManagement: React.FC = () => {
       setSelectedOrderOrgName(null);
     }
 
+  };
+
+  const resolveOrderSalesRepName = async (order: Order) => {
+    if (order.sales_rep_id) {
+      const { data } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', order.sales_rep_id)
+        .maybeSingle();
+      setOrderSalesRepName(data?.full_name || data?.email || null);
+    } else {
+      setOrderSalesRepName(null);
+    }
+  };
+
+  const fetchAvailableSalesReps = async (order: Order) => {
+    try {
+      const viewRole = effectiveProfile?.role ?? profile?.role;
+      const viewUserId = effectiveUserId ?? user?.id;
+
+      if (viewRole === 'distributor' && viewUserId) {
+        // Distributors see their own sales reps
+        const { data: dist } = await supabase
+          .from('distributors')
+          .select('id, profile_id')
+          .eq('profile_id', viewUserId)
+          .maybeSingle();
+
+        if (dist) {
+          const { data: reps } = await supabase
+            .from('distributor_sales_reps')
+            .select('sales_rep_id, profiles!distributor_sales_reps_sales_rep_id_fkey(id, full_name, email)')
+            .eq('distributor_id', dist.id)
+            .eq('is_active', true);
+
+          const repList: { id: string; full_name: string; email: string }[] = [];
+          // Add the distributor themselves
+          const { data: distProfile } = await supabase
+            .from('profiles')
+            .select('id, full_name, email')
+            .eq('id', dist.profile_id)
+            .maybeSingle();
+          if (distProfile) repList.push(distProfile);
+
+          if (reps) {
+            for (const r of reps) {
+              const p = r.profiles as any;
+              if (p?.id) repList.push({ id: p.id, full_name: p.full_name || '', email: p.email });
+            }
+          }
+          setAvailableSalesReps(repList);
+        }
+      } else if (viewRole === 'admin') {
+        // Admins see all sales reps + distributors
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .in('role', ['sales_rep', 'distributor'])
+          .order('full_name', { ascending: true });
+        setAvailableSalesReps(data || []);
+      } else {
+        setAvailableSalesReps([]);
+      }
+    } catch (error) {
+      console.error('Error fetching available sales reps:', error);
+      setAvailableSalesReps([]);
+    }
+  };
+
+  const handleChangeSalesRep = async (orderId: string, salesRepId: string | null) => {
+    const result = await orderService.updateOrderSalesRep(orderId, salesRepId);
+    if (result.success) {
+      if (selectedOrder?.id === orderId) {
+        const updated = { ...selectedOrder, sales_rep_id: salesRepId ?? undefined };
+        setSelectedOrder(updated);
+        resolveOrderSalesRepName(updated);
+        // Refresh commission if order is completed (trigger will recalculate)
+        if (selectedOrder.status === 'completed') {
+          fetchOrderCommission(orderId);
+        }
+      }
+      fetchOrders();
+    } else {
+      alert(result.error || 'Failed to update sales rep');
+    }
   };
 
   const fetchOrderCommission = async (orderId: string) => {
@@ -909,6 +1000,32 @@ const OrderManagement: React.FC = () => {
                           <span className="text-gray-400 italic text-xs">Loading…</span>
                         )}
                       </p>
+                    </div>
+                  )}
+                  {canManageOrders && (effectiveProfile?.role ?? profile?.role) !== 'customer' && (
+                    <div>
+                      <span className="text-gray-600">Sales Rep:</span>
+                      <div className="mt-1">
+                        {availableSalesReps.length > 0 ? (
+                          <select
+                            value={order.sales_rep_id || ''}
+                            onChange={(e) => handleChangeSalesRep(order.id, e.target.value || null)}
+                            className="w-full px-2 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          >
+                            <option value="">No Sales Rep</option>
+                            {availableSalesReps.map((rep) => (
+                              <option key={rep.id} value={rep.id}>
+                                {rep.full_name || rep.email}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <p className="font-medium flex items-center">
+                            <UserCheck className="h-3 w-3 mr-1 text-purple-600" />
+                            {orderSalesRepName || (order.sales_rep_id ? 'Loading...' : 'None')}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1858,39 +1975,34 @@ const OrderManagement: React.FC = () => {
                           </button>
                         )}
                       </div>
-                      <div className="flex-1 grid grid-cols-1 md:grid-cols-9 gap-4 items-center">
-                        <div>
+                      <div className="flex-1 grid grid-cols-2 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1.8fr)_minmax(0,1fr)_minmax(0,1.5fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)] gap-x-4 gap-y-2 items-center">
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Order ID</p>
                           <p className="text-sm font-mono font-medium text-gray-900">{parent.id.slice(0, 8)}...</p>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Customer</p>
-                          <p className="text-sm text-gray-900">{parent.customer_email}</p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-500 mb-1">Organization</p>
-                          {parent.organization_id ? (
-                            <p className="text-sm text-gray-900 flex items-center">
-                              <Building2 className="h-3 w-3 mr-1 text-green-600" />
-                              {organizationNames[parent.organization_id] || <span className="text-gray-400 italic text-xs">Resolving…</span>}
+                          <p className="text-sm text-gray-900 truncate" title={parent.customer_email}>{parent.customer_email}</p>
+                          {parent.organization_id && (
+                            <p className="text-xs text-gray-600 truncate flex items-center mt-0.5" title={organizationNames[parent.organization_id] || ''}>
+                              <Building2 className="h-3 w-3 mr-1 flex-shrink-0 text-green-600" />
+                              {organizationNames[parent.organization_id] || <span className="text-gray-400 italic">Resolving…</span>}
                             </p>
-                          ) : (
-                            <p className="text-sm text-gray-400">—</p>
                           )}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Date</p>
                           <p className="text-sm text-gray-900">{new Date(parent.created_at).toLocaleDateString()}</p>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Tracking</p>
                           {parent.shipments && parent.shipments.length > 0 ? (
                             <div className="space-y-1">
                               {parent.shipments.slice(0, 2).map((shipment, idx) => (
-                                <div key={idx} className="flex items-center space-x-2">
-                                  <Truck className="h-3 w-3 text-blue-600" />
-                                  <span className="text-xs font-mono text-gray-900">{shipment.tracking_number}</span>
-                                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded ${getShipmentStatusColor(shipment.status)}`}>
+                                <div key={idx} className="flex items-center space-x-1">
+                                  <Truck className="h-3 w-3 flex-shrink-0 text-blue-600" />
+                                  <span className="text-xs font-mono text-gray-900 truncate">{shipment.tracking_number}</span>
+                                  <span className={`px-1.5 py-0.5 text-[10px] font-medium rounded flex-shrink-0 ${getShipmentStatusColor(shipment.status)}`}>
                                     {shipment.status.replace('_', ' ')}
                                   </span>
                                 </div>
@@ -1903,17 +2015,17 @@ const OrderManagement: React.FC = () => {
                             <p className="text-sm text-gray-400">No tracking</p>
                           )}
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Total</p>
                           <p className="text-sm font-semibold text-gray-900">${Number(parent.total).toFixed(2)}</p>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Status</p>
-                          <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getStatusColor(parent.status)}`}>
+                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getStatusColor(parent.status)}`}>
                             {parent.status}
                           </span>
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-xs text-gray-500 mb-1">Payment</p>
                           {parent.payment_status ? (
                             <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full border ${getPaymentStatusColor(parent.payment_status)}`}>
