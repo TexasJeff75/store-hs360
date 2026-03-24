@@ -331,6 +331,7 @@ exports.handler = async (event) => {
     const isAdmin = userProfile?.role === 'admin';
 
     if (!isAdmin) {
+      // Check user_organization_roles first
       const { data: membership } = await supabase
         .from('user_organization_roles')
         .select('id')
@@ -339,11 +340,21 @@ exports.handler = async (event) => {
         .maybeSingle();
 
       if (!membership) {
-        return {
-          statusCode: 403,
-          headers: corsHeaders,
-          body: JSON.stringify({ error: 'Not authorized for this organization' })
-        };
+        // Fallback: check if the user's profile is directly linked to this org
+        const { data: profileOrg } = await supabase
+          .from('profiles')
+          .select('organization_id')
+          .eq('id', user.id)
+          .eq('organization_id', organizationId)
+          .maybeSingle();
+
+        if (!profileOrg) {
+          return {
+            statusCode: 403,
+            headers: corsHeaders,
+            body: JSON.stringify({ error: 'Not authorized for this organization' })
+          };
+        }
       }
     }
 
