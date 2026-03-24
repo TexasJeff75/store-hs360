@@ -51,11 +51,11 @@ async function authenticateUser(authHeader) {
     .eq('id', user.id)
     .maybeSingle();
 
-  if (!profile || profile.role !== 'admin') {
-    throw new Error('Only admins can access QuickBooks API');
+  if (!profile) {
+    throw new Error('User profile not found');
   }
 
-  return user;
+  return { user, role: profile.role };
 }
 
 async function getCredentials() {
@@ -242,7 +242,7 @@ exports.handler = async (event) => {
 
   try {
     const authHeader = event.headers.authorization || event.headers.Authorization;
-    const user = await authenticateUser(authHeader);
+    const { user, role } = await authenticateUser(authHeader);
 
     let body = {};
     if (event.body) {
@@ -258,6 +258,16 @@ exports.handler = async (event) => {
     }
 
     const { endpoint, method = 'GET', data, usePaymentsAPI = false, isQuery = false } = body;
+
+    // Payment API endpoints (tokenization, charges) are available to all authenticated users.
+    // Accounting API endpoints (invoices, customers, etc.) require admin role.
+    if (!usePaymentsAPI && role !== 'admin') {
+      return {
+        statusCode: 403,
+        headers: corsHeaders,
+        body: JSON.stringify({ error: 'Only admins can access QuickBooks accounting API' })
+      };
+    }
 
     if (usePaymentsAPI && method.toUpperCase() === 'POST') {
       if (!checkPaymentRateLimit(user.id)) {
