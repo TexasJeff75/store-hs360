@@ -12,6 +12,11 @@
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS organization_id uuid REFERENCES organizations(id) ON DELETE SET NULL;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS sales_rep_id uuid REFERENCES profiles(id) ON DELETE SET NULL;
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS items jsonb DEFAULT '[]'::jsonb;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status text DEFAULT 'pending';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_authorization_id text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_captured_at timestamptz;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method text;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_last_four text;
 CREATE INDEX IF NOT EXISTS idx_orders_organization_id ON orders(organization_id);
 
 -- ── distributors ──────────────────────────────────────────────────────────────
@@ -105,3 +110,40 @@ CREATE TABLE IF NOT EXISTS commission_audit_log (
   created_at    timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_cal_order_id ON commission_audit_log(order_id);
+
+-- ── payment_transactions ──────────────────────────────────────────────────────
+-- Ensure the table exists (may have been skipped by CREATE TABLE IF NOT EXISTS)
+CREATE TABLE IF NOT EXISTS payment_transactions (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id uuid NOT NULL REFERENCES orders(id),
+  transaction_type text NOT NULL,
+  payment_method text,
+  gateway_transaction_id text,
+  amount numeric(10,2) NOT NULL,
+  currency text DEFAULT 'USD',
+  status text NOT NULL,
+  last_four text,
+  error_message text,
+  metadata jsonb DEFAULT '{}',
+  created_by uuid REFERENCES auth.users(id),
+  created_at timestamptz DEFAULT now(),
+  CONSTRAINT valid_transaction_type CHECK (transaction_type IN ('authorization', 'capture', 'void', 'refund')),
+  CONSTRAINT valid_transaction_status CHECK (status IN ('success', 'failed', 'pending', 'declined'))
+);
+CREATE INDEX IF NOT EXISTS idx_payment_transactions_order_id ON payment_transactions(order_id);
+
+-- Allow customers to INSERT authorization records for their own orders during checkout
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE tablename = 'payment_transactions'
+      AND policyname = 'Users can log transactions for own orders'
+  ) THEN
+    CREATE POLICY "Users can log transactions for own orders"
+      ON payment_transactions FOR INSERT
+      WITH CHECK (
+        EXISTS (SELECT 1 FROM orders WHERE orders.id = order_id AND orders.user_id = auth.uid())
+      );
+  END IF;
+END $$;
