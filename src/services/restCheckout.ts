@@ -218,7 +218,12 @@ class RestCheckoutService {
       verification_value?: string;
     },
     paymentAuthId?: string,
-    options?: { is_test_order?: boolean }
+    options?: {
+      is_test_order?: boolean;
+      paymentStatus?: string;
+      paymentMethod?: string;
+      paymentLastFour?: string;
+    }
   ): Promise<CheckoutFlowResult> {
     try {
 
@@ -281,6 +286,10 @@ class RestCheckoutService {
         locationId: session.location_id || session.metadata?.location_id,
         notes: `Order placed via checkout session ${sessionId}`,
         is_test_order: options?.is_test_order,
+        paymentStatus: options?.paymentStatus || (paymentAuthId ? 'authorized' : 'pending'),
+        paymentAuthorizationId: paymentAuthId || undefined,
+        paymentMethod: options?.paymentMethod,
+        paymentLastFour: options?.paymentLastFour,
       };
 
       const result = await orderService.createOrder(orderData);

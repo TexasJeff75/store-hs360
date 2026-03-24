@@ -786,15 +786,28 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       };
 
       const isTestOrder = testMode && profile?.role === 'admin';
+
+      // Determine method label for storage
+      const methodLabel = paymentData.type === 'card' ? 'credit_card'
+        : paymentData.type === 'ach' ? 'ach'
+        : paymentData.type === 'saved' ? (paymentData.paymentType === 'ach' || paymentData.paymentType === 'bank_account' ? 'saved_ach' : 'saved_card')
+        : 'credit_card';
+
       const result = await restCheckoutService.processPayment(
         sessionId,
         checkoutId,
         sanitizedPaymentData,
         paymentAuthId,
-        isTestOrder ? { is_test_order: true } : undefined
+        {
+          is_test_order: isTestOrder || undefined,
+          paymentStatus,
+          paymentMethod: isTestOrder ? 'test' : methodLabel,
+          paymentLastFour: paymentLastFour,
+        }
       );
 
       if (result.success && result.orderId) {
+        // Safety-net: ensure payment status is set even if the atomic insert missed it
         const { orderService } = await import('@/services/orderService');
         await orderService.updatePaymentStatus(result.orderId, paymentStatus, paymentAuthId);
 

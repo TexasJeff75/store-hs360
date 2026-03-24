@@ -53,6 +53,10 @@ export interface CreateOrderData {
   locationId?: string;
   notes?: string;
   is_test_order?: boolean;
+  paymentStatus?: string;
+  paymentAuthorizationId?: string;
+  paymentMethod?: string;
+  paymentLastFour?: string;
 }
 
 interface Order {
@@ -143,6 +147,10 @@ class OrderService {
           sales_rep_id: salesRepId,
           notes: data.notes,
           is_test_order: data.is_test_order || false,
+          payment_status: data.paymentStatus || 'pending',
+          payment_authorization_id: data.paymentAuthorizationId || null,
+          payment_method: data.paymentMethod || null,
+          payment_last_four: data.paymentLastFour || null,
         })
         .select()
         .single();
