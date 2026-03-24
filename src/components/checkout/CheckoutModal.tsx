@@ -77,6 +77,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
   const [billingAddressLabel, setBillingAddressLabel] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [completedOrderId, setCompletedOrderId] = useState<string | null>(null);
   const [cartId, setCartId] = useState<string | null>(null);
@@ -285,36 +286,39 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
 
   const validateStep = (step: CheckoutStep): boolean => {
+    const errors: Record<string, string> = {};
     switch (step) {
       case 'customer':
         if (!selectedCustomerId) {
+          setFieldErrors({});
           setError('Please select a customer');
           return false;
         }
-        return true;
+        break;
       case 'shipping':
-        const shippingValid = !!(shippingAddress.firstName && shippingAddress.lastName &&
-                 shippingAddress.address1 && shippingAddress.city &&
-                 shippingAddress.state && shippingAddress.postalCode);
-        if (!shippingValid) return false;
-        if (saveShippingAddress && !shippingAddressLabel.trim()) {
-          setError('Please provide a label for the address');
-          return false;
-        }
-        return true;
+        if (!shippingAddress.firstName.trim()) errors['shipping.firstName'] = 'First name is required';
+        if (!shippingAddress.lastName.trim()) errors['shipping.lastName'] = 'Last name is required';
+        if (!shippingAddress.address1.trim()) errors['shipping.address1'] = 'Address is required';
+        if (!shippingAddress.city.trim()) errors['shipping.city'] = 'City is required';
+        if (!shippingAddress.state.trim()) errors['shipping.state'] = 'State is required';
+        if (!shippingAddress.postalCode.trim()) errors['shipping.postalCode'] = 'ZIP code is required';
+        if (saveShippingAddress && !shippingAddressLabel.trim()) errors['shipping.label'] = 'Address label is required';
+        break;
       case 'billing':
-        const billingValid = !!(billingAddress.firstName && billingAddress.lastName &&
-                 billingAddress.address1 && billingAddress.city &&
-                 billingAddress.state && billingAddress.postalCode && billingAddress.email);
-        if (!billingValid) return false;
-        if (saveBillingAddress && !billingAddressLabel.trim()) {
-          setError('Please provide a label for the billing address');
-          return false;
-        }
-        return true;
-      default:
-        return true;
+        if (!billingAddress.firstName.trim()) errors['billing.firstName'] = 'First name is required';
+        if (!billingAddress.lastName.trim()) errors['billing.lastName'] = 'Last name is required';
+        if (!billingAddress.address1.trim()) errors['billing.address1'] = 'Address is required';
+        if (!billingAddress.city.trim()) errors['billing.city'] = 'City is required';
+        if (!billingAddress.state.trim()) errors['billing.state'] = 'State is required';
+        if (!billingAddress.postalCode.trim()) errors['billing.postalCode'] = 'ZIP code is required';
+        if (!billingAddress.email.trim()) errors['billing.email'] = 'Email is required';
+        if (saveBillingAddress && !billingAddressLabel.trim()) errors['billing.label'] = 'Address label is required';
+        break;
     }
+
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return false;
+    return true;
   };
 
   const saveAddressToDatabase = async (
@@ -363,11 +367,12 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
   const handleNext = async () => {
     if (!validateStep(currentStep)) {
-      setError('Please fill in all required fields');
+      // fieldErrors are set by validateStep — don't set a system-level error
       return;
     }
 
     setError(null);
+    setFieldErrors({});
     setLoading(true);
 
     try {
@@ -517,6 +522,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
     const steps: CheckoutStep[] = ['customer', 'shipping', 'billing', 'payment', 'review'];
     const currentIndex = steps.indexOf(currentStep);
     if (currentIndex > 0) {
+      setFieldErrors({});
       setCurrentStep(steps[currentIndex - 1]);
     }
   };
@@ -971,21 +977,23 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           <input
             type="text"
             value={shippingAddress.firstName}
-            onChange={(e) => setShippingAddress({...shippingAddress, firstName: e.target.value})}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+            onChange={(e) => { setShippingAddress({...shippingAddress, firstName: e.target.value}); setFieldErrors(prev => { const n = {...prev}; delete n['shipping.firstName']; return n; }); }}
+            className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent ${fieldErrors['shipping.firstName'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
           />
+          {fieldErrors['shipping.firstName'] && <p className="text-xs text-red-600 mt-1">{fieldErrors['shipping.firstName']}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
           <input
             type="text"
             value={shippingAddress.lastName}
-            onChange={(e) => setShippingAddress({...shippingAddress, lastName: e.target.value})}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+            onChange={(e) => { setShippingAddress({...shippingAddress, lastName: e.target.value}); setFieldErrors(prev => { const n = {...prev}; delete n['shipping.lastName']; return n; }); }}
+            className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent ${fieldErrors['shipping.lastName'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
           />
+          {fieldErrors['shipping.lastName'] && <p className="text-xs text-red-600 mt-1">{fieldErrors['shipping.lastName']}</p>}
         </div>
       </div>
-      
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
         <input
@@ -995,18 +1003,19 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
         />
       </div>
-      
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Address *</label>
         <input
           type="text"
           value={shippingAddress.address1}
-          onChange={(e) => setShippingAddress({...shippingAddress, address1: e.target.value})}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+          onChange={(e) => { setShippingAddress({...shippingAddress, address1: e.target.value}); setFieldErrors(prev => { const n = {...prev}; delete n['shipping.address1']; return n; }); }}
+          className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent ${fieldErrors['shipping.address1'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
           placeholder="Street address"
         />
+        {fieldErrors['shipping.address1'] && <p className="text-xs text-red-600 mt-1">{fieldErrors['shipping.address1']}</p>}
       </div>
-      
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
         <input
@@ -1017,37 +1026,40 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           placeholder="Apartment, suite, etc."
         />
       </div>
-      
+
       <div className="grid grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">City *</label>
           <input
             type="text"
             value={shippingAddress.city}
-            onChange={(e) => setShippingAddress({...shippingAddress, city: e.target.value})}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+            onChange={(e) => { setShippingAddress({...shippingAddress, city: e.target.value}); setFieldErrors(prev => { const n = {...prev}; delete n['shipping.city']; return n; }); }}
+            className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent ${fieldErrors['shipping.city'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
           />
+          {fieldErrors['shipping.city'] && <p className="text-xs text-red-600 mt-1">{fieldErrors['shipping.city']}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
           <input
             type="text"
             value={shippingAddress.state}
-            onChange={(e) => setShippingAddress({...shippingAddress, state: e.target.value})}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+            onChange={(e) => { setShippingAddress({...shippingAddress, state: e.target.value}); setFieldErrors(prev => { const n = {...prev}; delete n['shipping.state']; return n; }); }}
+            className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent ${fieldErrors['shipping.state'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
           />
+          {fieldErrors['shipping.state'] && <p className="text-xs text-red-600 mt-1">{fieldErrors['shipping.state']}</p>}
         </div>
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">ZIP Code *</label>
           <input
             type="text"
             value={shippingAddress.postalCode}
-            onChange={(e) => setShippingAddress({...shippingAddress, postalCode: e.target.value})}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+            onChange={(e) => { setShippingAddress({...shippingAddress, postalCode: e.target.value}); setFieldErrors(prev => { const n = {...prev}; delete n['shipping.postalCode']; return n; }); }}
+            className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent ${fieldErrors['shipping.postalCode'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
           />
+          {fieldErrors['shipping.postalCode'] && <p className="text-xs text-red-600 mt-1">{fieldErrors['shipping.postalCode']}</p>}
         </div>
       </div>
-      
+
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
         <input
@@ -1080,13 +1092,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <input
               type="text"
               value={shippingAddressLabel}
-              onChange={(e) => setShippingAddressLabel(e.target.value)}
+              onChange={(e) => { setShippingAddressLabel(e.target.value); setFieldErrors(prev => { const n = {...prev}; delete n['shipping.label']; return n; }); }}
               placeholder="e.g., Home, Office, Warehouse"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent ${fieldErrors['shipping.label'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Give this address a memorable name
-            </p>
+            {fieldErrors['shipping.label'] ? (
+              <p className="text-xs text-red-600 mt-1">{fieldErrors['shipping.label']}</p>
+            ) : (
+              <p className="text-xs text-gray-500 mt-1">Give this address a memorable name</p>
+            )}
           </div>
         )}
       </div>
@@ -1187,18 +1201,20 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <input
                 type="text"
                 value={billingAddress.firstName}
-                onChange={(e) => setBillingAddress({...billingAddress, firstName: e.target.value})}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                onChange={(e) => { setBillingAddress({...billingAddress, firstName: e.target.value}); setFieldErrors(prev => { const n = {...prev}; delete n['billing.firstName']; return n; }); }}
+                className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent ${fieldErrors['billing.firstName'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
               />
+              {fieldErrors['billing.firstName'] && <p className="text-xs text-red-600 mt-1">{fieldErrors['billing.firstName']}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
               <input
                 type="text"
                 value={billingAddress.lastName}
-                onChange={(e) => setBillingAddress({...billingAddress, lastName: e.target.value})}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                onChange={(e) => { setBillingAddress({...billingAddress, lastName: e.target.value}); setFieldErrors(prev => { const n = {...prev}; delete n['billing.lastName']; return n; }); }}
+                className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent ${fieldErrors['billing.lastName'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
               />
+              {fieldErrors['billing.lastName'] && <p className="text-xs text-red-600 mt-1">{fieldErrors['billing.lastName']}</p>}
             </div>
           </div>
 
@@ -1207,9 +1223,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             <input
               type="text"
               value={billingAddress.address1}
-              onChange={(e) => setBillingAddress({...billingAddress, address1: e.target.value})}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+              onChange={(e) => { setBillingAddress({...billingAddress, address1: e.target.value}); setFieldErrors(prev => { const n = {...prev}; delete n['billing.address1']; return n; }); }}
+              className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent ${fieldErrors['billing.address1'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
             />
+            {fieldErrors['billing.address1'] && <p className="text-xs text-red-600 mt-1">{fieldErrors['billing.address1']}</p>}
           </div>
 
           <div className="grid grid-cols-3 gap-4">
@@ -1218,27 +1235,30 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <input
                 type="text"
                 value={billingAddress.city}
-                onChange={(e) => setBillingAddress({...billingAddress, city: e.target.value})}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                onChange={(e) => { setBillingAddress({...billingAddress, city: e.target.value}); setFieldErrors(prev => { const n = {...prev}; delete n['billing.city']; return n; }); }}
+                className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent ${fieldErrors['billing.city'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
               />
+              {fieldErrors['billing.city'] && <p className="text-xs text-red-600 mt-1">{fieldErrors['billing.city']}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">State *</label>
               <input
                 type="text"
                 value={billingAddress.state}
-                onChange={(e) => setBillingAddress({...billingAddress, state: e.target.value})}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                onChange={(e) => { setBillingAddress({...billingAddress, state: e.target.value}); setFieldErrors(prev => { const n = {...prev}; delete n['billing.state']; return n; }); }}
+                className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent ${fieldErrors['billing.state'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
               />
+              {fieldErrors['billing.state'] && <p className="text-xs text-red-600 mt-1">{fieldErrors['billing.state']}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">ZIP Code *</label>
               <input
                 type="text"
                 value={billingAddress.postalCode}
-                onChange={(e) => setBillingAddress({...billingAddress, postalCode: e.target.value})}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+                onChange={(e) => { setBillingAddress({...billingAddress, postalCode: e.target.value}); setFieldErrors(prev => { const n = {...prev}; delete n['billing.postalCode']; return n; }); }}
+                className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent ${fieldErrors['billing.postalCode'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
               />
+              {fieldErrors['billing.postalCode'] && <p className="text-xs text-red-600 mt-1">{fieldErrors['billing.postalCode']}</p>}
             </div>
           </div>
         </>
@@ -1249,9 +1269,10 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         <input
           type="email"
           value={billingAddress.email}
-          onChange={(e) => setBillingAddress({...billingAddress, email: e.target.value})}
-          className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent"
+          onChange={(e) => { setBillingAddress({...billingAddress, email: e.target.value}); setFieldErrors(prev => { const n = {...prev}; delete n['billing.email']; return n; }); }}
+          className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-pink-500 focus:border-transparent ${fieldErrors['billing.email'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
         />
+        {fieldErrors['billing.email'] && <p className="text-xs text-red-600 mt-1">{fieldErrors['billing.email']}</p>}
       </div>
 
       {/* Save Billing Address Option */}
@@ -1277,13 +1298,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
               <input
                 type="text"
                 value={billingAddressLabel}
-                onChange={(e) => setBillingAddressLabel(e.target.value)}
+                onChange={(e) => { setBillingAddressLabel(e.target.value); setFieldErrors(prev => { const n = {...prev}; delete n['billing.label']; return n; }); }}
                 placeholder="e.g., Business Address, Corporate HQ"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className={`w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-green-500 focus:border-transparent ${fieldErrors['billing.label'] ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Give this billing address a memorable name
-              </p>
+              {fieldErrors['billing.label'] ? (
+                <p className="text-xs text-red-600 mt-1">{fieldErrors['billing.label']}</p>
+              ) : (
+                <p className="text-xs text-gray-500 mt-1">Give this billing address a memorable name</p>
+              )}
             </div>
           )}
         </div>
@@ -1664,6 +1687,21 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             {!loading && !error && currentStep === 'payment' && renderPaymentStep()}
             {!loading && !error && currentStep === 'review' && renderReviewStep()}
             {!loading && !error && currentStep === 'confirmation' && renderConfirmationStep()}
+
+            {/* Inline field validation errors banner — shown above the form footer */}
+            {Object.keys(fieldErrors).length > 0 && !error && !loading && (
+              <div className="mx-6 mt-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-start space-x-2">
+                <AlertCircle className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-red-700">
+                  <p className="font-medium">Please fix the following:</p>
+                  <ul className="list-disc list-inside mt-1 space-y-0.5">
+                    {Object.values(fieldErrors).map((msg, i) => (
+                      <li key={i}>{msg}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer Navigation — hidden on customer, confirmation, and payment steps */}
