@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { orderService } from '../../services/orderService';
-import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle, DollarSign, FileText, Activity, Trash2, UserCheck, RefreshCw, Pencil, Save, XCircle } from 'lucide-react';
+import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle, DollarSign, FileText, Activity, Trash2, UserCheck, RefreshCw, Pencil, Save, XCircle, Check } from 'lucide-react';
+import { customerAddressService, type CustomerAddress } from '../../services/customerAddresses';
 import type { Order, OrderItem, Shipment } from './orders/types';
 import { normalizeAddress } from './orders/types';
 import { activityLogService } from '../../services/activityLog';
@@ -55,6 +56,9 @@ const OrderManagement: React.FC = () => {
   const [editNotes, setEditNotes] = useState('');
   const [editPaymentStatus, setEditPaymentStatus] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<CustomerAddress[]>([]);
+  const [loadingSavedAddresses, setLoadingSavedAddresses] = useState(false);
+  const [showAddressPicker, setShowAddressPicker] = useState(true);
 
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
@@ -989,11 +993,50 @@ const OrderManagement: React.FC = () => {
     }
   };
 
-  const startEditAddress = (type: 'shipping_address' | 'billing_address', order: Order) => {
+  const startEditAddress = async (type: 'shipping_address' | 'billing_address', order: Order) => {
     const raw = type === 'shipping_address' ? order.shipping_address : order.billing_address;
     const addr = normalizeAddress(raw);
     setEditAddress(addr || { firstName: '', lastName: '', company: '', address1: '', address2: '', city: '', state: '', postalCode: '', country: 'US', phone: '', email: '' });
     setEditingSection(type);
+    setShowAddressPicker(true);
+
+    // Fetch saved addresses for this customer's organization or user
+    setLoadingSavedAddresses(true);
+    try {
+      let addresses: CustomerAddress[] = [];
+      if (order.organization_id) {
+        addresses = await customerAddressService.getOrganizationAddresses(order.organization_id);
+      } else if (order.user_id) {
+        addresses = await customerAddressService.getUserAddresses(order.user_id);
+      }
+      // Filter to the relevant type (shipping/billing) or show all
+      const addrType = type === 'shipping_address' ? 'shipping' : 'billing';
+      const filtered = addresses.filter(a => a.address_type === addrType);
+      // If no addresses of that type, show all
+      setSavedAddresses(filtered.length > 0 ? filtered : addresses);
+    } catch (err) {
+      console.error('Failed to fetch saved addresses:', err);
+      setSavedAddresses([]);
+    } finally {
+      setLoadingSavedAddresses(false);
+    }
+  };
+
+  const selectSavedAddress = (addr: CustomerAddress) => {
+    setEditAddress({
+      firstName: addr.first_name || '',
+      lastName: addr.last_name || '',
+      company: addr.company || '',
+      address1: addr.address1 || '',
+      address2: addr.address2 || '',
+      city: addr.city || '',
+      state: addr.state_or_province || '',
+      postalCode: addr.postal_code || '',
+      country: addr.country_code || 'US',
+      phone: addr.phone || '',
+      email: addr.email || '',
+    });
+    setShowAddressPicker(false);
   };
 
   const startEditSummary = (order: Order) => {
@@ -1059,6 +1102,58 @@ const OrderManagement: React.FC = () => {
       setSavingEdit(false);
     }
   };
+
+  const renderAddressPicker = (order: Order) => (
+    <div className="space-y-2">
+      {loadingSavedAddresses ? (
+        <div className="flex items-center justify-center py-4">
+          <Loader className="h-4 w-4 animate-spin text-gray-400 mr-2" />
+          <span className="text-sm text-gray-500">Loading saved addresses...</span>
+        </div>
+      ) : savedAddresses.length > 0 ? (
+        <div className="space-y-2 max-h-60 overflow-y-auto">
+          {savedAddresses.map((addr) => (
+            <button
+              key={addr.id}
+              onClick={() => selectSavedAddress(addr)}
+              className="w-full text-left p-3 border border-gray-200 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gray-900">{addr.label}</span>
+                <div className="flex items-center gap-1.5">
+                  {addr.is_default && (
+                    <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">Default</span>
+                  )}
+                  <span className="text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{addr.address_type}</span>
+                </div>
+              </div>
+              <p className="text-xs text-gray-600 mt-1">
+                {addr.first_name} {addr.last_name}{addr.company ? ` — ${addr.company}` : ''}
+              </p>
+              <p className="text-xs text-gray-500">
+                {addr.address1}{addr.address2 ? `, ${addr.address2}` : ''}, {addr.city}, {addr.state_or_province} {addr.postal_code}
+              </p>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="text-sm text-gray-400 italic py-2">No saved addresses found for this customer.</p>
+      )}
+      <button
+        onClick={() => setShowAddressPicker(false)}
+        className="w-full flex items-center justify-center gap-1.5 p-2.5 border border-dashed border-gray-300 rounded-lg text-sm text-gray-600 hover:border-blue-400 hover:text-blue-600 transition-colors"
+      >
+        <Pencil className="h-3.5 w-3.5" />
+        Enter address manually
+      </button>
+      <div className="flex justify-end">
+        <button onClick={cancelEdit} className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200 transition-colors">
+          <XCircle className="h-3 w-3" />
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
 
   const renderAddressForm = () => (
     <div className="grid grid-cols-2 gap-3">
@@ -1854,8 +1949,12 @@ const OrderManagement: React.FC = () => {
                 </h4>
                 {editingSection === 'shipping_address' ? (
                   <div>
-                    {renderAddressForm()}
-                    {renderEditButtons(order)}
+                    {showAddressPicker ? renderAddressPicker(order) : (
+                      <>
+                        {renderAddressForm()}
+                        {renderEditButtons(order)}
+                      </>
+                    )}
                   </div>
                 ) : (() => {
                   const addr = normalizeAddress(order.shipping_address);
@@ -1889,8 +1988,12 @@ const OrderManagement: React.FC = () => {
                 </h4>
                 {editingSection === 'billing_address' ? (
                   <div>
-                    {renderAddressForm()}
-                    {renderEditButtons(order)}
+                    {showAddressPicker ? renderAddressPicker(order) : (
+                      <>
+                        {renderAddressForm()}
+                        {renderEditButtons(order)}
+                      </>
+                    )}
                   </div>
                 ) : (() => {
                   const addr = normalizeAddress(order.billing_address);
