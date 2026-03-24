@@ -115,7 +115,11 @@ class RestCheckoutService {
         .eq('id', sessionId);
 
       if (error) {
-        console.error('Failed to update session with cart ID:', error);
+        console.error('[RestCheckout] Failed to update session with cart ID:', error.message, error.code);
+        return {
+          success: false,
+          error: 'Failed to initialize cart. Please try again.',
+        };
       }
 
       return {
@@ -180,7 +184,11 @@ class RestCheckoutService {
         .eq('id', sessionId);
 
       if (error) {
-        console.error('Failed to update session with addresses:', error);
+        console.error('[RestCheckout] Failed to update session with addresses:', error.message, error.code);
+        return {
+          success: false,
+          error: 'Failed to save address information. Please try again.',
+        };
       }
 
       return {
@@ -298,13 +306,10 @@ class RestCheckoutService {
         throw new Error(result.error || 'Failed to create order');
       }
 
-      if (paymentAuthId) {
-        await orderService.updatePaymentStatus(
-          result.order.id,
-          'authorized',
-          paymentAuthId
-        );
-      }
+      // Payment fields (payment_status, payment_authorization_id, payment_method,
+      // payment_last_four) are now set atomically in createOrder above.
+      // No separate updatePaymentStatus call needed — and it would fail for
+      // non-admin users due to RLS UPDATE restrictions on the orders table.
 
       await supabase
         .from('checkout_sessions')

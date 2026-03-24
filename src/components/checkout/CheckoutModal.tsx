@@ -807,9 +807,9 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       );
 
       if (result.success && result.orderId) {
-        // Safety-net: ensure payment status is set even if the atomic insert missed it
+        // Payment fields are set atomically in the order INSERT via processPayment.
+        // No separate updatePaymentStatus call — it would be blocked by RLS for customers.
         const { orderService } = await import('@/services/orderService');
-        await orderService.updatePaymentStatus(result.orderId, paymentStatus, paymentAuthId);
 
         const methodLabel = paymentData.type === 'card' ? 'Credit Card'
           : paymentData.type === 'ach' ? 'Bank Account'
@@ -823,7 +823,27 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
           transactionId: paymentAuthId,
         });
 
-        await orderService.logPaymentEvent(result.orderId, {
+        // Log payment event — logPaymentEvent updates orders.notes which requires
+        // admin-level UPDATE on orders. Use activity log (user_activity_log) as the
+        // primary record since customers can INSERT into it.
+        activityLogService.logAction({
+          userId: user.id,
+          action: 'order_placed',
+          resourceType: 'order',
+          resourceId: result.orderId,
+          details: {
+            event: paymentStatus === 'authorized' ? 'authorization' : 'payment_initiated',
+            payment_status: paymentStatus,
+            payment_method: methodLabel,
+            last_four: paymentLastFour,
+            transaction_id: paymentAuthId,
+            amount: total,
+            organization_id: selectedOrgId,
+            session_id: sessionId,
+          },
+        });
+        // Also attempt to log to order notes (will succeed for admins, silently fail for customers)
+        orderService.logPaymentEvent(result.orderId, {
           event: paymentStatus === 'authorized' ? 'authorization' : 'payment_initiated',
           status: paymentStatus,
           method: methodLabel,
