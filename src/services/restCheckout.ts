@@ -311,6 +311,23 @@ class RestCheckoutService {
       // No separate updatePaymentStatus call needed — and it would fail for
       // non-admin users due to RLS UPDATE restrictions on the orders table.
 
+      // Log the initial authorization in payment_transactions for audit trail
+      if (paymentAuthId) {
+        try {
+          await orderService.logTransaction(
+            result.order.id,
+            'authorization',
+            orderData.total,
+            orderData.paymentStatus === 'pending' ? 'pending' : 'success',
+            paymentAuthId,
+            options?.paymentLastFour,
+            options?.paymentMethod,
+          );
+        } catch (txnLogErr) {
+          console.warn('Failed to log payment transaction (order was still created):', txnLogErr);
+        }
+      }
+
       await supabase
         .from('checkout_sessions')
         .update({
