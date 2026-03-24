@@ -135,7 +135,7 @@ const ResetPassword: React.FC<ResetPasswordProps> = ({ onComplete }) => {
             This password reset link is no longer valid. Links expire after 1 hour and can only be used once.
           </p>
           <p className="text-sm text-gray-500">
-            Please contact your administrator to send a new password reset link.
+            Please return to the login page and click "Forgot your password?" to request a new reset link.
           </p>
         </div>
       </div>

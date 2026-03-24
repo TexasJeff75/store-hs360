@@ -10,7 +10,7 @@ interface AuthModalProps {
 }
 
 const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 'signin' }) => {
-  const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -141,6 +141,46 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    if (!email) {
+      setError('Please enter your email address');
+      setLoading(false);
+      return;
+    }
+
+    if (!turnstileToken) {
+      setError('Please complete the CAPTCHA verification');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/request-password-reset', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, turnstileToken }),
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) {
+        throw new Error(result.error || 'Failed to send reset email');
+      }
+
+      setSuccess('If an account exists with this email, you will receive a password reset link shortly. Please check your inbox and spam folder.');
+    } catch (err) {
+      console.error('Password reset request error:', err);
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const switchMode = () => {
     setMode(mode === 'signin' ? 'signup' : 'signin');
     resetForm();
@@ -157,7 +197,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">
-              {mode === 'signin' ? 'Sign In' : 'Create Account'}
+              {mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Reset Password'}
             </h2>
             <button
               onClick={handleClose}
@@ -185,7 +225,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={mode === 'forgot' ? handleForgotPassword : handleSubmit} className="space-y-4">
               {/* Email Field */}
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
@@ -207,7 +247,14 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                 </div>
               </div>
 
-              {/* Password Field */}
+              {mode === 'forgot' && (
+                <p className="text-sm text-gray-600">
+                  Enter your email address and we'll send you a link to reset your password.
+                </p>
+              )}
+
+              {/* Password Field (not shown in forgot mode) */}
+              {mode !== 'forgot' && (
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                   Password
@@ -227,6 +274,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                   <Lock className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
                 </div>
               </div>
+              )}
 
               {/* Confirm Password Field (Sign Up Only) */}
               {mode === 'signup' && (
@@ -424,7 +472,8 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                 </>
               )}
 
-              {/* Age Verification Checkbox */}
+              {/* Age Verification Checkbox (not shown in forgot mode) */}
+              {mode !== 'forgot' && (
               <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
                 <label className="flex items-start space-x-3 cursor-pointer">
                   <input
@@ -440,6 +489,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
                   </span>
                 </label>
               </div>
+              )}
 
               <TurnstileWidget
                 onVerify={handleTurnstileVerify}
@@ -450,29 +500,41 @@ const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose, initialMode = 's
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading || !turnstileToken}
+                disabled={loading || !turnstileToken || (mode !== 'forgot' && !ageVerified)}
                 className="w-full bg-gradient-to-r from-pink-500 to-orange-500 text-white py-2 px-4 rounded-lg hover:from-pink-600 hover:to-orange-600 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
                 {loading ? (
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
                 ) : (
                   <>
-                    <User className="h-5 w-5" />
-                    <span>{mode === 'signin' ? 'Sign In' : 'Create Account'}</span>
+                    {mode === 'forgot' ? <Mail className="h-5 w-5" /> : <User className="h-5 w-5" />}
+                    <span>{mode === 'signin' ? 'Sign In' : mode === 'signup' ? 'Create Account' : 'Send Reset Link'}</span>
                   </>
                 )}
               </button>
             </form>
 
-            {/* Switch Mode */}
-            <div className="mt-6 text-center">
-              <p className="text-gray-600">
-                {mode === 'signin' ? "Don't have an account?" : 'Already have an account?'}
+            {/* Forgot Password link (sign in mode only) */}
+            {mode === 'signin' && (
+              <div className="mt-3 text-center">
                 <button
-                  onClick={switchMode}
+                  onClick={() => { resetForm(); setMode('forgot'); }}
+                  className="text-sm text-pink-600 hover:text-pink-700 font-medium transition-colors"
+                >
+                  Forgot your password?
+                </button>
+              </div>
+            )}
+
+            {/* Switch Mode */}
+            <div className="mt-4 text-center">
+              <p className="text-gray-600">
+                {mode === 'forgot' ? 'Remember your password?' : mode === 'signin' ? "Don't have an account?" : 'Already have an account?'}
+                <button
+                  onClick={() => { resetForm(); setMode(mode === 'signup' ? 'signin' : mode === 'forgot' ? 'signin' : 'signup'); }}
                   className="ml-1 text-pink-600 hover:text-pink-700 font-medium transition-colors"
                 >
-                  {mode === 'signin' ? 'Sign up' : 'Sign in'}
+                  {mode === 'forgot' ? 'Sign in' : mode === 'signin' ? 'Sign up' : 'Sign in'}
                 </button>
               </p>
             </div>
