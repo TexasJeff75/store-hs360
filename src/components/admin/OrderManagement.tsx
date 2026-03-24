@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../services/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { orderService } from '../../services/orderService';
-import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle, DollarSign, FileText, Activity, Trash2, UserCheck, RefreshCw } from 'lucide-react';
+import { Package, Search, Eye, X, Loader, Calendar, Mail, MapPin, CreditCard, Truck, Plus, Building2, ChevronDown, ChevronUp, Split, AlertTriangle, DollarSign, FileText, Activity, Trash2, UserCheck, RefreshCw, Pencil, Save, XCircle } from 'lucide-react';
 import type { Order, OrderItem, Shipment } from './orders/types';
 import { normalizeAddress } from './orders/types';
 import { activityLogService } from '../../services/activityLog';
@@ -47,6 +47,15 @@ const OrderManagement: React.FC = () => {
   const [isDeletingOrder, setIsDeletingOrder] = useState(false);
   const [availableSalesReps, setAvailableSalesReps] = useState<{ id: string; full_name: string; email: string; role?: string; distributor_name?: string }[]>([]);
   const [orderSalesRepName, setOrderSalesRepName] = useState<string | null>(null);
+  // Order editing state
+  const [editingSection, setEditingSection] = useState<'shipping_address' | 'billing_address' | 'order_summary' | 'notes' | null>(null);
+  const [editAddress, setEditAddress] = useState({ firstName: '', lastName: '', company: '', address1: '', address2: '', city: '', state: '', postalCode: '', country: 'US', phone: '', email: '' });
+  const [editShipping, setEditShipping] = useState(0);
+  const [editTax, setEditTax] = useState(0);
+  const [editNotes, setEditNotes] = useState('');
+  const [editPaymentStatus, setEditPaymentStatus] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
   const [newShipment, setNewShipment] = useState<Shipment>({
     carrier: '',
     tracking_number: '',
@@ -980,6 +989,139 @@ const OrderManagement: React.FC = () => {
     }
   };
 
+  const startEditAddress = (type: 'shipping_address' | 'billing_address', order: Order) => {
+    const raw = type === 'shipping_address' ? order.shipping_address : order.billing_address;
+    const addr = normalizeAddress(raw);
+    setEditAddress(addr || { firstName: '', lastName: '', company: '', address1: '', address2: '', city: '', state: '', postalCode: '', country: 'US', phone: '', email: '' });
+    setEditingSection(type);
+  };
+
+  const startEditSummary = (order: Order) => {
+    setEditShipping(Number(order.shipping) || 0);
+    setEditTax(Number(order.tax) || 0);
+    setEditPaymentStatus(order.payment_status || 'pending');
+    setEditingSection('order_summary');
+  };
+
+  const startEditNotes = (order: Order) => {
+    setEditNotes(order.notes || '');
+    setEditingSection('notes');
+  };
+
+  const cancelEdit = () => {
+    setEditingSection(null);
+    setSavingEdit(false);
+  };
+
+  const saveEdit = async (order: Order) => {
+    if (!editingSection) return;
+    setSavingEdit(true);
+    try {
+      let updates: Record<string, any> = {};
+
+      if (editingSection === 'shipping_address' || editingSection === 'billing_address') {
+        updates[editingSection] = {
+          firstName: editAddress.firstName,
+          lastName: editAddress.lastName,
+          company: editAddress.company,
+          address1: editAddress.address1,
+          address2: editAddress.address2,
+          city: editAddress.city,
+          state: editAddress.state,
+          postalCode: editAddress.postalCode,
+          country: editAddress.country,
+          phone: editAddress.phone,
+          email: editAddress.email,
+        };
+      } else if (editingSection === 'order_summary') {
+        updates.shipping = editShipping;
+        updates.tax = editTax;
+        updates.payment_status = editPaymentStatus;
+      } else if (editingSection === 'notes') {
+        updates.notes = editNotes;
+      }
+
+      const result = await orderService.adminUpdateOrder(order.id, updates);
+      if (result.success) {
+        // Refresh the order in state
+        const { order: refreshed } = await orderService.getOrderById(order.id);
+        if (refreshed) {
+          setSelectedOrder(refreshed);
+          setOrders(prev => prev.map(o => o.id === refreshed.id ? refreshed : o));
+        }
+        setEditingSection(null);
+      } else {
+        alert('Failed to save: ' + (result.error || 'Unknown error'));
+      }
+    } catch (err) {
+      alert('Error saving changes: ' + (err instanceof Error ? err.message : 'Unknown error'));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const renderAddressForm = () => (
+    <div className="grid grid-cols-2 gap-3">
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">First Name</label>
+        <input type="text" value={editAddress.firstName} onChange={e => setEditAddress(p => ({ ...p, firstName: e.target.value }))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Last Name</label>
+        <input type="text" value={editAddress.lastName} onChange={e => setEditAddress(p => ({ ...p, lastName: e.target.value }))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+      <div className="col-span-2">
+        <label className="block text-xs font-medium text-gray-600 mb-1">Company</label>
+        <input type="text" value={editAddress.company} onChange={e => setEditAddress(p => ({ ...p, company: e.target.value }))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+      <div className="col-span-2">
+        <label className="block text-xs font-medium text-gray-600 mb-1">Address Line 1</label>
+        <input type="text" value={editAddress.address1} onChange={e => setEditAddress(p => ({ ...p, address1: e.target.value }))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+      <div className="col-span-2">
+        <label className="block text-xs font-medium text-gray-600 mb-1">Address Line 2</label>
+        <input type="text" value={editAddress.address2} onChange={e => setEditAddress(p => ({ ...p, address2: e.target.value }))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">City</label>
+        <input type="text" value={editAddress.city} onChange={e => setEditAddress(p => ({ ...p, city: e.target.value }))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">State</label>
+        <input type="text" value={editAddress.state} onChange={e => setEditAddress(p => ({ ...p, state: e.target.value }))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Postal Code</label>
+        <input type="text" value={editAddress.postalCode} onChange={e => setEditAddress(p => ({ ...p, postalCode: e.target.value }))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Country</label>
+        <input type="text" value={editAddress.country} onChange={e => setEditAddress(p => ({ ...p, country: e.target.value }))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Phone</label>
+        <input type="text" value={editAddress.phone} onChange={e => setEditAddress(p => ({ ...p, phone: e.target.value }))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+      <div>
+        <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+        <input type="text" value={editAddress.email} onChange={e => setEditAddress(p => ({ ...p, email: e.target.value }))} className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+      </div>
+    </div>
+  );
+
+  const renderEditButtons = (order: Order) => (
+    <div className="flex items-center gap-2 mt-3">
+      <button onClick={() => saveEdit(order)} disabled={savingEdit} className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50 transition-colors">
+        {savingEdit ? <Loader className="h-3 w-3 animate-spin" /> : <Save className="h-3 w-3" />}
+        Save
+      </button>
+      <button onClick={cancelEdit} disabled={savingEdit} className="flex items-center gap-1 px-3 py-1.5 bg-gray-100 text-gray-700 text-sm rounded hover:bg-gray-200 disabled:opacity-50 transition-colors">
+        <XCircle className="h-3 w-3" />
+        Cancel
+      </button>
+    </div>
+  );
+
   const renderOrderDetailsModal = (order: Order) => (
     <div className="fixed inset-0 z-50 overflow-y-auto" onClick={e => e.stopPropagation()}>
       <div className="flex items-start justify-center min-h-screen pt-4 px-4 pb-20">
@@ -1010,7 +1152,7 @@ const OrderManagement: React.FC = () => {
                 </button>
               )}
               <button
-                onClick={() => setSelectedOrder(null)}
+                onClick={() => { setSelectedOrder(null); setEditingSection(null); }}
                 className="p-2 hover:bg-gray-100 rounded-full transition-colors"
               >
                 <X className="h-5 w-5" />
@@ -1115,10 +1257,51 @@ const OrderManagement: React.FC = () => {
               </div>
 
               <div className="bg-gray-50 rounded-lg p-4">
-                <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  Order Summary
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center justify-between">
+                  <span className="flex items-center">
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    Order Summary
+                  </span>
+                  {isAdmin && editingSection !== 'order_summary' && (
+                    <button onClick={() => startEditSummary(order)} className="p-1 text-gray-400 hover:text-blue-600 transition-colors" title="Edit order summary">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </h4>
+                {editingSection === 'order_summary' ? (
+                  <div className="space-y-3 text-sm">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600">Subtotal:</span>
+                      <span className="font-medium">${Number(order.subtotal).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <label className="text-gray-600">Tax:</label>
+                      <input type="number" step="0.01" min="0" value={editTax} onChange={e => setEditTax(parseFloat(e.target.value) || 0)} className="w-28 px-2 py-1 text-sm text-right border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <label className="text-gray-600">Shipping:</label>
+                      <input type="number" step="0.01" min="0" value={editShipping} onChange={e => setEditShipping(parseFloat(e.target.value) || 0)} className="w-28 px-2 py-1 text-sm text-right border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent" />
+                    </div>
+                    <div className="border-t border-gray-300 pt-2 flex justify-between font-semibold text-base">
+                      <span>Total:</span>
+                      <span>${(Number(order.subtotal) + editTax + editShipping).toFixed(2)}</span>
+                    </div>
+                    <div className="border-t border-gray-300 pt-2 mt-2">
+                      <div className="flex justify-between items-center">
+                        <label className="text-gray-600">Payment Status:</label>
+                        <select value={editPaymentStatus} onChange={e => setEditPaymentStatus(e.target.value)} className="px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                          <option value="pending">pending</option>
+                          <option value="authorized">authorized</option>
+                          <option value="captured">captured</option>
+                          <option value="refunded">refunded</option>
+                          <option value="failed">failed</option>
+                          <option value="cancelled">cancelled</option>
+                        </select>
+                      </div>
+                    </div>
+                    {renderEditButtons(order)}
+                  </div>
+                ) : (
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Subtotal:</span>
@@ -1189,7 +1372,31 @@ const OrderManagement: React.FC = () => {
                     )}
                   </div>
                 </div>
+                )}
               </div>
+            </div>
+
+            {/* Order Notes */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <h4 className="font-semibold text-gray-900 mb-3 flex items-center justify-between">
+                <span className="flex items-center">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Order Notes
+                </span>
+                {isAdmin && editingSection !== 'notes' && (
+                  <button onClick={() => startEditNotes(order)} className="p-1 text-gray-400 hover:text-blue-600 transition-colors" title="Edit notes">
+                    <Pencil className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </h4>
+              {editingSection === 'notes' ? (
+                <div>
+                  <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)} rows={4} className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="Add notes about this order..." />
+                  {renderEditButtons(order)}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{order.notes || <span className="text-gray-400 italic">No notes</span>}</p>
+              )}
             </div>
 
             {/* Payment Processing Log */}
@@ -1632,15 +1839,28 @@ const OrderManagement: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {order.shipping_address && (() => {
-                const addr = normalizeAddress(order.shipping_address);
-                if (!addr) return null;
-                return (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
-                      <MapPin className="h-4 w-4 mr-2" />
-                      Shipping Address
-                    </h4>
+              {/* Shipping Address */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center justify-between">
+                  <span className="flex items-center">
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Shipping Address
+                  </span>
+                  {isAdmin && editingSection !== 'shipping_address' && (
+                    <button onClick={() => startEditAddress('shipping_address', order)} className="p-1 text-gray-400 hover:text-blue-600 transition-colors" title="Edit shipping address">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </h4>
+                {editingSection === 'shipping_address' ? (
+                  <div>
+                    {renderAddressForm()}
+                    {renderEditButtons(order)}
+                  </div>
+                ) : (() => {
+                  const addr = normalizeAddress(order.shipping_address);
+                  if (!addr) return <p className="text-sm text-gray-400 italic">No shipping address</p>;
+                  return (
                     <div className="text-sm text-gray-700">
                       <p className="font-medium">{addr.firstName} {addr.lastName}</p>
                       {addr.company && <p>{addr.company}</p>}
@@ -1650,19 +1870,32 @@ const OrderManagement: React.FC = () => {
                       <p>{addr.country}</p>
                       {addr.phone && <p className="mt-2">Phone: {addr.phone}</p>}
                     </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
+              </div>
 
-              {order.billing_address && (() => {
-                const addr = normalizeAddress(order.billing_address);
-                if (!addr) return null;
-                return (
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
-                      <MapPin className="h-4 w-4 mr-2" />
-                      Billing Address
-                    </h4>
+              {/* Billing Address */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-semibold text-gray-900 mb-3 flex items-center justify-between">
+                  <span className="flex items-center">
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Billing Address
+                  </span>
+                  {isAdmin && editingSection !== 'billing_address' && (
+                    <button onClick={() => startEditAddress('billing_address', order)} className="p-1 text-gray-400 hover:text-blue-600 transition-colors" title="Edit billing address">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                  )}
+                </h4>
+                {editingSection === 'billing_address' ? (
+                  <div>
+                    {renderAddressForm()}
+                    {renderEditButtons(order)}
+                  </div>
+                ) : (() => {
+                  const addr = normalizeAddress(order.billing_address);
+                  if (!addr) return <p className="text-sm text-gray-400 italic">No billing address</p>;
+                  return (
                     <div className="text-sm text-gray-700">
                       <p className="font-medium">{addr.firstName} {addr.lastName}</p>
                       {addr.company && <p>{addr.company}</p>}
@@ -1672,9 +1905,9 @@ const OrderManagement: React.FC = () => {
                       <p>{addr.country}</p>
                       {addr.phone && <p className="mt-2">Phone: {addr.phone}</p>}
                     </div>
-                  </div>
-                );
-              })()}
+                  );
+                })()}
+              </div>
             </div>
 
             <div>

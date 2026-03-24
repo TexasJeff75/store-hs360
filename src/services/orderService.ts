@@ -53,6 +53,10 @@ export interface CreateOrderData {
   locationId?: string;
   notes?: string;
   is_test_order?: boolean;
+  paymentStatus?: string;
+  paymentAuthorizationId?: string;
+  paymentMethod?: string;
+  paymentLastFour?: string;
 }
 
 interface Order {
@@ -143,12 +147,31 @@ class OrderService {
           sales_rep_id: salesRepId,
           notes: data.notes,
           is_test_order: data.is_test_order || false,
+          payment_status: data.paymentStatus || 'pending',
+          payment_authorization_id: data.paymentAuthorizationId || null,
+          payment_method: data.paymentMethod || null,
+          payment_last_four: data.paymentLastFour || null,
         })
         .select()
         .single();
 
       if (error) {
-        console.error('Error creating order:', error);
+        console.error('[OrderService] Error creating order:', error.message, error.code, error.details);
+        activityLogService.logAction({
+          userId: data.userId,
+          action: 'checkout_order_failed',
+          resourceType: 'order',
+          details: {
+            error: error.message,
+            error_code: error.code,
+            error_details: error.details,
+            organization_id: data.organizationId,
+            location_id: data.locationId,
+            total: data.total,
+            items_count: data.items.length,
+            sales_rep_id: salesRepId,
+          },
+        });
         return { order: null, error: error.message };
       }
 
@@ -305,6 +328,57 @@ class OrderService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Failed to update sales rep'
+      };
+    }
+  }
+
+  async adminUpdateOrder(
+    orderId: string,
+    updates: {
+      shipping_address?: any;
+      billing_address?: any;
+      shipping?: number;
+      tax?: number;
+      notes?: string;
+      customer_email?: string;
+      payment_status?: string;
+      payment_authorization_id?: string;
+      payment_method?: string;
+      payment_last_four?: string;
+    }
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Recalculate total if shipping or tax changed
+      const updateData: Record<string, any> = {
+        ...updates,
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.shipping !== undefined || updates.tax !== undefined) {
+        const { order } = await this.getOrderById(orderId);
+        if (order) {
+          const newShipping = updates.shipping ?? order.shipping;
+          const newTax = updates.tax ?? order.tax;
+          updateData.total = order.subtotal + newTax + newShipping;
+        }
+      }
+
+      const { error } = await supabase
+        .from('orders')
+        .update(updateData)
+        .eq('id', orderId);
+
+      if (error) {
+        console.error('[OrderService] adminUpdateOrder error:', error.message);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('[OrderService] adminUpdateOrder exception:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to update order',
       };
     }
   }

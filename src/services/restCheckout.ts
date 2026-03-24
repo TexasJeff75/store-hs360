@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { orderService, CreateOrderData, OrderItem, Address } from './orderService';
+import { activityLogService } from './activityLog';
 
 export interface CartLineItem {
   product_id: number;
@@ -114,7 +115,11 @@ class RestCheckoutService {
         .eq('id', sessionId);
 
       if (error) {
-        console.error('Failed to update session with cart ID:', error);
+        console.error('[RestCheckout] Failed to update session with cart ID:', error.message, error.code);
+        return {
+          success: false,
+          error: 'Failed to initialize cart. Please try again.',
+        };
       }
 
       return {
@@ -179,7 +184,11 @@ class RestCheckoutService {
         .eq('id', sessionId);
 
       if (error) {
-        console.error('Failed to update session with addresses:', error);
+        console.error('[RestCheckout] Failed to update session with addresses:', error.message, error.code);
+        return {
+          success: false,
+          error: 'Failed to save address information. Please try again.',
+        };
       }
 
       return {
@@ -217,7 +226,12 @@ class RestCheckoutService {
       verification_value?: string;
     },
     paymentAuthId?: string,
-    options?: { is_test_order?: boolean }
+    options?: {
+      is_test_order?: boolean;
+      paymentStatus?: string;
+      paymentMethod?: string;
+      paymentLastFour?: string;
+    }
   ): Promise<CheckoutFlowResult> {
     try {
 
@@ -280,6 +294,10 @@ class RestCheckoutService {
         locationId: session.location_id || session.metadata?.location_id,
         notes: `Order placed via checkout session ${sessionId}`,
         is_test_order: options?.is_test_order,
+        paymentStatus: options?.paymentStatus || (paymentAuthId ? 'authorized' : 'pending'),
+        paymentAuthorizationId: paymentAuthId || undefined,
+        paymentMethod: options?.paymentMethod,
+        paymentLastFour: options?.paymentLastFour,
       };
 
       const result = await orderService.createOrder(orderData);
@@ -288,13 +306,10 @@ class RestCheckoutService {
         throw new Error(result.error || 'Failed to create order');
       }
 
-      if (paymentAuthId) {
-        await orderService.updatePaymentStatus(
-          result.order.id,
-          'authorized',
-          paymentAuthId
-        );
-      }
+      // Payment fields (payment_status, payment_authorization_id, payment_method,
+      // payment_last_four) are now set atomically in createOrder above.
+      // No separate updatePaymentStatus call needed — and it would fail for
+      // non-admin users due to RLS UPDATE restrictions on the orders table.
 
       await supabase
         .from('checkout_sessions')
@@ -312,19 +327,35 @@ class RestCheckoutService {
         orderId: result.order.id,
       };
     } catch (error) {
-      console.error('Error processing payment:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Payment failed';
+      console.error('[RestCheckout] processPayment error:', errorMsg, error);
 
       await supabase
         .from('checkout_sessions')
         .update({
           status: 'failed',
-          last_error: error instanceof Error ? error.message : 'Payment failed',
+          last_error: errorMsg,
         })
         .eq('id', sessionId);
 
+      // Log to activity log so admins can see checkout failures
+      activityLogService.logAction({
+        userId: session?.user_id || 'unknown',
+        action: 'checkout_order_failed',
+        resourceType: 'checkout',
+        resourceId: sessionId,
+        details: {
+          error: errorMsg,
+          step: 'process_payment',
+          organization_id: session?.organization_id,
+          total: session?.total,
+          items_count: session?.cart_items?.length,
+        },
+      });
+
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Payment failed',
+        error: errorMsg,
       };
     }
   }

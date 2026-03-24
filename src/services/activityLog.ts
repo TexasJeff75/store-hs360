@@ -36,6 +36,9 @@ export type ActivityAction =
   | 'login' | 'logout' | 'impersonation_started' | 'impersonation_stopped'
   // Orders
   | 'order_placed' | 'order_status_changed' | 'order_viewed'
+  // Checkout errors
+  | 'checkout_error' | 'checkout_session_failed' | 'checkout_payment_failed'
+  | 'checkout_order_failed' | 'checkout_vault_failed'
   // Users (admin)
   | 'user_approved' | 'user_denied' | 'user_role_changed' | 'user_created' | 'user_deleted'
   // Navigation
