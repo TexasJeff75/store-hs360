@@ -148,7 +148,22 @@ class OrderService {
         .single();
 
       if (error) {
-        console.error('Error creating order:', error);
+        console.error('[OrderService] Error creating order:', error.message, error.code, error.details);
+        activityLogService.logAction({
+          userId: data.userId,
+          action: 'checkout_order_failed',
+          resourceType: 'order',
+          details: {
+            error: error.message,
+            error_code: error.code,
+            error_details: error.details,
+            organization_id: data.organizationId,
+            location_id: data.locationId,
+            total: data.total,
+            items_count: data.items.length,
+            sales_rep_id: salesRepId,
+          },
+        });
         return { order: null, error: error.message };
       }
 

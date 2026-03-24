@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import { orderService, CreateOrderData, OrderItem, Address } from './orderService';
+import { activityLogService } from './activityLog';
 
 export interface CartLineItem {
   product_id: number;
@@ -312,19 +313,35 @@ class RestCheckoutService {
         orderId: result.order.id,
       };
     } catch (error) {
-      console.error('Error processing payment:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Payment failed';
+      console.error('[RestCheckout] processPayment error:', errorMsg, error);
 
       await supabase
         .from('checkout_sessions')
         .update({
           status: 'failed',
-          last_error: error instanceof Error ? error.message : 'Payment failed',
+          last_error: errorMsg,
         })
         .eq('id', sessionId);
 
+      // Log to activity log so admins can see checkout failures
+      activityLogService.logAction({
+        userId: session?.user_id || 'unknown',
+        action: 'checkout_order_failed',
+        resourceType: 'checkout',
+        resourceId: sessionId,
+        details: {
+          error: errorMsg,
+          step: 'process_payment',
+          organization_id: session?.organization_id,
+          total: session?.total,
+          items_count: session?.cart_items?.length,
+        },
+      });
+
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Payment failed',
+        error: errorMsg,
       };
     }
   }

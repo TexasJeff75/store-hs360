@@ -13,6 +13,7 @@ import { quickbooksPayments } from '@/services/quickbooks';
 import OrderReceipt from './OrderReceipt';
 import { siteSettingsService, type ShippingMethod } from '@/services/siteSettings';
 import TurnstileWidget from '../TurnstileWidget';
+import { activityLogService } from '@/services/activityLog';
 
 interface CartItem {
   id: number;
@@ -244,14 +245,39 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
       );
 
       if (!sessionResult.success || !sessionResult.sessionId) {
-        setError(sessionResult.error || 'Failed to create checkout session');
+        const errorMsg = sessionResult.error || 'Failed to create checkout session';
+        setError(errorMsg);
+        console.error('[Checkout] Session creation failed:', errorMsg);
+        activityLogService.logAction({
+          userId: user.id,
+          action: 'checkout_session_failed',
+          resourceType: 'checkout',
+          details: {
+            error: errorMsg,
+            organization_id: selectedOrgId,
+            step: 'session_creation',
+            items_count: items.length,
+          },
+        });
         return;
       }
 
       setSessionId(sessionResult.sessionId);
     } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       setError('Failed to initialize checkout. Please try again.');
-      console.error('Checkout initialization error:', err);
+      console.error('[Checkout] Initialization error:', errorMsg, err);
+      activityLogService.logAction({
+        userId: user.id,
+        action: 'checkout_session_failed',
+        resourceType: 'checkout',
+        details: {
+          error: errorMsg,
+          organization_id: selectedOrgId,
+          step: 'initialization',
+          items_count: items.length,
+        },
+      });
     } finally {
       setLoading(false);
     }
@@ -372,7 +398,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         if (cartResult.success && cartResult.cartId) {
           setCartId(cartResult.cartId);
         } else {
-          setError(cartResult.error || 'Failed to create cart');
+          const errorMsg = cartResult.error || 'Failed to create cart';
+          setError(errorMsg);
+          console.error('[Checkout] Cart creation failed:', errorMsg);
+          if (user?.id) {
+            activityLogService.logAction({
+              userId: user.id,
+              action: 'checkout_error',
+              resourceType: 'checkout',
+              resourceId: sessionId,
+              details: { error: errorMsg, step: 'cart_creation', organization_id: selectedOrgId },
+            });
+          }
           setLoading(false);
           return;
         }
@@ -418,7 +455,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         if (checkoutResult.success && checkoutResult.checkoutId) {
           setCheckoutId(checkoutResult.checkoutId);
         } else {
-          setError(checkoutResult.error || 'Failed to create checkout');
+          const errorMsg = checkoutResult.error || 'Failed to create checkout';
+          setError(errorMsg);
+          console.error('[Checkout] Address/checkout creation failed:', errorMsg);
+          if (user?.id) {
+            activityLogService.logAction({
+              userId: user.id,
+              action: 'checkout_error',
+              resourceType: 'checkout',
+              resourceId: sessionId,
+              details: { error: errorMsg, step: 'address_checkout', organization_id: selectedOrgId },
+            });
+          }
           setLoading(false);
           return;
         }
@@ -430,8 +478,18 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setCurrentStep(steps[currentIndex + 1]);
       }
     } catch (err) {
-      console.error('Error during checkout step:', err);
+      const errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      console.error('[Checkout] Step error:', currentStep, errorMsg, err);
       setError('An error occurred. Please try again.');
+      if (user?.id) {
+        activityLogService.logAction({
+          userId: user.id,
+          action: 'checkout_error',
+          resourceType: 'checkout',
+          resourceId: sessionId || undefined,
+          details: { error: errorMsg, step: currentStep, organization_id: selectedOrgId },
+        });
+      }
     } finally {
       setLoading(false);
     }
@@ -514,7 +572,14 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             if (!vaultResponse.ok || vaultResult.error) {
               // Vault failed — the single-use token may already be consumed by the
               // vault attempt, so we cannot safely fall back to a direct charge.
-              console.error('Failed to vault card:', vaultResult.error);
+              console.error('[Checkout] Failed to vault card:', vaultResult.error, 'intuit_tid:', vaultResult.intuit_tid);
+              activityLogService.logAction({
+                userId: user.id,
+                action: 'checkout_vault_failed',
+                resourceType: 'checkout',
+                resourceId: sessionId,
+                details: { error: vaultResult.error, step: 'vault_card', organization_id: selectedOrgId, intuit_tid: vaultResult.intuit_tid },
+              });
               setError('Unable to save your payment method. Please uncheck "Save for this organization" and try again, or use a different payment method.');
               setCurrentStep('payment');
               setLoading(false);
@@ -529,7 +594,15 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
             );
           } catch (vaultErr) {
             // Network/parse error — token may be consumed, cannot fall back safely
-            console.error('Vault error:', vaultErr);
+            const vaultErrMsg = vaultErr instanceof Error ? vaultErr.message : 'Unknown vault error';
+            console.error('[Checkout] Card vault error:', vaultErrMsg, vaultErr);
+            activityLogService.logAction({
+              userId: user.id,
+              action: 'checkout_vault_failed',
+              resourceType: 'checkout',
+              resourceId: sessionId,
+              details: { error: vaultErrMsg, step: 'vault_card_exception', organization_id: selectedOrgId },
+            });
             setError('Unable to save your payment method. Please uncheck "Save for this organization" and try again, or use a different payment method.');
             setCurrentStep('payment');
             setLoading(false);
@@ -538,7 +611,7 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
 
           // If charge was declined, clean up the orphaned saved payment method
           if (authResponse.status === 'DECLINED') {
-            console.warn('Card payment declined:', { sessionId, lastFour: paymentData.lastFour });
+            console.warn('[Checkout] Card payment declined:', { sessionId, lastFour: paymentData.lastFour });
             if (vaultedPaymentMethodId) {
               try {
                 await quickbooksPayments.deletePaymentMethod(vaultedPaymentMethodId);
@@ -749,11 +822,42 @@ const CheckoutModal: React.FC<CheckoutModalProps> = ({
         setCompletedOrderId(result.orderId);
         setCurrentStep('confirmation');
       } else {
-        setError(result.error || 'Failed to process payment');
+        const errorMsg = result.error || 'Failed to process payment';
+        console.error('[Checkout] Order creation failed:', errorMsg);
+        activityLogService.logAction({
+          userId: user.id,
+          action: 'checkout_order_failed',
+          resourceType: 'checkout',
+          resourceId: sessionId,
+          details: {
+            error: errorMsg,
+            step: 'order_creation',
+            organization_id: selectedOrgId,
+            payment_type: paymentData.type,
+            amount: total,
+          },
+        });
+        setError(errorMsg);
       }
     } catch (err: any) {
       const msg = err?.message || '';
-      if (msg.toLowerCase().includes('decline')) {
+      const isDecline = msg.toLowerCase().includes('decline');
+      console.error('[Checkout] Place order error:', msg, err);
+      activityLogService.logAction({
+        userId: user.id,
+        action: 'checkout_payment_failed',
+        resourceType: 'checkout',
+        resourceId: sessionId,
+        details: {
+          error: msg || 'Unknown error',
+          step: 'place_order',
+          organization_id: selectedOrgId,
+          payment_type: paymentData?.type,
+          amount: total,
+          is_decline: isDecline,
+        },
+      });
+      if (isDecline) {
         setError('Your payment was declined. Please try a different payment method.');
         setCurrentStep('payment');
       } else {
